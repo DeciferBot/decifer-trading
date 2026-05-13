@@ -1003,6 +1003,25 @@ CONFIG = {
     # nexus_pru_max_age_days: maximum PRU age (days) for rescue eligibility.
     #   PRU older than this is treated as stale and rescue is blocked.
     "nexus_pru_max_age_days": 2,
+
+    # ── ROTATION LIVE V1 CANARY ───────────────────────────────────────────────
+    # Kill switch — defaults OFF. Activate only after all tests pass and Amit approves.
+    # When OFF the module runs in HYPOTHETICAL mode: gates are evaluated and logged
+    # but no execute_sell is called and no positions are touched.
+    "ENABLE_ROTATION_LIVE_V1":         False,
+    # Maximum rotation events per calendar day (UTC). Hard ceiling regardless of
+    # how many strong candidates are blocked.
+    "ROTATION_LIVE_MAX_PER_DAY":       1,
+    # Maximum positions exited per rotation event.
+    "ROTATION_LIVE_MAX_EXITS":         1,
+    # Minimum score the blocked candidate must have to trigger evaluation.
+    "ROTATION_LIVE_MIN_BLOCKED_SCORE": 75,
+    # Minimum gap (blocked_score − book_avg) to trigger evaluation.
+    "ROTATION_LIVE_MIN_GAP_VS_BOOK":   15,
+    # Maximum score an exit candidate may have (weak position threshold).
+    "ROTATION_LIVE_EXIT_SCORE_MAX":    35,
+    # Maximum notional of the exit candidate expressed as a fraction of NLV.
+    "ROTATION_LIVE_MAX_NLV_PCT":       0.02,
 }
 
 

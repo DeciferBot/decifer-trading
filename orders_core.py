@@ -325,6 +325,11 @@ def execute_buy(
     # ── Guard: per-symbol lock closes TOCTOU gap between check and submission ──
     sym_lock = _get_symbol_lock(symbol)
     with sym_lock:
+        # _rlv1_info is populated when a margin_gross_cap_block fires so that
+        # rotation_live_v1.evaluate() can be called after _trades_lock is released
+        # (calling execute_sell inside _trades_lock would deadlock).
+        _rlv1_info: dict | None = None
+
         # ── Guard: check active_trades under lock (prop-003/014) ──────────
         with _trades_lock:
             if symbol in active_trades:
@@ -397,21 +402,43 @@ def execute_buy(
                     )
                 except Exception:
                     pass
-                return False
+                if exp_code == "margin_gross_cap_block":
+                    # Cannot call execute_sell here — _trades_lock is held and
+                    # execute_sell also acquires _trades_lock → deadlock.
+                    # Capture state; evaluate() is called after _trades_lock releases.
+                    _rlv1_info = {
+                        "blocked_symbol":         symbol,
+                        "blocked_score":          score,
+                        "portfolio_value":        portfolio_value,
+                        "active_trades_snapshot": dict(active_trades),
+                    }
+                else:
+                    return False
 
-            # ── FIX #2: Sector concentration check ────────────────────
-            sec_ok, sec_reason = check_sector_concentration(
-                symbol, list(active_trades.values()), portfolio_value, regime.get("regime", "NORMAL")
-            )
-            if not sec_ok:
-                log.warning(f"Sector block for {symbol}: {sec_reason}")
-                _block_reason[symbol] = "sector_concentration_block"
-                return False
+            if _rlv1_info is None:
+                # ── FIX #2: Sector concentration check ────────────────────
+                sec_ok, sec_reason = check_sector_concentration(
+                    symbol, list(active_trades.values()), portfolio_value, regime.get("regime", "NORMAL")
+                )
+                if not sec_ok:
+                    log.warning(f"Sector block for {symbol}: {sec_reason}")
+                    _block_reason[symbol] = "sector_concentration_block"
+                    return False
 
-            # ── Reserve slot — closes TOCTOU gap between check and submission ──
-            # A second execute_buy thread for the same symbol will now see this entry
-            # and exit early. Replaced with the full entry after order placement.
-            active_trades[symbol] = {"status": "RESERVED", "symbol": symbol}
+                # ── Reserve slot — closes TOCTOU gap between check and submission ──
+                # A second execute_buy thread for the same symbol will now see this entry
+                # and exit early. Replaced with the full entry after order placement.
+                active_trades[symbol] = {"status": "RESERVED", "symbol": symbol}
+
+        # ── Rotation Live V1: evaluate() outside _trades_lock (deadlock-safe) ──
+        # execute_sell acquires _trades_lock — must only be called after it is released.
+        if _rlv1_info is not None:
+            try:
+                import rotation_live_v1 as _rlv1_mod
+                _rlv1_mod.evaluate(**_rlv1_info)
+            except Exception as _rlv1_err:
+                log.debug("rotation_live_v1 evaluate error: %s", _rlv1_err)
+            return False
 
         # ── Duplicate open-order guard (prop-duplicate) ────────────────
         # Ask IBKR directly whether a BUY order for this symbol is already live.
