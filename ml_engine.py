@@ -40,6 +40,11 @@ except Exception as e:
 
 from config import CONFIG
 
+try:
+    import training_store as _training_store
+except ImportError:
+    _training_store = None  # type: ignore[assignment]
+
 # ──────────────────────────────────────────────────────────────────
 # Constants
 # ──────────────────────────────────────────────────────────────────
@@ -82,26 +87,39 @@ class TradeLabeler:
     and extracts features at entry time.
     """
 
-    def __init__(self, trade_log_file: str = TRADE_LOG_FILE):
+    def __init__(self, trade_log_file: str | None = None):
         self.trade_log_file = trade_log_file
         self.trades = []
         self.labeled_data = None
         self.load_trades()
 
     def load_trades(self):
-        """Load all trades from JSON."""
-        if not os.path.exists(self.trade_log_file):
-            log.warning(f"Trade log not found: {self.trade_log_file}")
-            self.trades = []
-            return
-
-        try:
-            with open(self.trade_log_file) as f:
-                self.trades = json.load(f)
-            log.info(f"Loaded {len(self.trades)} trades from {self.trade_log_file}")
-        except Exception as e:
-            log.error(f"Failed to load trades: {e}")
-            self.trades = []
+        """Load closed trades from training_store (default) or a legacy JSON file (tests)."""
+        if self.trade_log_file:
+            # Explicit path provided — legacy format used in tests.
+            if not os.path.exists(self.trade_log_file):
+                log.warning(f"Trade log not found: {self.trade_log_file}")
+                self.trades = []
+                return
+            try:
+                with open(self.trade_log_file) as f:
+                    self.trades = json.load(f)
+                log.info(f"Loaded {len(self.trades)} trades from {self.trade_log_file}")
+            except Exception as e:
+                log.error(f"Failed to load trades: {e}")
+                self.trades = []
+        else:
+            # Production path: read from training_records.jsonl via training_store.
+            if _training_store is None:
+                log.warning("training_store unavailable — no training data loaded")
+                self.trades = []
+                return
+            try:
+                self.trades = _training_store.load()
+                log.info(f"Loaded {len(self.trades)} records from training_store")
+            except Exception as e:
+                log.error(f"Failed to load from training_store: {e}")
+                self.trades = []
 
     def label_trade(self, trade: dict) -> str:
         """
@@ -131,17 +149,28 @@ class TradeLabeler:
     def extract_features(self, trade: dict) -> dict:
         """
         Extract features from trade at entry time.
-        Includes: score, regime, VIX, per-dimension signal scores, and time info.
+        Accepts both training_store format (ts_fill, fill_price, direction, hold_minutes)
+        and legacy trades.json format (entry_time, entry_price, action, shares).
         Only processes closed records with a real pnl outcome.
         """
         if trade.get("action") in ("OPEN", "open"):
             return None
         if trade.get("pnl") is None:
             return None
+
+        # Timestamp: training_store uses ts_fill; legacy uses entry_time.
+        raw_ts = trade.get("ts_fill") or trade.get("entry_time", "")
         try:
-            entry_time = datetime.fromisoformat(trade.get("entry_time", "").replace(" ", "T"))
+            entry_time = datetime.fromisoformat(raw_ts.replace(" ", "T"))
         except Exception:
             return None
+
+        # Direction: training_store uses direction (LONG/SHORT); legacy uses action (BUY/SELL/SHORT).
+        direction = trade.get("direction", "")
+        if direction:
+            action_feature = "BUY" if direction.upper() == "LONG" else "SHORT"
+        else:
+            action_feature = trade.get("action", "BUY")
 
         features = {
             "symbol": trade.get("symbol", ""),
@@ -149,7 +178,7 @@ class TradeLabeler:
             "regime": trade.get("regime", "UNKNOWN"),
             "vix": trade.get("vix", 0.0),
             "shares": trade.get("shares", trade.get("qty", 0)),
-            "entry_price": trade.get("entry_price", trade.get("fill_price", 0.0)),
+            "entry_price": trade.get("fill_price", trade.get("entry_price", 0.0)),
             "exit_price": trade.get("exit_price", 0.0),
             "pnl": trade.get("pnl", 0),
             "pnl_pct": trade.get("pnl_pct", None),
@@ -158,7 +187,7 @@ class TradeLabeler:
             "day_of_week": entry_time.weekday(),
             "is_weekend": entry_time.weekday() >= 5,
             "is_after_hours": entry_time.hour < 9 or entry_time.hour >= 16,
-            "action": trade.get("action", "BUY"),
+            "action": action_feature,
             "exit_reason": trade.get("exit_reason", ""),
         }
 
