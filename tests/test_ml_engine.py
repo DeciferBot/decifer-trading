@@ -34,8 +34,17 @@ configmod.CONFIG = {
     "log_file": "/tmp/ml_test.log",
     "ml_min_trades": 50,
     "ml_confidence_weight": 0.3,
+    "training_records": "/tmp/ml_test_training_records.jsonl",
 }
 sys.modules.setdefault("config", configmod)
+
+# Stub training_store so TradeLabeler() with no args works in tests.
+# _STORE_FILE must be present because conftest._redirect_training_store monkeypatches it.
+from pathlib import Path
+training_store_mod = types.ModuleType("training_store")
+training_store_mod.load = lambda symbol=None, limit=0: []
+training_store_mod._STORE_FILE = Path("/tmp/ml_test_training_records.jsonl")
+sys.modules.setdefault("training_store", training_store_mod)
 
 import ml_engine
 from ml_engine import (
@@ -78,6 +87,7 @@ def _make_trade_record(
     exit_reason="TP",
     signal_scores=None,
 ):
+    """Legacy format — used by TestTradeLabeler (file-based injection via trade_log_file)."""
     return {
         "symbol": symbol,
         "pnl": pnl,
@@ -93,6 +103,44 @@ def _make_trade_record(
         "action": action,
         "exit_reason": exit_reason,
         "signal_scores": signal_scores if signal_scores is not None else dict(_DEFAULT_SIGNAL_SCORES),
+    }
+
+
+def _make_training_record(
+    symbol="AAPL",
+    pnl=150.0,
+    fill_price=100.0,
+    exit_price=101.5,
+    pnl_pct=0.015,
+    score=7.0,
+    regime="TRENDING_UP",
+    ts_fill="2024-01-15T10:30:00",
+    ts_close="2024-01-15T14:00:00",
+    direction="LONG",
+    hold_minutes=210.0,
+    exit_reason="tp_hit",
+    signal_scores=None,
+):
+    """training_store format — used by TestDeciferML and TestWeeklyReportGenerator."""
+    return {
+        "trade_id": f"{symbol}_20240115",
+        "symbol": symbol,
+        "direction": direction,
+        "trade_type": "INTRADAY",
+        "instrument": "equity_long",
+        "fill_price": fill_price,
+        "intended_price": fill_price,
+        "exit_price": exit_price,
+        "pnl": pnl,
+        "hold_minutes": hold_minutes,
+        "exit_reason": exit_reason,
+        "regime": regime,
+        "signal_scores": signal_scores if signal_scores is not None else dict(_DEFAULT_SIGNAL_SCORES),
+        "conviction": 0.0,
+        "score": score,
+        "ts_fill": ts_fill,
+        "ts_close": ts_close,
+        "pnl_pct": pnl_pct,
     }
 
 
@@ -116,6 +164,30 @@ def _make_sufficient_trades(n=60):
         )
         trades.append(t)
     return trades
+
+
+def _make_sufficient_training_records(n=60):
+    """Generate n synthetic training_store records for ML training."""
+    records = []
+    for i in range(n):
+        pnl = 100.0 if i % 3 != 0 else -50.0
+        regime = ["TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND"][i % 3]
+        direction = "LONG" if i % 4 != 0 else "SHORT"
+        r = _make_training_record(
+            symbol=f"SYM{i % 10}",
+            pnl=pnl,
+            fill_price=100.0,
+            exit_price=101.0 if pnl > 0 else 99.5,
+            pnl_pct=pnl / 1000.0,
+            score=5.0 + (i % 5),
+            regime=regime,
+            direction=direction,
+            hold_minutes=float(60 + (i % 120)),
+            ts_fill=f"2024-01-{1 + (i % 28):02d}T10:30:00",
+            ts_close=f"2024-01-{1 + (i % 28):02d}T14:00:00",
+        )
+        records.append(r)
+    return records
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -257,25 +329,20 @@ class TestDeciferML:
     """Tests for DeciferML — prepare_data, train, predict."""
 
     def setup_method(self):
-        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)  # noqa: SIM115
-        self.tmp.close()
-        trades = _make_sufficient_trades(60)
-        with open(self.tmp.name, "w") as f:
-            json.dump(trades, f)
-        # Point the TradeLabeler to our file
-        self._orig_log = ml_engine.TRADE_LOG_FILE
-        ml_engine.TRADE_LOG_FILE = self.tmp.name
+        self._records = _make_sufficient_training_records(60)
+        # Patch load() on whatever module ml_engine._training_store actually references
+        # at test time — this survives other test files loading the real training_store first.
+        self._orig_load = ml_engine._training_store.load
+        ml_engine._training_store.load = lambda symbol=None, limit=0: list(self._records)
 
     def teardown_method(self):
-        ml_engine.TRADE_LOG_FILE = self._orig_log
-        if os.path.exists(self.tmp.name):
-            os.remove(self.tmp.name)
+        ml_engine._training_store.load = self._orig_load
 
     def _fresh_ml(self):
         ml = DeciferML.__new__(DeciferML)
         from sklearn.preprocessing import StandardScaler
 
-        ml.labeler = TradeLabeler(trade_log_file=self.tmp.name)
+        ml.labeler = TradeLabeler()
         ml.df = None
         ml.X = None
         ml.y = None
@@ -457,35 +524,26 @@ class TestWeeklyReportGenerator:
     """Tests for WeeklyReportGenerator.generate_report."""
 
     def setup_method(self):
-        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)  # noqa: SIM115
-        self.tmp.close()
-        self._orig = ml_engine.TRADE_LOG_FILE
-        ml_engine.TRADE_LOG_FILE = self.tmp.name
+        self._orig_load = ml_engine._training_store.load
+        ml_engine._training_store.load = lambda symbol=None, limit=0: []
 
     def teardown_method(self):
-        ml_engine.TRADE_LOG_FILE = self._orig
-        if os.path.exists(self.tmp.name):
-            os.remove(self.tmp.name)
-
-    def _write_trades(self, trades):
-        with open(self.tmp.name, "w") as f:
-            json.dump(trades, f)
+        ml_engine._training_store.load = self._orig_load
 
     def test_generate_report_no_trades_returns_string(self):
-        """generate_report returns a string even with empty trade log."""
-        self._write_trades([])
+        """generate_report returns a string even with no training records."""
         gen = WeeklyReportGenerator()
         report = gen.generate_report()
         assert isinstance(report, str)
 
     def test_generate_report_with_trades_returns_nonempty_string(self):
         """generate_report with closed trades returns a nonempty report."""
-        trades = [
-            _make_trade_record(pnl=200.0, regime="TRENDING_UP"),
-            _make_trade_record(pnl=-80.0, regime="RANGE_BOUND", symbol="MSFT"),
-            _make_trade_record(pnl=120.0, regime="TRENDING_UP", symbol="NVDA"),
+        records = [
+            _make_training_record(pnl=200.0, regime="TRENDING_UP"),
+            _make_training_record(pnl=-80.0, regime="RANGE_BOUND", symbol="MSFT"),
+            _make_training_record(pnl=120.0, regime="TRENDING_UP", symbol="NVDA"),
         ]
-        self._write_trades(trades)
+        ml_engine._training_store.load = lambda symbol=None, limit=0: list(records)
         gen = WeeklyReportGenerator()
         report = gen.generate_report()
         assert isinstance(report, str)
