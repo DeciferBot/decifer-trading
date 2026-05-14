@@ -158,6 +158,43 @@ class FillWatcher:
                 self._log_audit("fill_watcher_filled", attempts=attempts, fill_limit=current_limit)
                 log.info(f"FillWatcher: {self._symbol} filled after {attempts} adjustment(s)")
                 self._remove_from_registry()
+                # Write ORDER_FILLED event and entry snapshot — bracket fills have no
+                # synchronous fill confirmation in execute_buy/execute_short, so this
+                # is the canonical confirmation point for bracket orders.
+                from orders_state import _trades_lock, active_trades
+                try:
+                    from event_log import append_fill as _el_fill_fw
+                    with _trades_lock:
+                        _fw_entry = dict(active_trades.get(self._symbol, {}))
+                    _el_fill_fw(
+                        _fw_entry.get("trade_id", ""), self._symbol,
+                        fill_price=float(_fw_entry.get("entry", 0.0)),
+                        fill_qty=int(_fw_entry.get("qty", 0)),
+                        order_id=int(self._order_id or 0),
+                    )
+                except Exception as _fw_fill_err:
+                    log.warning(
+                        "FillWatcher %s: ORDER_FILLED write failed (non-fatal): %s",
+                        self._symbol, _fw_fill_err,
+                    )
+                try:
+                    from trade_data_contract import write_entry_snapshot as _wes_fw
+                    with _trades_lock:
+                        _fw_trade = dict(active_trades.get(self._symbol, {}))
+                    _wes_fw(
+                        trade_id=_fw_trade.get("trade_id", ""),
+                        active_trade_copy=_fw_trade,
+                        fill_price=float(_fw_trade.get("entry", 0.0)),
+                        fill_qty=int(_fw_trade.get("qty", 0)),
+                        entry_price_source="bracket_fill_watcher",
+                        fill_confirmed=True,
+                        order_id=int(self._order_id or 0),
+                    )
+                except Exception as _fw_snap_err:
+                    log.warning(
+                        "FillWatcher %s: entry snapshot write failed (non-fatal): %s",
+                        self._symbol, _fw_snap_err,
+                    )
                 return
 
             next_limit = round(current_limit * (1 + self._chase_sign * step_pct), 2)
@@ -199,6 +236,34 @@ class FillWatcher:
             self._log_audit("fill_watcher_filled_late", attempts=attempts, fill_limit=current_limit)
             log.info(f"FillWatcher: {self._symbol} filled (detected post-loop) after {attempts} adjustment(s)")
             self._remove_from_registry()
+            from orders_state import _trades_lock, active_trades
+            try:
+                from event_log import append_fill as _el_fill_late
+                with _trades_lock:
+                    _fw_late = dict(active_trades.get(self._symbol, {}))
+                _el_fill_late(
+                    _fw_late.get("trade_id", ""), self._symbol,
+                    fill_price=float(_fw_late.get("entry", 0.0)),
+                    fill_qty=int(_fw_late.get("qty", 0)),
+                    order_id=int(self._order_id or 0),
+                )
+            except Exception as _fl_err:
+                log.warning("FillWatcher %s: late ORDER_FILLED write failed (non-fatal): %s", self._symbol, _fl_err)
+            try:
+                from trade_data_contract import write_entry_snapshot as _wes_late
+                with _trades_lock:
+                    _fw_late_t = dict(active_trades.get(self._symbol, {}))
+                _wes_late(
+                    trade_id=_fw_late_t.get("trade_id", ""),
+                    active_trade_copy=_fw_late_t,
+                    fill_price=float(_fw_late_t.get("entry", 0.0)),
+                    fill_qty=int(_fw_late_t.get("qty", 0)),
+                    entry_price_source="bracket_fill_watcher_late",
+                    fill_confirmed=True,
+                    order_id=int(self._order_id or 0),
+                )
+            except Exception as _ws_late_err:
+                log.warning("FillWatcher %s: late entry snapshot write failed (non-fatal): %s", self._symbol, _ws_late_err)
             return
 
         self._log_audit("fill_watcher_max_attempts", attempts=attempts, final_limit=current_limit)

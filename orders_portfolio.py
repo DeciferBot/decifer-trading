@@ -258,6 +258,19 @@ def _close_position_record(
         })
     except Exception as _e:
         log.warning("_close_position_record: training_store write failed for %s: %s", key, _e)
+    # Canonical closed training record — joined from entry snapshot + realised outcome.
+    try:
+        from trade_data_contract import write_closed_record as _wcr
+        _wcr(
+            trade_id=_tid,
+            exit_price=exit_price,
+            realised_pnl=pnl,
+            exit_reason=exit_reason,
+            hold_minutes=hold_minutes,
+            outcome_source="_close_position_record",
+        )
+    except Exception as _wcr_err:
+        log.warning("_close_position_record: closed ledger write failed for %s: %s", key, _wcr_err)
     with _trades_lock:
         active_trades.pop(key, None)
     _save_positions_file()
@@ -1825,6 +1838,19 @@ def _resolve_exiting_positions(ib: IB, price_map: dict, positions_keys: set) -> 
             })
         except Exception as _e:
             log.warning("Deferred CLOSE training_store write failed for %s: %s", k, _e)
+        # Canonical closed training record — deferred EXITING close path.
+        try:
+            from trade_data_contract import write_closed_record as _wcr_dfr
+            _wcr_dfr(
+                trade_id=_trade_id,
+                exit_price=_exit_px,
+                realised_pnl=_pnl,
+                exit_reason=_exit_reason,
+                hold_minutes=0,
+                outcome_source="_resolve_exiting_positions",
+            )
+        except Exception as _wcr_dfr_err:
+            log.warning("Deferred CLOSE closed ledger write failed for %s: %s", k, _wcr_dfr_err)
         try:
             from learning import log_trade as _log_trade_ex
             _log_trade_ex(

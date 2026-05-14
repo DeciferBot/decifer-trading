@@ -345,6 +345,25 @@ def execute_buy_option(
 
         _save_positions_file()
 
+        # Entry snapshot — option entry. fill_confirmed=False because IBKR has not
+        # confirmed the fill yet; best available price is mid_price (limit price approx).
+        try:
+            from trade_data_contract import write_entry_snapshot as _wes_opt
+            _wes_opt(
+                trade_id=_trade_id_opt,
+                active_trade_copy=dict(active_trades[opt_key]),
+                fill_price=mid_price,
+                fill_qty=n_contracts,
+                entry_price_source="limit_price_approx_option",
+                fill_confirmed=False,
+                order_id=trade.order.orderId,
+            )
+        except Exception as _snap_opt_err:
+            log.warning(
+                "execute_buy_option %s: entry snapshot write failed (non-fatal): %s",
+                opt_key, _snap_opt_err,
+            )
+
         log.info(
             f"✅ BUY {contract_info['right']} {symbol} "
             f"${contract_info['strike']:.0f} exp={contract_info['expiry_str']} "

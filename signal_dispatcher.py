@@ -513,6 +513,16 @@ def dispatch_signals(
             pattern_id = ""
 
         # ── Trade advisor (PT / SL / size / instrument) ───────
+        # Enrich agent_outputs with source-tracking fields for evidence chain.
+        # This is additive — execution behaviour is unchanged.
+        _enriched_ao = dict(agent_outputs or {})
+        _enriched_ao["candidate_source"] = (
+            "position_research_universe" if getattr(signal, "scanner_tier", "") == "D"
+            else ("handoff_reader" if getattr(signal, "handoff_source_labels", None)
+                  else "legacy_scanner")
+        )
+        _enriched_ao["handoff_source_labels"] = getattr(signal, "handoff_source_labels", None) or []
+
         if signal.direction == "LONG" and "LONG" in allowed_dirs:
             try:
                 advice = _formula_advice(signal.symbol, "LONG", signal.price, signal.atr)
@@ -533,7 +543,7 @@ def dispatch_signals(
                         regime=regime,
                         reasoning=signal.rationale,
                         signal_scores=signal.dimension_scores,
-                        agent_outputs=agent_outputs,
+                        agent_outputs=_enriched_ao,
                         open_time=datetime.now(UTC).isoformat(),
                         candle_gate=signal.candle_gate,
                         instrument=signal.instrument,
@@ -577,7 +587,7 @@ def dispatch_signals(
                         regime=regime,
                         reasoning=signal.rationale,
                         signal_scores=signal.dimension_scores,
-                        agent_outputs=agent_outputs,
+                        agent_outputs=_enriched_ao,
                         open_time=datetime.now(UTC).isoformat(),
                         candle_gate=signal.candle_gate,
                         instrument=signal.instrument,

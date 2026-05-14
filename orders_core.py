@@ -824,6 +824,22 @@ def execute_buy(
                                  order_id=int(_result.get("order_id") or 0))
                     except Exception as _elf_err:
                         log.warning("execute_buy %s: ORDER_FILLED write failed (non-fatal): %s", symbol, _elf_err)
+                    # Entry snapshot — TWAP path (fill_price and qty confirmed synchronously).
+                    try:
+                        from trade_data_contract import write_entry_snapshot as _wes_twap
+                        with _trades_lock:
+                            _twap_snap = dict(active_trades.get(symbol, {}))
+                        _wes_twap(
+                            trade_id=_trade_id,
+                            active_trade_copy=_twap_snap,
+                            fill_price=_fill_price,
+                            fill_qty=int(stats.filled_quantity),
+                            entry_price_source="twap_fill",
+                            fill_confirmed=True,
+                            order_id=int(_result.get("order_id") or 0),
+                        )
+                    except Exception as _snap_twap_err:
+                        log.warning("execute_buy %s: entry snapshot write failed (non-fatal): %s", symbol, _snap_twap_err)
                     _save_positions_file()
                     try:
                         from learning import log_trade as _log_trade
@@ -2548,6 +2564,19 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 })
             except Exception as _tsa_err:
                 log.warning("execute_sell %s: training_store write failed (non-fatal): %s", symbol, _tsa_err)
+            # Canonical closed training record — joined from entry snapshot + realised outcome.
+            try:
+                from trade_data_contract import write_closed_record as _wcr_sell
+                _wcr_sell(
+                    trade_id=_close_trade_id,
+                    exit_price=_exit_price_val,
+                    realised_pnl=pnl,
+                    exit_reason=reason,
+                    hold_minutes=_hold_mins,
+                    outcome_source="execute_sell",
+                )
+            except Exception as _wcr_sell_err:
+                log.warning("execute_sell %s: closed ledger write failed (non-fatal): %s", symbol, _wcr_sell_err)
             with _trades_lock:
                 with _recently_closed_lock:  # RB-4: nest inside _trades_lock (consistent acquisition order — never reversed)
                     recently_closed[symbol] = now_ts

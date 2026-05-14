@@ -727,11 +727,18 @@ CONFIG = {
     # ── ML ENGINE (scikit-learn learning loop) ─────────────────────
     # Learns from trade history to identify winning patterns and enhance signals.
     # Requires: scikit-learn, joblib (pip install scikit-learn joblib)
-    "ml_enabled": True,  # Master switch: enable ML enhancements
+    "ml_enabled": False,  # enhance_score() is never called in production; True was a stale default
     "ml_min_trades": 50,  # Minimum trades before ML kicks in
     "ml_retrain_interval": 168,  # Hours between automatic retraining (1 week)
     "ml_confidence_weight": 0.3,  # Weight of ML adjustment: 0.3 = 30% of change
     "ml_models_dir": "data/models",  # Where to persist trained models
+    # ── ML SAFETY GATES (Trade Evidence Collection Repair sprint) ──────────
+    # These gates make safe-disabled posture explicit and testable.
+    # None become True until IC Phase 2 gate is cleared and Amit approves.
+    "ml_live_multiplier_enabled": False,  # ML score multiplier applied to signal scores
+    "ml_can_block_entries": False,        # ML allowed to veto an entry
+    "ml_can_size_positions": False,       # ML allowed to adjust position size
+    "ml_data_dir": "data/ml",            # Root dir for canonical evidence ledgers
     # ── TELEGRAM KILL SWITCH ──────────────────────────────────────
     # Emergency stop accessible via Telegram (supplement to dashboard).
     # Required before live trading (Phase 4) — see phase_gate frozen_features.

@@ -109,14 +109,41 @@ class TradeLabeler:
                 log.error(f"Failed to load trades: {e}")
                 self.trades = []
         else:
-            # Production path: read from training_records.jsonl via training_store.
+            # Production path: prefer canonical closed ledger, fall back to training_store.
+            import json as _json_ml
+            from pathlib import Path as _Path_ml
+            _new_ledger = _Path_ml(CONFIG.get("ml_data_dir", "data/ml")) / "closed_trade_training_ledger.jsonl"
+            if _new_ledger.exists() and _new_ledger.stat().st_size > 0:
+                try:
+                    _recs: list = []
+                    with open(_new_ledger, encoding="utf-8") as _f:
+                        for _line in _f:
+                            _stripped = _line.strip()
+                            if _stripped:
+                                try:
+                                    _recs.append(_json_ml.loads(_stripped))
+                                except _json_ml.JSONDecodeError:
+                                    pass
+                    self.trades = _recs
+                    log.info(
+                        "ML: loaded %d records from canonical ledger %s",
+                        len(_recs), _new_ledger,
+                    )
+                    return
+                except Exception as _le:
+                    log.warning("ML: canonical ledger read failed (%s) — falling back to training_store", _le)
+            # Legacy fallback.
             if _training_store is None:
                 log.warning("training_store unavailable — no training data loaded")
                 self.trades = []
                 return
             try:
                 self.trades = _training_store.load()
-                log.info(f"Loaded {len(self.trades)} records from training_store")
+                log.warning(
+                    "ML: using legacy training_store fallback (%d records) — "
+                    "data quality may be lower than canonical ledger",
+                    len(self.trades),
+                )
             except Exception as e:
                 log.error(f"Failed to load from training_store: {e}")
                 self.trades = []

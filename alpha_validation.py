@@ -30,6 +30,7 @@ _BASE = os.path.dirname(os.path.abspath(__file__))
 _HIST_FILE = os.path.join(_BASE, "data", "signals_log_historical.jsonl")
 _LIVE_IC_FILE = os.path.join(_BASE, "data", "ic_weights.json")
 _TRAINING_FILE = os.path.join(_BASE, "data", "training_records.jsonl")
+_NEW_LEDGER_FILE = os.path.join(_BASE, "data", "ml", "closed_trade_training_ledger.jsonl")
 _OUT_FILE = os.path.join(_BASE, "data", "alpha_validation_report.json")
 _CHIEF_OUT = os.path.join(_BASE, "chief-decifer", "state", "research", "research-alpha-validation.json")
 
@@ -76,7 +77,21 @@ def _load_historical(path: str = _HIST_FILE, max_records: int = _MAX_HIST_RECORD
     return pd.DataFrame(rows)
 
 
-def _load_training(path: str = _TRAINING_FILE) -> pd.DataFrame:
+def _load_training(path: str | None = None) -> pd.DataFrame:
+    # Prefer canonical closed ledger; fall back to legacy training_records.
+    if path is None:
+        if os.path.exists(_NEW_LEDGER_FILE) and os.path.getsize(_NEW_LEDGER_FILE) > 0:
+            path = _NEW_LEDGER_FILE
+            import logging as _log_av
+            _log_av.getLogger("decifer.alpha_validation").info(
+                "alpha_validation: using canonical ledger %s", path
+            )
+        else:
+            path = _TRAINING_FILE
+            import logging as _log_av
+            _log_av.getLogger("decifer.alpha_validation").warning(
+                "alpha_validation: canonical ledger not found — using legacy %s", path
+            )
     rows = []
     with open(path) as f:
         for line in f:

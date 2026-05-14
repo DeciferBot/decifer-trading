@@ -1,0 +1,50 @@
+{
+  "healthcheck_ts": "2026-05-14T19:09:23.637766+00:00",
+  "check_date": "2026-05-14",
+  "verdict": "DEGRADED",
+  "exit_code": 1,
+  "broken_reasons": [],
+  "degraded_reasons": [
+    "2 entry snapshots have empty signal_scores",
+    "14 records in quarantine_missing_entry_snapshot"
+  ],
+  "metrics": {
+    "order_filled_today": 0,
+    "position_closed_today": 0,
+    "entry_snapshots_today": 2,
+    "closed_records_today": 0,
+    "total_entry_snapshots": 2,
+    "total_closed_records": 0,
+    "total_rebuilt_records": 416,
+    "filled_missing_snapshot_today": 0,
+    "closed_missing_record_today": 0,
+    "duplicate_snapshot_ids": 0,
+    "duplicate_closed_ids": 0,
+    "fresh_dup_snapshots": 0,
+    "fresh_dup_closed": 0,
+    "empty_signal_scores_total": 2,
+    "unknown_regime_total": 0,
+    "unknown_regime_today": 0,
+    "quarantine_entry": 14,
+    "quarantine_closed": 0,
+    "quarantine_missing_entry": 14,
+    "quarantine_missing_outcome": 0,
+    "quarantine_schema_invalid": 0,
+    "quarantine_duplicate": 2,
+    "quarantine_duplicate_today": 2,
+    "stale_files": [],
+    "latest_entry_snapshot_ts": "2026-05-14T19:05:58.482803+00:00",
+    "latest_closed_record_ts": ""
+  },
+  "file_status": {
+    "entry_snapshots": "data/ml/entry_trade_snapshots.jsonl",
+    "entry_snapshots_exists": true,
+    "entry_snapshots_lines": 2,
+    "closed_ledger": "data/ml/closed_trade_training_ledger.jsonl",
+    "closed_ledger_exists": false,
+    "closed_ledger_lines": 0,
+    "rebuilt_ledger": "data/ml/closed_trade_training_ledger.rebuilt.jsonl",
+    "rebuilt_ledger_exists": true,
+    "rebuilt_ledger_lines": 416
+  }
+}
