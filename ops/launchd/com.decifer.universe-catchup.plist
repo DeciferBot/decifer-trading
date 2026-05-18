@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.decifer.universe-catchup.plist
+
+  Staleness-aware catchup supervisor for universe workers.
+
+  macOS launchd silently skips StartCalendarInterval events when the machine is
+  asleep. This supervisor fires on every login AND every 2 hours to detect and
+  recover any worker that missed its scheduled window.
+
+  Worker: scripts/universe_catchup.py
+  Checks: committed_universe (stale >8d), promoter (stale >28h weekdays),
+          intelligence-pipeline (stale >28h weekdays)
+
+  INSTALLATION (one-time):
+    cp ops/launchd/com.decifer.universe-catchup.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.decifer.universe-catchup.plist
+
+  MANUAL TEST:
+    python3.11 scripts/universe_catchup.py --dry-run
+    python3.11 scripts/universe_catchup.py
+
+  VERIFY:
+    launchctl list | grep decifer.universe-catchup
+    cat /tmp/decifer-universe-catchup.log
+
+  UNINSTALL:
+    launchctl unload ~/Library/LaunchAgents/com.decifer.universe-catchup.plist
+    rm ~/Library/LaunchAgents/com.decifer.universe-catchup.plist
+-->
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>com.decifer.universe-catchup</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3.11</string>
+    <string>scripts/universe_catchup.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/amitchopra/Desktop/decifer trading</string>
+
+  <!-- Run immediately on launchctl load / machine login -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Then re-check every 2 hours -->
+  <key>StartInterval</key>
+  <integer>7200</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/decifer-universe-catchup.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/decifer-universe-catchup.err</string>
+
+  <!-- One-shot: exit after each run. No KeepAlive. -->
+  <key>KeepAlive</key>
+  <false/>
+
+</dict>
+</plist>
