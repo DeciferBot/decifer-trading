@@ -1385,6 +1385,8 @@ def run_scan():
             return
 
     pv, pnl = get_account_data()
+    from bot_ibkr import _refresh_account_values_from_ibkr
+    _refresh_account_values_from_ibkr()
     dash["portfolio_value"] = pv
     dash["daily_pnl"] = pnl
 

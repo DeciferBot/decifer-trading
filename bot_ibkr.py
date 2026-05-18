@@ -513,6 +513,46 @@ def _on_account_value(account_value) -> None:
         log.warning(f"_on_account_value error: {exc}")
 
 
+def _refresh_account_values_from_ibkr() -> bool:
+    """
+    One-shot synchronous pull of account values. Updates bot_state.account_values
+    and resets account_values_updated_at so check_combined_exposure() sees fresh data.
+
+    Called at the start of each scan cycle because the scan's 5-8 minute duration
+    blocks the ib_async event loop, preventing accountValueEvent callbacks from
+    firing. By the time risk.py runs (~300-500s in), the streaming timestamp is
+    stale. This pull bypasses the event loop entirely.
+    """
+    if not bot_state._account_ready:
+        log.warning("[account_health] pull_refresh skipped — accountReady=false")
+        return False
+    try:
+        account = CONFIG.get("active_account", "")
+        vals = bot_state.ib.accountValues(account)
+        count = 0
+        for v in vals:
+            if v.tag not in _ACCOUNT_KEYS_OF_INTEREST:
+                continue
+            try:
+                bot_state.account_values[v.tag] = float(v.value)
+            except (ValueError, TypeError):
+                bot_state.account_values[v.tag] = v.value
+            count += 1
+        if count:
+            bot_state.account_values_updated_at = time.time()
+            log.info(
+                "[account_health] pull_refresh=success tags_updated=%d account=%s",
+                count,
+                account,
+            )
+            return True
+        log.warning("[account_health] pull_refresh=empty — no matching tags returned")
+        return False
+    except Exception as exc:
+        log.warning("[account_health] pull_refresh=failed error=%s", exc)
+        return False
+
+
 def _on_position(position) -> None:
     """
     Callback for ib.positionEvent (fired by reqPositions).
@@ -625,6 +665,7 @@ def connect_ibkr() -> bool:
             f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG.get('active_account', '')} | Market data: DELAYED (free)",
         )
         reconcile_with_ibkr(ib)
+        _refresh_account_values_from_ibkr()
         # Orphan cleanup now handled by Pass 2 in audit_bracket_orders (runs each scan cycle).
         dash["status"] = "running"
         return True

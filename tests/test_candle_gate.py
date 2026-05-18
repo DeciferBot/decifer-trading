@@ -139,6 +139,8 @@ class TestCandleGateBlocking:
         """Gate only changes signal — score is NOT zeroed."""
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", True)
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
+        import ic_calculator as _ic
+        monkeypatch.setattr(_ic, "get_current_weights", lambda: _ic.EQUAL_WEIGHTS)
         result = compute_confluence(_make_sig(signal="BUY", candle_bull=0), None, None)
         assert result["candle_gate"] == "BLOCKED"
         assert result["score"] > 0  # Score unchanged — just signal downgraded

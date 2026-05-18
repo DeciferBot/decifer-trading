@@ -202,7 +202,7 @@ def _score_with_claude(headlines: list[str], ticker: str) -> float | None:
             messages=[{"role": "user", "content": prompt}],
         )
         text = response.content[0].text.strip()
-        score = float(text)
+        score = float(text.split()[0])
         return max(-1.0, min(1.0, score))
     except Exception as exc:
         logger.warning("[sentiment_scorer] Claude scoring failed for %s: %s", ticker, exc)
