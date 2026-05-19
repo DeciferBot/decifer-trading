@@ -1206,10 +1206,16 @@ canvas{display:block;width:100% !important}
     </div>
   </div>
 
+  <!-- Data Connection Pills -->
+  <div id="hlth-connections" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>
+
   <!-- Trading Verdict Banner -->
   <div id="hlth-verdict" style="margin-bottom:18px;padding:12px 16px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2)">
     <div style="font-size:11px;color:var(--muted2)">Loading…</div>
   </div>
+
+  <!-- Issues Summary -->
+  <div id="hlth-issues" style="margin-bottom:14px"></div>
 
   <!-- 7-Stage Pipeline Funnel -->
   <div id="hlth-stages" style="display:flex;flex-direction:column;gap:0"></div>
@@ -2297,16 +2303,25 @@ function _stageDetail(s) {
 
   if (name === 'Bot Core') {
     const ibkrColor = s.ibkr_connected ? 'var(--green)' : 'var(--red)';
-    const alpacaColor = s.alpaca_running ? 'var(--green)' : 'var(--orange)';
+    // Alpaca has two layers: thread alive (_running) and data flowing (last bar age).
+    // A silent WebSocket drop leaves _running=true but stops updating the timestamp.
+    const alpacaDataOk = s.alpaca_running && !s.alpaca_data_stale;
+    const alpacaColor = alpacaDataOk ? 'var(--green)' : s.alpaca_running ? 'var(--orange)' : 'var(--orange)';
+    const alpacaLabel = !s.alpaca_running ? 'not running'
+      : s.alpaca_data_stale ? `stream up, no data (${s.alpaca_last_bar_age_s}s)`
+      : s.alpaca_last_bar_age_s !== null && s.alpaca_last_bar_age_s !== undefined
+        ? `streaming · last bar ${s.alpaca_last_bar_age_s}s ago`
+        : 'streaming · no bars yet';
     rows += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:10px">
       <span><span style="color:${ibkrColor}">●</span> IBKR ${s.ibkr_connected ? 'connected' : 'DISCONNECTED'}</span>
-      <span><span style="color:${alpacaColor}">●</span> Alpaca ${s.alpaca_running ? 'streaming' : 'not running'}</span>
+      <span><span style="color:${alpacaColor}">●</span> Alpaca ${alpacaLabel}</span>
       ${s.paused ? '<span style="color:var(--orange)">▲ PAUSED</span>' : ''}
       ${s.killed ? '<span style="color:var(--red)">✗ KILLED</span>' : ''}
     </div>`;
     if (s.account_value_age_s !== null && s.account_value_age_s !== undefined) {
       const acWarn = s.account_stale;
-      rows += `<div style="margin-top:4px;font-size:10px;color:${acWarn ? 'var(--orange)' : 'var(--muted2)'}">Account value: ${s.account_value_age_s}s ago${acWarn ? ' ▲ stale' : ''}</div>`;
+      // account_value_age_s is a hard heartbeat from IBKR reqAccountUpdates — reliable.
+      rows += `<div style="margin-top:4px;font-size:10px;color:${acWarn ? 'var(--orange)' : 'var(--muted2)'}">IBKR heartbeat: ${s.account_value_age_s}s ago${acWarn ? ' ▲ stale' : ' ✓'}</div>`;
     }
   }
 
@@ -2371,6 +2386,28 @@ function _stageDetail(s) {
       <span style="color:${gates.sharpe_gate_passed ? 'var(--green)' : 'var(--red)'}">${gates.sharpe_gate_passed ? '✓' : '✗'} Sharpe gate</span>
       ${phase.current_phase !== undefined ? `<span style="color:var(--muted2)">Phase ${phase.current_phase} · ${phase.closed_trades ?? '?'} trades</span>` : ''}
     </div>`;
+    // Per-dimension IC breakdown — the mean is uninterpretable without knowing which
+    // dimensions are positive vs. negative. One bad dimension can sink the aggregate.
+    const rawIc = ic.raw_ic || {};
+    const dimKeys = Object.keys(rawIc);
+    if (dimKeys.length) {
+      rows += `<div style="margin-top:8px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:5px">IC BY DIMENSION</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          ${dimKeys.map(dim => {
+            const v = rawIc[dim];
+            const isPos = v !== null && v !== undefined && v > 0;
+            const isNeg = v !== null && v !== undefined && v < 0;
+            const col = isPos ? 'var(--green)' : isNeg ? 'var(--red)' : 'var(--muted2)';
+            const val = v !== null && v !== undefined ? v.toFixed(3) : '—';
+            return `<div style="padding:2px 7px;border-radius:3px;border:1px solid ${col}44;background:${col}11;font-size:9px;font-family:'JetBrains Mono',monospace">
+              <span style="color:var(--muted2)">${dim.substring(0,4)}</span>
+              <span style="color:${col};margin-left:3px">${val}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
   }
 
   if (name === 'Intelligence') {
@@ -2428,8 +2465,18 @@ function _stageDetail(s) {
     }
   }
 
-  if (name === 'Universe' && s.heartbeats && s.heartbeats.length) {
-    rows += `<div style="margin-top:4px">` + s.heartbeats.map(_artifactRow).join('') + `</div>`;
+  if (name === 'Universe') {
+    if (s.universe_symbol_count !== null && s.universe_symbol_count !== undefined) {
+      const countOk = s.universe_symbol_count >= 100;
+      // Hard content proof: symbol count proves the job produced real data, not just ran.
+      rows += `<div style="margin-top:4px;font-size:10px;color:${countOk ? 'var(--green)' : 'var(--orange)'}">
+        ${countOk ? '✓' : '▲'} Committed universe: <b>${s.universe_symbol_count}</b> symbols
+        ${s.universe_refreshed_at ? `<span style="color:var(--muted2)">· refreshed ${new Date(s.universe_refreshed_at).toLocaleDateString()}</span>` : ''}
+      </div>`;
+    }
+    if (s.heartbeats && s.heartbeats.length) {
+      rows += `<div style="margin-top:4px">` + s.heartbeats.map(_artifactRow).join('') + `</div>`;
+    }
   }
 
   return rows;
@@ -2546,6 +2593,75 @@ function loadIntelligence() {
   });
 }
 
+function _connPill(c) {
+  const sc = c.status === 'ok' ? 'var(--green)' : c.status === 'warn' ? 'var(--orange)' : c.status === 'error' ? 'var(--red)' : 'var(--muted2)';
+  const dot = c.status === 'ok' ? '●' : c.status === 'warn' ? '▲' : c.status === 'error' ? '✗' : '?';
+  return `<div title="${esc(c.detail)}" style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid ${sc}33;background:${sc}11;color:var(--text);cursor:default;white-space:nowrap">
+    <span style="color:${sc};font-size:9px">${dot}</span>
+    <span>${esc(c.name)}</span>
+    <span style="color:${sc};font-size:9px;font-weight:400">${esc(c.detail)}</span>
+  </div>`;
+}
+
+function _buildIssues(stages) {
+  const issues = [];
+  for (const s of stages) {
+    if (s.status === 'ok') continue;
+    if (s.name === 'Bot Core' && !s.alpaca_running) {
+      issues.push({
+        severity: 'warn',
+        title: 'Alpaca stream thread is not running',
+        body: 'The AlpacaBarStream thread has stopped. The bot cannot receive live 1-minute price bars. Signal calculations fall back to last-cached values, reducing scan quality. Typically caused by a failed stream restart after a universe update, or exhausted reconnect attempts (max 10). Restarting the bot will reconnect.',
+      });
+    }
+    if (s.name === 'Bot Core' && s.alpaca_running && s.alpaca_data_stale) {
+      issues.push({
+        severity: 'warn',
+        title: `Alpaca stream is up but no bars received in ${s.alpaca_last_bar_age_s}s`,
+        body: 'The stream thread is alive (_running=true) but no price bar has been received recently. This is a silent WebSocket drop — the connection looks healthy but data has stopped flowing. During market hours this is abnormal. The stream will auto-reconnect on the next exception, but until then signal data is stale. Restarting the bot forces an immediate reconnect.',
+      });
+    }
+    if (s.name === 'Bot Core' && s.account_stale) {
+      issues.push({
+        severity: 'warn',
+        title: 'Account value is stale',
+        body: `IBKR last reported account value ${s.account_value_age_s}s ago (threshold: 300s). The pnl refresh loop may have stalled. This does not affect order execution but means the dashboard equity figures may be outdated.`,
+      });
+    }
+    if (s.name === 'Execution' && (s.stuck_intent_count || 0) > 0) {
+      const n = s.stuck_intent_count;
+      const isLarge = n > 50;
+      issues.push({
+        severity: isLarge ? 'warn' : 'info',
+        title: `${n} stuck order${n === 1 ? '' : 's'} in event log`,
+        body: isLarge
+          ? `${n} ORDER_INTENT records have no matching fill confirmation and are older than 5 minutes. With this many, the most likely cause is historical artifacts — order intents written before the JSONL migration (2026-04-28) or from order cycles that expired and were never reconciled. These are not live at-risk orders. They will clear if you run a reconcile pass or prune the event log of pre-migration artifacts.`
+          : `${n} order${n === 1 ? '' : 's'} submitted to IBKR but not yet confirmed as filled. Normal if the bot recently submitted orders. Monitor whether this count keeps growing across scan cycles.`,
+      });
+    }
+    if (s.name === 'Execution' && (s.disk_free_pct !== null) && s.disk_free_pct < 15) {
+      issues.push({
+        severity: s.disk_free_pct < 10 ? 'error' : 'warn',
+        title: `Low disk space (${s.disk_free_pct}% free)`,
+        body: `Only ${s.disk_free_gb}GB of disk space remains. JSONL logs, apex snapshots, and audit files grow continuously. If disk fills completely the bot will crash when attempting to write trade events. Prune old audit logs, apex snapshots, or move logs off-machine.`,
+      });
+    }
+    if (s.name === 'Validation' && s.gates) {
+      const g = s.gates;
+      if (!g.ic_gate_passed) {
+        const ic = (s.ic || {});
+        const score = ic.mean_positive_ic !== undefined ? ic.mean_positive_ic.toFixed(3) : '?';
+        issues.push({
+          severity: 'warn',
+          title: `IC gate failing (score: ${score})`,
+          body: `The Information Coefficient has dropped to ${score}, below the gate threshold. This means recent signal predictions are correlating less well with actual price movements than during the validation window. The bot continues trading with current weights — no action is required immediately. Worth investigating whether market regime has shifted or a signal dimension is degrading.`,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
 function loadHealth() {
   fetch('/api/health').then(r => r.json()).then(d => {
     // Timestamp
@@ -2553,6 +2669,15 @@ function loadHealth() {
     if (tsEl && d.ts) {
       try { tsEl.textContent = 'Updated ' + new Date(d.ts).toLocaleTimeString(); }
       catch(e) { tsEl.textContent = d.ts; }
+    }
+
+    // ── Connection pills ──────────────────────────────────
+    const connEl = document.getElementById('hlth-connections');
+    if (connEl) {
+      const conns = d.connections || [];
+      connEl.innerHTML = conns.length
+        ? conns.map(_connPill).join('')
+        : '<span style="font-size:10px;color:var(--muted2)">Connection data unavailable</span>';
     }
 
     // ── Verdict banner ────────────────────────────────────
@@ -2574,8 +2699,35 @@ function loadHealth() {
         </div>`;
     }
 
-    // ── Pipeline stages ───────────────────────────────────
+    // ── Issues summary ────────────────────────────────────
+    const issuesEl = document.getElementById('hlth-issues');
     const stages = d.stages || [];
+    if (issuesEl) {
+      const issues = _buildIssues(stages);
+      if (issues.length) {
+        const severityColor = sev => sev === 'error' ? 'var(--red)' : sev === 'warn' ? 'var(--orange)' : 'var(--muted2)';
+        const severityIcon = sev => sev === 'error' ? '✗' : sev === 'warn' ? '▲' : 'ℹ';
+        issuesEl.innerHTML = `
+          <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase;margin-bottom:8px">Active Issues</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${issues.map(iss => {
+              const sc = severityColor(iss.severity);
+              const si = severityIcon(iss.severity);
+              return `<div style="padding:10px 14px;border-radius:4px;border:1px solid ${sc}44;background:${sc}09">
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+                  <span style="color:${sc};font-size:11px">${si}</span>
+                  <span style="font-size:11px;font-weight:700;color:${sc}">${esc(iss.title)}</span>
+                </div>
+                <div style="font-size:10px;color:var(--muted2);line-height:1.6;padding-left:18px">${esc(iss.body)}</div>
+              </div>`;
+            }).join('')}
+          </div>`;
+      } else {
+        issuesEl.innerHTML = '';
+      }
+    }
+
+    // ── Pipeline stages ───────────────────────────────────
     const stagesEl = document.getElementById('hlth-stages');
     if (!stagesEl) return;
 
