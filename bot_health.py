@@ -224,16 +224,37 @@ def _read_funnel() -> dict:
         return {"available": False, "error": str(e)}
 
 
+def _parse_last_scan_age(last_scan: str) -> float | None:
+    """Parse last_scan to age in seconds. Handles both ISO and bare HH:MM:SS formats."""
+    if not last_scan:
+        return None
+    s = str(last_scan)
+    # Try full ISO format first
+    try:
+        _ts = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return round((datetime.now(UTC) - _ts).total_seconds(), 1)
+    except Exception:
+        pass
+    # bot_trading.py stores last_scan as bare "HH:MM:SS" in ET timezone
+    try:
+        import zoneinfo as _zi
+        _ET = _zi.ZoneInfo("America/New_York")
+        _now_et = datetime.now(_ET)
+        _h, _m, _sec = (int(x) for x in s.split(":"))
+        _ts = datetime(_now_et.year, _now_et.month, _now_et.day, _h, _m, _sec, tzinfo=_ET)
+        age = round((_now_et - _ts).total_seconds(), 1)
+        # Handle midnight wrap (scan was just before midnight, now just after)
+        if age < 0:
+            age += 86400
+        return age
+    except Exception:
+        return None
+
+
 def _stage_scan_engine(dash: dict) -> dict:
     """Stage 5 — Scan Engine: signal scoring + Apex synthesizer. CRITICAL."""
     last_scan = dash.get("last_scan")
-    last_scan_age_s: float | None = None
-    if last_scan:
-        try:
-            _ts = datetime.fromisoformat(str(last_scan).replace("Z", "+00:00"))
-            last_scan_age_s = round((datetime.now(UTC) - _ts).total_seconds(), 1)
-        except Exception:
-            pass
+    last_scan_age_s = _parse_last_scan_age(last_scan)
 
     durations = dash.get("scan_durations") or []
     last_duration_s: float | None = None
