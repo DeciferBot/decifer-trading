@@ -277,6 +277,9 @@ class AlpacaBarStream:
         self._stream = None
         self._thread: threading.Thread | None = None
         self._running = False
+        # epoch seconds of the last successfully received 1m bar — None until first bar arrives.
+        # Used by bot_health to prove data is flowing, not just that the thread is alive.
+        self._last_bar_received_at: float | None = None
 
     def start(self, symbols: list[str]) -> None:
         """Start streaming for symbols. Non-blocking.
@@ -366,6 +369,7 @@ class AlpacaBarStream:
                     "vwap": getattr(bar, "vwap", None),
                 },
             )
+            self._last_bar_received_at = time.time()
             log.debug(f"AlpacaBarStream: {bar.symbol} 1m close={bar.close:.2f}")
 
         async def on_daily_bar(bar) -> None:

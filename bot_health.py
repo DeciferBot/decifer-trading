@@ -142,14 +142,33 @@ def _stage_universe() -> dict:
         _file_age("heartbeats/universe_committed_worker.json", 7 * 86_400, "Committed worker heartbeat"),
         _file_age("heartbeats/universe_promoter_worker.json",  18 * 3600,  "Promoter worker heartbeat"),
     ]
+
+    # Content validation — file age proves the job ran; symbol count proves it produced real data.
+    universe_symbol_count: int | None = None
+    universe_refreshed_at: str | None = None
+    try:
+        with open(os.path.join(_DATA_DIR, "committed_universe.json")) as f:
+            _u = json.load(f)
+        universe_symbol_count = _u.get("count") or len(_u.get("symbols", []))
+        universe_refreshed_at = _u.get("refreshed_at")
+    except Exception:
+        pass
+
+    # Downgrade status if the file is fresh but the universe is suspiciously small.
+    agg = _agg_status(artifacts)
+    if universe_symbol_count is not None and universe_symbol_count < 100 and agg == "ok":
+        agg = "warn"
+
     return {
         "name": "Universe",
         "label": "Stage 2 — Universe Builders",
         "description": "launchd: universe-committed (weekly)  +  universe-promoter (daily 2×)",
-        "status": _agg_status(artifacts),
+        "status": agg,
         "critical": False,
         "artifacts": artifacts,
         "heartbeats": heartbeats,
+        "universe_symbol_count": universe_symbol_count,
+        "universe_refreshed_at": universe_refreshed_at,
     }
 
 
@@ -163,14 +182,21 @@ def _stage_handoff() -> dict:
     handoff_enabled = bool(CONFIG.get("enable_active_opportunity_universe_handoff", False))
 
     universe_summary: dict = {}
+    handoff_candidate_count: int | None = None
     try:
         with open(os.path.join(_DATA_DIR, "live/active_opportunity_universe.json")) as f:
             uu = json.load(f)
         universe_summary = uu.get("universe_summary", {})
+        # Content proof: a fresh file with zero candidates is a silent failure.
+        handoff_candidate_count = universe_summary.get("total_candidates")
     except Exception:
         pass
 
     raw_status = _agg_status(artifacts)
+    # Downgrade if file is fresh but contains no candidates (silent pipeline failure).
+    if (handoff_candidate_count is not None and handoff_candidate_count == 0
+            and raw_status == "ok" and handoff_enabled):
+        raw_status = "warn"
     return {
         "name": "Handoff",
         "label": "Stage 3 — Handoff Publisher",
@@ -180,6 +206,7 @@ def _stage_handoff() -> dict:
         "critical": False,
         "artifacts": artifacts,
         "universe_summary": universe_summary,
+        "handoff_candidate_count": handoff_candidate_count,
     }
 
 
@@ -193,9 +220,15 @@ def _stage_bot_core(dash: dict) -> dict:
     killed = dash.get("killed", False)
 
     alpaca_running = False
+    alpaca_last_bar_age_s: float | None = None
+    # _running=True proves the thread is alive; last_bar_age_s proves data is actually flowing.
+    # A silent WebSocket drop leaves _running=True but stops updating the timestamp.
     try:
         if _bs._bar_stream is not None:
             alpaca_running = bool(getattr(_bs._bar_stream, "_running", False))
+            _lbr = getattr(_bs._bar_stream, "_last_bar_received_at", None)
+            if _lbr is not None:
+                alpaca_last_bar_age_s = round(time.time() - _lbr, 1)
     except Exception:
         pass
 
@@ -204,11 +237,19 @@ def _stage_bot_core(dash: dict) -> dict:
         account_value_age_s = round(time.time() - _bs.account_values_updated_at, 1)
     account_stale = account_value_age_s is not None and account_value_age_s > 300
 
+    # Alpaca stream is "stale" if _running=True but no bar received in >10 min —
+    # this catches silent WebSocket drops that don't raise an exception.
+    alpaca_data_stale = (
+        alpaca_running
+        and alpaca_last_bar_age_s is not None
+        and alpaca_last_bar_age_s > 600
+    )
+
     if killed or not ibkr_connected:
         status = "stale"
     elif account_stale:
         status = "warn"
-    elif paused or not alpaca_running:
+    elif paused or not alpaca_running or alpaca_data_stale:
         status = "warn"
     else:
         status = "ok"
@@ -221,6 +262,8 @@ def _stage_bot_core(dash: dict) -> dict:
         "critical": True,
         "ibkr_connected": ibkr_connected,
         "alpaca_running": alpaca_running,
+        "alpaca_last_bar_age_s": alpaca_last_bar_age_s,
+        "alpaca_data_stale": alpaca_data_stale,
         "bot_status": bot_status,
         "paused": paused,
         "killed": killed,
@@ -379,7 +422,11 @@ def _stage_execution() -> dict:
             if ts_str:
                 try:
                     _ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                    if (now_utc - _ts).total_seconds() > 300:
+                    age_s = (now_utc - _ts).total_seconds()
+                    # >5 min = stuck (not just slow fill); <7 days = recent enough to be live.
+                    # Older records are historical artifacts from pre-migration order cycles —
+                    # they have no matching ORDER_FILLED but are not active at-risk orders.
+                    if 300 < age_s < 7 * 86_400:
                         stuck_count += 1
                 except Exception:
                     pass
@@ -433,11 +480,15 @@ def _stage_validation() -> dict:
     try:
         from ic_validator import get_ic_health
         _ih = get_ic_health()
+        # Include raw_ic per-dimension so the dashboard can show which signals are
+        # carrying weight and which are dragging the mean down — a single aggregate
+        # score is uninterpretable without knowing which dimensions are failing.
         ic_health = {
             "quality": _ih.quality,
             "mean_positive_ic": _ih.mean_positive_ic,
             "n_positive_dims": _ih.n_positive_dims,
             "n_records": _ih.n_records,
+            "raw_ic": _ih.raw_ic,
         }
     except Exception as e:
         ic_health = {"quality": "ERROR", "error": str(e)}
@@ -512,6 +563,79 @@ def _trading_verdict(stages: list[dict]) -> dict:
     return {"verdict": "TRADING", "reason": "All pipeline stages healthy"}
 
 
+# ── Data connections ──────────────────────────────────────────────────────────
+
+def _data_connections() -> list[dict]:
+    """Check configured status of each data source. Never makes live API calls."""
+    sources: list[dict] = []
+
+    # IBKR — use bot_state disconnect flag
+    try:
+        import bot_state as _bs
+        ibkr_ok = not _bs.dash.get("ibkr_disconnected", True)
+        sources.append({
+            "name": "IBKR",
+            "status": "ok" if ibkr_ok else "error",
+            "detail": "TWS connected" if ibkr_ok else "TWS disconnected",
+        })
+    except Exception:
+        sources.append({"name": "IBKR", "status": "unknown", "detail": "bot not running"})
+
+    # Alpaca — key configured + stream state
+    try:
+        alpaca_key = CONFIG.get("alpaca_api_key", "")
+        alpaca_secret = CONFIG.get("alpaca_secret_key", "")
+        key_ok = bool(alpaca_key and alpaca_secret)
+        stream_running = False
+        try:
+            import bot_state as _bs2
+            if _bs2._bar_stream is not None:
+                stream_running = bool(getattr(_bs2._bar_stream, "_running", False))
+        except Exception:
+            pass
+        if not key_ok:
+            status, detail = "error", "no API key"
+        elif not stream_running:
+            status, detail = "warn", "key OK — stream down"
+        else:
+            status, detail = "ok", "streaming"
+        sources.append({"name": "Alpaca", "status": status, "detail": detail})
+    except Exception:
+        sources.append({"name": "Alpaca", "status": "unknown", "detail": "check failed"})
+
+    # FMP
+    try:
+        from fmp_client import is_available as _fmp_ok
+        ok = _fmp_ok()
+        sources.append({
+            "name": "FMP",
+            "status": "ok" if ok else "error",
+            "detail": "API key configured" if ok else "FMP_API_KEY not set",
+        })
+    except Exception:
+        sources.append({"name": "FMP", "status": "unknown", "detail": "check failed"})
+
+    # Alpha Vantage
+    try:
+        import alpha_vantage_client as _av
+        keys = _av._api_keys()
+        key_ok = bool(keys)
+        calls_today = _av.get_calls_today() if key_ok else 0
+        limit = CONFIG.get("alpha_vantage_daily_limit", 25) * max(len(keys), 1)
+        exhausted = key_ok and calls_today >= limit
+        if not key_ok:
+            status, detail = "error", "no API key"
+        elif exhausted:
+            status, detail = "warn", f"budget exhausted ({calls_today}/{limit} calls)"
+        else:
+            status, detail = "ok", f"{calls_today}/{limit} calls today"
+        sources.append({"name": "Alpha Vantage", "status": status, "detail": detail})
+    except Exception:
+        sources.append({"name": "Alpha Vantage", "status": "unknown", "detail": "check failed"})
+
+    return sources
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def build_health_report() -> dict:
@@ -545,4 +669,10 @@ def build_health_report() -> dict:
         _safe(_stage_validation),
     ]
 
-    return {"ts": ts, "stages": stages, "verdict": _trading_verdict(stages)}
+    connections = []
+    try:
+        connections = _data_connections()
+    except Exception:
+        pass
+
+    return {"ts": ts, "stages": stages, "verdict": _trading_verdict(stages), "connections": connections}
