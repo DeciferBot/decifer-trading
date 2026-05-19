@@ -221,14 +221,33 @@ def _stage_bot_core(dash: dict) -> dict:
 
     alpaca_running = False
     alpaca_last_bar_age_s: float | None = None
-    # _running=True proves the thread is alive; last_bar_age_s proves data is actually flowing.
-    # A silent WebSocket drop leaves _running=True but stops updating the timestamp.
+    alpaca_stream_age_s: float | None = None
+    # Primary: _running flag + _last_bar_received_at (detects silent WebSocket drops).
+    # Override: if QUOTE_CACHE for an anchor symbol (SPY/QQQ) has a quote within 30 s,
+    # treat the stream as running regardless of the _running flag.  The flag is
+    # transiently False during update_symbols() stop/start cycles and produces false
+    # WARNs even when data is actively flowing.
+    _ALPACA_FRESHNESS_S = 30
+    _STREAM_ANCHORS = ("SPY", "QQQ")
     try:
         if _bs._bar_stream is not None:
             alpaca_running = bool(getattr(_bs._bar_stream, "_running", False))
             _lbr = getattr(_bs._bar_stream, "_last_bar_received_at", None)
             if _lbr is not None:
                 alpaca_last_bar_age_s = round(time.time() - _lbr, 1)
+    except Exception:
+        pass
+    try:
+        from alpaca_stream import QUOTE_CACHE
+        _now = time.time()
+        for _anchor in _STREAM_ANCHORS:
+            _q = QUOTE_CACHE.get(_anchor)
+            if _q and _q.get("ts"):
+                _age = _now - _q["ts"]
+                if alpaca_stream_age_s is None or _age < alpaca_stream_age_s:
+                    alpaca_stream_age_s = round(_age, 1)
+        if alpaca_stream_age_s is not None and alpaca_stream_age_s <= _ALPACA_FRESHNESS_S:
+            alpaca_running = True  # data is flowing — override transient _running=False
     except Exception:
         pass
 
@@ -263,6 +282,7 @@ def _stage_bot_core(dash: dict) -> dict:
         "ibkr_connected": ibkr_connected,
         "alpaca_running": alpaca_running,
         "alpaca_last_bar_age_s": alpaca_last_bar_age_s,
+        "alpaca_stream_age_s": alpaca_stream_age_s,
         "alpaca_data_stale": alpaca_data_stale,
         "bot_status": bot_status,
         "paused": paused,
