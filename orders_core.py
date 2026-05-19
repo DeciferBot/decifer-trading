@@ -2610,7 +2610,13 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                     f"{CONFIG.get('failed_thesis_cooldown_hours', 4)}h cooldown + 1% dislocation required"
                 )
             _pnl_str = f"{'+'if pnl>=0 else ''}{pnl:.2f}" if pnl is not None else "?"
-            from bot_state import clog as _clog; _clog("TRADE", f"✅ SELL {symbol} @ ${_exit_price_val:.2f} | PnL=${_pnl_str} | reason={reason}")
+            if reason == "unknown_trade_type":
+                _entry_px = info.get("entry") or 0
+                _open_t = (info.get("open_time") or "")[:16]
+                _reason_display = f"orphan_force_exit (metadata lost on restart | entry=${_entry_px:.2f} | opened={_open_t or 'unknown'})"
+            else:
+                _reason_display = reason
+            from bot_state import clog as _clog; _clog("TRADE", f"✅ SELL {symbol} @ ${_exit_price_val:.2f} | PnL=${_pnl_str} | reason={_reason_display}")
             _save_positions_file()
         return True
 

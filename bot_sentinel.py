@@ -343,7 +343,7 @@ def _execute_sentinel_sell(decision: dict, open_positions: list, regime: dict, t
 def handle_catalyst_trigger(trigger: dict):
     """
     Callback fired by CatalystSentinel when a catalyst event is detected.
-    Runs the existing 3-agent sentinel pipeline and executes immediately.
+    Pre-scores the symbol, runs Apex NEWS_INTERRUPT, and executes immediately.
     """
     sym = trigger.get("symbol", "?")
     trigger_type = trigger.get("trigger_type", "unknown")
@@ -406,6 +406,70 @@ def handle_catalyst_trigger(trigger: dict):
             "reasoning": "catalyst routed via news-interrupt Apex path",
             "trigger_type": "catalyst",
         }
+
+        try:
+            import apex_orchestrator as _aorch_c
+            from signal_dispatcher import dispatch as _apex_dispatch_c
+
+            _c_scored_candidate = None
+            try:
+                from signals import score_universe as _su_c
+                _regime_str = regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN"
+                _c_above, _ = _su_c(
+                    [sym],
+                    regime=_regime_str,
+                    ib=ib,
+                    regime_dict=regime if isinstance(regime, dict) else None,
+                )
+                if _c_above:
+                    _c_scored_candidate = _c_above[0]
+                    clog("INFO", f"Catalyst {sym}: pre-scored for NEWS_INTERRUPT — score={_c_scored_candidate.get('score')}")
+                else:
+                    clog("INFO", f"Catalyst {sym}: pre-score returned no candidate above threshold — passing empty")
+            except Exception as _c_score_err:
+                log.warning("Catalyst %s: pre-score failed (%s) — passing scored_candidate=None", sym, _c_score_err)
+
+            _c_apex_input = build_news_trigger_payload(
+                trigger=trigger,
+                open_positions=open_pos,
+                portfolio_value=pv,
+                daily_pnl=pnl,
+                regime=regime,
+                scored_candidate=_c_scored_candidate,
+            )
+            _c_shadow = _aorch_c._run_apex_pipeline(
+                _c_apex_input, candidates_by_symbol={}, execute=False
+            )
+            _aorch_c.log_shadow_result(
+                "NEWS_INTERRUPT", _c_shadow,
+                trigger_context=_c_apex_input.get("trigger_context"),
+            )
+            _c_report = _apex_dispatch_c(
+                _c_shadow.get("decision") or {},
+                candidates_by_symbol={},
+                active_trades={p.get("symbol"): p for p in open_pos if p.get("symbol")},
+                ib=ib,
+                portfolio_value=pv,
+                regime=regime,
+                execute=True,
+            )
+            _entries = _c_report.get("new_entries") or []
+            if _entries:
+                _e = _entries[0]
+                decision.update({
+                    "action": "BUY" if (_e.get("direction") == "LONG") else (
+                        "SELL" if _e.get("direction") == "SHORT" else "SKIP"
+                    ),
+                    "symbol": _e.get("symbol") or sym,
+                    "qty": int(_e.get("qty") or 0),
+                    "sl": float(_e.get("sl") or 0),
+                    "tp": float(_e.get("tp") or 0),
+                    "instrument": _e.get("instrument") or "stock",
+                    "confidence": 7 if _e.get("conviction") == "HIGH" else 5,
+                    "reasoning": _e.get("rationale") or decision["reasoning"],
+                })
+        except Exception as _c_apex_err:
+            log.error(f"Catalyst Apex NEWS_INTERRUPT failed for {sym}: {_c_apex_err}")
 
         dash.setdefault("catalyst_triggers", []).insert(
             0,

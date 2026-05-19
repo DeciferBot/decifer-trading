@@ -176,6 +176,13 @@ def screen_open_positions(
         direction = (pos.get("direction") or "LONG").upper()
 
         if tt in ("UNKNOWN", ""):
+            _entry_px = pos.get("entry") or 0
+            _open_t = (pos.get("open_time") or "")[:16]
+            log.warning(
+                "Guardrails: %s has no trade_type — orphaned position (metadata lost on restart). "
+                "entry=%.2f opened=%s. Scheduling force-exit.",
+                sym, _entry_px, _open_t or "unknown",
+            )
             forced.append((sym, "unknown_trade_type")); continue
         if direction == "SHORT" and sym in _LONG_ONLY:
             forced.append((sym, "architecture_violation")); continue
