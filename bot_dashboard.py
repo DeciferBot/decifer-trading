@@ -1355,6 +1355,66 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("[dashboard][/api/health] error: %s", exc)
                 payload = {"error": str(exc), "ts": ""}
             self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/intelligence":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                import time as _t
+                from datetime import UTC, datetime as _dt
+                _base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+                def _read_json(rel):
+                    p = os.path.join(_base, rel)
+                    with open(p) as _f:
+                        return json.load(_f)
+                market_map: dict = {}
+                candidates: list = []
+                themes: list = []
+                theme_summary: dict = {}
+                universe_summary: dict = {}
+                quota_summary: dict = {}
+                try:
+                    ld = _read_json("intelligence/live_driver_state.json")
+                    market_map = {
+                        "active_drivers": ld.get("active_drivers", []),
+                        "blocked_conditions": ld.get("blocked_conditions", []),
+                        "mode": ld.get("mode", ""),
+                        "evidence": ld.get("evidence", {}),
+                    }
+                except Exception:
+                    pass
+                try:
+                    cf = _read_json("intelligence/economic_candidate_feed.json")
+                    candidates = cf.get("candidates", [])
+                except Exception:
+                    pass
+                try:
+                    ta = _read_json("intelligence/theme_activation.json")
+                    themes = ta.get("themes", [])
+                    s = ta.get("activation_summary", {})
+                    theme_summary = {"activated": s.get("activated", 0), "total_themes": s.get("total_themes", 0)}
+                except Exception:
+                    pass
+                try:
+                    uu = _read_json("live/active_opportunity_universe.json")
+                    universe_summary = uu.get("universe_summary", {})
+                    quota_summary = uu.get("quota_summary", {})
+                except Exception:
+                    pass
+                payload = {
+                    "ts": _dt.now(UTC).isoformat(),
+                    "market_map": market_map,
+                    "candidates": candidates,
+                    "themes": themes,
+                    "theme_summary": theme_summary,
+                    "universe_summary": universe_summary,
+                    "quota_summary": quota_summary,
+                }
+            except Exception as exc:
+                log.warning("[dashboard][/api/intelligence] error: %s", exc)
+                payload = {"available": False, "error": str(exc), "ts": ""}
+            self.wfile.write(json.dumps(payload, default=str).encode())
         else:
             self.send_response(404)
             self.end_headers()

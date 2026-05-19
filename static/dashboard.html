@@ -631,6 +631,47 @@ canvas{display:block;width:100% !important}
 
 <!-- VIEW 4: AGENTS -->
 <div class="view agents-view" id="view-agents">
+  <div id="intel-context-section" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Intelligence Pipeline</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="intel-ts" style="font-size:9px;color:var(--muted2)">—</span>
+        <button onclick="loadIntelligence()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:9px;padding:2px 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:10px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">MARKET MAP</div>
+        <div id="intel-drivers">
+          <div style="font-size:10px;color:var(--muted2)">Loading…</div>
+        </div>
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:10px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">ACTIVE THEMES</div>
+        <div id="intel-themes">
+          <div style="font-size:10px;color:var(--muted2)">Loading…</div>
+        </div>
+      </div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:4px;overflow:hidden;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer" onclick="toggleIntelCandidates()">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2)">ECONOMIC CANDIDATES</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="intel-cand-count" style="font-size:10px;font-weight:700;color:var(--orange)">—</span>
+          <span id="intel-cand-toggle" style="font-size:10px;color:var(--muted2)">▼</span>
+        </div>
+      </div>
+      <div id="intel-candidates" style="display:none;border-top:1px solid var(--border);padding:8px 12px;max-height:220px;overflow-y:auto">
+        <div style="font-size:10px;color:var(--muted2)">Loading…</div>
+      </div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:10px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">HANDOFF UNIVERSE</div>
+      <div id="intel-universe">
+        <div style="font-size:10px;color:var(--muted2)">Loading…</div>
+      </div>
+    </div>
+  </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
     <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Agent Live Conversation</div>
     <div style="display:flex;align-items:center;gap:10px">
@@ -2197,6 +2238,10 @@ function switchTab(id, el) {
     setTimeout(loadAnalytics, 50);
   }
 
+  if (id === 'agents') {
+    loadIntelligence();
+  }
+
   // Health tab: load immediately, start auto-refresh
   if (id === 'health') {
     loadHealth();
@@ -2328,10 +2373,59 @@ function _stageDetail(s) {
     </div>`;
   }
 
-  if (name === 'Handoff' && !s.handoff_enabled) {
-    rows += `<div style="margin-top:4px;font-size:10px;color:var(--muted2)">Handoff disabled in config — stages 1-3 not required for trading</div>`;
-  } else if (s.artifacts && s.artifacts.length && name !== 'Intelligence' && name !== 'Universe') {
-    // already rendered artifacts above
+  if (name === 'Intelligence') {
+    const mm = s.market_map || {};
+    const drivers = mm.active_drivers || [];
+    const blocked = mm.blocked_conditions || [];
+    if (drivers.length) {
+      rows += `<div style="margin-top:6px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:4px">ACTIVE DRIVERS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${drivers.map(d =>
+          `<span style="padding:2px 6px;border-radius:3px;background:var(--orange)22;border:1px solid var(--orange)44;font-size:10px;color:var(--orange);font-family:'JetBrains Mono',monospace">${d}</span>`
+        ).join('')}</div>
+      </div>`;
+    }
+    if (blocked.length) {
+      rows += `<div style="margin-top:4px;font-size:10px;color:var(--red)">Blocked: ${blocked.join(', ')}</div>`;
+    }
+    const th = s.themes || {};
+    if (th.total_themes) {
+      rows += `<div style="margin-top:4px;font-size:10px;color:var(--muted2)">Themes: <b style="color:var(--green)">${th.activated}</b> active · <b style="color:var(--muted2)">${th.dormant}</b> dormant</div>`;
+    }
+    if (s.candidate_count !== null && s.candidate_count !== undefined) {
+      rows += `<div style="margin-top:2px;font-size:10px;color:var(--muted2)">Candidate feed: <b style="color:var(--text)">${s.candidate_count}</b> symbols</div>`;
+    }
+    const ev = mm.evidence || {};
+    const evKeys = Object.keys(ev).filter(k => k.endsWith('_reason'));
+    if (evKeys.length) {
+      rows += `<div style="margin-top:6px">` +
+        evKeys.map(k => {
+          const driverKey = k.replace('_reason','');
+          const isActive = drivers.includes(driverKey);
+          const col = isActive ? 'var(--green)' : 'var(--muted2)';
+          return `<div style="font-size:9px;color:${col};padding:1px 0">${isActive ? '●' : '○'} ${ev[k]}</div>`;
+        }).join('') +
+      `</div>`;
+    }
+  }
+
+  if (name === 'Handoff') {
+    const us = s.universe_summary || {};
+    if (us.total_candidates !== undefined) {
+      const structural = us.structural_candidates || 0;
+      const economic = us.economic_intelligence_candidates || 0;
+      const manual = us.manual_candidates || 0;
+      const catalyst = us.catalyst_candidates || 0;
+      rows += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;font-size:10px">
+        <span style="color:var(--text)"><b>${us.total_candidates}</b> <span style="color:var(--muted2)">total</span></span>
+        <span style="color:var(--orange)">${structural} structural</span>
+        <span style="color:var(--green)">${economic} econ intel</span>
+        <span style="color:var(--muted2)">${manual} manual · ${catalyst} catalyst</span>
+      </div>`;
+    }
+    if (!s.handoff_enabled) {
+      rows += `<div style="margin-top:4px;font-size:10px;color:var(--muted2)">Handoff disabled in config</div>`;
+    }
   }
 
   if (name === 'Universe' && s.heartbeats && s.heartbeats.length) {
@@ -2339,6 +2433,117 @@ function _stageDetail(s) {
   }
 
   return rows;
+}
+
+let _intelCandOpen = false;
+function toggleIntelCandidates() {
+  _intelCandOpen = !_intelCandOpen;
+  const el = document.getElementById('intel-candidates');
+  const tog = document.getElementById('intel-cand-toggle');
+  if (el) el.style.display = _intelCandOpen ? 'block' : 'none';
+  if (tog) tog.textContent = _intelCandOpen ? '▲' : '▼';
+}
+
+function loadIntelligence() {
+  fetch('/api/intelligence').then(r => r.json()).then(d => {
+    if (!d.available && d.available !== undefined) return;
+
+    const tsEl = document.getElementById('intel-ts');
+    if (tsEl && d.ts) {
+      try { tsEl.textContent = 'Updated ' + new Date(d.ts).toLocaleTimeString(); }
+      catch(e) { tsEl.textContent = d.ts; }
+    }
+
+    const driversEl = document.getElementById('intel-drivers');
+    if (driversEl) {
+      const mm = d.market_map || {};
+      const drivers = mm.active_drivers || [];
+      const blocked = mm.blocked_conditions || [];
+      const ev = mm.evidence || {};
+      const evKeys = Object.keys(ev).filter(k => k.endsWith('_reason'));
+      driversEl.innerHTML = drivers.length
+        ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${drivers.map(dr =>
+            `<span style="padding:1px 6px;border-radius:3px;background:var(--orange)22;border:1px solid var(--orange)55;font-size:10px;color:var(--orange);font-family:'JetBrains Mono',monospace">${dr}</span>`
+          ).join('')}</div>` +
+          (blocked.length ? `<div style="font-size:9px;color:var(--red);margin-bottom:4px">blocked: ${blocked.join(', ')}</div>` : '') +
+          evKeys.map(k => {
+            const dk = k.replace('_reason','');
+            const isActive = drivers.includes(dk);
+            const col = isActive ? 'var(--green)' : 'var(--muted)';
+            return `<div style="font-size:9px;color:${col};padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(ev[k])}">${isActive ? '●' : '○'} ${esc(ev[k])}</div>`;
+          }).join('')
+        : '<div style="font-size:10px;color:var(--muted2)">No drivers resolved</div>';
+    }
+
+    const themesEl = document.getElementById('intel-themes');
+    if (themesEl) {
+      const themes = d.themes || [];
+      if (themes.length) {
+        const active = themes.filter(t => t.status === 'ACTIVE' || t.status === 'ACTIVATED');
+        themesEl.innerHTML =
+          `<div style="font-size:10px;color:var(--muted2);margin-bottom:5px">${active.length} of ${themes.length} active</div>` +
+          themes.map(t => {
+            const isActive = (t.status === 'ACTIVE' || t.status === 'ACTIVATED');
+            const col = isActive ? 'var(--green)' : 'var(--muted)';
+            const name = t.name || t.theme_id || '?';
+            return `<div style="display:flex;align-items:center;gap:5px;padding:1px 0;font-size:10px">
+              <span style="color:${col};font-size:8px">${isActive ? '●' : '○'}</span>
+              <span style="color:${isActive ? 'var(--text)' : 'var(--muted2)'}">${esc(name)}</span>
+            </div>`;
+          }).join('');
+      } else {
+        themesEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No theme data</div>';
+      }
+    }
+
+    const countEl = document.getElementById('intel-cand-count');
+    const candEl = document.getElementById('intel-candidates');
+    const cands = d.candidates || [];
+    if (countEl) countEl.textContent = cands.length + ' symbols';
+    if (candEl && cands.length) {
+      candEl.innerHTML = cands.map(c => {
+        const conf = c.confidence != null ? Math.round(c.confidence * 100) + '%' : '—';
+        const confColor = (c.confidence || 0) >= 0.7 ? 'var(--green)' : (c.confidence || 0) >= 0.5 ? 'var(--orange)' : 'var(--muted2)';
+        return `<div style="display:grid;grid-template-columns:72px 40px 1fr;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:10px;align-items:start">
+          <span style="font-weight:700;font-family:'Syne',sans-serif;font-size:12px;color:var(--orange)">${esc(c.symbol)}</span>
+          <span style="color:${confColor};font-family:'JetBrains Mono',monospace">${conf}</span>
+          <span style="color:var(--muted2)">${esc(c.reason_to_care || c.reason || '—')}</span>
+        </div>`;
+      }).join('');
+    }
+
+    const uniEl = document.getElementById('intel-universe');
+    if (uniEl) {
+      const us = d.universe_summary || {};
+      const qs = d.quota_summary || {};
+      if (us.total_candidates !== undefined) {
+        const bars = [
+          {label:'Structural', used: (qs.structural_position||{}).used||0, max:(qs.structural_position||{}).max||35, color:'var(--orange)'},
+          {label:'Econ Intel', used: us.economic_intelligence_candidates||0, max:35, color:'var(--green)'},
+          {label:'Attention', used: (qs.attention||{}).used||0, max:(qs.attention||{}).max||20, color:'var(--muted2)'},
+          {label:'Manual', used: (qs.manual_conviction||{}).used||0, max:13, color:'var(--text)'},
+          {label:'Catalyst', used: (qs.catalyst_swing||{}).used||0, max:(qs.catalyst_swing||{}).max||30, color:'var(--red)'},
+        ];
+        uniEl.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px">${us.total_candidates} / ${(qs.total||{}).max||75} candidates</div>` +
+          bars.map(b => {
+            const pct = b.max > 0 ? Math.min(b.used / b.max * 100, 100) : 0;
+            return `<div style="margin-bottom:4px">
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-bottom:2px">
+                <span>${b.label}</span><span style="color:${b.color}">${b.used}/${b.max}</span>
+              </div>
+              <div style="height:4px;background:var(--border);border-radius:2px">
+                <div style="height:4px;width:${pct}%;background:${b.color};border-radius:2px;transition:width .3s"></div>
+              </div>
+            </div>`;
+          }).join('');
+      } else {
+        uniEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No universe data</div>';
+      }
+    }
+  }).catch(() => {
+    const driversEl = document.getElementById('intel-drivers');
+    if (driversEl) driversEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">Pipeline not yet run</div>';
+  });
 }
 
 function loadHealth() {

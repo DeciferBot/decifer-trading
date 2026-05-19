@@ -76,20 +76,58 @@ def _agg_status(artifacts: list[dict]) -> str:
 
 def _stage_intelligence() -> dict:
     """Stage 1 — Intelligence Pipeline (manual-only refresh)."""
-    SLA = 86_400  # 24h
+    SLA = 3600
     artifacts = [
-        _file_age("intelligence/daily_economic_state.json",     SLA, "Economic state"),
-        _file_age("intelligence/current_economic_context.json", SLA, "Economic context"),
-        _file_age("intelligence/theme_activation.json",         SLA, "Theme activation"),
-        _file_age("intelligence/thesis_store.json",             SLA, "Thesis store"),
+        _file_age("intelligence/live_driver_state.json",      SLA, "Market Map (live drivers)"),
+        _file_age("intelligence/economic_candidate_feed.json", SLA, "Economic candidate feed"),
+        _file_age("intelligence/theme_activation.json",        SLA, "Theme activation"),
     ]
+
+    market_map: dict = {}
+    candidate_count: int | None = None
+    themes: dict = {}
+
+    try:
+        with open(os.path.join(_DATA_DIR, "intelligence/live_driver_state.json")) as f:
+            ld = json.load(f)
+        market_map = {
+            "active_drivers": ld.get("active_drivers", []),
+            "blocked_conditions": ld.get("blocked_conditions", []),
+            "mode": ld.get("mode", ""),
+            "evidence": ld.get("evidence", {}),
+        }
+    except Exception:
+        pass
+
+    try:
+        with open(os.path.join(_DATA_DIR, "intelligence/economic_candidate_feed.json")) as f:
+            cf = json.load(f)
+        candidate_count = len(cf.get("candidates", []))
+    except Exception:
+        pass
+
+    try:
+        with open(os.path.join(_DATA_DIR, "intelligence/theme_activation.json")) as f:
+            ta = json.load(f)
+        summary = ta.get("activation_summary", {})
+        themes = {
+            "activated": summary.get("activated", 0),
+            "total_themes": summary.get("total_themes", 0),
+            "dormant": summary.get("dormant", 0),
+        }
+    except Exception:
+        pass
+
     return {
         "name": "Intelligence",
         "label": "Stage 1 — Intelligence Pipeline",
-        "description": "Manual: run_intelligence_pipeline.py  ·  no scheduler",
+        "description": "run_intelligence_pipeline.py — market data → drivers → candidates → themes",
         "status": _agg_status(artifacts),
         "critical": False,
         "artifacts": artifacts,
+        "market_map": market_map,
+        "candidate_count": candidate_count,
+        "themes": themes,
     }
 
 
@@ -116,22 +154,32 @@ def _stage_universe() -> dict:
 
 
 def _stage_handoff() -> dict:
-    """Stage 3 — Handoff Publisher (launchd every 10 min)."""
+    """Stage 3 — Handoff Publisher (run_intelligence_pipeline.py output)."""
+    SLA = 3600
     artifacts = [
-        _file_age("heartbeats/handoff_publisher.json",     10 * 60, "Publisher heartbeat"),
-        _file_age("live/active_opportunity_universe.json", 15 * 60, "Active opportunity universe"),
-        _file_age("live/current_manifest.json",            15 * 60, "Current manifest"),
+        _file_age("live/active_opportunity_universe.json", SLA, "Active opportunity universe"),
+        _file_age("live/current_manifest.json",            SLA, "Handoff manifest"),
     ]
     handoff_enabled = bool(CONFIG.get("enable_active_opportunity_universe_handoff", False))
+
+    universe_summary: dict = {}
+    try:
+        with open(os.path.join(_DATA_DIR, "live/active_opportunity_universe.json")) as f:
+            uu = json.load(f)
+        universe_summary = uu.get("universe_summary", {})
+    except Exception:
+        pass
+
     raw_status = _agg_status(artifacts)
     return {
         "name": "Handoff",
         "label": "Stage 3 — Handoff Publisher",
-        "description": "launchd: handoff-publisher  ·  every 10 min",
+        "description": "run_intelligence_pipeline.py — universe_builder → live handoff files",
         "status": raw_status if handoff_enabled else "ok",
         "handoff_enabled": handoff_enabled,
         "critical": False,
         "artifacts": artifacts,
+        "universe_summary": universe_summary,
     }
 
 
