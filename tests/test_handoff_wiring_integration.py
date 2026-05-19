@@ -866,15 +866,6 @@ class TestImportSafety(unittest.TestCase):
         imports = self._get_top_level_imports("bot_trading.py")
         self.assertNotIn("backtest_intelligence", imports)
 
-    def test_bot_trading_does_not_import_advisory_reporter(self):
-        """advisory_reporter must not be a top-level import in bot_trading."""
-        imports = self._get_top_level_imports("bot_trading.py")
-        self.assertNotIn("advisory_reporter", imports)
-
-    def test_bot_trading_does_not_import_advisory_log_reviewer(self):
-        imports = self._get_top_level_imports("bot_trading.py")
-        self.assertNotIn("advisory_log_reviewer", imports)
-
     def test_bot_trading_does_not_import_provider_fetch_tester(self):
         imports = self._get_top_level_imports("bot_trading.py")
         self.assertNotIn("provider_fetch_tester", imports)

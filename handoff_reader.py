@@ -11,8 +11,7 @@ an optional structured validation log entry.
 
 No broker calls, no LLM calls, no provider ingestion, no raw news, no broad scan.
 No import of: bot_trading, scanner, orders_core, guardrails, bot_ibkr,
-market_intelligence, provider_fetch_tester, backtest_intelligence,
-advisory_reporter, advisory_log_reviewer.
+market_intelligence.
 
 Public API:
     read_manifest(path)                   -> dict

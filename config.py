@@ -979,16 +979,6 @@ CONFIG = {
         "max_symbols_to_score":   140,   # global cap on total symbols entering score_universe()
     },
 
-    # ── INTELLIGENCE-FIRST MIGRATION FLAGS ────────────────────────────────────
-    # All flags default false. Production-changing flags must remain false until
-    # shadow comparison, backtest gate, and advisory mode are all proven.
-    # See docs/intelligence_first_audit.md for wiring points.
-    # See docs/intelligence_first_retirement_register.md for retirement plan.
-    "intelligence_first_shadow_enabled":          False,  # master switch for all shadow output (safe to enable)
-    "intelligence_first_transmission_enabled":    False,  # run macro transmission matrix (safe to enable)
-    "intelligence_first_candidate_feed_enabled":  False,  # run economic candidate feed (safe to enable)
-    "intelligence_first_universe_builder_enabled": False, # run shadow universe builder (safe to enable)
-    "intelligence_first_advisory_enabled":        False,  # advisory logging alongside live bot — Sprint 6C observation complete, gate met (advisory_ready_for_handoff_design)
     "enable_active_opportunity_universe_handoff": True,   # PRODUCTION WIRING — Sprint 7J.4 controlled activation — Amit approved 2026-05-09
 
     # ── Nexus contamination controls (fix/nexus-contamination-controls) ───────
