@@ -84,8 +84,7 @@ _RULES_PATH = os.path.join(_INTEL_DIR, "transmission_rules.json")
 _TAXONOMY_PATH = os.path.join(_INTEL_DIR, "theme_taxonomy.json")
 _ROSTER_PATH = os.path.join(_INTEL_DIR, "thematic_roster.json")
 _FEED_PATH = os.path.join(_INTEL_DIR, "economic_candidate_feed.json")
-_DAILY_STATE_PATH = os.path.join(_INTEL_DIR, "daily_economic_state.json")
-_CONTEXT_PATH = os.path.join(_INTEL_DIR, "current_economic_context.json")
+_LIVE_DRIVER_PATH = os.path.join(_INTEL_DIR, "live_driver_state.json")
 _SHADOW_PATH = os.path.join(_UB_DIR, "active_opportunity_universe_shadow.json")
 
 _OUTPUT_PATH = os.path.join(_INTEL_DIR, "theme_activation.json")
@@ -131,12 +130,12 @@ def _build_themes(
         for target in (rule.get("affected_targets") or []):
             theme_rules.setdefault(target, []).append(rule)
 
-    # ── Driver states from Sprint 4A
+    # ── Driver states from live_driver_state.json
     driver_states: dict[str, str] = {}
     if isinstance(daily_state_data, dict):
-        ds = daily_state_data.get("driver_states")
-        if isinstance(ds, dict):
-            driver_states = ds
+        # daily_state_data is now live_driver_state.json
+        for drv in (daily_state_data.get("active_drivers") or []):
+            driver_states[drv] = "active_shadow_inferred"
 
     # ── Candidate evidence from feed
     feed_by_theme: dict[str, list[dict]] = {}
@@ -373,7 +372,7 @@ def generate_theme_activation(output_path: str = _OUTPUT_PATH) -> dict:
     """
     input_paths = [
         _RULES_PATH, _TAXONOMY_PATH, _ROSTER_PATH, _FEED_PATH,
-        _DAILY_STATE_PATH, _CONTEXT_PATH, _SHADOW_PATH,
+        _LIVE_DRIVER_PATH, _SHADOW_PATH,
     ]
 
     source_files: list[str] = []
@@ -395,7 +394,7 @@ def generate_theme_activation(output_path: str = _OUTPUT_PATH) -> dict:
         taxonomy_data=loaded.get(_TAXONOMY_PATH),
         roster_data=loaded.get(_ROSTER_PATH),
         feed_data=loaded.get(_FEED_PATH),
-        daily_state_data=loaded.get(_DAILY_STATE_PATH),
+        daily_state_data=loaded.get(_LIVE_DRIVER_PATH),
         shadow_data=loaded.get(_SHADOW_PATH),
     )
 

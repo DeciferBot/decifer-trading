@@ -13,8 +13,6 @@ import pytest
 _SHADOW_PATH   = "data/universe_builder/active_opportunity_universe_shadow.json"
 _UNIVERSE_PATH = "data/live/active_opportunity_universe.json"
 _MANIFEST_PATH = "data/live/current_manifest.json"
-_OBS_PATH      = "data/live/handoff_publisher_observation_report.json"
-
 _GOVERNED_WATCH = ["COST", "MSFT", "PG"]
 _QUOTA_WATCH    = ["SNDK", "WDC", "IREN"]
 
@@ -39,17 +37,6 @@ def universe():
 def manifest():
     with open(_MANIFEST_PATH) as f:
         return json.load(f)
-
-
-@pytest.fixture(scope="module")
-def obs():
-    with open(_OBS_PATH) as f:
-        return json.load(f)
-
-
-@pytest.fixture(scope="module")
-def obs_summary(obs):
-    return obs["observation_summary"]
 
 
 # 1. Quota policy is 75/35
@@ -155,34 +142,13 @@ def test_manifest_publication_mode(manifest):
 
 
 # 15. Config gate active (bot able to consume handoff when manifest is enabled)
-def test_live_bot_config_gate_active(obs):
+def test_live_bot_config_gate_active():
     import config
     assert config.CONFIG.get("enable_active_opportunity_universe_handoff") is True, \
         "config gate must be True — activated Sprint 7J.4"
 
 
-# 16. live_output_changed=false
-def test_live_output_changed_false(universe, manifest, obs):
+# 16. live_output_changed=false (universe + manifest only — observation report removed)
+def test_live_output_changed_false(universe, manifest):
     assert universe.get("live_output_changed") is False
     assert manifest.get("live_output_changed") is False or "live_output_changed" not in manifest
-    sa = obs.get("safety_analysis", {})
-    assert sa.get("live_output_changed") is False
-
-
-# 17. Validator passes (checked via import — if module constants are correct)
-def test_validator_quota_constants():
-    from intelligence_schema_validator import _TOTAL_MAX, _QUOTA_CAPS
-    assert _TOTAL_MAX == 75, f"Validator _TOTAL_MAX must be 75, got {_TOTAL_MAX}"
-    assert _QUOTA_CAPS["structural_position"] == 35, \
-        f"Validator _QUOTA_CAPS['structural_position'] must be 35, got {_QUOTA_CAPS['structural_position']}"
-
-
-# 18. Observer reports quota policy version
-def test_observer_quota_policy_version(obs_summary):
-    assert obs_summary.get("quota_policy_version") == _EXPECTED_POLICY_VERSION, \
-        f"Observer quota_policy_version must be '{_EXPECTED_POLICY_VERSION}'"
-    assert "successful_runs_for_current_quota" in obs_summary
-    assert "distinct_sessions_for_current_quota" in obs_summary
-    assert isinstance(obs_summary["successful_runs_for_current_quota"], int)
-    assert obs_summary["successful_runs_for_current_quota"] >= 1, \
-        "Must have at least 1 successful run for current quota policy after pipeline run"

@@ -459,23 +459,24 @@ def generate_feed(
     headwind_theme_ids: set[str] | None = None
 
     if activated_themes is None:
-        # Default: fire the transmission matrix with all Sprint 3 active drivers.
-        # Each driver alias maps to the rules in transmission_rules.json.
         from macro_transmission_matrix import MacroTransmissionMatrix
+        import live_driver_resolver as _ldr
         rules_path = os.path.join(os.path.dirname(taxonomy_path), "transmission_rules.json")
         matrix = MacroTransmissionMatrix(rules_path=rules_path)
-        result = matrix.fire({
-            "active_drivers": [
-                "ai_capex_growth",
-                "yields_rising",
-                "oil_supply_shock",
-                "geopolitical_risk_rising",
-                "credit_stress_rising",    # Sprint 3
-                "risk_off_rotation",       # Sprint 3
-                "ai_compute_demand",       # Sprint 7A.2: neocloud/AI compute infrastructure
-            ],
-            "blocked_conditions": [],
-        })
+        # Load live driver state — falls back to conservative defaults if unavailable
+        _live_state = _ldr.load()
+        if _live_state and _live_state.get("active_drivers"):
+            _driver_state = {
+                "active_drivers":    _live_state["active_drivers"],
+                "blocked_conditions": _live_state.get("blocked_conditions", []),
+            }
+        else:
+            # Fallback: structurally persistent drivers only
+            _driver_state = {
+                "active_drivers": ["ai_capex_growth", "ai_compute_demand"],
+                "blocked_conditions": [],
+            }
+        result = matrix.fire(_driver_state)
 
         activated_themes = {}
         if fired_rule_reasons is None:

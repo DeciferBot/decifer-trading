@@ -49,90 +49,111 @@ _cfg_mod.CONFIG.setdefault("max_tokens", 100)
 # (a) Caller-wiring test: run_intelligence_pipeline.run() must invoke IC funcs
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _mock_pipeline_steps():
+    """Context manager that mocks all 4 intelligence steps (Steps 1-4) in run()."""
+    from contextlib import ExitStack
+    stack = ExitStack()
+    # Step 1: live_driver_resolver.resolve (imported inside run())
+    stack.enter_context(
+        patch("live_driver_resolver.resolve",
+              return_value={"active_drivers": [], "mode": "test", "blocked_conditions": []}),
+    )
+    # Step 2: candidate_resolver.generate_feed (imported inside run())
+    stack.enter_context(
+        patch("candidate_resolver.generate_feed",
+              return_value=MagicMock(candidates=[])),
+    )
+    # Step 3: theme_activation_engine.generate_theme_activation
+    stack.enter_context(
+        patch("theme_activation_engine.generate_theme_activation",
+              return_value={"activation_summary": {"activated": 0, "total_themes": 0}}),
+    )
+    # Step 4: universe_builder.UniverseBuilder().write()
+    ub_mock = MagicMock()
+    ub_mock.return_value.write.return_value = MagicMock(candidates=[])
+    stack.enter_context(patch("universe_builder.UniverseBuilder", ub_mock))
+    # Also stub _promote_to_live and _write_manifest (they write files)
+    import run_intelligence_pipeline as rip
+    stack.enter_context(patch.object(rip, "_promote_to_live", return_value=0))
+    stack.enter_context(patch.object(rip, "_write_manifest"))
+    return stack
+
+
 class TestIntelligencePipelineWiring:
     """run_intelligence_pipeline.run() must call the three IC functions."""
 
     def test_run_calls_update_ic_weights(self):
-        import run_intelligence_pipeline as rip
         with (
-            patch.object(rip, "generate_feed", return_value=MagicMock(candidates=[])),
-            patch.object(rip, "generate_economic_intelligence", return_value=({}, {})),
-            patch.object(rip, "generate_theme_activation",
-                         return_value={"activation_summary": {"activated": 0, "total_themes": 0}}),
-            patch.object(rip, "generate_thesis_store",
-                         return_value={"thesis_summary": {"total_theses": 0},
-                                       "unavailable_sources": []}),
-            patch.object(rip, "update_ic_weights", return_value={}) as mock_uiw,
-            patch.object(rip, "update_live_ic", return_value={}),
-            patch.object(rip, "validate_and_persist",
-                         return_value=MagicMock(ready_for_live=False, weights={})),
+            _mock_pipeline_steps(),
+            patch("ic_calculator.update_ic_weights", return_value={}) as mock_uiw,
+            patch("ic_calculator.update_live_ic", return_value={}),
+            patch("ic_validator.validate_and_persist",
+                  return_value=MagicMock(ready_for_live=False)),
         ):
+            import run_intelligence_pipeline as rip
             rip.run()
         mock_uiw.assert_called_once()
 
     def test_run_calls_update_live_ic(self):
-        import run_intelligence_pipeline as rip
         with (
-            patch.object(rip, "generate_feed", return_value=MagicMock(candidates=[])),
-            patch.object(rip, "generate_economic_intelligence", return_value=({}, {})),
-            patch.object(rip, "generate_theme_activation",
-                         return_value={"activation_summary": {"activated": 0, "total_themes": 0}}),
-            patch.object(rip, "generate_thesis_store",
-                         return_value={"thesis_summary": {"total_theses": 0},
-                                       "unavailable_sources": []}),
-            patch.object(rip, "update_ic_weights", return_value={}),
-            patch.object(rip, "update_live_ic", return_value={}) as mock_uli,
-            patch.object(rip, "validate_and_persist",
-                         return_value=MagicMock(ready_for_live=False, weights={})),
+            _mock_pipeline_steps(),
+            patch("ic_calculator.update_ic_weights", return_value={}),
+            patch("ic_calculator.update_live_ic", return_value={}) as mock_uli,
+            patch("ic_validator.validate_and_persist",
+                  return_value=MagicMock(ready_for_live=False)),
         ):
+            import run_intelligence_pipeline as rip
             rip.run()
         mock_uli.assert_called_once()
 
     def test_run_calls_validate_and_persist(self):
-        import run_intelligence_pipeline as rip
         with (
-            patch.object(rip, "generate_feed", return_value=MagicMock(candidates=[])),
-            patch.object(rip, "generate_economic_intelligence", return_value=({}, {})),
-            patch.object(rip, "generate_theme_activation",
-                         return_value={"activation_summary": {"activated": 0, "total_themes": 0}}),
-            patch.object(rip, "generate_thesis_store",
-                         return_value={"thesis_summary": {"total_theses": 0},
-                                       "unavailable_sources": []}),
-            patch.object(rip, "update_ic_weights", return_value={}),
-            patch.object(rip, "update_live_ic", return_value={}),
-            patch.object(rip, "validate_and_persist",
-                         return_value=MagicMock(ready_for_live=False, weights={})) as mock_vp,
+            _mock_pipeline_steps(),
+            patch("ic_calculator.update_ic_weights", return_value={}),
+            patch("ic_calculator.update_live_ic", return_value={}),
+            patch("ic_validator.validate_and_persist",
+                  return_value=MagicMock(ready_for_live=False)) as mock_vp,
         ):
+            import run_intelligence_pipeline as rip
             rip.run()
         mock_vp.assert_called_once()
 
-    def test_run_calls_ic_after_thesis_store(self):
-        """IC update (Step 5) must come after all 4 intelligence steps."""
+    def test_run_calls_ic_after_universe_build(self):
+        """IC update (Step 5) must come after Steps 1-4."""
         call_order = []
-        import run_intelligence_pipeline as rip
-
-        def _ts_side(*a, **kw):
-            call_order.append("thesis_store")
-            return {"thesis_summary": {"total_theses": 0}, "unavailable_sources": []}
 
         def _uiw_side(*a, **kw):
             call_order.append("update_ic_weights")
             return {}
 
+        def _ub_write_side(*a, **kw):
+            call_order.append("universe_build")
+            return MagicMock(candidates=[])
+
+        import run_intelligence_pipeline as rip
+        ub_mock = MagicMock()
+        ub_instance = MagicMock()
+        ub_instance.write.side_effect = _ub_write_side
+        ub_mock.return_value = ub_instance
+
         with (
-            patch.object(rip, "generate_feed", return_value=MagicMock(candidates=[])),
-            patch.object(rip, "generate_economic_intelligence", return_value=({}, {})),
-            patch.object(rip, "generate_theme_activation",
-                         return_value={"activation_summary": {"activated": 0, "total_themes": 0}}),
-            patch.object(rip, "generate_thesis_store", side_effect=_ts_side),
-            patch.object(rip, "update_ic_weights", side_effect=_uiw_side),
-            patch.object(rip, "update_live_ic", return_value={}),
-            patch.object(rip, "validate_and_persist",
-                         return_value=MagicMock(ready_for_live=False, weights={})),
+            patch("live_driver_resolver.resolve",
+                  return_value={"active_drivers": [], "mode": "test", "blocked_conditions": []}),
+            patch("candidate_resolver.generate_feed",
+                  return_value=MagicMock(candidates=[])),
+            patch("theme_activation_engine.generate_theme_activation",
+                  return_value={"activation_summary": {"activated": 0, "total_themes": 0}}),
+            patch("universe_builder.UniverseBuilder", ub_mock),
+            patch.object(rip, "_promote_to_live", return_value=0),
+            patch.object(rip, "_write_manifest"),
+            patch("ic_calculator.update_ic_weights", side_effect=_uiw_side),
+            patch("ic_calculator.update_live_ic", return_value={}),
+            patch("ic_validator.validate_and_persist",
+                  return_value=MagicMock(ready_for_live=False)),
         ):
             rip.run()
 
-        assert call_order.index("thesis_store") < call_order.index("update_ic_weights")
+        assert call_order.index("universe_build") < call_order.index("update_ic_weights")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -436,32 +457,7 @@ class TestStep5FailSoft:
 
     def _mock_steps_1_to_4(self, rip):
         """Return a context manager that mocks all four intelligence steps."""
-        from contextlib import ExitStack
-        from unittest.mock import patch
-
-        stack = ExitStack()
-        stack.enter_context(
-            patch.object(rip, "generate_feed", return_value=MagicMock(candidates=[]))
-        )
-        stack.enter_context(
-            patch.object(rip, "generate_economic_intelligence", return_value=({}, {}))
-        )
-        stack.enter_context(
-            patch.object(
-                rip,
-                "generate_theme_activation",
-                return_value={"activation_summary": {"activated": 0, "total_themes": 0}},
-            )
-        )
-        stack.enter_context(
-            patch.object(
-                rip,
-                "generate_thesis_store",
-                return_value={"thesis_summary": {"total_theses": 0},
-                              "unavailable_sources": []},
-            )
-        )
-        return stack
+        return _mock_pipeline_steps()
 
     # (1) Step 5 success path — normal execution
     def test_step5_success_path_completes(self):
@@ -469,12 +465,10 @@ class TestStep5FailSoft:
 
         with self._mock_steps_1_to_4(rip):
             with (
-                patch.object(rip, "update_ic_weights", return_value={"trend": 0.1}) as m_uiw,
-                patch.object(rip, "update_live_ic", return_value={}) as m_uli,
-                patch.object(
-                    rip, "validate_and_persist",
-                    return_value=MagicMock(ready_for_live=True, weights={})
-                ) as m_vp,
+                patch("ic_calculator.update_ic_weights", return_value={"trend": 0.1}) as m_uiw,
+                patch("ic_calculator.update_live_ic", return_value={}) as m_uli,
+                patch("ic_validator.validate_and_persist",
+                      return_value=MagicMock(ready_for_live=True, weights={})) as m_vp,
             ):
                 rip.run()   # must not raise
 
@@ -488,15 +482,11 @@ class TestStep5FailSoft:
 
         with self._mock_steps_1_to_4(rip):
             with (
-                patch.object(
-                    rip, "update_ic_weights",
-                    side_effect=RuntimeError("yfinance timeout"),
-                ),
-                patch.object(rip, "update_live_ic", return_value={}),
-                patch.object(
-                    rip, "validate_and_persist",
-                    return_value=MagicMock(ready_for_live=False, weights={}),
-                ),
+                patch("ic_calculator.update_ic_weights",
+                      side_effect=RuntimeError("yfinance timeout")),
+                patch("ic_calculator.update_live_ic", return_value={}),
+                patch("ic_validator.validate_and_persist",
+                      return_value=MagicMock(ready_for_live=False, weights={})),
             ):
                 rip.run()   # must NOT raise — fail soft
 
@@ -506,36 +496,39 @@ class TestStep5FailSoft:
 
         executed = []
 
-        def _feed(*a, **kw):
+        def _resolve(*a, **kw):
             executed.append("step1")
-            return MagicMock(candidates=[])
+            return {"active_drivers": [], "mode": "test", "blocked_conditions": []}
 
-        def _econ(*a, **kw):
+        def _feed(*a, **kw):
             executed.append("step2")
-            return {}, {}
+            return MagicMock(candidates=[])
 
         def _theme(*a, **kw):
             executed.append("step3")
             return {"activation_summary": {"activated": 0, "total_themes": 0}}
 
-        def _thesis(*a, **kw):
+        def _ub_write(*a, **kw):
             executed.append("step4")
-            return {"thesis_summary": {"total_theses": 0}, "unavailable_sources": []}
+            return MagicMock(candidates=[])
+
+        ub_mock = MagicMock()
+        ub_instance = MagicMock()
+        ub_instance.write.side_effect = _ub_write
+        ub_mock.return_value = ub_instance
 
         with (
-            patch.object(rip, "generate_feed", side_effect=_feed),
-            patch.object(rip, "generate_economic_intelligence", side_effect=_econ),
-            patch.object(rip, "generate_theme_activation", side_effect=_theme),
-            patch.object(rip, "generate_thesis_store", side_effect=_thesis),
-            patch.object(
-                rip, "update_ic_weights",
-                side_effect=ConnectionError("market data unavailable"),
-            ),
-            patch.object(rip, "update_live_ic", return_value={}),
-            patch.object(
-                rip, "validate_and_persist",
-                return_value=MagicMock(ready_for_live=False, weights={}),
-            ),
+            patch("live_driver_resolver.resolve", side_effect=_resolve),
+            patch("candidate_resolver.generate_feed", side_effect=_feed),
+            patch("theme_activation_engine.generate_theme_activation", side_effect=_theme),
+            patch("universe_builder.UniverseBuilder", ub_mock),
+            patch.object(rip, "_promote_to_live", return_value=0),
+            patch.object(rip, "_write_manifest"),
+            patch("ic_calculator.update_ic_weights",
+                  side_effect=ConnectionError("market data unavailable")),
+            patch("ic_calculator.update_live_ic", return_value={}),
+            patch("ic_validator.validate_and_persist",
+                  return_value=MagicMock(ready_for_live=False, weights={})),
         ):
             rip.run()
 
@@ -550,15 +543,10 @@ class TestStep5FailSoft:
 
         with self._mock_steps_1_to_4(rip):
             with (
-                patch.object(
-                    rip, "update_ic_weights",
-                    side_effect=OSError("disk full"),
-                ),
-                patch.object(rip, "update_live_ic", return_value={}),
-                patch.object(
-                    rip, "validate_and_persist",
-                    return_value=MagicMock(ready_for_live=False, weights={}),
-                ),
+                patch("ic_calculator.update_ic_weights", side_effect=OSError("disk full")),
+                patch("ic_calculator.update_live_ic", return_value={}),
+                patch("ic_validator.validate_and_persist",
+                      return_value=MagicMock(ready_for_live=False, weights={})),
             ):
                 # run() itself must not raise — that is what guarantees exit 0
                 try:
@@ -595,15 +583,10 @@ class TestStep5FailSoft:
 
         with self._mock_steps_1_to_4(rip):
             with (
-                patch.object(
-                    rip, "update_ic_weights",
-                    side_effect=ValueError("bad data"),
-                ),
-                patch.object(rip, "update_live_ic", return_value={}),
-                patch.object(
-                    rip, "validate_and_persist",
-                    return_value=MagicMock(ready_for_live=False, weights={}),
-                ),
+                patch("ic_calculator.update_ic_weights", side_effect=ValueError("bad data")),
+                patch("ic_calculator.update_live_ic", return_value={}),
+                patch("ic_validator.validate_and_persist",
+                      return_value=MagicMock(ready_for_live=False, weights={})),
             ):
                 with caplog.at_level(logging.WARNING, logger="decifer.intelligence_pipeline"):
                     rip.run()

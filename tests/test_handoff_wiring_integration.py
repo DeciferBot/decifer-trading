@@ -285,7 +285,6 @@ class TestFlagTrueValidHandoff(unittest.TestCase):
         """Governance map contains all accepted symbols."""
         result = _mock_valid_production_result(["NVDA", "AAPL"])
         import bot_trading
-        import handoff_candidate_adapter as hca
         with patch("handoff_reader.load_production_handoff", return_value=result):
             syms, gov_map, reason = bot_trading._get_handoff_symbol_universe()
         self.assertIn("NVDA", gov_map)
@@ -713,139 +712,7 @@ class TestSpring7BFailClosedMatrix(unittest.TestCase):
             os.unlink(manifest_file.name)
 
 
-# ---------------------------------------------------------------------------
-# Group 5 — Candidate Adapter Tests
-# ---------------------------------------------------------------------------
-
-class TestHandoffCandidateAdapter(unittest.TestCase):
-    """Group 5: handoff_candidate_adapter.py pure function tests."""
-
-    def _import_adapter(self):
-        sys.path.insert(0, _ROOT)
-        import handoff_candidate_adapter
-        return handoff_candidate_adapter
-
-    def test_adapter_module_exists(self):
-        adapter = self._import_adapter()
-        self.assertTrue(hasattr(adapter, "attach_governance_metadata"))
-        self.assertTrue(hasattr(adapter, "build_governance_map"))
-
-    def test_attach_governance_metadata_prefixes_all_fields(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8, "raw_score": 0.75}]
-        adapter.attach_governance_metadata(scored, gov_map)
-        expected_fields = [
-            "handoff_symbol", "handoff_route", "handoff_route_hint",
-            "handoff_reason_to_care", "handoff_source_labels",
-            "handoff_theme_ids", "handoff_risk_flags",
-            "handoff_confirmation_required", "handoff_approval_status",
-            "handoff_quota_group", "handoff_freshness_status",
-            "handoff_executable", "handoff_order_instruction",
-        ]
-        for field in expected_fields:
-            self.assertIn(field, scored[0], f"Missing field: {field}")
-
-    def test_adapter_does_not_mutate_score(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8, "raw_score": 0.75}]
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertEqual(scored[0]["score"], 0.8)
-        self.assertEqual(scored[0]["raw_score"], 0.75)
-
-    def test_adapter_does_not_mutate_signal_dimensions(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8, "momentum_score": 0.9, "breakout_score": 0.7}]
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertEqual(scored[0]["momentum_score"], 0.9)
-        self.assertEqual(scored[0]["breakout_score"], 0.7)
-
-    def test_adapter_preserves_symbol(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8}]
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertEqual(scored[0]["symbol"], "NVDA")
-        self.assertEqual(scored[0]["handoff_symbol"], "NVDA")
-
-    def test_adapter_preserves_route(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8}]
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertEqual(scored[0]["handoff_route"], "swing")
-
-    def test_adapter_preserves_source_labels(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8}]
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertEqual(scored[0]["handoff_source_labels"], ["intelligence_first_static_rule"])
-
-    def test_adapter_preserves_reason_to_care(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8}]
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertEqual(scored[0]["handoff_reason_to_care"], "test reason")
-
-    def test_adapter_handoff_executable_always_false(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8}]
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertIs(scored[0]["handoff_executable"], False)
-
-    def test_adapter_handoff_order_instruction_always_none(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8}]
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertIsNone(scored[0]["handoff_order_instruction"])
-
-    def test_adapter_unknown_symbol_silently_skipped(self):
-        adapter = self._import_adapter()
-        gov_map = {"KNOWN": _valid_candidate("KNOWN")}
-        scored = [{"symbol": "UNKNOWN", "score": 0.5}]
-        before = dict(scored[0])
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertEqual(scored[0], before, "Unknown symbol must not be modified")
-
-    def test_build_governance_map_keys_are_symbols(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA"), _valid_candidate("AAPL")]
-        gov_map = adapter.build_governance_map(candidates)
-        self.assertIn("NVDA", gov_map)
-        self.assertIn("AAPL", gov_map)
-        self.assertEqual(len(gov_map), 2)
-
-    def test_build_governance_map_skips_missing_symbol(self):
-        adapter = self._import_adapter()
-        no_sym = _valid_candidate("NVDA")
-        del no_sym["symbol"]
-        gov_map = adapter.build_governance_map([no_sym])
-        self.assertEqual(gov_map, {})
-
-    def test_attach_governance_is_in_place(self):
-        adapter = self._import_adapter()
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = adapter.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8}]
-        original_id = id(scored[0])
-        adapter.attach_governance_metadata(scored, gov_map)
-        self.assertEqual(id(scored[0]), original_id, "attach must modify in place")
-
+# Group 5 (handoff_candidate_adapter) removed — module deleted in architectural cleanup.
 
 # ---------------------------------------------------------------------------
 # Group 6 — Apex Boundary Tests
@@ -853,29 +720,6 @@ class TestHandoffCandidateAdapter(unittest.TestCase):
 
 class TestApexBoundary(unittest.TestCase):
     """Group 6: Apex receives only handoff candidates when flag is True."""
-
-    def test_apex_input_shape_compatible(self):
-        """Scored dict with handoff_* fields still has required Apex fields."""
-        sys.path.insert(0, _ROOT)
-        import handoff_candidate_adapter as hca
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = hca.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8, "raw_score": 0.75, "price": 450.0, "atr": 5.0}]
-        hca.attach_governance_metadata(scored, gov_map)
-        # Required Apex input fields still present
-        self.assertIn("symbol", scored[0])
-        self.assertIn("score", scored[0])
-
-    def test_governance_metadata_fields_present_in_scored(self):
-        """Apex-visible fields include governance context."""
-        import handoff_candidate_adapter as hca
-        candidates = [_valid_candidate("NVDA")]
-        gov_map = hca.build_governance_map(candidates)
-        scored = [{"symbol": "NVDA", "score": 0.8}]
-        hca.attach_governance_metadata(scored, gov_map)
-        self.assertIn("handoff_route_hint", scored[0])
-        self.assertIn("handoff_theme_ids", scored[0])
-        self.assertIn("handoff_risk_flags", scored[0])
 
     def test_handoff_governance_map_not_empty_on_valid_handoff(self):
         """_handoff_governance_map is populated after valid handoff."""
@@ -914,47 +758,12 @@ class TestRiskOrderExecutionUnchanged(unittest.TestCase):
         with open(os.path.join(_ROOT, filename)) as f:
             return f.read()
 
-    def _adapter_imports(self) -> set[str]:
-        """Return the set of module names imported by handoff_candidate_adapter."""
-        src = self._get_src("handoff_candidate_adapter.py")
-        tree = ast.parse(src)
-        names: set[str] = set()
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    names.add(alias.name.split(".")[0])
-            elif isinstance(node, ast.ImportFrom):
-                if node.module:
-                    names.add(node.module.split(".")[0])
-        return names
-
-    def test_guardrails_not_modified_by_sprint7e(self):
-        """guardrails.py is unchanged — handoff adapter does not import it."""
-        self.assertNotIn("guardrails", self._adapter_imports())
-
-    def test_orders_core_not_modified_by_adapter(self):
-        """orders_core not imported by handoff_candidate_adapter."""
-        self.assertNotIn("orders_core", self._adapter_imports())
-
-    def test_no_broker_calls_in_adapter(self):
-        """No broker/IBKR calls in handoff_candidate_adapter."""
-        imports = self._adapter_imports()
-        self.assertNotIn("bot_ibkr", imports)
-        src = self._get_src("handoff_candidate_adapter.py")
-        self.assertNotIn("IBKRConnection", src)
-
     def test_no_order_placement_in_handoff_reader(self):
         """handoff_reader makes no order placement calls."""
         src = self._get_src("handoff_reader.py")
         self.assertNotIn("execute_buy", src)
         self.assertNotIn("execute_short", src)
         self.assertNotIn("place_order", src)
-
-    def test_no_order_placement_in_adapter(self):
-        """handoff_candidate_adapter makes no order calls."""
-        src = self._get_src("handoff_candidate_adapter.py")
-        self.assertNotIn("execute_buy", src)
-        self.assertNotIn("execute_short", src)
 
     def test_scanner_output_changed_false_in_source(self):
         """scanner_output_changed=False logged in wiring path."""
@@ -1040,34 +849,6 @@ class TestImportSafety(unittest.TestCase):
         """Collect all imported module names including those in function bodies."""
         return self._get_top_level_imports(filename)
 
-    def test_adapter_does_not_import_scanner(self):
-        imports = self._get_all_imports("handoff_candidate_adapter.py")
-        self.assertNotIn("scanner", imports)
-
-    def test_adapter_does_not_import_bot_trading(self):
-        imports = self._get_all_imports("handoff_candidate_adapter.py")
-        self.assertNotIn("bot_trading", imports)
-
-    def test_adapter_does_not_import_orders_core(self):
-        imports = self._get_all_imports("handoff_candidate_adapter.py")
-        self.assertNotIn("orders_core", imports)
-
-    def test_adapter_does_not_import_guardrails(self):
-        imports = self._get_all_imports("handoff_candidate_adapter.py")
-        self.assertNotIn("guardrails", imports)
-
-    def test_adapter_does_not_import_bot_ibkr(self):
-        imports = self._get_all_imports("handoff_candidate_adapter.py")
-        self.assertNotIn("bot_ibkr", imports)
-
-    def test_adapter_does_not_import_market_intelligence(self):
-        imports = self._get_all_imports("handoff_candidate_adapter.py")
-        self.assertNotIn("market_intelligence", imports)
-
-    def test_adapter_does_not_import_apex_orchestrator(self):
-        imports = self._get_all_imports("handoff_candidate_adapter.py")
-        self.assertNotIn("apex_orchestrator", imports)
-
     def test_handoff_reader_does_not_import_scanner(self):
         imports = self._get_all_imports("handoff_reader.py")
         self.assertNotIn("scanner", imports)
@@ -1143,21 +924,6 @@ class TestSafetyFlags(unittest.TestCase):
             src = f.read()
         self.assertIn("live_output_changed=False", src)
 
-    def test_production_manifest_not_written_by_sprint7e(self):
-        """No process in Sprint 7E writes data/live/current_manifest.json."""
-        adapter_path = os.path.join(_ROOT, "handoff_candidate_adapter.py")
-        with open(adapter_path) as f:
-            src = f.read()
-        self.assertNotIn("current_manifest.json", src)
-        self.assertNotIn("open(", src)  # no file writes in adapter
-
-    def test_production_active_universe_not_written_by_sprint7e(self):
-        """handoff_candidate_adapter does not write to active_opportunity_universe.json."""
-        adapter_path = os.path.join(_ROOT, "handoff_candidate_adapter.py")
-        with open(adapter_path) as f:
-            src = f.read()
-        self.assertNotIn("active_opportunity_universe", src)
-
     def test_enable_active_opportunity_universe_handoff_default_false(self):
         """The flag defaults to False in config; skips when intentionally True for controlled activation."""
         import config
@@ -1176,16 +942,11 @@ class TestSmokeSpotCheck(unittest.TestCase):
     """Smoke: quick end-to-end structure checks."""
 
     def test_smoke_passes_for_7e(self):
-        """Sprint 7E smoke: adapter + reader + bot_trading wiring points exist."""
+        """Sprint 7E smoke: reader + bot_trading wiring points exist."""
         sys.path.insert(0, _ROOT)
-        import handoff_candidate_adapter as hca
         import handoff_reader as hr
 
-        # Adapter has expected public API
-        self.assertTrue(callable(hca.attach_governance_metadata))
-        self.assertTrue(callable(hca.build_governance_map))
-
-        # Reader has new production function
+        # Reader has production function
         self.assertTrue(callable(hr.load_production_handoff))
 
         # Bot_trading has wiring constants

@@ -164,13 +164,7 @@ def _get_handoff_symbol_universe() -> tuple[list[str], dict, str | None]:
         _log_handoff_fail_closed(reason)
         return [], {}, reason
 
-    try:
-        from handoff_candidate_adapter import build_governance_map as _build_gov_map
-        governance_map = _build_gov_map(accepted)
-    except Exception as exc:
-        reason = f"handoff_adapter_exception: {exc}"
-        _log_handoff_fail_closed(reason)
-        return [], {}, reason
+    governance_map = {c["symbol"]: c for c in accepted if c.get("symbol")}
 
     symbol_list = list(governance_map.keys())
     if not symbol_list:
@@ -1721,11 +1715,14 @@ def run_scan():
     # Pure adapter call — does not modify score, raw_score, or signal dimensions.
     # Only runs when handoff is enabled and succeeded (fail-closed check is below).
     if CONFIG.get("enable_active_opportunity_universe_handoff", False) and not _handoff_fail_closed_reason and _handoff_governance_map:
-        try:
-            from handoff_candidate_adapter import attach_governance_metadata as _attach_gov
-            _attach_gov(pipeline.all_scored, _handoff_governance_map)
-        except Exception as _hoff_adapt_err:
-            log.debug("handoff governance attachment skipped: %s", _hoff_adapt_err)
+        for _sd in pipeline.all_scored:
+            _gov = _handoff_governance_map.get(_sd.get("symbol", ""))
+            if _gov:
+                _sd["handoff_route"] = _gov.get("route")
+                _sd["handoff_reason_to_care"] = _gov.get("reason_to_care")
+                _sd["handoff_source_labels"] = _gov.get("source_labels")
+                _sd["handoff_quota_group"] = _gov.get("quota", {}).get("group") if isinstance(_gov.get("quota"), dict) else None
+                _sd["handoff_executable"] = False
 
     # BACK-007 — update directional skew display each scan
     try:
