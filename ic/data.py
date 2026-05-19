@@ -223,3 +223,20 @@ def _fetch_forward_returns_batch(records: list) -> dict:
         result.setdefault(idx, None)
 
     return result
+
+
+def count_independent_dates(records: list[dict]) -> int:
+    """
+    Count unique trading dates in a set of signal records.
+
+    Each record's ``ts`` field (ISO-8601) is truncated to YYYY-MM-DD.
+    This is used to assess IC statistical reliability: the effective
+    sample size for time-series significance testing is the number of
+    independent cross-section dates, not the total number of records.
+    """
+    dates: set = set()
+    for rec in records:
+        ts = rec.get("ts", "")
+        if ts and isinstance(ts, str) and len(ts) >= 10:
+            dates.add(ts[:10])
+    return len(dates)
