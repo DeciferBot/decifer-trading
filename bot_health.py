@@ -1,22 +1,19 @@
 """
-bot_health.py — Read-only health report aggregator for the /api/health endpoint.
+bot_health.py — 7-stage pipeline health report for /api/health endpoint.
 
-Single public function:
-    build_health_report() -> dict
+Pipeline funnel:
+  Stage 1: Intelligence Pipeline  (manual → intelligence/*.json)
+  Stage 2: Universe Builders      (launchd weekly/daily → universe files)
+  Stage 3: Handoff Publisher      (launchd 10min → live/ + heartbeats/)
+  Stage 4: Bot Core               (always-on → IBKR + Alpaca + process)
+  Stage 5: Scan Engine            (scan cycle → Apex + signal funnel)
+  Stage 6: Execution              (positions + bracket integrity + disk)
+  Stage 7: IC & Validation        (ic_weights + quality + gates)
 
-Reads from existing sources (bot_state.dash, event_log, ic_validator,
-phase_gate, orders_state, disk stats).  Never submits orders, never mutates
-positions, never raises — all exceptions are caught and surface as degraded
-status fields so the dashboard always gets a complete JSON blob.
+Stages 4 and 5 are critical — if they fail, verdict = NOT TRADING.
+Stages 1-3 stale → DEGRADED (data quality issue, bot still runs).
 
-Seven domains mirroring the plan:
-  infrastructure  — IBKR, Alpaca stream, data feed tier, account value age
-  scan            — last scan age, consecutive zero-scored, duration, universe size
-  apex            — per-track call status, latency stats, error count
-  funnel          — last scan cycle stage-by-stage attrition from tier_d_funnel.jsonl
-  positions       — bracket gaps, reconciliation, stuck pending orders
-  resources       — disk free, JSONL write freshness, .fail_* sentinels
-  readiness       — IC quality, live-readiness gates, phase gate status
+Always returns a complete JSON structure. Never raises.
 """
 
 from __future__ import annotations
@@ -25,109 +22,210 @@ import json
 import os
 import time
 from datetime import UTC, datetime
-from typing import Any
 
 from config import CONFIG
 
 _DATA_DIR = CONFIG.get("data_dir", "data")
+if not os.path.isabs(_DATA_DIR):
+    _DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), _DATA_DIR)
 
-# JSONL log paths whose write freshness we track
-_WATCHED_LOGS = {
-    "tier_d_funnel": os.path.join(_DATA_DIR, "tier_d_funnel.jsonl"),
-    "apex_shadow": os.path.join(_DATA_DIR, "apex_shadow_log.jsonl"),
-    "apex_audit": os.path.join(_DATA_DIR, "apex_decision_audit.jsonl"),
-    "event_log": os.path.join(_DATA_DIR, "trade_events.jsonl"),
-    "reconciled": os.path.join(_DATA_DIR, "reconciled_trades.jsonl"),
-}
-
-_FAIL_SENTINEL_GLOB = ".fail_"
 _LATENCY_RING_SIZE = 20
+_FUNNEL_LOG = os.path.join(_DATA_DIR, "tier_d_funnel.jsonl")
 
 
-# ── Domain builders ───────────────────────────────────────────────────────────
+def _fmt_age(s: float) -> str:
+    if s < 60:
+        return f"{int(s)}s"
+    if s < 3600:
+        return f"{int(s / 60)}m"
+    if s < 86400:
+        return f"{int(s / 3600)}h"
+    return f"{int(s / 86400)}d"
 
-def _infrastructure(dash: dict) -> dict:
-    """IBKR connectivity, Alpaca stream, data feed tier, account value staleness."""
+
+def _file_age(rel_path: str, sla_s: float, label: str) -> dict:
+    """Check file age vs SLA. Returns status: ok | warn | stale | missing."""
+    path = os.path.join(_DATA_DIR, rel_path) if not os.path.isabs(rel_path) else rel_path
+    if not os.path.exists(path):
+        return {"label": label, "present": False, "age_s": None, "age_human": "absent",
+                "sla_s": sla_s, "sla_human": _fmt_age(sla_s), "status": "missing"}
+    age_s = time.time() - os.path.getmtime(path)
+    if age_s <= sla_s:
+        status = "ok"
+    elif age_s <= sla_s * 1.5:
+        status = "warn"
+    else:
+        status = "stale"
+    return {"label": label, "present": True, "age_s": round(age_s, 0),
+            "age_human": _fmt_age(age_s), "sla_s": sla_s, "sla_human": _fmt_age(sla_s),
+            "status": status}
+
+
+def _agg_status(artifacts: list[dict]) -> str:
+    statuses = [a.get("status", "missing") for a in artifacts]
+    if any(s == "stale" for s in statuses):
+        return "stale"
+    if any(s == "missing" for s in statuses):
+        return "missing"
+    if any(s == "warn" for s in statuses):
+        return "warn"
+    return "ok"
+
+
+# ── Stage builders ────────────────────────────────────────────────────────────
+
+def _stage_intelligence() -> dict:
+    """Stage 1 — Intelligence Pipeline (manual-only refresh)."""
+    SLA = 86_400  # 24h
+    artifacts = [
+        _file_age("intelligence/daily_economic_state.json",     SLA, "Economic state"),
+        _file_age("intelligence/current_economic_context.json", SLA, "Economic context"),
+        _file_age("intelligence/theme_activation.json",         SLA, "Theme activation"),
+        _file_age("intelligence/thesis_store.json",             SLA, "Thesis store"),
+    ]
+    return {
+        "name": "Intelligence",
+        "label": "Stage 1 — Intelligence Pipeline",
+        "description": "Manual: run_intelligence_pipeline.py  ·  no scheduler",
+        "status": _agg_status(artifacts),
+        "critical": False,
+        "artifacts": artifacts,
+    }
+
+
+def _stage_universe() -> dict:
+    """Stage 2 — Universe Builders (launchd weekly + daily)."""
+    artifacts = [
+        _file_age("committed_universe.json",         7 * 86_400,  "Committed universe"),
+        _file_age("daily_promoted.json",             18 * 3600,   "Daily promoted"),
+        _file_age("position_research_universe.json", 8 * 86_400,  "Position research universe"),
+    ]
+    heartbeats = [
+        _file_age("heartbeats/universe_committed_worker.json", 7 * 86_400, "Committed worker heartbeat"),
+        _file_age("heartbeats/universe_promoter_worker.json",  18 * 3600,  "Promoter worker heartbeat"),
+    ]
+    return {
+        "name": "Universe",
+        "label": "Stage 2 — Universe Builders",
+        "description": "launchd: universe-committed (weekly)  +  universe-promoter (daily 2×)",
+        "status": _agg_status(artifacts),
+        "critical": False,
+        "artifacts": artifacts,
+        "heartbeats": heartbeats,
+    }
+
+
+def _stage_handoff() -> dict:
+    """Stage 3 — Handoff Publisher (launchd every 10 min)."""
+    artifacts = [
+        _file_age("heartbeats/handoff_publisher.json",     10 * 60, "Publisher heartbeat"),
+        _file_age("live/active_opportunity_universe.json", 15 * 60, "Active opportunity universe"),
+        _file_age("live/current_manifest.json",            15 * 60, "Current manifest"),
+    ]
+    handoff_enabled = bool(CONFIG.get("enable_active_opportunity_universe_handoff", False))
+    raw_status = _agg_status(artifacts)
+    return {
+        "name": "Handoff",
+        "label": "Stage 3 — Handoff Publisher",
+        "description": "launchd: handoff-publisher  ·  every 10 min",
+        "status": raw_status if handoff_enabled else "ok",
+        "handoff_enabled": handoff_enabled,
+        "critical": False,
+        "artifacts": artifacts,
+    }
+
+
+def _stage_bot_core(dash: dict) -> dict:
+    """Stage 4 — Bot Core: IBKR + Alpaca + process liveness. CRITICAL."""
     import bot_state as _bs
 
     ibkr_connected = not dash.get("ibkr_disconnected", False)
+    bot_status = dash.get("status", "unknown")
+    paused = dash.get("paused", False)
+    killed = dash.get("killed", False)
+
+    alpaca_running = False
+    try:
+        if _bs._bar_stream is not None:
+            alpaca_running = bool(getattr(_bs._bar_stream, "_running", False))
+    except Exception:
+        pass
+
     account_value_age_s: float | None = None
     if _bs.account_values_updated_at is not None:
         account_value_age_s = round(time.time() - _bs.account_values_updated_at, 1)
+    account_stale = account_value_age_s is not None and account_value_age_s > 300
 
-    # Alpaca stream: _running is the authoritative live flag on AlpacaBarStream
-    alpaca_stream_ok: bool | None = None
-    try:
-        if _bs._bar_stream is not None:
-            alpaca_stream_ok = bool(getattr(_bs._bar_stream, "_running", False))
-        else:
-            alpaca_stream_ok = False
-    except Exception:
-        pass
-
-    # Data feed tier: infer from recent signal logs — last logged source
-    data_feed_tier = "unknown"
-    try:
-        import alpaca_data as _ad
-        data_feed_tier = getattr(_ad, "_last_source_used", "unknown")
-    except Exception:
-        pass
-
-    # External data source availability (key configured = available)
-    fmp_key_set = False
-    alpha_vantage_key_set = False
-    try:
-        from fmp_client import is_available as _fmp_ok
-        fmp_key_set = _fmp_ok()
-    except Exception:
-        pass
-    try:
-        import os as _os
-        alpha_vantage_key_set = bool(_os.environ.get("ALPHA_VANTAGE_KEY", ""))
-    except Exception:
-        pass
-    try:
-        from config import CONFIG as _cfg
-        if not alpha_vantage_key_set:
-            alpha_vantage_key_set = bool(_cfg.get("alpha_vantage_key", ""))
-    except Exception:
-        pass
-
-    reconnects_today = 0
-    try:
-        _logs = dash.get("logs") or []
-        for _l in _logs[:500]:
-            if "reconnect" in (_l.get("msg") or "").lower():
-                reconnects_today += 1
-    except Exception:
-        pass
-
-    # Stale threshold from bot_ibkr config
-    stale_warn_s = 240
-    stale_hard_s = 300
-    account_stale = False
-    if account_value_age_s is not None and account_value_age_s > stale_warn_s:
-        account_stale = True
+    if killed or not ibkr_connected:
+        status = "stale"
+    elif account_stale:
+        status = "warn"
+    elif paused or not alpaca_running:
+        status = "warn"
+    else:
+        status = "ok"
 
     return {
+        "name": "Bot Core",
+        "label": "Stage 4 — Bot Core",
+        "description": "bot.py: IBKR connection  +  Alpaca stream  +  process health",
+        "status": status,
+        "critical": True,
         "ibkr_connected": ibkr_connected,
+        "alpaca_running": alpaca_running,
+        "bot_status": bot_status,
+        "paused": paused,
+        "killed": killed,
         "account_value_age_s": account_value_age_s,
         "account_stale": account_stale,
-        "account_stale_warn_threshold_s": stale_warn_s,
-        "alpaca_stream_ok": alpaca_stream_ok,
-        "data_feed_tier": data_feed_tier,
-        "fmp_available": fmp_key_set,
-        "alpha_vantage_available": alpha_vantage_key_set,
-        "reconnects_today": reconnects_today,
-        "bot_status": dash.get("status", "unknown"),
-        "paused": dash.get("paused", False),
-        "killed": dash.get("killed", False),
         "hot_reload_count": dash.get("hot_reload_count", 0),
     }
 
 
-def _scan(dash: dict) -> dict:
-    """Last scan age, consecutive zero-scored scans, duration ring, universe size."""
+def _read_funnel() -> dict:
+    """Read last scan cycle attrition from tier_d_funnel.jsonl."""
+    if not os.path.exists(_FUNNEL_LOG):
+        return {"available": False}
+    try:
+        with open(_FUNNEL_LOG, errors="replace") as fh:
+            fh.seek(0, 2)
+            file_size = fh.tell()
+            fh.seek(max(0, file_size - 32_768))
+            lines = fh.readlines()
+        last_pipeline: dict[int, dict] = {}
+        last_dispatch: dict | None = None
+        for line in lines:
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            stage = rec.get("stage")
+            if stage == "pipeline" and isinstance(rec.get("step"), int):
+                last_pipeline[rec["step"]] = rec
+            elif stage == "dispatch":
+                last_dispatch = rec
+        if not last_pipeline:
+            return {"available": False}
+        universe_in = (last_pipeline.get(1) or {}).get("in")
+        last_out = None
+        for step in sorted(last_pipeline.keys(), reverse=True):
+            v = (last_pipeline.get(step) or {}).get("out")
+            if v is not None:
+                last_out = v
+                break
+        return {
+            "available": True,
+            "universe_in": universe_in,
+            "after_pipeline": last_out,
+            "dispatched": (last_dispatch or {}).get("dispatched"),
+            "filled": (last_dispatch or {}).get("filled"),
+        }
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+def _stage_scan_engine(dash: dict) -> dict:
+    """Stage 5 — Scan Engine: signal scoring + Apex synthesizer. CRITICAL."""
     last_scan = dash.get("last_scan")
     last_scan_age_s: float | None = None
     if last_scan:
@@ -138,15 +236,12 @@ def _scan(dash: dict) -> dict:
             pass
 
     durations = dash.get("scan_durations") or []
-    avg_duration_s: float | None = None
     last_duration_s: float | None = None
     if durations:
-        _vals = [d.get("duration_s") for d in durations if d.get("duration_s") is not None]
-        if _vals:
-            avg_duration_s = round(sum(_vals) / len(_vals), 1)
-            last_duration_s = round(_vals[-1], 1)
+        vals = [d.get("duration_s") for d in durations if d.get("duration_s") is not None]
+        if vals:
+            last_duration_s = round(vals[-1], 1)
 
-    # consecutive zero-scored: stored in bot_trading module-level counter
     consecutive_zero = 0
     try:
         import bot_trading as _bt
@@ -154,168 +249,45 @@ def _scan(dash: dict) -> dict:
     except Exception:
         pass
 
-    # universe size from last scan cycle entry
-    last_universe_size: int | None = None
-    if durations:
-        last_universe_size = durations[-1].get("candidates")
-
-    return {
-        "scan_count": dash.get("scan_count", 0),
-        "last_scan_age_s": last_scan_age_s,
-        "consecutive_zero_scored": consecutive_zero,
-        "consecutive_zero_threshold": 3,
-        "avg_duration_s": avg_duration_s,
-        "last_duration_s": last_duration_s,
-        "last_universe_size": last_universe_size,
-        "scanning": dash.get("scanning", False),
-        "next_scan_seconds": dash.get("next_scan_seconds", 0),
-    }
-
-
-def _apex(dash: dict) -> dict:
-    """Track A / Track B / Shadow call status, latency stats, error count."""
     latencies = dash.get("apex_call_latencies") or []
     errors_1h = dash.get("apex_errors_1h") or 0
-
-    # Compute per-track last status and latency
-    tracks: dict[str, dict] = {}
-    for entry in reversed(latencies):
-        track = entry.get("track", "SCAN_CYCLE")
-        if track not in tracks:
-            tracks[track] = {
-                "last_ok": entry.get("ok"),
-                "last_latency_s": entry.get("latency_s"),
-                "last_ts": entry.get("ts"),
-            }
-
-    all_latency_vals = [e.get("latency_s") for e in latencies if e.get("latency_s") is not None]
     avg_latency_s: float | None = None
-    p95_latency_s: float | None = None
-    if all_latency_vals:
-        avg_latency_s = round(sum(all_latency_vals) / len(all_latency_vals), 2)
-        sorted_vals = sorted(all_latency_vals)
-        p95_idx = max(0, int(len(sorted_vals) * 0.95) - 1)
-        p95_latency_s = round(sorted_vals[p95_idx], 2)
-
-    recent_ok_rate: float | None = None
     if latencies:
-        ok_count = sum(1 for e in latencies if e.get("ok"))
-        recent_ok_rate = round(ok_count / len(latencies), 3)
+        vals = [e.get("latency_s") for e in latencies if e.get("latency_s") is not None]
+        if vals:
+            avg_latency_s = round(sum(vals) / len(vals), 2)
+
+    funnel = _read_funnel()
+
+    if last_scan_age_s is None:
+        status = "missing"
+    elif last_scan_age_s > 900:  # 15 min
+        status = "stale"
+    elif last_scan_age_s > 600 or consecutive_zero >= 2 or errors_1h > 2:
+        status = "warn"
+    else:
+        status = "ok"
 
     return {
-        "tracks": tracks,
-        "avg_latency_s": avg_latency_s,
-        "p95_latency_s": p95_latency_s,
-        "recent_ok_rate": recent_ok_rate,
-        "errors_1h": errors_1h,
-        "call_history": latencies[-_LATENCY_RING_SIZE:],
+        "name": "Scan Engine",
+        "label": "Stage 5 — Scan Engine",
+        "description": "bot_trading.py: signal scoring  +  apex_orchestrator.py: Apex synthesizer",
+        "status": status,
+        "critical": True,
+        "scan_count": dash.get("scan_count", 0),
+        "last_scan_age_s": last_scan_age_s,
+        "last_duration_s": last_duration_s,
+        "consecutive_zero_scored": consecutive_zero,
+        "apex_avg_latency_s": avg_latency_s,
+        "apex_errors_1h": errors_1h,
+        "funnel": funnel,
     }
 
 
-def _funnel() -> dict:
-    """Last scan cycle attrition from tier_d_funnel.jsonl."""
-    path = _WATCHED_LOGS["tier_d_funnel"]
-    if not os.path.exists(path):
-        return {"available": False}
-
-    # Read last ~200 lines to find the most recent pipeline stage set
-    last_pipeline: dict[int, dict] = {}
-    last_apex_cap: dict | None = None
-    last_dispatch: dict | None = None
-    try:
-        with open(path, errors="replace") as fh:
-            # Seek from end for efficiency on large files
-            fh.seek(0, 2)
-            file_size = fh.tell()
-            read_size = min(file_size, 32_768)  # last 32KB
-            fh.seek(max(0, file_size - read_size))
-            lines = fh.readlines()
-
-        for line in lines:
-            try:
-                rec = json.loads(line)
-            except Exception:
-                continue
-            stage = rec.get("stage")
-            if stage == "pipeline":
-                step = rec.get("step")
-                if isinstance(step, int):
-                    last_pipeline[step] = rec
-            elif stage == "apex_cap":
-                last_apex_cap = rec
-            elif stage == "dispatch":
-                last_dispatch = rec
-    except Exception as e:
-        return {"available": False, "error": str(e)}
-
-    if not last_pipeline:
-        return {"available": False}
-
-    attrition = {
-        step: {
-            "in": r.get("in"),
-            "out": r.get("out"),
-            "blocked": r.get("blocked"),
-            "reason": r.get("reason"),
-        }
-        for step, r in sorted(last_pipeline.items())
-    }
-
-    top_blocks: list[dict] = []
-    try:
-        _block_counts: dict[str, int] = {}
-        for r in last_pipeline.values():
-            for sym, reason in (r.get("block_reasons") or {}).items():
-                _block_counts[reason] = _block_counts.get(reason, 0) + 1
-        top_blocks = sorted(
-            [{"reason": k, "count": v} for k, v in _block_counts.items()],
-            key=lambda x: x["count"],
-            reverse=True,
-        )[:5]
-    except Exception:
-        pass
-
-    universe_in = (attrition.get(1) or {}).get("in")
-    last_out = None
-    for step in sorted(attrition.keys(), reverse=True):
-        candidate = (attrition.get(step) or {}).get("out")
-        if candidate is not None:
-            last_out = candidate
-            break
-
-    apex_cap_hit = None
-    if last_apex_cap:
-        apex_cap_hit = {
-            "cap": last_apex_cap.get("cap"),
-            "before": last_apex_cap.get("before"),
-            "after": last_apex_cap.get("after"),
-            "killed": (last_apex_cap.get("before") or 0) - (last_apex_cap.get("after") or 0),
-        }
-
-    dispatch_summary = None
-    if last_dispatch:
-        dispatch_summary = {
-            "dispatched": last_dispatch.get("dispatched"),
-            "filled": last_dispatch.get("filled"),
-            "rejected": last_dispatch.get("rejected"),
-        }
-
-    return {
-        "available": True,
-        "universe_in": universe_in,
-        "after_pipeline": last_out,
-        "attrition": attrition,
-        "top_blocks": top_blocks,
-        "apex_cap": apex_cap_hit,
-        "dispatch": dispatch_summary,
-    }
-
-
-def _positions() -> dict:
-    """Bracket gaps, reconciliation mismatches, stuck pending intents."""
+def _stage_execution() -> dict:
+    """Stage 6 — Execution: positions, bracket integrity, disk, fail sentinels."""
     bracket_gaps: list[str] = []
-    unmatched_count = 0
-    stuck_intents: list[dict] = []
+    stuck_count = 0
     position_count = 0
 
     try:
@@ -325,10 +297,7 @@ def _positions() -> dict:
         position_count = len(snapshot)
         for symbol, trade in snapshot.items():
             if trade.get("status") in ("ACTIVE", "TRIMMING"):
-                sl_id = trade.get("sl_order_id")
-                tp_id = trade.get("tp_order_id")
-                # If both are missing, flag as bracket gap
-                if not sl_id and not tp_id:
+                if not trade.get("sl_order_id") and not trade.get("tp_order_id"):
                     bracket_gaps.append(symbol)
     except Exception:
         pass
@@ -336,86 +305,58 @@ def _positions() -> dict:
     try:
         from event_log import pending_orders
         now_utc = datetime.now(UTC)
-        _stuck_threshold_s = 300  # 5 minutes
-        for order in pending_orders():
+        for order in (pending_orders() or []):
             ts_str = order.get("ts") or ""
             if ts_str:
                 try:
                     _ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                    age_s = (now_utc - _ts).total_seconds()
-                    if age_s > _stuck_threshold_s:
-                        stuck_intents.append({
-                            "symbol": order.get("symbol"),
-                            "trade_id": order.get("trade_id"),
-                            "age_s": round(age_s, 0),
-                        })
+                    if (now_utc - _ts).total_seconds() > 300:
+                        stuck_count += 1
                 except Exception:
                     pass
     except Exception:
         pass
 
-    try:
-        from ibkr_reconciler import load_reconciled
-        from datetime import date
-        _today = date.today().isoformat()
-        _records = load_reconciled(_today)
-        unmatched_count = sum(1 for r in _records if not r.get("reconciled", True))
-    except Exception:
-        pass
-
-    return {
-        "position_count": position_count,
-        "bracket_gaps": bracket_gaps,
-        "bracket_gap_count": len(bracket_gaps),
-        "unmatched_count": unmatched_count,
-        "stuck_pending_intents": stuck_intents,
-        "stuck_intent_count": len(stuck_intents),
-    }
-
-
-def _resources() -> dict:
-    """Disk free, JSONL write freshness, .fail_* sentinel files."""
     disk_free_gb: float | None = None
     disk_free_pct: float | None = None
     try:
         _stat = os.statvfs(_DATA_DIR if os.path.isdir(_DATA_DIR) else ".")
         disk_free_gb = round(_stat.f_bavail * _stat.f_frsize / 1_073_741_824, 2)
-        disk_total_gb = _stat.f_blocks * _stat.f_frsize / 1_073_741_824
-        if disk_total_gb > 0:
-            disk_free_pct = round(disk_free_gb / disk_total_gb * 100, 1)
+        disk_total = _stat.f_blocks * _stat.f_frsize / 1_073_741_824
+        if disk_total > 0:
+            disk_free_pct = round(disk_free_gb / disk_total * 100, 1)
     except Exception:
         pass
 
-    log_freshness: dict[str, Any] = {}
-    _now = time.time()
-    for name, path in _WATCHED_LOGS.items():
-        if os.path.exists(path):
-            age_s = round(_now - os.path.getmtime(path), 0)
-            size_mb = round(os.path.getsize(path) / 1_048_576, 2)
-            log_freshness[name] = {"age_s": age_s, "size_mb": size_mb, "present": True}
-        else:
-            log_freshness[name] = {"age_s": None, "size_mb": 0, "present": False}
-
-    fail_sentinels: list[str] = []
+    fail_sentinels = 0
     try:
-        for fname in os.listdir("."):
-            if fname.startswith(_FAIL_SENTINEL_GLOB):
-                fail_sentinels.append(fname)
+        fail_sentinels = sum(1 for f in os.listdir(".") if f.startswith(".fail_"))
     except Exception:
         pass
+
+    has_issues = bool(bracket_gaps) or stuck_count > 0 or fail_sentinels > 0 or (disk_free_pct is not None and disk_free_pct < 10)
+    status = "warn" if has_issues else "ok"
 
     return {
+        "name": "Execution",
+        "label": "Stage 6 — Execution",
+        "description": "orders_core.py: positions  +  bracket integrity  +  system resources",
+        "status": status,
+        "critical": False,
+        "position_count": position_count,
+        "bracket_gaps": bracket_gaps,
+        "bracket_gap_count": len(bracket_gaps),
+        "stuck_intent_count": stuck_count,
         "disk_free_gb": disk_free_gb,
         "disk_free_pct": disk_free_pct,
-        "disk_low": disk_free_pct is not None and disk_free_pct < 10,
-        "log_freshness": log_freshness,
-        "fail_sentinel_count": len(fail_sentinels),
-        "fail_sentinels": fail_sentinels,
+        "fail_sentinel_count": fail_sentinels,
     }
 
 
-def _readiness() -> dict:
-    """IC quality, live-readiness gates, phase gate status."""
+def _stage_validation() -> dict:
+    """Stage 7 — IC & Validation: IC quality, readiness gates, phase status."""
+    ic_weights_check = _file_age("ic_weights.json", 14 * 86_400, "IC weights")
+
     ic_health: dict = {}
     live_readiness: dict = {}
     phase: dict = {}
@@ -428,7 +369,6 @@ def _readiness() -> dict:
             "mean_positive_ic": _ih.mean_positive_ic,
             "n_positive_dims": _ih.n_positive_dims,
             "n_records": _ih.n_records,
-            "using_equal_weights": _ih.using_equal_weights,
         }
     except Exception as e:
         ic_health = {"quality": "ERROR", "error": str(e)}
@@ -442,32 +382,73 @@ def _readiness() -> dict:
             "sharpe_gate_passed": _lr.sharpe_gate_passed,
             "ready_for_live": _lr.ready_for_live,
             "failures": _lr.failures,
-            "n_valid_records": _lr.n_valid_records,
-            "walkforward_sharpe": _lr.walkforward_sharpe,
         }
     except Exception as e:
         live_readiness = {"error": str(e)}
 
     try:
         from phase_gate import get_status
-        _ps = get_status()
-        phase = _ps.as_dict()
+        phase = get_status().as_dict()
     except Exception as e:
         phase = {"error": str(e)}
 
+    q = ic_health.get("quality", "NO_SIGNAL")
+    quality_ok = q in ("STRONG", "MODERATE")
+    gates_ok = (live_readiness.get("sample_gate_passed") and
+                live_readiness.get("ic_gate_passed") and
+                live_readiness.get("sharpe_gate_passed"))
+
+    if ic_weights_check["status"] in ("stale", "missing") or not quality_ok or not gates_ok:
+        status = "warn"
+    else:
+        status = "ok"
+
     return {
+        "name": "Validation",
+        "label": "Stage 7 — IC & Validation",
+        "description": "ic_validator.py: IC quality  +  phase gate status",
+        "status": status,
+        "critical": False,
+        "ic_weights_check": ic_weights_check,
         "ic": ic_health,
         "gates": live_readiness,
         "phase": phase,
     }
 
 
+# ── Verdict ───────────────────────────────────────────────────────────────────
+
+def _trading_verdict(stages: list[dict]) -> dict:
+    by_name = {s["name"]: s for s in stages}
+    bc = by_name.get("Bot Core", {})
+    se = by_name.get("Scan Engine", {})
+
+    if bc.get("killed"):
+        return {"verdict": "NOT TRADING", "reason": "Bot process has been killed"}
+    if not bc.get("ibkr_connected", True):
+        return {"verdict": "NOT TRADING", "reason": "IBKR disconnected"}
+    if bc.get("status") in ("stale", "missing"):
+        return {"verdict": "NOT TRADING", "reason": f"Bot Core failure ({bc.get('status')})"}
+    if se.get("status") in ("stale", "missing"):
+        return {"verdict": "NOT TRADING", "reason": f"Scan Engine failure ({se.get('status')})"}
+
+    stale = [s["name"] for s in stages if s.get("status") in ("stale", "missing") and not s.get("critical")]
+    if stale:
+        return {"verdict": "DEGRADED", "reason": f"Stale pipeline data: {', '.join(stale)}"}
+
+    warned = [s["name"] for s in stages if s.get("status") == "warn"]
+    if warned:
+        return {"verdict": "DEGRADED", "reason": f"Warnings in: {', '.join(warned)}"}
+
+    return {"verdict": "TRADING", "reason": "All pipeline stages healthy"}
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def build_health_report() -> dict:
     """
-    Aggregate all seven health domains into a single dict suitable for JSON
-    serialisation.  Always returns a complete structure — never raises.
+    Returns {"ts": ..., "stages": [...7 stages...], "verdict": {...}}.
+    Always returns a complete structure. Never raises.
     """
     try:
         import bot_state as _bs
@@ -477,19 +458,22 @@ def build_health_report() -> dict:
 
     ts = datetime.now(UTC).isoformat()
 
-    def _safe(fn, *args, **kwargs):
+    def _safe(fn, *args):
         try:
-            return fn(*args, **kwargs)
+            return fn(*args)
         except Exception as e:
-            return {"error": str(e)}
+            name = getattr(fn, "__name__", "unknown").replace("_stage_", "").title()
+            return {"name": name, "label": name, "status": "missing",
+                    "critical": False, "error": str(e), "artifacts": []}
 
-    return {
-        "ts": ts,
-        "infrastructure": _safe(_infrastructure, _dash),
-        "scan": _safe(_scan, _dash),
-        "apex": _safe(_apex, _dash),
-        "funnel": _safe(_funnel),
-        "positions": _safe(_positions),
-        "resources": _safe(_resources),
-        "readiness": _safe(_readiness),
-    }
+    stages = [
+        _safe(_stage_intelligence),
+        _safe(_stage_universe),
+        _safe(_stage_handoff),
+        _safe(_stage_bot_core, _dash),
+        _safe(_stage_scan_engine, _dash),
+        _safe(_stage_execution),
+        _safe(_stage_validation),
+    ]
+
+    return {"ts": ts, "stages": stages, "verdict": _trading_verdict(stages)}

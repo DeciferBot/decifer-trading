@@ -1154,65 +1154,24 @@ canvas{display:block;width:100% !important}
 </div>
 
 <!-- VIEW: HEALTH ──────────────────────────────────────────────────────────── -->
-<div class="view" id="view-health" style="flex-direction:column;padding:16px;gap:14px;overflow-y:auto">
+<div class="view" id="view-health" style="flex-direction:column;padding:16px 20px;gap:0;overflow-y:auto">
 
-  <div style="display:flex;align-items:center;justify-content:space-between">
-    <div style="font-size:13px;font-weight:600;letter-spacing:1px;color:var(--muted2)">BOT HEALTH</div>
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase">Pipeline Health</div>
     <div style="display:flex;align-items:center;gap:10px">
       <span id="hlth-ts" style="font-size:10px;color:var(--muted2)">—</span>
-      <button onclick="loadHealth()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace">↻ REFRESH</button>
+      <button onclick="loadHealth()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
     </div>
   </div>
 
-  <!-- Infrastructure row -->
-  <div class="card">
-    <div class="card-title">Infrastructure</div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px" id="hlth-infra-chips"></div>
-    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;font-size:11px;color:var(--muted2)" id="hlth-infra-meta"></div>
+  <!-- Trading Verdict Banner -->
+  <div id="hlth-verdict" style="margin-bottom:18px;padding:12px 16px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2)">
+    <div style="font-size:11px;color:var(--muted2)">Loading…</div>
   </div>
 
-  <!-- Scan cycle -->
-  <div class="card">
-    <div class="card-title">Scan Cycle</div>
-    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:6px" id="hlth-scan-meta"></div>
-    <div style="margin-top:10px" id="hlth-scan-bar"></div>
-  </div>
-
-  <!-- Apex synthesizer -->
-  <div class="card">
-    <div class="card-title">Apex Synthesizer</div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px" id="hlth-apex-chips"></div>
-    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;font-size:11px;color:var(--muted2)" id="hlth-apex-meta"></div>
-  </div>
-
-  <!-- Signal funnel -->
-  <div class="card">
-    <div class="card-title">Signal Funnel <span style="font-size:9px;color:var(--muted2);margin-left:6px">LAST SCAN CYCLE</span></div>
-    <div id="hlth-funnel" style="margin-top:6px"></div>
-  </div>
-
-  <!-- Positions integrity -->
-  <div class="card">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div class="card-title" style="margin:0">Position Integrity</div>
-      <span id="hlth-pos-alert" style="font-size:10px;color:var(--red);display:none">▲ issues found</span>
-    </div>
-    <div id="hlth-positions" style="margin-top:8px;font-size:11px"></div>
-  </div>
-
-  <!-- Resources row -->
-  <div class="card">
-    <div class="card-title">Resources &amp; Audit Trail</div>
-    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:6px" id="hlth-resources"></div>
-    <div style="margin-top:10px;font-size:11px" id="hlth-log-freshness"></div>
-  </div>
-
-  <!-- IC / Readiness -->
-  <div class="card">
-    <div class="card-title">IC &amp; Readiness</div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px" id="hlth-readiness-chips"></div>
-    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;font-size:11px;color:var(--muted2)" id="hlth-readiness-meta"></div>
-  </div>
+  <!-- 7-Stage Pipeline Funnel -->
+  <div id="hlth-stages" style="display:flex;flex-direction:column;gap:0"></div>
 
 </div>
 <!-- END VIEW: HEALTH ───────────────────────────────────────────────────────── -->
@@ -2258,28 +2217,128 @@ function _stopHealthRefresh() {
   if (_healthRefreshTimer) { clearInterval(_healthRefreshTimer); _healthRefreshTimer = null; }
 }
 
-function _chip(label, ok, detail) {
-  const color = ok === true ? 'var(--green)' : ok === false ? 'var(--red)' : 'var(--muted2)';
-  const dot = ok === true ? '●' : ok === false ? '●' : '○';
-  return `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid ${color};border-radius:3px;font-size:11px;white-space:nowrap">
-    <span style="color:${color}">${dot}</span>
-    <span style="color:var(--fg)">${label}</span>
-    ${detail ? `<span style="color:var(--muted2)">${detail}</span>` : ''}
-  </span>`;
+// Status colour + icon helpers
+function _statusColor(s) {
+  return s === 'ok' ? 'var(--green)' : s === 'warn' ? 'var(--orange)' : s === 'stale' ? 'var(--red)' : s === 'missing' ? 'var(--red)' : 'var(--muted2)';
+}
+function _statusIcon(s) {
+  return s === 'ok' ? '●' : s === 'warn' ? '▲' : '✗';
+}
+function _statusLabel(s) {
+  return s === 'ok' ? 'OK' : s === 'warn' ? 'WARN' : s === 'stale' ? 'STALE' : s === 'missing' ? 'MISSING' : '—';
 }
 
-function _badge(label, passed) {
-  const bg = passed ? 'rgba(80,220,100,0.12)' : 'rgba(220,80,80,0.12)';
-  const border = passed ? 'var(--green)' : 'var(--red)';
-  const icon = passed ? '✓' : '✗';
-  return `<span style="padding:3px 8px;border:1px solid ${border};border-radius:3px;font-size:10px;background:${bg};color:${passed ? 'var(--green)' : 'var(--red)'}">
-    ${icon} ${label}
-  </span>`;
+// Render one artifact row (file age check)
+function _artifactRow(a) {
+  const sc = _statusColor(a.status);
+  const icon = _statusIcon(a.status);
+  const age = a.present ? `${a.age_human} ago` : 'absent';
+  const slaNote = a.sla_human ? ` · SLA ${a.sla_human}` : '';
+  return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:10px">
+    <span style="color:${sc};font-size:9px">${icon}</span>
+    <span style="color:var(--muted2);flex:1">${a.label}</span>
+    <span style="color:${sc}">${age}${slaNote}</span>
+  </div>`;
 }
 
-function _metaItem(label, value, warn) {
-  const color = warn ? 'var(--orange)' : 'var(--muted2)';
-  return `<span style="color:${color}">${label}: <b style="color:var(--fg)">${value ?? '—'}</b></span>`;
+// Render stage detail content (varies by stage name)
+function _stageDetail(s) {
+  const name = s.name;
+  let rows = '';
+
+  if (s.artifacts && s.artifacts.length) {
+    rows += s.artifacts.map(_artifactRow).join('');
+  }
+
+  if (name === 'Bot Core') {
+    const ibkrColor = s.ibkr_connected ? 'var(--green)' : 'var(--red)';
+    const alpacaColor = s.alpaca_running ? 'var(--green)' : 'var(--orange)';
+    rows += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:10px">
+      <span><span style="color:${ibkrColor}">●</span> IBKR ${s.ibkr_connected ? 'connected' : 'DISCONNECTED'}</span>
+      <span><span style="color:${alpacaColor}">●</span> Alpaca ${s.alpaca_running ? 'streaming' : 'not running'}</span>
+      ${s.paused ? '<span style="color:var(--orange)">▲ PAUSED</span>' : ''}
+      ${s.killed ? '<span style="color:var(--red)">✗ KILLED</span>' : ''}
+    </div>`;
+    if (s.account_value_age_s !== null && s.account_value_age_s !== undefined) {
+      const acWarn = s.account_stale;
+      rows += `<div style="margin-top:4px;font-size:10px;color:${acWarn ? 'var(--orange)' : 'var(--muted2)'}">Account value: ${s.account_value_age_s}s ago${acWarn ? ' ▲ stale' : ''}</div>`;
+    }
+  }
+
+  if (name === 'Scan Engine') {
+    const ageWarn = s.last_scan_age_s > 600;
+    const zeroWarn = s.consecutive_zero_scored >= 2;
+    rows += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:10px;color:var(--muted2)">
+      <span style="color:${ageWarn ? 'var(--orange)' : 'var(--muted2)'}">Last scan: ${s.last_scan_age_s !== null && s.last_scan_age_s !== undefined ? s.last_scan_age_s + 's ago' : '—'}</span>
+      <span>Scan #${s.scan_count ?? 0}</span>
+      ${s.last_duration_s !== null && s.last_duration_s !== undefined ? `<span>Duration: ${s.last_duration_s}s</span>` : ''}
+      <span style="color:${zeroWarn ? 'var(--orange)' : 'var(--muted2)'}">Zero-scored: ${s.consecutive_zero_scored ?? 0}</span>
+      ${s.apex_avg_latency_s !== null && s.apex_avg_latency_s !== undefined ? `<span>Apex avg: ${s.apex_avg_latency_s}s</span>` : ''}
+      ${s.apex_errors_1h > 0 ? `<span style="color:var(--red)">Apex errors 1h: ${s.apex_errors_1h}</span>` : ''}
+    </div>`;
+    // Signal funnel
+    const fn = s.funnel || {};
+    if (fn.available) {
+      const uIn = fn.universe_in ?? '?';
+      const aPipe = fn.after_pipeline ?? '?';
+      const aDisp = fn.dispatched ?? '?';
+      const filled = fn.filled ?? '?';
+      const filledColor = filled > 0 ? 'var(--green)' : filled === 0 ? 'var(--orange)' : 'var(--muted2)';
+      rows += `<div style="margin-top:6px;font-size:11px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+        <span style="color:var(--text)">${uIn}</span>
+        <span style="color:var(--muted2)">→[score]→</span>
+        <span style="color:var(--text)">${aPipe}</span>
+        <span style="color:var(--muted2)">→[dispatch]→</span>
+        <span style="color:var(--text)">${aDisp}</span>
+        <span style="color:var(--muted2)">→[Apex]→</span>
+        <span style="color:${filledColor};font-weight:600">${filled} entries</span>
+      </div>`;
+    } else {
+      rows += `<div style="margin-top:4px;font-size:10px;color:var(--muted2)">No funnel data yet — awaiting first scan cycle</div>`;
+    }
+  }
+
+  if (name === 'Execution') {
+    const gapColor = s.bracket_gap_count > 0 ? 'var(--red)' : 'var(--green)';
+    const stuckColor = s.stuck_intent_count > 0 ? 'var(--orange)' : 'var(--muted2)';
+    const diskWarn = s.disk_free_pct !== null && s.disk_free_pct < 15;
+    rows += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:10px">
+      <span style="color:var(--muted2)">Positions: <b style="color:var(--text)">${s.position_count ?? 0}</b></span>
+      <span style="color:${gapColor}">Bracket gaps: ${s.bracket_gap_count ?? 0}${s.bracket_gap_count > 0 ? ' (' + (s.bracket_gaps||[]).join(', ') + ')' : ''}</span>
+      <span style="color:${stuckColor}">Stuck orders: ${s.stuck_intent_count ?? 0}</span>
+      ${s.disk_free_gb !== null ? `<span style="color:${diskWarn ? 'var(--orange)' : 'var(--muted2)'}">Disk: ${s.disk_free_gb}GB free (${s.disk_free_pct}%)</span>` : ''}
+      ${s.fail_sentinel_count > 0 ? `<span style="color:var(--red)">.fail_* files: ${s.fail_sentinel_count}</span>` : ''}
+    </div>`;
+  }
+
+  if (name === 'Validation') {
+    const wc = s.ic_weights_check || {};
+    const ic = s.ic || {};
+    const gates = s.gates || {};
+    const phase = s.phase || {};
+    const q = ic.quality || '—';
+    const qColor = (q === 'STRONG' || q === 'MODERATE') ? 'var(--green)' : 'var(--orange)';
+    rows += `<div style="margin-top:4px">` + _artifactRow(wc) + `</div>`;
+    rows += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;font-size:10px">
+      <span style="color:${qColor}">IC: ${q}${ic.mean_positive_ic !== undefined ? ' (' + ic.mean_positive_ic.toFixed(3) + ')' : ''}</span>
+      <span style="color:${gates.sample_gate_passed ? 'var(--green)' : 'var(--red)'}">${gates.sample_gate_passed ? '✓' : '✗'} Sample gate</span>
+      <span style="color:${gates.ic_gate_passed ? 'var(--green)' : 'var(--red)'}">${gates.ic_gate_passed ? '✓' : '✗'} IC gate</span>
+      <span style="color:${gates.sharpe_gate_passed ? 'var(--green)' : 'var(--red)'}">${gates.sharpe_gate_passed ? '✓' : '✗'} Sharpe gate</span>
+      ${phase.current_phase !== undefined ? `<span style="color:var(--muted2)">Phase ${phase.current_phase} · ${phase.closed_trades ?? '?'} trades</span>` : ''}
+    </div>`;
+  }
+
+  if (name === 'Handoff' && !s.handoff_enabled) {
+    rows += `<div style="margin-top:4px;font-size:10px;color:var(--muted2)">Handoff disabled in config — stages 1-3 not required for trading</div>`;
+  } else if (s.artifacts && s.artifacts.length && name !== 'Intelligence' && name !== 'Universe') {
+    // already rendered artifacts above
+  }
+
+  if (name === 'Universe' && s.heartbeats && s.heartbeats.length) {
+    rows += `<div style="margin-top:4px">` + s.heartbeats.map(_artifactRow).join('') + `</div>`;
+  }
+
+  return rows;
 }
 
 function loadHealth() {
@@ -2287,213 +2346,65 @@ function loadHealth() {
     // Timestamp
     const tsEl = document.getElementById('hlth-ts');
     if (tsEl && d.ts) {
-      try {
-        const dt = new Date(d.ts);
-        tsEl.textContent = 'Updated ' + dt.toLocaleTimeString();
-      } catch(e) { tsEl.textContent = d.ts; }
+      try { tsEl.textContent = 'Updated ' + new Date(d.ts).toLocaleTimeString(); }
+      catch(e) { tsEl.textContent = d.ts; }
     }
 
-    // ── Infrastructure ─────────────────────────────────────
-    const inf = d.infrastructure || {};
-    const infraChips = document.getElementById('hlth-infra-chips');
-    const infraMeta  = document.getElementById('hlth-infra-meta');
-    if (infraChips) {
-      const ibkrOk = inf.ibkr_connected === true;
-      const alpacaOk = inf.alpaca_stream_ok;
-      const feedTier = (inf.data_feed_tier || 'unknown').toUpperCase();
-      const feedOk = feedTier.includes('ALPACA') || feedTier === 'UNKNOWN';
-      infraChips.innerHTML =
-        _chip('IBKR', ibkrOk, ibkrOk ? 'connected' : 'DISCONNECTED') +
-        _chip('Alpaca', alpacaOk === true, alpacaOk === true ? 'streaming' : alpacaOk === false ? 'DOWN' : '?') +
-        _chip('FMP', inf.fmp_available === true, inf.fmp_available ? 'key set' : 'NO KEY') +
-        _chip('Alpha Vantage', inf.alpha_vantage_available === true, inf.alpha_vantage_available ? 'key set' : 'NO KEY') +
-        _chip('Bot', inf.bot_status !== 'killed' && !inf.killed, inf.paused ? 'PAUSED' : (inf.bot_status || '?'));
-    }
-    if (infraMeta) {
-      const acAge = inf.account_value_age_s;
-      const acWarn = inf.account_stale || (acAge !== null && acAge > 240);
-      infraMeta.innerHTML = [
-        _metaItem('Account value age', acAge !== null && acAge !== undefined ? acAge + 's' : '?', acWarn),
-        _metaItem('Reconnects today', inf.reconnects_today ?? 0, (inf.reconnects_today || 0) > 3),
-        _metaItem('Hot reloads', inf.hot_reload_count ?? 0, false),
-      ].join('');
-    }
-
-    // ── Scan cycle ─────────────────────────────────────────
-    const sc = d.scan || {};
-    const scanMeta = document.getElementById('hlth-scan-meta');
-    const scanBar  = document.getElementById('hlth-scan-bar');
-    if (scanMeta) {
-      const zeroWarn = (sc.consecutive_zero_scored || 0) > 0;
-      const ageWarn  = sc.last_scan_age_s !== null && sc.last_scan_age_s > 600;
-      scanMeta.innerHTML = [
-        _metaItem('Last scan', sc.last_scan_age_s !== null ? sc.last_scan_age_s + 's ago' : '—', ageWarn),
-        _metaItem('Duration', sc.last_duration_s !== null ? sc.last_duration_s + 's' : '—', false),
-        _metaItem('Scan count', sc.scan_count ?? 0, false),
-        _metaItem('Consecutive zero-scored', (sc.consecutive_zero_scored || 0) + ' / ' + (sc.consecutive_zero_threshold || 3), zeroWarn),
-        _metaItem('Universe size', sc.last_universe_size ?? '—', false),
-      ].join('');
-    }
-    if (scanBar) {
-      const dur = sc.last_duration_s;
-      const maxDur = 30;
-      const pct = dur !== null && dur !== undefined ? Math.min(100, (dur / maxDur) * 100) : 0;
-      const barColor = pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--orange)' : 'var(--green)';
-      scanBar.innerHTML = dur !== null && dur !== undefined
-        ? `<div style="display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted2)">
-            <span>Scan duration</span>
-            <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px">
-              <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;transition:width .4s"></div>
-            </div>
-            <span style="min-width:40px;text-align:right">${dur}s / ${maxDur}s</span>
-           </div>`
-        : '';
-    }
-
-    // ── Apex ───────────────────────────────────────────────
-    const ap = d.apex || {};
-    const apexChips = document.getElementById('hlth-apex-chips');
-    const apexMeta  = document.getElementById('hlth-apex-meta');
-    if (apexChips) {
-      const tracks = ap.tracks || {};
-      let chipsHtml = '';
-      const trackLabels = {'SCAN_CYCLE':'Track A/B', 'NEWS_INTERRUPT':'News', 'SHADOW':'Shadow'};
-      const knownTracks = Object.keys(tracks);
-      if (knownTracks.length === 0) {
-        chipsHtml = _chip('Apex', null, 'no calls yet');
-      } else {
-        knownTracks.forEach(t => {
-          const info = tracks[t] || {};
-          chipsHtml += _chip(trackLabels[t] || t, info.last_ok, info.last_ok ? 'OK' : info.last_ok === false ? 'ERROR' : '?');
-        });
-      }
-      apexChips.innerHTML = chipsHtml;
-    }
-    if (apexMeta) {
-      const errWarn = (ap.errors_1h || 0) > 0;
-      apexMeta.innerHTML = [
-        _metaItem('Avg latency', ap.avg_latency_s !== null && ap.avg_latency_s !== undefined ? ap.avg_latency_s + 's' : '—', (ap.avg_latency_s || 0) > 8),
-        _metaItem('p95 latency', ap.p95_latency_s !== null && ap.p95_latency_s !== undefined ? ap.p95_latency_s + 's' : '—', (ap.p95_latency_s || 0) > 15),
-        _metaItem('Success rate', ap.recent_ok_rate !== null && ap.recent_ok_rate !== undefined ? Math.round(ap.recent_ok_rate * 100) + '%' : '—', (ap.recent_ok_rate || 1) < 0.9),
-        _metaItem('Errors (1h)', ap.errors_1h ?? 0, errWarn),
-      ].join('');
-    }
-
-    // ── Funnel ─────────────────────────────────────────────
-    const fn = d.funnel || {};
-    const funnelEl = document.getElementById('hlth-funnel');
-    if (funnelEl) {
-      if (!fn.available) {
-        funnelEl.innerHTML = '<span style="font-size:11px;color:var(--muted2)">No funnel data yet — awaiting first scan cycle</span>';
-      } else {
-        const uIn  = fn.universe_in ?? '?';
-        const aOut = fn.after_pipeline ?? '?';
-        const cap  = fn.apex_cap;
-        const disp = fn.dispatch;
-        const capAfter = cap ? cap.after : aOut;
-        const filled   = disp ? (disp.filled ?? '?') : '?';
-
-        let flowHtml = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;font-size:12px;font-family:'JetBrains Mono',monospace">
-          <span style="color:var(--fg)">${uIn}</span>
-          <span style="color:var(--muted2)">─[pipeline]─▶</span>
-          <span style="color:var(--fg)">${aOut}</span>`;
-        if (cap) {
-          const killed = cap.killed || 0;
-          const capColor = killed > 0 ? 'var(--orange)' : 'var(--muted2)';
-          flowHtml += `<span style="color:${capColor}">─[Apex cap -${killed}]─▶</span>
-            <span style="color:var(--fg)">${capAfter}</span>`;
-        }
-        flowHtml += `<span style="color:var(--muted2)">─[Apex]─▶</span>
-          <span style="color:var(--green);font-weight:600">${filled} entries</span>
+    // ── Verdict banner ────────────────────────────────────
+    const v = d.verdict || {};
+    const verdictEl = document.getElementById('hlth-verdict');
+    if (verdictEl) {
+      const vv = v.verdict || 'UNKNOWN';
+      const vc = vv === 'TRADING' ? 'var(--green)' : vv === 'DEGRADED' ? 'var(--orange)' : vv === 'NOT TRADING' ? 'var(--red)' : 'var(--muted2)';
+      const vi = vv === 'TRADING' ? '●' : vv === 'DEGRADED' ? '▲' : '✗';
+      verdictEl.style.borderColor = vc;
+      verdictEl.style.background = `${vc}11`;
+      verdictEl.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="color:${vc};font-size:18px;line-height:1">${vi}</span>
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:${vc}">${vv}</div>
+            <div style="font-size:10px;color:var(--muted2);margin-top:2px">${v.reason || ''}</div>
+          </div>
         </div>`;
-
-        // Top blocks
-        let blocksHtml = '';
-        const blocks = fn.top_blocks || [];
-        if (blocks.length > 0) {
-          blocksHtml = '<div style="margin-top:8px;font-size:10px;color:var(--muted2)">Top blocks: ' +
-            blocks.map(b => `<span style="color:var(--fg)">${b.reason}</span> (${b.count})`).join(' · ') + '</div>';
-        }
-
-        funnelEl.innerHTML = flowHtml + blocksHtml;
-      }
     }
 
-    // ── Positions ──────────────────────────────────────────
-    const pos = d.positions || {};
-    const posEl    = document.getElementById('hlth-positions');
-    const posAlert = document.getElementById('hlth-pos-alert');
-    const hasIssues = (pos.bracket_gap_count || 0) > 0 || (pos.stuck_intent_count || 0) > 0 || (pos.unmatched_count || 0) > 0;
-    if (posAlert) posAlert.style.display = hasIssues ? '' : 'none';
-    if (posEl) {
-      if ((pos.position_count || 0) === 0) {
-        posEl.innerHTML = '<span style="color:var(--muted2)">No open positions</span>';
-      } else {
-        const rows = [
-          `<div>${_metaItem('Open positions', pos.position_count, false)}</div>`,
-          `<div>${_badge('Bracket coverage', (pos.bracket_gap_count || 0) === 0)}
-            ${(pos.bracket_gap_count || 0) > 0
-              ? `<span style="color:var(--red);margin-left:8px">Missing on: ${(pos.bracket_gaps || []).join(', ')}</span>`
-              : '<span style="color:var(--muted2);margin-left:8px">all positions protected</span>'}</div>`,
-          `<div>${_metaItem('Unmatched (no IBKR fill)', pos.unmatched_count ?? 0, (pos.unmatched_count || 0) > 0)}</div>`,
-          `<div>${_metaItem('Stuck pending intents (>5m)', pos.stuck_intent_count ?? 0, (pos.stuck_intent_count || 0) > 0)}</div>`,
-        ];
-        posEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">${rows.join('')}</div>`;
-      }
-    }
+    // ── Pipeline stages ───────────────────────────────────
+    const stages = d.stages || [];
+    const stagesEl = document.getElementById('hlth-stages');
+    if (!stagesEl) return;
 
-    // ── Resources ──────────────────────────────────────────
-    const res = d.resources || {};
-    const resEl = document.getElementById('hlth-resources');
-    const logEl = document.getElementById('hlth-log-freshness');
-    if (resEl) {
-      const diskPct = res.disk_free_pct;
-      const diskWarn = res.disk_low || (diskPct !== null && diskPct < 15);
-      resEl.innerHTML = [
-        _metaItem('Disk free', diskPct !== null ? res.disk_free_gb + ' GB (' + diskPct + '%)' : '?', diskWarn),
-        _metaItem('.fail_* sentinels', res.fail_sentinel_count ?? 0, (res.fail_sentinel_count || 0) > 0),
-      ].join('');
-    }
-    if (logEl) {
-      const freshness = res.log_freshness || {};
-      const items = Object.entries(freshness).map(([name, info]) => {
-        const age = info.age_s;
-        const stale = age !== null && age > 600;
-        const color = !info.present ? 'var(--muted2)' : stale ? 'var(--orange)' : 'var(--green)';
-        const ageStr = !info.present ? 'absent' : age !== null ? age + 's ago' : '?';
-        return `<span style="color:var(--muted2)">${name}:</span> <span style="color:${color}">${ageStr}</span>`;
-      });
-      logEl.innerHTML = '<div style="color:var(--muted2);margin-bottom:4px;font-size:10px;letter-spacing:1px">LOG FRESHNESS</div>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:12px">' + items.join('') + '</div>';
-    }
+    stagesEl.innerHTML = stages.map((s, i) => {
+      const sc = _statusColor(s.status);
+      const si = _statusIcon(s.status);
+      const sl = _statusLabel(s.status);
+      const isCritical = s.critical;
+      const detail = _stageDetail(s);
+      const critTag = isCritical ? `<span style="font-size:8px;padding:1px 5px;border:1px solid var(--muted);border-radius:2px;color:var(--muted2);margin-left:6px;letter-spacing:1px">CRITICAL</span>` : '';
+      const connector = i < stages.length - 1
+        ? `<div style="display:flex;justify-content:center;height:14px;color:var(--muted);font-size:11px;line-height:14px">│</div>`
+        : '';
+      return `<div style="border:1px solid var(--border2);border-radius:5px;background:var(--bg2);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer"
+             onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+          <span style="font-size:9px;color:var(--muted2);min-width:24px;text-align:right">S${i+1}</span>
+          <span style="color:${sc};font-size:13px;line-height:1">${si}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:600;color:var(--text)">${s.name}${critTag}</div>
+            <div style="font-size:9px;color:var(--muted2);margin-top:1px;letter-spacing:.3px">${s.description || ''}</div>
+          </div>
+          <span style="font-size:10px;font-weight:700;color:${sc};letter-spacing:1px">${sl}</span>
+        </div>
+        <div style="display:${s.status !== 'ok' ? 'block' : 'none'};border-top:1px solid var(--border);padding:8px 14px 10px 48px">
+          ${detail || '<span style="font-size:10px;color:var(--muted2)">—</span>'}
+        </div>
+      </div>${connector}`;
+    }).join('');
 
-    // ── Readiness ──────────────────────────────────────────
-    const rd = d.readiness || {};
-    const ic = rd.ic || {};
-    const gates = rd.gates || {};
-    const phase = rd.phase || {};
-    const rdChips = document.getElementById('hlth-readiness-chips');
-    const rdMeta  = document.getElementById('hlth-readiness-meta');
-    if (rdChips) {
-      const q = ic.quality || 'NO_SIGNAL';
-      const qOk = q === 'STRONG' || q === 'MODERATE';
-      rdChips.innerHTML =
-        _chip('IC quality', qOk, q) +
-        _badge('Sample gate', gates.sample_gate_passed) +
-        _badge('IC gate', gates.ic_gate_passed) +
-        _badge('Sharpe gate', gates.sharpe_gate_passed) +
-        _badge('Ready for live', gates.ready_for_live);
-    }
-    if (rdMeta) {
-      rdMeta.innerHTML = [
-        _metaItem('Mean IC', ic.mean_positive_ic !== undefined ? ic.mean_positive_ic.toFixed(4) : '—', false),
-        _metaItem('Positive dims', ic.n_positive_dims ?? '—', false),
-        _metaItem('Phase', phase.current_phase !== undefined ? phase.current_phase + ' — ' + (phase.phase_description || '') : '—', false),
-        _metaItem('Closed trades', phase.closed_trades ?? '—', false),
-      ].join('');
-    }
   }).catch(err => {
     console.warn('Health fetch failed:', err);
+    const el = document.getElementById('hlth-verdict');
+    if (el) el.innerHTML = `<span style="color:var(--red);font-size:11px">✗ Failed to load health data</span>`;
   });
 }
 

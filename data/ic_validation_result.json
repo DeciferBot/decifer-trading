@@ -1,13 +1,15 @@
 {
   "sample_gate_passed": true,
-  "ic_gate_passed": true,
+  "ic_gate_passed": false,
   "sharpe_gate_passed": true,
-  "n_valid_records": 60,
-  "mean_positive_ic": 0.172791,
-  "n_positive_dims": 5,
+  "n_valid_records": 35963,
+  "mean_positive_ic": 0.0,
+  "n_positive_dims": 0,
   "walkforward_sharpe": 6.69,
   "ic_quality": "NO_SIGNAL",
-  "failures": [],
-  "ready_for_live": true,
-  "checked_at": "2026-04-28T18:18:08.953202+00:00"
+  "failures": [
+    "IC GATE: only 0 dimensions with positive IC (need 5). Signal composite lacks breadth."
+  ],
+  "ready_for_live": false,
+  "checked_at": "2026-05-19T14:11:08.449105+00:00"
 }
