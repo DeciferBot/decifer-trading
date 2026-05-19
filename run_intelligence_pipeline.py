@@ -63,6 +63,8 @@ def _write_manifest(universe_path: str, candidate_count: int) -> None:
         "enable_flag_required": True,
         "ready_for_consumption": True,
         "active_universe_file": universe_path,
+        "economic_context_file": os.path.join("data", "intelligence", "live_driver_state.json"),
+        "source_snapshot_versions": {},
         "candidate_count": candidate_count,
         "no_executable_trade_instructions": True,
         "live_output_changed": False,
@@ -89,6 +91,17 @@ def _promote_to_live(shadow_path: str, live_path: str) -> int:
         universe = json.load(f)
 
     universe["mode"] = "production_handoff_universe"
+    universe["validation_status"] = "pass"
+    universe["source_shadow_file"] = shadow_path
+    # Mirror manifest expiry: 15 min from generation time
+    from datetime import timedelta
+    gen_str = universe.get("generated_at", "")
+    try:
+        from datetime import datetime as _dt
+        gen = _dt.fromisoformat(gen_str.replace("Z", "+00:00"))
+        universe["expires_at"] = (gen + timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        universe["expires_at"] = universe.get("generated_at", "")
     universe["no_executable_trade_instructions"] = True
     universe["live_output_changed"] = False
     universe["secrets_exposed"] = False

@@ -61,6 +61,42 @@ _VALID_QUOTA_GROUPS = {
     "current_source_unclassified",
 }
 
+# Reason-to-care → normalised reason bucket (one of the 5 canonical buckets)
+_REASON_TO_BUCKET: dict[str, str] = {
+    "manual_conviction":              "protected",
+    "structural":                     "structural",
+    "structural_candidate_source":    "structural",
+    "structural_or_catalyst_watch":   "structural",
+    "economic_intelligence_candidate":"structural",
+    "catalyst_candidate_from_adapter":"catalyst",
+    "attention_shadow_only":          "attention",
+    "current_source_unclassified":    "attention",
+    "proxy":                          "reference",
+    "reference_data_approved_theme":  "reference",
+    "headwind_pressure_watchlist":    "reference",
+}
+
+# Source label → canonical primary_source name
+_SOURCE_LABEL_TO_PRIMARY: dict[str, str] = {
+    "favourites_manual_conviction":   "protected_manual_conviction",
+    "economic_intelligence":          "economic_intelligence_candidate_feed",
+    "intelligence_first_static_rule": "economic_intelligence_candidate_feed",
+    "position_research_universe":     "position_research_universe",
+    "daily_attention_feed":           "daily_attention_feed",
+    "reference_data_approved_theme":  "permanent_core_reference_universe",
+    "catalyst_candidate_feed":        "catalyst_candidate_feed",
+}
+
+# Route → handoff_reader approval_status
+_ROUTE_TO_APPROVAL_STATUS: dict[str, str] = {
+    "manual_conviction": "manual_protected",
+    "held":              "held_protected",
+    "watchlist":         "watchlist_allowed",
+    "position":          "approved",
+    "swing":             "approved",
+    "intraday_swing":    "approved",
+}
+
 
 @dataclass
 class ShadowCandidate:
@@ -85,11 +121,20 @@ class ShadowCandidate:
     live_output_changed: bool = False
 
     def to_dict(self) -> dict[str, Any]:
+        primary_source = next(
+            (_SOURCE_LABEL_TO_PRIMARY[lbl] for lbl in (self.source_labels or [])
+             if lbl in _SOURCE_LABEL_TO_PRIMARY),
+            None,
+        )
         return {
             "symbol":                      self.symbol,
             "company_name":                self.company_name,
             "asset_type":                  self.asset_type,
             "reason_to_care":              self.reason_to_care,
+            "reason_bucket":               _REASON_TO_BUCKET.get(self.reason_to_care, "attention"),
+            "primary_source":              primary_source,
+            "approval_status":             _ROUTE_TO_APPROVAL_STATUS.get(self.route, "approved"),
+            "risk_flags":                  list(self.risk_notes),
             "bucket_id":                   self.bucket_id,
             "bucket_type":                 self.bucket_type,
             "route":                       self.route,
@@ -148,7 +193,7 @@ class ShadowUniverse:
             1 for c in self.candidates if c.reason_to_care in _STRUCTURAL_REASONS
         )
         tier_d_structural_count = sum(
-            1 for c in self.candidates if "tier_d_position_research" in (c.source_labels or [])
+            1 for c in self.candidates if "position_research_universe" in (c.source_labels or [])
         )
         structural_watchlist = sum(
             1 for c in self.candidates
@@ -432,7 +477,7 @@ def _from_tier_d(symbol: str) -> ShadowCandidate:
         bucket_id=f"tier_d_{symbol}",
         bucket_type="structural",
         route="position",
-        source_labels=["tier_d_position_research"],
+        source_labels=["position_research_universe"],
         macro_rules_fired=[],
         transmission_direction="none",
         company_validation_status="not_run_static_bootstrap",
@@ -456,7 +501,7 @@ def _from_tier_b(symbol: str) -> ShadowCandidate:
         bucket_id=f"tier_b_{symbol}",
         bucket_type="attention",
         route="watchlist",
-        source_labels=["tier_b_daily_promoted"],
+        source_labels=["daily_attention_feed"],
         macro_rules_fired=[],
         transmission_direction="none",
         company_validation_status="not_run_static_bootstrap",
@@ -663,7 +708,7 @@ class UniverseBuilder:
         for sym in _preload_tier_d:
             ctx = RouteContext(
                 symbol=sym, reason_to_care="structural_candidate_source",
-                source_labels=["tier_d_position_research"],
+                source_labels=["position_research_universe"],
                 role="direct_beneficiary", theme="position_research",
                 driver="fundamental_discovery",
                 is_held=False, is_manual_conviction=False,
@@ -674,7 +719,7 @@ class UniverseBuilder:
             cand.route = decision.route
             quota_candidates.append(QuotaCandidate(
                 symbol=sym, quota_group="structural_position",
-                source_labels=["tier_d_position_research"],
+                source_labels=["position_research_universe"],
                 route=decision.route, priority=3, is_protected=True,
                 source_name="tier_d_structural",
                 driver="fundamental_discovery",
@@ -731,7 +776,7 @@ class UniverseBuilder:
         for sym in _preload_tier_b:
             ctx = RouteContext(
                 symbol=sym, reason_to_care="attention_shadow_only",
-                source_labels=["tier_b_daily_promoted"],
+                source_labels=["daily_attention_feed"],
                 role="attention", theme="", driver="",
                 is_held=False, is_manual_conviction=False,
                 route_hint=["intraday_swing", "watchlist"], bucket_type="attention",
@@ -741,7 +786,7 @@ class UniverseBuilder:
             cand.route = decision.route
             quota_candidates.append(QuotaCandidate(
                 symbol=sym, quota_group="attention",
-                source_labels=["tier_b_daily_promoted"],
+                source_labels=["daily_attention_feed"],
                 route=decision.route, priority=5, is_protected=False,
                 source_name="tier_b_attention",
                 payload=cand,
