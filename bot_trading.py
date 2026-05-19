@@ -1692,7 +1692,7 @@ def run_scan():
     except Exception:
         pass
 
-    clog("SCAN", "Running signal pipeline (sympathy → sentiment → 9-dim score)...")
+    clog("SCAN", "Running signal pipeline (sympathy → sentiment → 10-dim score)...")
     pipeline = run_signal_pipeline(
         universe=universe,
         regime=regime,
