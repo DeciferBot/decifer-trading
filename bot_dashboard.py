@@ -1343,6 +1343,18 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("prices API error: %s", exc)
                 payload = {"ts": 0, "prices": {}}
             self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/health":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from bot_health import build_health_report
+                payload = build_health_report()
+            except Exception as exc:
+                log.warning("[dashboard][/api/health] error: %s", exc)
+                payload = {"error": str(exc), "ts": ""}
+            self.wfile.write(json.dumps(payload, default=str).encode())
         else:
             self.send_response(404)
             self.end_headers()

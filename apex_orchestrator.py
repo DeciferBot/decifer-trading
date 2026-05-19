@@ -68,6 +68,44 @@ _PROMPT_SNAPSHOT_MAX_BYTES   = int(CONFIG.get("apex_prompt_snapshot_max_mb",  25
 _RESPONSE_SNAPSHOT_MAX_BYTES = int(CONFIG.get("apex_response_snapshot_max_mb", 25)) * 1_048_576
 
 
+_LATENCY_RING_SIZE = 20
+
+
+def _record_apex_latency(track: str, latency_s: float, *, ok: bool) -> None:
+    """Append one entry to bot_state.dash apex telemetry ring buffers. Never raises."""
+    try:
+        import bot_state as _bs
+        entry = {
+            "ts": datetime.now(UTC).isoformat(),
+            "track": track,
+            "latency_s": round(latency_s, 2),
+            "ok": ok,
+        }
+        _buf = _bs.dash["apex_call_latencies"]
+        _buf.append(entry)
+        if len(_buf) > _LATENCY_RING_SIZE:
+            del _buf[:-_LATENCY_RING_SIZE]
+
+        if not ok:
+            # Rolling hourly reset
+            import time as _t
+            _now = _t.time()
+            _reset_at = _bs.dash.get("apex_errors_reset_at")
+            if _reset_at:
+                try:
+                    _age = _now - _reset_at
+                    if _age >= 3600:
+                        _bs.dash["apex_errors_1h"] = 0
+                        _bs.dash["apex_errors_reset_at"] = _now
+                except Exception:
+                    pass
+            else:
+                _bs.dash["apex_errors_reset_at"] = _now
+            _bs.dash["apex_errors_1h"] = (_bs.dash.get("apex_errors_1h") or 0) + 1
+    except Exception:
+        pass
+
+
 def _write_apex_audit(record: dict) -> None:
     """Append one JSON line to apex_decision_audit.jsonl. Non-critical — never raises."""
     try:
@@ -329,10 +367,15 @@ def _run_apex_pipeline(
     if len(_floor_eligible) >= 3:
         log.info("apex: pre-call floor rule eligible (≥35): %s", _floor_eligible)
 
+    import time as _time
+    _call_start = _time.monotonic()
+    _call_track = apex_input.get("trigger_type", "SCAN_CYCLE")
     try:
         decision = apex_call(apex_input)
+        _record_apex_latency(_call_track, _time.monotonic() - _call_start, ok=True)
     except Exception as e:
         import traceback as _tb
+        _record_apex_latency(_call_track, _time.monotonic() - _call_start, ok=False)
         log.error("apex_orchestrator: apex_call raised — %s\n%s", e, _tb.format_exc())
         empty["note"] = f"apex_call_error:{e}"
         return empty

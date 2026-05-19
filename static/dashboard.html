@@ -447,6 +447,7 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('alpha',this)">📉 Alpha Decay</div>
   <div class="tab" onclick="switchTab('analytics',this)">📊 Analytics</div>
   <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
+  <div class="tab" onclick="switchTab('health',this)">🏥 Health</div>
 </div>
 
 <!-- VIEW 1: LIVE -->
@@ -1151,6 +1152,70 @@ canvas{display:block;width:100% !important}
   </div>
 
 </div>
+
+<!-- VIEW: HEALTH ──────────────────────────────────────────────────────────── -->
+<div class="view" id="view-health" style="flex-direction:column;padding:16px;gap:14px;overflow-y:auto">
+
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:13px;font-weight:600;letter-spacing:1px;color:var(--muted2)">BOT HEALTH</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="hlth-ts" style="font-size:10px;color:var(--muted2)">—</span>
+      <button onclick="loadHealth()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace">↻ REFRESH</button>
+    </div>
+  </div>
+
+  <!-- Infrastructure row -->
+  <div class="card">
+    <div class="card-title">Infrastructure</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px" id="hlth-infra-chips"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;font-size:11px;color:var(--muted2)" id="hlth-infra-meta"></div>
+  </div>
+
+  <!-- Scan cycle -->
+  <div class="card">
+    <div class="card-title">Scan Cycle</div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:6px" id="hlth-scan-meta"></div>
+    <div style="margin-top:10px" id="hlth-scan-bar"></div>
+  </div>
+
+  <!-- Apex synthesizer -->
+  <div class="card">
+    <div class="card-title">Apex Synthesizer</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px" id="hlth-apex-chips"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;font-size:11px;color:var(--muted2)" id="hlth-apex-meta"></div>
+  </div>
+
+  <!-- Signal funnel -->
+  <div class="card">
+    <div class="card-title">Signal Funnel <span style="font-size:9px;color:var(--muted2);margin-left:6px">LAST SCAN CYCLE</span></div>
+    <div id="hlth-funnel" style="margin-top:6px"></div>
+  </div>
+
+  <!-- Positions integrity -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title" style="margin:0">Position Integrity</div>
+      <span id="hlth-pos-alert" style="font-size:10px;color:var(--red);display:none">▲ issues found</span>
+    </div>
+    <div id="hlth-positions" style="margin-top:8px;font-size:11px"></div>
+  </div>
+
+  <!-- Resources row -->
+  <div class="card">
+    <div class="card-title">Resources &amp; Audit Trail</div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:6px" id="hlth-resources"></div>
+    <div style="margin-top:10px;font-size:11px" id="hlth-log-freshness"></div>
+  </div>
+
+  <!-- IC / Readiness -->
+  <div class="card">
+    <div class="card-title">IC &amp; Readiness</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px" id="hlth-readiness-chips"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;font-size:11px;color:var(--muted2)" id="hlth-readiness-meta"></div>
+  </div>
+
+</div>
+<!-- END VIEW: HEALTH ───────────────────────────────────────────────────────── -->
 
 <script>
 // ── State ──────────────────────────────────────────────────
@@ -2172,6 +2237,263 @@ function switchTab(id, el) {
     if (_anDdChart)  { _anDdChart.destroy();  _anDdChart  = null; }
     setTimeout(loadAnalytics, 50);
   }
+
+  // Health tab: load immediately, start auto-refresh
+  if (id === 'health') {
+    loadHealth();
+    _startHealthRefresh();
+  } else {
+    _stopHealthRefresh();
+  }
+}
+
+// ── Health tab ─────────────────────────────────────────────
+let _healthRefreshTimer = null;
+
+function _startHealthRefresh() {
+  _stopHealthRefresh();
+  _healthRefreshTimer = setInterval(loadHealth, 5000);
+}
+function _stopHealthRefresh() {
+  if (_healthRefreshTimer) { clearInterval(_healthRefreshTimer); _healthRefreshTimer = null; }
+}
+
+function _chip(label, ok, detail) {
+  const color = ok === true ? 'var(--green)' : ok === false ? 'var(--red)' : 'var(--muted2)';
+  const dot = ok === true ? '●' : ok === false ? '●' : '○';
+  return `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid ${color};border-radius:3px;font-size:11px;white-space:nowrap">
+    <span style="color:${color}">${dot}</span>
+    <span style="color:var(--fg)">${label}</span>
+    ${detail ? `<span style="color:var(--muted2)">${detail}</span>` : ''}
+  </span>`;
+}
+
+function _badge(label, passed) {
+  const bg = passed ? 'rgba(80,220,100,0.12)' : 'rgba(220,80,80,0.12)';
+  const border = passed ? 'var(--green)' : 'var(--red)';
+  const icon = passed ? '✓' : '✗';
+  return `<span style="padding:3px 8px;border:1px solid ${border};border-radius:3px;font-size:10px;background:${bg};color:${passed ? 'var(--green)' : 'var(--red)'}">
+    ${icon} ${label}
+  </span>`;
+}
+
+function _metaItem(label, value, warn) {
+  const color = warn ? 'var(--orange)' : 'var(--muted2)';
+  return `<span style="color:${color}">${label}: <b style="color:var(--fg)">${value ?? '—'}</b></span>`;
+}
+
+function loadHealth() {
+  fetch('/api/health').then(r => r.json()).then(d => {
+    // Timestamp
+    const tsEl = document.getElementById('hlth-ts');
+    if (tsEl && d.ts) {
+      try {
+        const dt = new Date(d.ts);
+        tsEl.textContent = 'Updated ' + dt.toLocaleTimeString();
+      } catch(e) { tsEl.textContent = d.ts; }
+    }
+
+    // ── Infrastructure ─────────────────────────────────────
+    const inf = d.infrastructure || {};
+    const infraChips = document.getElementById('hlth-infra-chips');
+    const infraMeta  = document.getElementById('hlth-infra-meta');
+    if (infraChips) {
+      const ibkrOk = inf.ibkr_connected === true;
+      const alpacaOk = inf.alpaca_stream_ok;
+      const feedTier = (inf.data_feed_tier || 'unknown').toUpperCase();
+      const feedOk = feedTier.includes('ALPACA') || feedTier === 'UNKNOWN';
+      infraChips.innerHTML =
+        _chip('IBKR', ibkrOk, ibkrOk ? 'connected' : 'DISCONNECTED') +
+        _chip('Alpaca stream', alpacaOk, alpacaOk === true ? 'streaming' : alpacaOk === false ? 'DOWN' : '?') +
+        _chip('Data feed', feedOk, feedTier) +
+        _chip('Bot', inf.bot_status !== 'killed' && !inf.killed, inf.paused ? 'PAUSED' : (inf.bot_status || '?'));
+    }
+    if (infraMeta) {
+      const acAge = inf.account_value_age_s;
+      const acWarn = inf.account_stale || (acAge !== null && acAge > 240);
+      infraMeta.innerHTML = [
+        _metaItem('Account value age', acAge !== null && acAge !== undefined ? acAge + 's' : '?', acWarn),
+        _metaItem('Reconnects today', inf.reconnects_today ?? 0, (inf.reconnects_today || 0) > 3),
+        _metaItem('Hot reloads', inf.hot_reload_count ?? 0, false),
+      ].join('');
+    }
+
+    // ── Scan cycle ─────────────────────────────────────────
+    const sc = d.scan || {};
+    const scanMeta = document.getElementById('hlth-scan-meta');
+    const scanBar  = document.getElementById('hlth-scan-bar');
+    if (scanMeta) {
+      const zeroWarn = (sc.consecutive_zero_scored || 0) > 0;
+      const ageWarn  = sc.last_scan_age_s !== null && sc.last_scan_age_s > 600;
+      scanMeta.innerHTML = [
+        _metaItem('Last scan', sc.last_scan_age_s !== null ? sc.last_scan_age_s + 's ago' : '—', ageWarn),
+        _metaItem('Duration', sc.last_duration_s !== null ? sc.last_duration_s + 's' : '—', false),
+        _metaItem('Scan count', sc.scan_count ?? 0, false),
+        _metaItem('Consecutive zero-scored', (sc.consecutive_zero_scored || 0) + ' / ' + (sc.consecutive_zero_threshold || 3), zeroWarn),
+        _metaItem('Universe size', sc.last_universe_size ?? '—', false),
+      ].join('');
+    }
+    if (scanBar) {
+      const dur = sc.last_duration_s;
+      const maxDur = 30;
+      const pct = dur !== null && dur !== undefined ? Math.min(100, (dur / maxDur) * 100) : 0;
+      const barColor = pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--orange)' : 'var(--green)';
+      scanBar.innerHTML = dur !== null && dur !== undefined
+        ? `<div style="display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted2)">
+            <span>Scan duration</span>
+            <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px">
+              <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;transition:width .4s"></div>
+            </div>
+            <span style="min-width:40px;text-align:right">${dur}s / ${maxDur}s</span>
+           </div>`
+        : '';
+    }
+
+    // ── Apex ───────────────────────────────────────────────
+    const ap = d.apex || {};
+    const apexChips = document.getElementById('hlth-apex-chips');
+    const apexMeta  = document.getElementById('hlth-apex-meta');
+    if (apexChips) {
+      const tracks = ap.tracks || {};
+      let chipsHtml = '';
+      const trackLabels = {'SCAN_CYCLE':'Track A/B', 'NEWS_INTERRUPT':'News', 'SHADOW':'Shadow'};
+      const knownTracks = Object.keys(tracks);
+      if (knownTracks.length === 0) {
+        chipsHtml = _chip('Apex', null, 'no calls yet');
+      } else {
+        knownTracks.forEach(t => {
+          const info = tracks[t] || {};
+          chipsHtml += _chip(trackLabels[t] || t, info.last_ok, info.last_ok ? 'OK' : info.last_ok === false ? 'ERROR' : '?');
+        });
+      }
+      apexChips.innerHTML = chipsHtml;
+    }
+    if (apexMeta) {
+      const errWarn = (ap.errors_1h || 0) > 0;
+      apexMeta.innerHTML = [
+        _metaItem('Avg latency', ap.avg_latency_s !== null && ap.avg_latency_s !== undefined ? ap.avg_latency_s + 's' : '—', (ap.avg_latency_s || 0) > 8),
+        _metaItem('p95 latency', ap.p95_latency_s !== null && ap.p95_latency_s !== undefined ? ap.p95_latency_s + 's' : '—', (ap.p95_latency_s || 0) > 15),
+        _metaItem('Success rate', ap.recent_ok_rate !== null && ap.recent_ok_rate !== undefined ? Math.round(ap.recent_ok_rate * 100) + '%' : '—', (ap.recent_ok_rate || 1) < 0.9),
+        _metaItem('Errors (1h)', ap.errors_1h ?? 0, errWarn),
+      ].join('');
+    }
+
+    // ── Funnel ─────────────────────────────────────────────
+    const fn = d.funnel || {};
+    const funnelEl = document.getElementById('hlth-funnel');
+    if (funnelEl) {
+      if (!fn.available) {
+        funnelEl.innerHTML = '<span style="font-size:11px;color:var(--muted2)">No funnel data yet — awaiting first scan cycle</span>';
+      } else {
+        const uIn  = fn.universe_in ?? '?';
+        const aOut = fn.after_pipeline ?? '?';
+        const cap  = fn.apex_cap;
+        const disp = fn.dispatch;
+        const capAfter = cap ? cap.after : aOut;
+        const filled   = disp ? (disp.filled ?? '?') : '?';
+
+        let flowHtml = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;font-size:12px;font-family:'JetBrains Mono',monospace">
+          <span style="color:var(--fg)">${uIn}</span>
+          <span style="color:var(--muted2)">─[pipeline]─▶</span>
+          <span style="color:var(--fg)">${aOut}</span>`;
+        if (cap) {
+          const killed = cap.killed || 0;
+          const capColor = killed > 0 ? 'var(--orange)' : 'var(--muted2)';
+          flowHtml += `<span style="color:${capColor}">─[Apex cap -${killed}]─▶</span>
+            <span style="color:var(--fg)">${capAfter}</span>`;
+        }
+        flowHtml += `<span style="color:var(--muted2)">─[Apex]─▶</span>
+          <span style="color:var(--green);font-weight:600">${filled} entries</span>
+        </div>`;
+
+        // Top blocks
+        let blocksHtml = '';
+        const blocks = fn.top_blocks || [];
+        if (blocks.length > 0) {
+          blocksHtml = '<div style="margin-top:8px;font-size:10px;color:var(--muted2)">Top blocks: ' +
+            blocks.map(b => `<span style="color:var(--fg)">${b.reason}</span> (${b.count})`).join(' · ') + '</div>';
+        }
+
+        funnelEl.innerHTML = flowHtml + blocksHtml;
+      }
+    }
+
+    // ── Positions ──────────────────────────────────────────
+    const pos = d.positions || {};
+    const posEl    = document.getElementById('hlth-positions');
+    const posAlert = document.getElementById('hlth-pos-alert');
+    const hasIssues = (pos.bracket_gap_count || 0) > 0 || (pos.stuck_intent_count || 0) > 0 || (pos.unmatched_count || 0) > 0;
+    if (posAlert) posAlert.style.display = hasIssues ? '' : 'none';
+    if (posEl) {
+      if ((pos.position_count || 0) === 0) {
+        posEl.innerHTML = '<span style="color:var(--muted2)">No open positions</span>';
+      } else {
+        const rows = [
+          `<div>${_metaItem('Open positions', pos.position_count, false)}</div>`,
+          `<div>${_badge('Bracket coverage', (pos.bracket_gap_count || 0) === 0)}
+            ${(pos.bracket_gap_count || 0) > 0
+              ? `<span style="color:var(--red);margin-left:8px">Missing on: ${(pos.bracket_gaps || []).join(', ')}</span>`
+              : '<span style="color:var(--muted2);margin-left:8px">all positions protected</span>'}</div>`,
+          `<div>${_metaItem('Unmatched (no IBKR fill)', pos.unmatched_count ?? 0, (pos.unmatched_count || 0) > 0)}</div>`,
+          `<div>${_metaItem('Stuck pending intents (>5m)', pos.stuck_intent_count ?? 0, (pos.stuck_intent_count || 0) > 0)}</div>`,
+        ];
+        posEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">${rows.join('')}</div>`;
+      }
+    }
+
+    // ── Resources ──────────────────────────────────────────
+    const res = d.resources || {};
+    const resEl = document.getElementById('hlth-resources');
+    const logEl = document.getElementById('hlth-log-freshness');
+    if (resEl) {
+      const diskPct = res.disk_free_pct;
+      const diskWarn = res.disk_low || (diskPct !== null && diskPct < 15);
+      resEl.innerHTML = [
+        _metaItem('Disk free', diskPct !== null ? res.disk_free_gb + ' GB (' + diskPct + '%)' : '?', diskWarn),
+        _metaItem('.fail_* sentinels', res.fail_sentinel_count ?? 0, (res.fail_sentinel_count || 0) > 0),
+      ].join('');
+    }
+    if (logEl) {
+      const freshness = res.log_freshness || {};
+      const items = Object.entries(freshness).map(([name, info]) => {
+        const age = info.age_s;
+        const stale = age !== null && age > 600;
+        const color = !info.present ? 'var(--muted2)' : stale ? 'var(--orange)' : 'var(--green)';
+        const ageStr = !info.present ? 'absent' : age !== null ? age + 's ago' : '?';
+        return `<span style="color:var(--muted2)">${name}:</span> <span style="color:${color}">${ageStr}</span>`;
+      });
+      logEl.innerHTML = '<div style="color:var(--muted2);margin-bottom:4px;font-size:10px;letter-spacing:1px">LOG FRESHNESS</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:12px">' + items.join('') + '</div>';
+    }
+
+    // ── Readiness ──────────────────────────────────────────
+    const rd = d.readiness || {};
+    const ic = rd.ic || {};
+    const gates = rd.gates || {};
+    const phase = rd.phase || {};
+    const rdChips = document.getElementById('hlth-readiness-chips');
+    const rdMeta  = document.getElementById('hlth-readiness-meta');
+    if (rdChips) {
+      const q = ic.quality || 'NO_SIGNAL';
+      const qOk = q === 'STRONG' || q === 'MODERATE';
+      rdChips.innerHTML =
+        _chip('IC quality', qOk, q) +
+        _badge('Sample gate', gates.sample_gate_passed) +
+        _badge('IC gate', gates.ic_gate_passed) +
+        _badge('Sharpe gate', gates.sharpe_gate_passed) +
+        _badge('Ready for live', gates.ready_for_live);
+    }
+    if (rdMeta) {
+      rdMeta.innerHTML = [
+        _metaItem('Mean IC', ic.mean_positive_ic !== undefined ? ic.mean_positive_ic.toFixed(4) : '—', false),
+        _metaItem('Positive dims', ic.n_positive_dims ?? '—', false),
+        _metaItem('Phase', phase.current_phase !== undefined ? phase.current_phase + ' — ' + (phase.phase_description || '') : '—', false),
+        _metaItem('Closed trades', phase.closed_trades ?? '—', false),
+      ].join('');
+    }
+  }).catch(err => {
+    console.warn('Health fetch failed:', err);
+  });
 }
 
 // ── Kill switch ────────────────────────────────────────────

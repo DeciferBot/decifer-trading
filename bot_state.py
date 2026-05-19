@@ -88,6 +88,12 @@ dash = {
     "skew": {},
     # ── Sector rotation bias (updated each scan cycle) ───────────────────────
     "sector_bias": {},
+    # ── Health telemetry (written by apex_orchestrator; read by /api/health) ──
+    # Ring buffers capped at 20 entries — oldest entry is dropped when full.
+    "apex_call_latencies": [],   # list of {"ts": ISO, "track": str, "latency_s": float, "ok": bool}
+    "scan_durations": [],        # list of {"ts": ISO, "duration_s": float, "candidates": int}
+    "apex_errors_1h": 0,         # rolling count of Apex failures in the last 60 minutes
+    "apex_errors_reset_at": None, # ISO timestamp of last hourly reset
 }
 
 # ── Persistent file paths ─────────────────────────────────────────────────────
