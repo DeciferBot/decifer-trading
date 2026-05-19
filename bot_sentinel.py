@@ -108,7 +108,7 @@ def handle_news_trigger(trigger: dict):
             try:
                 from signals import score_universe as _su_ni
                 _regime_str = regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN"
-                _ni_above, _ = _su_ni(
+                _ni_above, _ni_all = _su_ni(
                     [sym],
                     regime=_regime_str,
                     ib=ib,
@@ -117,8 +117,12 @@ def handle_news_trigger(trigger: dict):
                 if _ni_above:
                     _s_scored_candidate = _ni_above[0]
                     clog("INFO", f"Sentinel {sym}: pre-scored for NEWS_INTERRUPT — score={_s_scored_candidate.get('score')}")
+                elif _ni_all:
+                    # Catalyst is the signal — pass the scored candidate even if below normal threshold
+                    _s_scored_candidate = _ni_all[0]
+                    clog("INFO", f"Sentinel {sym}: pre-scored below threshold for NEWS_INTERRUPT — score={_s_scored_candidate.get('score')} (catalyst override)")
                 else:
-                    clog("INFO", f"Sentinel {sym}: pre-score returned no candidate above threshold — passing empty")
+                    clog("INFO", f"Sentinel {sym}: pre-score returned no data — passing empty")
             except Exception as _ni_score_err:
                 log.warning("Sentinel %s: pre-score failed (%s) — passing scored_candidate=None", sym, _ni_score_err)
 
@@ -415,7 +419,7 @@ def handle_catalyst_trigger(trigger: dict):
             try:
                 from signals import score_universe as _su_c
                 _regime_str = regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN"
-                _c_above, _ = _su_c(
+                _c_above, _c_all = _su_c(
                     [sym],
                     regime=_regime_str,
                     ib=ib,
@@ -424,8 +428,12 @@ def handle_catalyst_trigger(trigger: dict):
                 if _c_above:
                     _c_scored_candidate = _c_above[0]
                     clog("INFO", f"Catalyst {sym}: pre-scored for NEWS_INTERRUPT — score={_c_scored_candidate.get('score')}")
+                elif _c_all:
+                    # Catalyst is the signal — pass the scored candidate even if below normal threshold
+                    _c_scored_candidate = _c_all[0]
+                    clog("INFO", f"Catalyst {sym}: pre-scored below threshold for NEWS_INTERRUPT — score={_c_scored_candidate.get('score')} (catalyst override)")
                 else:
-                    clog("INFO", f"Catalyst {sym}: pre-score returned no candidate above threshold — passing empty")
+                    clog("INFO", f"Catalyst {sym}: pre-score returned no data — passing empty")
             except Exception as _c_score_err:
                 log.warning("Catalyst %s: pre-score failed (%s) — passing scored_candidate=None", sym, _c_score_err)
 
