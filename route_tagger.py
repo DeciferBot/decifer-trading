@@ -24,8 +24,8 @@ _VALID_ROUTES = frozenset({
 
 _HELD_SOURCE_LABELS = frozenset({"held_position", "held_positions"})
 _MANUAL_SOURCE_LABELS = frozenset({"favourites_manual_conviction", "manual_conviction"})
-_TIER_B_SOURCE_LABELS = frozenset({"tier_b_daily_promoted", "tier_b"})
-_TIER_A_SOURCE_LABELS = frozenset({"tier_a_core_floor", "tier_a"})
+_DAILY_PROMOTED_SOURCE_LABELS = frozenset({"tier_b_daily_promoted", "tier_b"})
+_CORE_FLOOR_SOURCE_LABELS = frozenset({"tier_a_core_floor", "tier_a"})
 _CATALYST_SOURCE_LABELS = frozenset({
     "catalyst_watchlist_read_only", "catalyst_engine", "catalyst",
 })
@@ -78,8 +78,8 @@ def assign_route(ctx: RouteContext) -> RouteDecision:
       4. Direct beneficiary (structural) → route_hint[0] (position or swing per theme)
       5. Second-order beneficiary → route_hint[0] (typically swing)
       6. Catalyst adapter → swing
-      7. Tier B attention source → intraday_swing
-      8. Tier A / unclassified current source → watchlist
+      7. Daily promoted source (legacy scanner attention) → intraday_swing
+      8. Core floor / unclassified source → watchlist
       9. Pressure candidate (headwind monitoring) → watchlist (never executable)
      10. do_not_touch → do_not_touch
      11. Fallback → watchlist
@@ -171,11 +171,11 @@ def assign_route(ctx: RouteContext) -> RouteDecision:
             ],
         )
 
-    # Rule 7 — Tier B daily promoted (attention)
-    if labels & _TIER_B_SOURCE_LABELS:
+    # Rule 7 — daily promoted source (legacy scanner attention — intraday only)
+    if labels & _DAILY_PROMOTED_SOURCE_LABELS:
         return RouteDecision(
             route="intraday_swing",
-            route_reason="Tier B daily promoted candidate — intraday attention only",
+            route_reason="Daily promoted candidate — intraday attention only",
             route_confidence=0.7,
             allowed_routes=["intraday_swing", "watchlist"],
             required_confirmations=[
@@ -184,9 +184,9 @@ def assign_route(ctx: RouteContext) -> RouteDecision:
             ],
         )
 
-    # Rule 8 — Tier A unclassified / attention shadow
+    # Rule 8 — core floor / unclassified source (watchlist monitoring only)
     if (
-        labels & _TIER_A_SOURCE_LABELS
+        labels & _CORE_FLOOR_SOURCE_LABELS
         or ctx.reason_to_care in {"current_source_unclassified", "attention_shadow_only"}
     ):
         return RouteDecision(

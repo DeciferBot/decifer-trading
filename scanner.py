@@ -1,10 +1,16 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  scanner.py                                 ║
 # ║                                                              ║
-# ║   Three-tier universe assembler:                             ║
-# ║     Tier A — inline floor (CORE_SYMBOLS + CORE_EQUITIES)    ║
-# ║     Tier B — daily promoted list (universe_promoter)        ║
-# ║     Tier C — dynamic per-cycle adds (catalyst/held/etc)     ║
+# ║   Legacy scanner-led universe assembler (fallback path).    ║
+# ║   Normal operation: live bot reads from Intelligence-First  ║
+# ║   handoff (data/live/active_opportunity_universe.json).     ║
+# ║                                                              ║
+# ║   Legacy source layers (used when handoff disabled):        ║
+# ║     core floor — CORE_SYMBOLS + CORE_EQUITIES (inline)     ║
+# ║     daily promoted — daily promoted list (universe_promoter)║
+# ║     dynamic adds — catalyst/held/favourites/sympathy        ║
+# ║     position research — PRU discovery (position_research_   ║
+# ║                          universe.json, additive)           ║
 # ║                                                              ║
 # ║   Also owns market regime classification.                    ║
 # ║   TV screener removed 2026-04-15 — replaced with own Python ║
