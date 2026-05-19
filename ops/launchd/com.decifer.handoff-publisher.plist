@@ -3,94 +3,37 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   com.decifer.handoff-publisher.plist
-  Classification: documentation only / deployment template
+  Classification: DEPRECATED — do not install
 
-  Standalone launchd daemon — handoff publisher recurring run.
-  Keeps the active opportunity universe manifest fresh throughout the trading day.
+  *** THIS PLIST IS SUPERSEDED AND MUST NOT BE INSTALLED ***
 
-  Worker         : handoff_publisher.py
-  Mode           : controlled_activation (see ACTIVATION NOTE below)
-  Schedule       : Every 10 minutes (StartInterval = 600 seconds)
-  Manifest TTL   : 15 minutes (_EXPIRY_MINUTES = 15 in handoff_publisher.py)
-  Heartbeat      : data/heartbeats/handoff_publisher.json
-  Run log        : data/live/publisher_run_log.jsonl
-  Stdout log     : /tmp/decifer-handoff-publisher.log
-  Stderr log     : /tmp/decifer-handoff-publisher.err
+  handoff_publisher.py has been deleted. The intelligence pipeline now owns
+  the full publish cycle including manifest and universe promotion.
 
-  ACTIVATION NOTE:
-    validation_only  → handoff_enabled=false → bot fails closed (safe default).
-    controlled_activation → handoff_enabled=true → bot consumes universe.
+  Replacement: ops/launchd/com.decifer.intelligence-pipeline.plist
+  Replacement worker: run_intelligence_pipeline.py
 
-    This plist defaults to controlled_activation. Change --mode to
-    validation_only if you need to suspend handoff consumption without
-    stopping the bot.
+  The replacement pipeline:
+    - Runs once per trading day (pre-open, 16:45 Dubai / 12:45 UTC)
+    - Writes data/live/active_opportunity_universe.json
+    - Writes data/live/current_manifest.json with session-valid expiry (22:00 UTC)
+    - The live bot reads the manifest every scan cycle — no periodic publisher needed
 
-  INSTALLATION (manual — do not auto-install):
-    1. Edit WorkingDirectory to your actual repo path if different.
-    2. Verify Python path: which python3.11
-    3. cp ops/launchd/com.decifer.handoff-publisher.plist ~/Library/LaunchAgents/
-    4. launchctl load ~/Library/LaunchAgents/com.decifer.handoff-publisher.plist
-    5. launchctl list | grep decifer.handoff-publisher
+  WHY THE OLD DESIGN IS GONE:
+    The 10-minute publisher with 15-minute TTL expired the manifest before or
+    shortly after market open, causing the bot to fail closed for new entries
+    even though the once-daily universe was still valid for the session.
+    The correct model is: one pipeline run per day, session-valid manifest.
 
-  MANUAL TEST RUN (before installing — verifies publisher is safe):
-    cd /path/to/decifer-trading
-    python3 handoff_publisher.py --mode controlled_activation
-    cat data/heartbeats/handoff_publisher.json
-
-  SUSPEND HANDOFF (without stopping publisher):
-    launchctl unload ~/Library/LaunchAgents/com.decifer.handoff-publisher.plist
-    python3 handoff_publisher.py --mode validation_only
-
-  UNINSTALL:
+  If this file exists in ~/Library/LaunchAgents/, unload and remove it:
     launchctl unload ~/Library/LaunchAgents/com.decifer.handoff-publisher.plist
     rm ~/Library/LaunchAgents/com.decifer.handoff-publisher.plist
-
-  EXIT CODES:
-    0 = success  (manifest written, heartbeat updated, run log appended)
-    1 = fail-closed (heartbeat status=fail, reason logged to stderr)
-
-  WHY 10-MINUTE INTERVAL:
-    Manifest TTL is 15 minutes. Running every 10 minutes gives 5 minutes
-    of margin before the bot would fail-closed on an expired manifest.
-    The publisher is a read-only operation (no orders, no broker calls)
-    so running outside market hours is safe — it just refreshes metadata.
 -->
+<!-- DEPRECATED: This plist body is intentionally left inert.
+     Do not install. See comment block above. -->
 <plist version="1.0">
 <dict>
-
   <key>Label</key>
-  <string>com.decifer.handoff-publisher</string>
-
-  <key>ProgramArguments</key>
-  <array>
-    <string>/usr/local/bin/python3.11</string>
-    <string>handoff_publisher.py</string>
-    <string>--mode</string>
-    <string>controlled_activation</string>
-  </array>
-
-  <!-- Adjust to your repo root if different -->
-  <key>WorkingDirectory</key>
-  <string>/Users/amitchopra/Desktop/decifer trading</string>
-
-  <!-- Every 10 minutes (600 seconds) -->
-  <key>StartInterval</key>
-  <integer>600</integer>
-
-  <key>StandardOutPath</key>
-  <string>/tmp/decifer-handoff-publisher.log</string>
-
-  <key>StandardErrorPath</key>
-  <string>/tmp/decifer-handoff-publisher.err</string>
-
-  <!-- Run once and exit. If the publisher crashes, launchd will restart it
-       on the next interval — not immediately (no KeepAlive). -->
-  <key>KeepAlive</key>
-  <false/>
-
-  <!-- Do not run on launchctl load; only on the interval. -->
-  <key>RunAtLoad</key>
-  <false/>
-
+  <string>com.decifer.handoff-publisher-DEPRECATED-DO-NOT-INSTALL</string>
 </dict>
 </plist>

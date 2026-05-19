@@ -7,7 +7,7 @@
 
   Standalone launchd daemon — intelligence pipeline pre-open run.
   Regenerates economic intelligence files before US market open each weekday.
-  Runs independently of bot.py, handoff_publisher.py, and universe_promoter.py.
+  Runs independently of bot.py and universe_promoter.py.
 
   Worker         : run_intelligence_pipeline.py
   Entry point    : python3.11 run_intelligence_pipeline.py
@@ -24,16 +24,20 @@
       systemsetup -gettimezone
 
   Pipeline sequence (no LLM, no broker, no live data):
-    Step 1: candidate_resolver.generate_feed()
+    Step 1: live_driver_resolver.resolve()
+            → data/intelligence/live_driver_state.json
+    Step 2: candidate_resolver.generate_feed()
             → data/intelligence/economic_candidate_feed.json
-    Step 2: intelligence_engine.generate_economic_intelligence()
-            → data/intelligence/daily_economic_state.json
-            → data/intelligence/current_economic_context.json
     Step 3: theme_activation_engine.generate_theme_activation()
             → data/intelligence/theme_activation.json
+    Step 4: universe_builder.UniverseBuilder().write()
+            → data/live/active_opportunity_universe.json
+            → data/live/current_manifest.json  (session-valid: expires 22:00 UTC)
+    Step 5: IC weights update (fail-soft)
 
-  After this job finishes, the next handoff_publisher run (every 10 min)
-  picks up the fresh intelligence files automatically.
+  The manifest written by Step 4 is session-valid (expires 22:00 UTC same day),
+  not a 15-minute TTL. The live bot reads it every scan cycle without
+  triggering a pipeline rebuild.
 
   Stdout log : /tmp/decifer-intelligence-pipeline.log
   Stderr log : /tmp/decifer-intelligence-pipeline.err
@@ -73,10 +77,7 @@
   WHAT THIS DOES NOT CHANGE:
     - bot.py execution logic
     - orders_core.py / risk logic
-    - handoff_publisher.py (untouched)
-    - active_opportunity_universe.json (written only by handoff_publisher)
-    - current_manifest.json (written only by handoff_publisher)
-    - No LLM calls. No broker calls. No live data fetched.
+    - No LLM calls. No broker calls.
 -->
 <plist version="1.0">
 <dict>
@@ -86,9 +87,8 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/sh</string>
-    <string>-c</string>
-    <string>/usr/local/bin/python3.11 run_intelligence_pipeline.py &amp;&amp; /usr/local/bin/python3.11 universe_builder.py &amp;&amp; /usr/local/bin/python3.11 handoff_publisher.py --mode controlled_activation</string>
+    <string>/usr/local/bin/python3.11</string>
+    <string>run_intelligence_pipeline.py</string>
   </array>
 
   <!-- Repo root — adjust if repo was cloned to a different path -->
