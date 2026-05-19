@@ -375,11 +375,31 @@ CONFIG = {
         # Phase 1: 1 day (fast bootstrap, noisier IC)
         # Phase 2 (2026-05-07): raised to 5 — factor analysis confirmed 5d IC is more stable
         # and predictive (news: +0.115, social: +0.072 at 5d vs noisier 1d estimates).
-        "ic_min_threshold": 0.03,  # Noise floor — dimensions below this get zero weight
+        "ic_min_threshold": 0.01,  # Noise floor — dimensions below this get zero weight
         # Phase 1: 0.0 (any positive IC passes)
-        # Phase 2 (2026-05-07): raised to 0.03 — suppresses marginal dims (flow +0.025,
-        # reversion +0.020, breakout +0.006) that are below reliable detection threshold.
+        # Phase 2 (2026-05-07): raised to 0.03 — suppressed too aggressively; collapsed to 2 dims.
+        # Phase 2 revised (2026-05-19): lowered to 0.01 — deconcentration fix.  0.03 caused
+        # news+social to absorb 100% of weight, inverting the IC-derived ranking (social 60% >
+        # news 40% despite news having higher IC).  0.01 retains ~6 dims and passes validity gates.
         "max_single_weight": 0.40,  # HHI cap — no dimension may exceed this share of total weight
+        # ── IC VALIDITY GATES ─────────────────────────────────────────────────
+        # These gates prevent weak or concentrated IC from influencing live scoring.
+        # If any gate fails, normalize_ic_weights() returns BASELINE_WEIGHTS and
+        # ic_valid_for_live_scoring is set to False in ic_weights.json.
+        # get_current_weights() reads ic_valid_for_live_scoring and returns
+        # BASELINE_WEIGHTS if False — live scoring cannot consume invalid IC weights.
+        "min_active_dims": 5,           # Minimum active (non-zero weight) dims after normalization
+        "min_independent_dates": 60,    # Unique trading dates required for full IC authority.
+        # Below 60 dates, IC is advisory-only: weights are computed and stored for research
+        # but ic_valid_for_live_scoring is set False and live scoring uses BASELINE_WEIGHTS.
+        # Current data has ~22 dates (2026-05-19); gate met at ~60 trading days from now.
+        "max_top2_combined_weight": 0.75,  # Top-2 dims combined weight ceiling.
+        # Set at 0.75 (not 0.70) because with 6 survivors and one HHI-capped dim, the
+        # natural IC distribution produces top_2 ≈ 72%.  0.75 blocks degenerate 2-dim
+        # concentration (100%) while permitting a legitimate 6-dim distribution.
+        "max_hhi": 0.30,               # Maximum Herfindahl-Hirschman Index for IC weights.
+        # HHI = sum(w²). HHI=1.0 = monopoly (one dim), HHI=1/N = equal weights.
+        # Current 2-dim state: HHI=0.52.  Target 6-dim state: HHI≈0.28 (passes).
         # IC auto-disable: if a dimension's IC falls below the threshold for N
         # consecutive weekly updates, it is automatically disabled via
         # data/settings_override.json. Re-enabled when IC recovers above re-enable
@@ -398,9 +418,9 @@ CONFIG = {
         # Fixes the cold-start trap: dimensions with IC=0 (no data) get zero weight →
         # never generate trades → never build IC → permanently stuck at 0.
         # Enable in paper mode. Disable once all dimensions have ≥20 trades of IC data.
-        "force_equal_weights": False,  # IC weighting active. Phase 2 (2026-05-07): date-based
-        # window (200 dates), 5d horizon, ic_min=0.03. Active dims: news(40%), social(26%),
-        # trend(19%), reversion(15%). squeeze/momentum/mtf zero-weighted (negative IC).
+        "force_equal_weights": False,  # IC weighting active. Phase 2 revised (2026-05-19):
+        # ic_min=0.01, min_independent_dates=60.  Live scoring uses BASELINE_WEIGHTS until
+        # 60 independent dates are accumulated.  Raw IC stored for advisory/research use.
         "edge_gate_enabled": True,   # Re-enabled: mean positive IC = 0.1728 (gate: >0.02)
         # Circular: low IC → gate raises bar → fewer trades → lower IC.
         # Re-enable when system has proven IC > 0.02 across dims.

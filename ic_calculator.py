@@ -30,6 +30,7 @@ log = logging.getLogger("decifer.ic_calculator")
 # ── Explicit re-exports (NOT `import *` — that would drop underscore names) ────
 
 from ic.constants import (
+    BASELINE_WEIGHTS,
     DIMENSIONS,
     EQUAL_WEIGHTS,
     IC_HISTORY_FILE,

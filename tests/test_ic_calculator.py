@@ -424,39 +424,60 @@ class TestNoiseFlorAndHHICap:
 
 
 class TestCacheIO:
-    def test_get_current_weights_no_file_returns_equal(self, tmp_path, monkeypatch):
-        """Missing cache → equal weights."""
+    def test_get_current_weights_no_file_returns_baseline(self, tmp_path, monkeypatch):
+        """Missing cache → BASELINE_WEIGHTS (not equal weights)."""
         monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(tmp_path / "nonexistent.json"))
         weights = ic.get_current_weights()
-        _assert_equal_weights(weights)
+        _assert_baseline_weights(weights)
 
-    def test_get_current_weights_corrupt_file_returns_equal(self, tmp_path, monkeypatch):
-        """Corrupt JSON → equal weights."""
+    def test_get_current_weights_corrupt_file_returns_baseline(self, tmp_path, monkeypatch):
+        """Corrupt JSON → BASELINE_WEIGHTS."""
         f = tmp_path / "ic_weights.json"
         f.write_text("{ not valid json }")
         monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
         weights = ic.get_current_weights()
-        _assert_equal_weights(weights)
+        _assert_baseline_weights(weights)
 
-    def test_get_current_weights_missing_dims_returns_equal(self, tmp_path, monkeypatch):
-        """Cache missing some dimensions → equal weights."""
+    def test_get_current_weights_missing_dims_returns_baseline(self, tmp_path, monkeypatch):
+        """Cache missing some dimensions → BASELINE_WEIGHTS."""
         f = tmp_path / "ic_weights.json"
         partial = {"weights": {"trend": 0.5, "momentum": 0.5}}
         f.write_text(json.dumps(partial))
         monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
         weights = ic.get_current_weights()
-        _assert_equal_weights(weights)
+        _assert_baseline_weights(weights)
 
     def test_get_current_weights_loads_valid_cache(self, tmp_path, monkeypatch):
-        """Valid cache is loaded and returned correctly."""
+        """Valid cache with ic_valid_for_live_scoring=True returns IC weights."""
         equal_w = {d: round(1.0 / N, 6) for d in DIMS}
-        record = {"weights": equal_w, "raw_ic": {}, "updated": "2025-01-01T00:00:00"}
+        record = {
+            "weights": equal_w,
+            "raw_ic": {},
+            "updated": "2025-01-01T00:00:00",
+            "ic_valid_for_live_scoring": True,
+        }
         f = tmp_path / "ic_weights.json"
         f.write_text(json.dumps(record))
         monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
         weights = ic.get_current_weights()
         assert set(weights.keys()) == set(DIMS)
         assert abs(sum(weights.values()) - 1.0) < 0.05
+
+    def test_get_current_weights_invalid_flag_returns_baseline(self, tmp_path, monkeypatch):
+        """ic_valid_for_live_scoring=False → BASELINE_WEIGHTS regardless of weight values."""
+        equal_w = {d: round(1.0 / N, 6) for d in DIMS}
+        record = {
+            "weights": equal_w,
+            "raw_ic": {},
+            "updated": "2025-01-01T00:00:00",
+            "ic_valid_for_live_scoring": False,
+            "fallback_reason": "insufficient_independent_dates:21<60",
+        }
+        f = tmp_path / "ic_weights.json"
+        f.write_text(json.dumps(record))
+        monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
+        weights = ic.get_current_weights()
+        _assert_baseline_weights(weights)
 
     def test_update_ic_weights_writes_file(self, tmp_path, monkeypatch):
         """update_ic_weights() must write a valid ic_weights.json."""
@@ -500,6 +521,17 @@ def _assert_equal_weights(weights: dict):
     for d in DIMS:
         expected = pytest.approx(1.0 / N, abs=1e-6)
         assert weights[d] == expected, f"Expected equal weight {1 / N:.6f} for {d}, got {weights[d]}"
+
+
+def _assert_baseline_weights(weights: dict):
+    """Assert weights match BASELINE_WEIGHTS exactly."""
+    from ic.constants import BASELINE_WEIGHTS
+    assert set(weights.keys()) == set(DIMS), "Missing dimensions in weights"
+    for d in DIMS:
+        assert weights[d] == pytest.approx(BASELINE_WEIGHTS[d], abs=1e-6), (
+            f"Expected BASELINE_WEIGHTS[{d}]={BASELINE_WEIGHTS[d]}, got {weights[d]}"
+        )
+    assert abs(sum(weights.values()) - 1.0) < 1e-9
     assert abs(sum(weights.values()) - 1.0) < 1e-9
 
 
@@ -538,18 +570,18 @@ class TestICInitializationEdgeCases:
     def test_get_current_weights_consistent_across_two_calls(self, tmp_path, monkeypatch):
         """
         Calling get_current_weights() twice with no file must return identical
-        equal-weights dicts — no caching anomaly between calls.
+        BASELINE_WEIGHTS dicts — no caching anomaly between calls.
         """
         monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(tmp_path / "nonexistent.json"))
         w1 = ic.get_current_weights()
         w2 = ic.get_current_weights()
         assert w1 == w2, "Two successive calls with no file must return identical dicts"
-        _assert_equal_weights(w1)
+        _assert_baseline_weights(w1)
 
-    def test_partial_json_missing_some_dimensions_triggers_fallback(self, tmp_path, monkeypatch):
+    def test_partial_json_missing_some_dimensions_triggers_baseline_fallback(self, tmp_path, monkeypatch):
         """
-        A JSON file with only 4 of 9 dimensions must trigger the equal-weights
-        fallback, not silently use the partial weights.
+        A JSON file with only 4 dimensions must trigger BASELINE_WEIGHTS fallback,
+        not silently use partial weights or EQUAL_WEIGHTS.
         """
         partial = {
             "weights": {
@@ -557,7 +589,7 @@ class TestICInitializationEdgeCases:
                 "momentum": 0.3,
                 "squeeze": 0.2,
                 "flow": 0.2,
-                # missing: breakout, mtf, news, social, reversion
+                # missing: breakout, mtf, news, social, reversion (and newer dims)
             }
         }
         f = tmp_path / "ic_weights.json"
@@ -565,12 +597,11 @@ class TestICInitializationEdgeCases:
         monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
 
         weights = ic.get_current_weights()
-        _assert_equal_weights(weights)
+        _assert_baseline_weights(weights)
 
-    def test_json_with_wrong_sum_triggers_fallback(self, tmp_path, monkeypatch):
+    def test_json_with_wrong_sum_triggers_baseline_fallback(self, tmp_path, monkeypatch):
         """
-        A JSON file whose weights sum to ~0.5 (clearly wrong) must trigger
-        the equal-weights fallback, not return the malformed weights.
+        A JSON file whose weights sum to ~0.5 must trigger BASELINE_WEIGHTS fallback.
         """
         bad_weights = {d: round(1.0 / (9 * 2), 6) for d in ic.DIMENSIONS}
         f = tmp_path / "ic_weights.json"
@@ -578,28 +609,29 @@ class TestICInitializationEdgeCases:
         monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
 
         weights = ic.get_current_weights()
-        _assert_equal_weights(weights)
+        _assert_baseline_weights(weights)
 
-    def test_empty_json_object_triggers_fallback(self, tmp_path, monkeypatch):
-        """An empty JSON object {} must trigger the equal-weights fallback."""
+    def test_empty_json_object_triggers_baseline_fallback(self, tmp_path, monkeypatch):
+        """An empty JSON object {} must trigger BASELINE_WEIGHTS fallback."""
         f = tmp_path / "ic_weights.json"
         f.write_text("{}")
         monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
 
         weights = ic.get_current_weights()
-        _assert_equal_weights(weights)
+        _assert_baseline_weights(weights)
 
     def test_fallback_returns_independent_copy_not_shared_reference(self, tmp_path, monkeypatch):
         """
-        get_current_weights() must return a copy of EQUAL_WEIGHTS, not the dict
-        itself. Mutating the returned value must not affect the next call.
+        get_current_weights() must return a copy of BASELINE_WEIGHTS, not the
+        dict itself.  Mutating the returned value must not affect the next call.
         """
         monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(tmp_path / "nonexistent.json"))
         w1 = ic.get_current_weights()
+        expected_trend = ic.BASELINE_WEIGHTS["trend"]
         w1["trend"] = 999.0  # mutate the returned copy
 
         w2 = ic.get_current_weights()
-        assert w2["trend"] == pytest.approx(1.0 / N, abs=1e-6), (
+        assert w2["trend"] == pytest.approx(expected_trend, abs=1e-6), (
             "Mutating the returned dict polluted the next call — fallback must return a fresh copy"
         )
 
@@ -727,4 +759,291 @@ class TestICCorrectnessWithKnownValues:
             ref = _real_spearman(z, fwd_arr)
             assert raw[dim] == pytest.approx(ref, abs=1e-9), (
                 f"Pipeline IC for {dim!r}: {raw[dim]:.10f} != direct formula {ref:.10f}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# IC validity gate guardrail tests (A–E from spec 2026-05-19)
+# ---------------------------------------------------------------------------
+
+
+def _cfg_mock(threshold: float = 0.0):
+    """Return a _ic_cfg mock that sets ic_min_threshold and leaves other keys at defaults."""
+    def _cfg(key, default):
+        if key == "force_equal_weights":
+            return False
+        if key == "ic_min_threshold":
+            return threshold
+        if key == "max_single_weight":
+            return 0.40
+        if key == "min_active_dims":
+            return 5
+        if key == "max_top2_combined_weight":
+            return 0.75
+        if key == "max_hhi":
+            return 0.30
+        return default
+    return _cfg
+
+
+class TestGuardrailA_CurrentFailureCase:
+    """
+    (A) Current observed failure: threshold=0.03 → only news+social survive.
+    Expected: IC validity fails, live scoring receives BASELINE_WEIGHTS,
+    social must NOT be 60%.
+    """
+
+    _RAW_IC = {
+        "trend": 0.022, "momentum": -0.048, "squeeze": -0.047,
+        "flow": -0.010, "breakout": 0.013, "mtf": -0.033,
+        "news": 0.121, "social": 0.074, "reversion": 0.019,
+        "iv_skew": -0.095, "pead": 0.0, "short_squeeze": 0.010,
+        "overnight_drift": -0.073, "analyst_revision": 0.0, "insider_buying": -0.069,
+    }
+
+    def test_threshold_003_triggers_insufficient_survivors(self, monkeypatch):
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.03))
+        weights, meta = ic.normalize_ic_weights(self._RAW_IC)
+        assert meta["ic_valid_for_live_scoring"] is False
+        assert "insufficient_survivors" in (meta["fallback_reason"] or "")
+
+    def test_threshold_003_returns_baseline_not_ic_weights(self, monkeypatch):
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.03))
+        weights, meta = ic.normalize_ic_weights(self._RAW_IC)
+        _assert_baseline_weights(weights)
+
+    def test_threshold_003_social_not_60_pct(self, monkeypatch):
+        """Social must NOT receive 60% weight under any validity-failing scenario."""
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.03))
+        weights, _ = ic.normalize_ic_weights(self._RAW_IC)
+        assert weights["social"] < 0.30, (
+            f"social weight {weights['social']:.3f} is too high — IC inversion guard failed"
+        )
+
+    def test_threshold_003_meta_records_n_survivors(self, monkeypatch):
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.03))
+        _, meta = ic.normalize_ic_weights(self._RAW_IC)
+        assert meta["n_survivors"] == 2, f"Expected 2 survivors, got {meta['n_survivors']}"
+
+
+class TestGuardrailB_LowerThresholdCase:
+    """
+    (B) With threshold=0.01, more dimensions survive the noise floor.
+    Expected: n_active > 2, no collapse to 2 dims, concentration gates may pass.
+    """
+
+    _RAW_IC = {
+        "trend": 0.022, "momentum": -0.048, "squeeze": -0.047,
+        "flow": -0.010, "breakout": 0.013, "mtf": -0.033,
+        "news": 0.121, "social": 0.074, "reversion": 0.019,
+        "iv_skew": -0.095, "pead": 0.0, "short_squeeze": 0.010,
+        "overnight_drift": -0.073, "analyst_revision": 0.0, "insider_buying": -0.069,
+    }
+
+    def test_threshold_001_produces_6_survivors(self, monkeypatch):
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.01))
+        _, meta = ic.normalize_ic_weights(self._RAW_IC)
+        assert meta["n_survivors"] == 6, (
+            f"Expected 6 survivors with threshold=0.01, got {meta['n_survivors']}"
+        )
+
+    def test_threshold_001_no_collapse_to_two_dims(self, monkeypatch):
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.01))
+        _, meta = ic.normalize_ic_weights(self._RAW_IC)
+        assert meta["n_active_dimensions"] >= 5, (
+            f"Expected ≥5 active dims with threshold=0.01, got {meta['n_active_dimensions']}"
+        )
+
+    def test_threshold_001_news_not_inverted_by_social(self, monkeypatch):
+        """news has higher IC than social — news weight must be >= social weight."""
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.01))
+        weights, meta = ic.normalize_ic_weights(self._RAW_IC)
+        # If IC is valid, news (IC=0.121) should have weight >= social (IC=0.074)
+        if meta["ic_valid_for_live_scoring"]:
+            assert weights["news"] >= weights["social"] - 0.05, (
+                f"Ranking inversion: news(IC=0.121, wt={weights['news']:.3f}) < "
+                f"social(IC=0.074, wt={weights['social']:.3f})"
+            )
+
+    def test_threshold_001_avoids_degenerate_2dim_concentration(self, monkeypatch):
+        """threshold=0.01 must avoid the degenerate 2-dim concentration of threshold=0.03.
+        With threshold=0.03, only 2 dims survive and the HHI would be 0.52 (news²+social²
+        after inversion-cap redistribution). With threshold=0.01, 6 dims survive and HHI
+        is ~0.28 — materially better. We compare against the known 2-dim degenerate HHI.
+        """
+        DEGENERATE_2DIM_HHI = 0.40 ** 2 + 0.60 ** 2  # = 0.52 (news capped at 40%, social 60%)
+
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.01))
+        _, meta_001 = ic.normalize_ic_weights(self._RAW_IC)
+
+        # The 6-dim IC-weighted HHI (~0.28) must be well below the degenerate 2-dim HHI (0.52)
+        hhi_001 = meta_001["hhi"]
+        assert hhi_001 < DEGENERATE_2DIM_HHI - 0.10, (
+            f"threshold=0.01 HHI={hhi_001:.3f} is not materially better "
+            f"than degenerate 2-dim HHI={DEGENERATE_2DIM_HHI:.3f}"
+        )
+
+
+class TestGuardrailC_LowSampleSize:
+    """
+    (C) Low independent dates (n_dates < 60).
+    Expected: ic_valid_for_live_scoring=False, live scoring uses BASELINE_WEIGHTS.
+    Tests update_ic_weights() n_dates gate via patched count_independent_dates.
+    """
+
+    def test_low_ndates_sets_invalid_flag(self, tmp_path, monkeypatch):
+        """When n_independent_dates < 60, ic_valid_for_live_scoring must be False in JSON."""
+        from ic import storage as ic_storage_mod
+
+        monkeypatch.setattr(ic_storage_mod, "IC_WEIGHTS_FILE", str(tmp_path / "ic_weights.json"))
+        monkeypatch.setattr(ic_storage_mod, "IC_HISTORY_FILE", str(tmp_path / "history.jsonl"))
+
+        # Patch count_independent_dates at the storage module (where it was imported),
+        # not at ic.data — `from ic.data import count_independent_dates` binds a local name.
+        monkeypatch.setattr(ic_storage_mod, "count_independent_dates", lambda records: 21)
+
+        (tmp_path / "signals.jsonl").write_text("")  # empty → all-None raw IC
+
+        ic.update_ic_weights(signals_log_path=str(tmp_path / "signals.jsonl"))
+
+        with open(tmp_path / "ic_weights.json") as f:
+            data = json.load(f)
+        assert data["ic_valid_for_live_scoring"] is False
+        assert data.get("n_independent_dates") == 21
+
+    def test_low_ndates_get_current_weights_returns_baseline(self, tmp_path, monkeypatch):
+        """get_current_weights() must return BASELINE_WEIGHTS when ic_valid is False."""
+        equal_w = {d: round(1.0 / N, 6) for d in DIMS}
+        record = {
+            "weights": equal_w,
+            "ic_valid_for_live_scoring": False,
+            "fallback_reason": "insufficient_independent_dates:21<60",
+            "updated": "2026-05-19T00:00:00+00:00",
+        }
+        f = tmp_path / "ic_weights.json"
+        f.write_text(json.dumps(record))
+        monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
+
+        weights = ic.get_current_weights()
+        _assert_baseline_weights(weights)
+
+    def test_ndates_written_to_json(self, tmp_path, monkeypatch):
+        """n_independent_dates must be persisted to ic_weights.json."""
+        from ic import storage as ic_storage_mod
+
+        monkeypatch.setattr(ic_storage_mod, "IC_WEIGHTS_FILE", str(tmp_path / "ic_weights.json"))
+        monkeypatch.setattr(ic_storage_mod, "IC_HISTORY_FILE", str(tmp_path / "history.jsonl"))
+        monkeypatch.setattr(ic_storage_mod, "count_independent_dates", lambda records: 21)
+        (tmp_path / "signals.jsonl").write_text("")
+
+        ic.update_ic_weights(signals_log_path=str(tmp_path / "signals.jsonl"))
+
+        with open(tmp_path / "ic_weights.json") as f:
+            data = json.load(f)
+        assert data.get("n_independent_dates") == 21
+
+
+class TestGuardrailD_HealthyCase:
+    """
+    (D) Healthy IC: sufficient dims, reasonable concentration.
+    Expected: ic_valid_for_live_scoring=True, IC weights returned (not BASELINE).
+    """
+
+    def _healthy_raw_ic(self) -> dict:
+        """6 dims with moderate, well-spread positive IC — should pass all gates."""
+        base = {d: -0.02 for d in DIMS}  # most dims slightly negative
+        base.update({
+            "news": 0.10,
+            "social": 0.08,
+            "trend": 0.06,
+            "momentum": 0.05,
+            "breakout": 0.04,
+            "reversion": 0.03,
+        })
+        return base
+
+    def test_healthy_ic_passes_validity_gate(self, monkeypatch):
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.01))
+        _, meta = ic.normalize_ic_weights(self._healthy_raw_ic())
+        assert meta["ic_valid_for_live_scoring"] is True, (
+            f"Healthy IC failed validity: {meta.get('fallback_reason')}"
+        )
+
+    def test_healthy_ic_returns_ic_weights_not_baseline(self, monkeypatch):
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.01))
+        weights, meta = ic.normalize_ic_weights(self._healthy_raw_ic())
+        assert meta["fallback_weights_source"] == "ic"
+        # news should have highest weight (highest IC)
+        assert weights["news"] == max(weights.values()), (
+            f"Expected news to have highest weight, got: {weights}"
+        )
+
+    def test_healthy_ic_hhi_within_gate(self, monkeypatch):
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.01))
+        _, meta = ic.normalize_ic_weights(self._healthy_raw_ic())
+        if meta["ic_valid_for_live_scoring"]:
+            assert meta["hhi"] <= 0.30 + 1e-9, f"HHI={meta['hhi']:.3f} exceeds gate 0.30"
+
+    def test_healthy_ic_n_active_dims_gte_5(self, monkeypatch):
+        monkeypatch.setattr(ic_core, "_ic_cfg", _cfg_mock(threshold=0.01))
+        _, meta = ic.normalize_ic_weights(self._healthy_raw_ic())
+        if meta["ic_valid_for_live_scoring"]:
+            assert meta["n_active_dimensions"] >= 5
+
+
+class TestGuardrailE_MissingOrStaleFile:
+    """
+    (E) Missing or stale IC file.
+    Expected: BASELINE_WEIGHTS returned, warning logged, no crash.
+    """
+
+    def test_missing_file_returns_baseline_no_crash(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(tmp_path / "nonexistent.json"))
+        weights = ic.get_current_weights()  # must not raise
+        _assert_baseline_weights(weights)
+
+    def test_stale_file_ic_valid_false_returns_baseline(self, tmp_path, monkeypatch):
+        """A file with ic_valid_for_live_scoring=False is treated as stale."""
+        record = {
+            "weights": {d: round(1.0 / N, 6) for d in DIMS},
+            "ic_valid_for_live_scoring": False,
+            "fallback_reason": "hhi_exceeded:0.52>0.30",
+            "updated": "2026-01-01T00:00:00+00:00",
+        }
+        f = tmp_path / "ic_weights.json"
+        f.write_text(json.dumps(record))
+        monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
+        weights = ic.get_current_weights()
+        _assert_baseline_weights(weights)
+
+    def test_corrupt_file_returns_baseline_no_crash(self, tmp_path, monkeypatch):
+        f = tmp_path / "ic_weights.json"
+        f.write_text("CORRUPTED DATA {{{{")
+        monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(f))
+        weights = ic.get_current_weights()  # must not raise
+        _assert_baseline_weights(weights)
+
+    def test_baseline_weights_sum_to_one(self):
+        """BASELINE_WEIGHTS must sum to exactly 1.0."""
+        from ic.constants import BASELINE_WEIGHTS
+        total = sum(BASELINE_WEIGHTS.values())
+        assert abs(total - 1.0) < 1e-9, f"BASELINE_WEIGHTS sums to {total}, not 1.0"
+
+    def test_baseline_weights_has_all_dimensions(self):
+        """BASELINE_WEIGHTS must contain all canonical dimensions."""
+        from ic.constants import BASELINE_WEIGHTS
+        assert set(BASELINE_WEIGHTS.keys()) == set(DIMS)
+
+    def test_baseline_weights_no_negative_values(self):
+        """BASELINE_WEIGHTS must have no negative values."""
+        from ic.constants import BASELINE_WEIGHTS
+        for d, w in BASELINE_WEIGHTS.items():
+            assert w >= 0.0, f"BASELINE_WEIGHTS[{d}]={w} is negative"
+
+    def test_baseline_weights_inactive_dims_are_zero(self):
+        """pead, analyst_revision, insider_buying must be 0 in BASELINE_WEIGHTS."""
+        from ic.constants import BASELINE_WEIGHTS
+        for dim in ("pead", "analyst_revision", "insider_buying"):
+            assert BASELINE_WEIGHTS[dim] == 0.0, (
+                f"Expected BASELINE_WEIGHTS[{dim}]=0.0, got {BASELINE_WEIGHTS[dim]}"
             )

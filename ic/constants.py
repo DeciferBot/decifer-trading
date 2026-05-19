@@ -48,6 +48,35 @@ _CORE_DIMENSIONS = [
 _N = len(DIMENSIONS)
 EQUAL_WEIGHTS: dict = {d: 1.0 / _N for d in DIMENSIONS}
 
+# Baseline strategic weights — used when IC is not trusted for live scoring.
+# These reflect the intended signal architecture before IC data has accumulated
+# or when the computed IC weights fail a validity gate (concentration, insufficient
+# dates, degenerate HHI-cap redistribution).
+#
+# NOT equal weights: dimensions with consistently zero/inactive IC (pead,
+# analyst_revision, insider_buying) receive zero weight.  News and social receive
+# the highest prior weight based on Phase 1 IC evidence; the remaining active
+# dimensions receive proportional priors reflecting the orthogonal architecture.
+#
+# Sum = 1.00 (verified).
+BASELINE_WEIGHTS: dict = {
+    "trend":            0.12,
+    "momentum":         0.10,
+    "squeeze":          0.09,
+    "flow":             0.07,
+    "breakout":         0.09,
+    "mtf":              0.07,
+    "news":             0.15,
+    "social":           0.12,
+    "reversion":        0.07,
+    "iv_skew":          0.05,
+    "pead":             0.00,
+    "short_squeeze":    0.04,
+    "overnight_drift":  0.03,
+    "analyst_revision": 0.00,
+    "insider_buying":   0.00,
+}
+
 # ── File paths ─────────────────────────────────────────────────────────────────
 # _BASE must resolve to the repo root (parent of the `ic/` package dir).
 # Going up TWO levels from this file: ic/constants.py → ic/ → repo root.
