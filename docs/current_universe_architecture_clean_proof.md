@@ -163,7 +163,45 @@ No new failures introduced by this proof pass.
 
 ---
 
-## 9. Final Verdict
+## 9. Handoff Validity Contract
+
+**Operational model:** the intelligence pipeline runs **once per trading day**, scheduled before NYSE open via `com.decifer.intelligence-pipeline.plist`. The live bot reads the resulting handoff every scan cycle (3–15 min). The bot must not rebuild intelligence.
+
+### Manifest validity window
+
+| Field | Value written by pipeline | Semantics |
+|-------|--------------------------|-----------|
+| `published_at` | UTC timestamp at pipeline run time | When the universe was created |
+| `expires_at` | 22:00 UTC same day (pushed to next day if published ≥ 22:00 UTC) | End of intended validity window |
+| `handoff_enabled` | `true` | Bot may consume this handoff |
+| `publisher` | `run_intelligence_pipeline` | Entry point that wrote the manifest |
+
+**Why 22:00 UTC:** NYSE closes at 20:00 UTC during EDT and 21:00 UTC during EST. Setting `expires_at` to 22:00 UTC gives a 1–2 hour post-close buffer in all seasons. A pre-market handoff written at 12:45 UTC is valid for 9+ hours — it covers the full session without requiring re-publication.
+
+### Fail-closed invariants (unchanged)
+
+- Manifest missing → fail closed (no scanner fallback)
+- `handoff_enabled = false` → fail closed
+- `expires_at` in the past → fail closed
+- `validation_status ≠ pass` → fail closed
+- Required manifest field missing → fail closed
+- Safety flag wrong (`live_output_changed=true`, etc.) → fail closed
+- Universe file missing or invalid → fail closed
+- Zero accepted candidates → fail closed
+
+### Scanner fallback
+
+`scanner_fallback_attempted` is always `False` in all handoff paths. The scanner path (`get_dynamic_universe()`) is the emergency path when `enable_active_opportunity_universe_handoff = False` in config — it is not a fallback for a failed handoff.
+
+### Deployment
+
+- **Current plist:** `ops/launchd/com.decifer.intelligence-pipeline.plist`
+- **Entry point:** `python3.11 run_intelligence_pipeline.py`
+- **Deprecated plist:** `ops/launchd/com.decifer.handoff-publisher.plist` — marked DEPRECATED, inert label, must not be installed. The worker it referenced (`handoff_publisher.py`) has been deleted.
+
+---
+
+## 10. Final Verdict
 
 | Question | Answer |
 |----------|--------|

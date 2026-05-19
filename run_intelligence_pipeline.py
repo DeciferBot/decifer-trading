@@ -44,13 +44,28 @@ _LIVE_UNIVERSE = os.path.join(_LIVE_DIR, "active_opportunity_universe.json")
 _MANIFEST_PATH = os.path.join(_LIVE_DIR, "current_manifest.json")
 
 
+def _session_expiry_utc(published_at: datetime) -> datetime:
+    """Return session-valid expiry for a handoff published at `published_at`.
+
+    Valid until 22:00 UTC on the same calendar day as publication.
+    22:00 UTC covers NYSE close (20:00 UTC EDT / 21:00 UTC EST) plus a 1-2h buffer.
+    If publication is at or after 22:00 UTC (edge case / test), push to next day.
+    """
+    from datetime import time, timedelta
+    session_end = datetime.combine(
+        published_at.date(), time(22, 0), tzinfo=timezone.utc
+    )
+    if published_at >= session_end:
+        session_end += timedelta(days=1)
+    return session_end
+
+
 def _write_manifest(universe_path: str, candidate_count: int) -> None:
     """Write a minimal production manifest for handoff_reader."""
     now = datetime.now(timezone.utc)
     published_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-    # Manifest is valid for 15 minutes — pipeline should run every ~10 min
-    from datetime import timedelta
-    expires_at = (now + timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Manifest is session-valid: expires at 22:00 UTC same day (covers full NYSE session)
+    expires_at = _session_expiry_utc(now).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     manifest = {
         "schema_version": "1.0",
@@ -93,15 +108,14 @@ def _promote_to_live(shadow_path: str, live_path: str) -> int:
     universe["mode"] = "production_handoff_universe"
     universe["validation_status"] = "pass"
     universe["source_shadow_file"] = shadow_path
-    # Mirror manifest expiry: 15 min from generation time
-    from datetime import timedelta
+    # Universe is session-valid: expires at 22:00 UTC same day as generation
     gen_str = universe.get("generated_at", "")
     try:
         from datetime import datetime as _dt
         gen = _dt.fromisoformat(gen_str.replace("Z", "+00:00"))
-        universe["expires_at"] = (gen + timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        universe["expires_at"] = _session_expiry_utc(gen).strftime("%Y-%m-%dT%H:%M:%SZ")
     except Exception:
-        universe["expires_at"] = universe.get("generated_at", "")
+        universe["expires_at"] = _session_expiry_utc(datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
     universe["no_executable_trade_instructions"] = True
     universe["live_output_changed"] = False
     universe["secrets_exposed"] = False
