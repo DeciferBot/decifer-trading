@@ -5,6 +5,30 @@ Format: newest entries at the top. Each entry includes the date, what changed, a
 
 ---
 
+## v4.1.0 — 2026-05-19 — "Nexus" (Intelligence Layer + Health Tab sprint)
+
+Version correction: the previous 4.0.x patch series should have produced multiple MINOR bumps for
+feature commits. Root cause: `pre-commit` hook was bumping PATCH and staging `version.py` before
+`commit-msg` ran, causing `commit-msg` to exit early (it skips when `version.py` is already staged).
+Result: `feat → MINOR` never triggered. Fix: version bump logic removed from `pre-commit` entirely;
+`commit-msg` is now the sole authority on version increments.
+
+### Intelligence Layer v4.0
+- **Added**: `live_driver_resolver.py` — fetches 9 real market symbols (SPY/IEF/HYG/LQD/USO/ITA/SMH/NVDA/UVXY), applies 7 deterministic rules to produce live driver state.
+- **Changed**: `candidate_resolver.py` now reads live driver state instead of hard-coded drivers.
+- **Removed**: 13 dead modules (~13k lines) including legacy advisory pipeline (Sprint 6A/6B/6C).
+- **Result**: All 11 architecture layers wired end-to-end; circular inference bug eliminated.
+
+### Health Tab (bot_dashboard.py)
+- **Added**: 7-stage pipeline funnel Health tab in `bot_dashboard.py` — monitors Market Map, Economic Intelligence, Theme Activation, Universe Builder, Live Bot, Trade Execution, and Signal Engine.
+- **Added**: Agents intelligence panel showing live driver state and candidate pipeline status.
+
+### Versioning infrastructure
+- **Fixed**: `pre-commit` hook no longer bumps PATCH — `commit-msg` is sole version authority.
+- **Fixed**: `feat` commits now correctly produce MINOR bumps; `feat!`/BREAKING CHANGE → MAJOR.
+
+---
+
 ## v2.0.0 — 2026-04-16 — "Paper Alpha" (Version 2 baseline)
 
 This release marks the official v2 baseline. The system has been rebuilt from first principles since
