@@ -54,9 +54,8 @@ WORKERS = [
         "max_age_hours_weekend": None,   # weekday-only
         "cmd": [
             "/bin/sh", "-c",
-            f"{sys.executable} run_intelligence_pipeline.py && "
-            f"{sys.executable} universe_builder.py && "
-            f"{sys.executable} handoff_publisher.py --mode controlled_activation",
+            # run_intelligence_pipeline.py includes universe_builder + live promotion
+            f"{sys.executable} run_intelligence_pipeline.py",
         ],
     },
 ]

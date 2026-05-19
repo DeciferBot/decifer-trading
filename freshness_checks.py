@@ -3,9 +3,8 @@ freshness_checks.py — Control-plane staleness validation utilities.
 
 Single responsibility: check that critical data artifacts are recent
 enough to be trusted. Used by:
-  - handoff_publisher.py  (intelligence files — fail closed if stale)
-  - ic_validator.py       (ic_weights.json — warn only)
-  - intelligence_adapters.py (committed_universe.json — warn only)
+  - run_intelligence_pipeline.py  (intelligence files — fail closed if stale)
+  - ic_validator.py               (ic_weights.json — warn only)
   - scripts/control_plane_status.py (observability report)
 
 No broker calls. No live data. No order logic. Safe to import anywhere.

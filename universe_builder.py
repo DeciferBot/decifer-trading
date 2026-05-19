@@ -559,9 +559,9 @@ class UniverseBuilder:
       1. Held positions (protected, always included — empty in static bootstrap)
       2. Manual conviction / favourites (protected)
       3. Economic intelligence candidates (direct_beneficiary → structural_position)
-      4. Tier D position research (structural_position, up to structural max)
-      5. Tier B daily promoted (attention, capped at 15)
-      6. Tier A core floor (current_source_unclassified, fills remaining attention slots)
+      4. Position research universe (structural_position, up to structural max)
+      5. Daily promoted source (attention, capped at 15 — legacy scanner layer)
+      6. Core floor source (current_source_unclassified, fills remaining attention slots)
     """
 
     def __init__(
