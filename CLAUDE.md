@@ -43,14 +43,15 @@ Three actors:
 - **Three-tier universe — Active ✅**: TV Screener ripped out. Universe is now: committed universe (top-1000 by dollar volume, weekly refresh) + dynamic adds (catalyst hits, held positions, favourites, sympathy plays, news-driven).
 - **Catalyst screener — Active ✅**: `catalyst_engine.py` scores EDGAR filings, earnings surprises, and analyst actions in real-time. High-conviction catalyst hits get a flat score boost to clear `min_score_to_trade`.
 - **Full architecture audit — Complete ✅** (2026-04-22): 27-issue audit, 24 fixes shipped.
-- **Decifer 3.0 "Apex" — Live ✅** (cutover 2026-04-24): The 4-agent pipeline is replaced by the **Apex Single-Synthesizer** — one `apex_call()` via `claude-sonnet-4-6`. Three Sonnet calls per cycle: Track A (new entries), Track B PM (TRIM/EXIT/HOLD), Shadow (divergence log). Legacy code (`agents.py`, `sentinel_agents.py` pipeline, `run_portfolio_review()`, buy loop) was deleted at post-migration cleanup (2026-04-27). No rollback path — forward only.
-- **Post-migration cleanup — Complete ✅** (2026-04-27): `agents.py` deleted, legacy buy loop deleted, 3 migration flags collapsed, 5 Phase 8A test files renamed to permanent regression names. Test suite: **1931 passing**. Tag: `decifer-3.0-post-migration-cleanup`.
+- **Decifer 3.0 "Apex" — Live ✅** (cutover 2026-04-24): The 4-agent pipeline is replaced by the **Apex Single-Synthesizer** — one `apex_call()` via `claude-sonnet-4-6`. Three Sonnet calls per cycle: Track A (new entries), Track B PM (TRIM/EXIT/HOLD), Shadow (divergence log). Legacy code (`agents.py`, `run_portfolio_review()`, buy loop, and the 3-agent pipeline inside `sentinel_agents.py`) was deleted. `sentinel_agents.py` itself still exists — it was gutted to contain only `build_news_trigger_payload()`, a pure function that shapes trigger data for `apex_call()`. No rollback path — forward only.
+- **Post-migration cleanup — Complete ✅** (2026-04-27): `agents.py` deleted, legacy buy loop deleted, 3 migration flags collapsed, 5 Phase 8A test files renamed to permanent regression names. Test suite: **2623 passing** (updated 2026-05-19). Tag: `decifer-3.0-post-migration-cleanup`.
 - **JSONL persistence migration — Complete ✅** (2026-04-28): `trade_log.py` (SQLite WAL) and `trade_store.py` deleted. Replaced with `event_log.py` (ORDER_INTENT → ORDER_FILLED → POSITION_CLOSED write-ahead log) and `training_store.py` (ML training records). Eliminates UNKNOWN trade_type bug caused by SQLite WAL corruption. 349 closed trades migrated to `data/training_records.jsonl`. Phase C gate now reads from `training_store.count()`.
 - **Phase B — Unlocked**: HMM regime detection and walk-forward weight calibration gates are now met. Next: implement HMM as VIX-proxy replacement (see `roadmap/03-hmm-regime-detection.md`) and signal weight calibration (see `roadmap/06-weight-calibration.md`).
 - **Phase C / D — Pending Amit approval**: Alphalens full factor analysis and ML engine activation (ML gate = 50 trades, already met).
 - **Position Research Universe Phase 1 — Shadow observation only ✅** (2026-05-03): Tier D discovery path. Full pipeline instrumentation in place: `tier_d_funnel.jsonl` records stage=pipeline (stages 1-6 attrition), stage=dispatch (Apex classification breakdown), and stage=apex_cap (top-30 hard cap before Apex — whether Tier D is being killed before Apex sees them). Evidence script: `scripts/tier_d_evidence_report.py`. **Phase 2 gate: NOT MET** — awaiting real scan-cycle evidence. Must run report and review Section 0b (Apex Cap Analysis) with Amit before ANY of: gate softening, stratified cap, live entries, or Phase 2 work. The next fix decision (A=tier-aware shortlist / B=scoring threshold / C=Apex prompt / D=gate softening) depends entirely on what Section 0b shows. 30 tests, all passing (2029/2031 suite).
 - **Health Tab — Active ✅** (2026-05-19): 7-stage pipeline funnel in `bot_dashboard.py` Health tab (`bot_health.py`). Monitors: Market Map (Alpaca stream), Economic Intelligence (candidate feed age), Theme Activation (theme_activation.json age), Universe Builder (handoff age + manifest validity), Live Bot (last_scan timestamp), Trade Execution (IBKR connection), Signal Engine (worker heartbeats). `last_scan` parses HH:MM:SS format correctly.
 - **Intelligence Layer v4.0 — Live ✅** (2026-05-19): Root-cause fix for circular inference bug. `live_driver_resolver.py` (NEW) fetches 9 real market symbols (SPY/IEF/HYG/LQD/USO/ITA/SMH/NVDA/UVXY) and applies 7 deterministic rules to produce live driver state. `candidate_resolver.py` now reads live driver state instead of hard-coded drivers. 13 dead modules deleted (~13k lines). `enable_active_opportunity_universe_handoff = True`. All 11 architecture layers now wired end-to-end. Tag: `feat(intelligence)`. Test suite: 2623 passing, 7 pre-existing failures.
+- **Dashboard stale message cleanup — Complete ✅** (2026-05-19): All legacy agent/Opus/pipeline labels purged from `static/dashboard.html`. Tab renamed `🧠 Apex`, "Opus Market View" → "Apex Synthesis View", "Agent Live Conversation" → "Apex Live Conversation", "Scoring & Agents" → "Scoring & Apex". Removed "Agents required to agree" settings row (legacy field, not used by Apex). Fixed sidebar "Min score:" display to read `min_score_to_trade` instead of the undefined `agents_required`. API key renamed `agent_conversation_history` → `apex_conversation_history` in `bot_dashboard.py`.
 - **Test suite**: 2623 passing (2026-05-19). 7 pre-existing failures (unrelated to recent changes).
 - **Regime detector**: VIX-proxy + SPY EMA (locked until HMM implementation approved).
 
@@ -63,14 +64,14 @@ These decisions are LOCKED. Do not second-guess them without reading `docs/DECIS
 ### Signal Engine: 10 Independent Dimensions, Not Overlapping Oscillators
 RSI + Stochastic + CCI all measure momentum — using all three is one signal dressed up as three. Each of Decifer's 10 dimensions (Directional, Momentum, Squeeze, Flow, Breakout, PEAD, News, Short Squeeze, Reversion, Overnight Drift) measures something fundamentally different. Two optional dimensions (Social, IV Skew) are config-gated. Adding a new dimension requires the same standard: it must be orthogonal to the existing ones.
 
-### Direction-Agnostic Scoring, Not Regime-Switched Agent Prompts
-We do not tell agents "you're in a bear market, be more bearish." That replaces bullish groupthink with regime-driven groupthink — one bad regime call cascades through all agents. Instead, the signal engine scores setup *conviction* independently of direction. Bearish setups score identically to equivalent bullish setups. The market determines the long/short ratio naturally.
+### Direction-Agnostic Scoring, Not Regime-Switched Prompts
+We do not tell Apex "you're in a bear market, be more bearish." That replaces bullish groupthink with regime-driven groupthink — one bad regime call cascades through all synthesis decisions. Instead, the signal engine scores setup *conviction* independently of direction. Bearish setups score identically to equivalent bullish setups. The market determines the long/short ratio naturally.
 
 ### Regime Detection: VIX-Proxy Locked, HMM Deferred
 Hard classifier (BULL_TRENDING / BEAR_TRENDING / CHOPPY / PANIC) via VIX levels + SPY EMA. HMM is NOT running in production — `PRODUCTION_LOCKED = True`. Gate to reopen HMM: ≥200 closed trades AND IC Phase 2 review complete. Running two regime detectors in parallel is architecturally incoherent. HMM replaces VIX-proxy entirely when the gate is met, does not run alongside it.
 
 ### Skew Tracking: Diagnostic Only, Never a Feedback Loop
-`get_directional_skew()` in `learning.py` tracks % long vs short. This is a dashboard metric and alert for Amit — it is NOT fed back into agent prompts. Feeding skew back ("you've been 80% long, correct") creates forced trades to balance a statistic. The market is structurally long-biased. Fighting that base rate is wrong.
+`get_directional_skew()` in `learning.py` tracks % long vs short. This is a dashboard metric and alert for Amit — it is NOT fed back into Apex context. Feeding skew back ("you've been 80% long, correct") creates forced trades to balance a statistic. The market is structurally long-biased. Fighting that base rate is wrong.
 
 ### Apex Single-Synthesizer: One Sonnet Call, Not 4-Agent Pipeline (Decifer 3.0)
 The 4-agent pipeline (Technical Analyst + Trading Analyst Opus + Risk Manager + Final Decision Maker) is replaced by `apex_call()` in `market_intelligence.py` — a single `claude-sonnet-4-6` call that receives all context (candidates, regime, portfolio state, overnight research, session character, IC weights) and returns a structured `ApexDecision` JSON with `new_entries[]` and `pm_actions[]`. Three calls per scan cycle:
@@ -78,17 +79,32 @@ The 4-agent pipeline (Technical Analyst + Trading Analyst Opus + Risk Manager + 
 2. **Track B** — PM TRIM/EXIT/HOLD review (live execute)
 3. **Shadow** — divergence logging only (`USE_APEX_V3_SHADOW=True`)
 
-Forced exits (EOD flat, 90-min INTRADAY timeout, architecture violations) remain deterministic — they never go through Apex. Regime-change sells (`check_thesis_validity()`) are also deterministic — `_apex_mode_sells` builds directly from `positions_to_reconsider`, no LLM involved. Legacy code is flag-gated (`USE_LEGACY_PIPELINE`), not deleted. Rollback = flip flag + restart.
+Forced exits (EOD flat, 90-min INTRADAY timeout, architecture violations) remain deterministic — they never go through Apex. Regime-change sells (`check_thesis_validity()`) are also deterministic — `_apex_mode_sells` builds directly from `positions_to_reconsider`, no LLM involved. Legacy code was deleted at post-migration cleanup — no rollback path.
 
 **Entry floor rule (locked):** When ≥3 candidates score ≥35 with no named systemic blocking condition, Apex MUST produce at least one new entry. `FEAR_ELEVATED` is a regime descriptor, not an AVOID mandate. `divergence_flags` restrict instrument selection to stocks only — they do NOT veto the stock trade.
 
 **Model = Sonnet, not Opus.** Amit's explicit decision at cutover. Do not change without Amit approval.
 
+### Intelligence Pipeline: Full End-to-End Flow (v4.0, live 2026-05-19)
+The complete execution path from market data to trade:
+```
+Economic Intelligence  →  live_driver_resolver.py: 9 real symbols, 7 deterministic rules → live driver state
+Live Driver Resolver   →  candidate_resolver.py: reads live driver state (not hard-coded drivers)
+Candidate Sources      →  economic_candidate_feed.json: scored candidates with reason-to-care classification
+Eligibility            →  approval_status + risk_flags on each candidate
+Controlled Handoff     →  run_intelligence_pipeline.py → live/active_opportunity_universe.json
+Live Bot               →  handoff_reader.py reads handoff, feeds candidates to Apex
+Trade Readiness        →  signal scoring (10 dimensions) + IC-weighted direction
+Risk / Sizing          →  risk.py + orders_core.py
+Execution              →  IBKR via bot_ibkr.py
+```
+Intelligence pipeline and live bot run **separately** — the pipeline publishes a handoff file; the bot reads it. They do not share state at runtime.
+
 ### News Sentinel: Single Apex Call, Not 3-Agent Pipeline
-Sentinel `NEWS_INTERRUPT` path now builds an `ApexInput` and calls `apex_call()` — same synthesizer as scan cycles, not the old 3-agent (Catalyst Analyst + Risk Gate + Instant Decision). The catalyst symbol is **pre-scored** before the Apex call so Track A always has a real candidate (not an empty list). Position sizing remains 0.75× sentinel multiplier. Hardcoded risk limits still apply.
+Sentinel `NEWS_INTERRUPT` path builds an `ApexInput` via `build_news_trigger_payload()` in `sentinel_agents.py` and calls `apex_call()` — same synthesizer as scan cycles, not the old 3-agent (Catalyst Analyst + Risk Gate + Instant Decision). `handle_news_trigger()` routes through `apex_orchestrator._run_apex_pipeline(execute=True)`. The catalyst symbol is **pre-scored** before the Apex call so Track A always has a real candidate (not an empty list). Position sizing remains 0.75× sentinel multiplier. Hardcoded risk limits still apply.
 
 ### Paper Config: Aggressive for Data Generation
-Paper trading thresholds are deliberately loose (min_score 14, agents_required 3, max_positions 100 sanity ceiling). Cost of a bad paper trade = zero. Value = training data. Every parameter that differs from live config is preserved as an inline comment in `config.py`. When switching to live, revert ALL of them (live: min_score 28, agents_required 4).
+Paper trading thresholds are deliberately loose (min_score 14, max_positions 100 sanity ceiling). Cost of a bad paper trade = zero. Value = training data. Every parameter that differs from live config is preserved as an inline comment in `config.py`. When switching to live, revert ALL of them (live: min_score 28). Note: `agents_required_to_agree` remains in config as a legacy key (validation requires it) but is not used by Apex — do not treat it as a meaningful gate.
 
 ### ThreadPoolExecutor for score_universe()
 `score_universe()` uses `ThreadPoolExecutor`. IBKR `reqHistoricalData` is thread-safe via a shared IB connection — the original yfinance thread-safety concern (GitHub issue #2557) no longer applies since Alpaca is the primary data source. Do not revert to ProcessPoolExecutor without verifying the data source in use.
@@ -104,9 +120,6 @@ OTM options (δ 0.30–0.40) have higher leverage per dollar of premium — but 
 1. **Liquidity** — ATM options have the highest volume, tightest spreads, and most open interest. Fill quality matters more than theoretical leverage.
 2. **Gamma/theta ratio** — ATM options have maximum gamma per unit of theta. OTM options at short DTE decay catastrophically fast and require a large move AND correct timing; ATM only requires directional correctness.
 3. **Signal type** — Decifer's momentum/breakout signals fire when a stock is already moving. ATM captures that move immediately. OTM requires the move to exceed the strike before theta erodes the position.
-
-### News Sentinel: Single Apex Call, Not 3-Agent Pipeline
-Speed matters for breaking news. `handle_news_trigger()` calls `build_news_trigger_payload()` then routes through `apex_orchestrator._run_apex_pipeline(execute=True)`. The catalyst symbol is pre-scored so Apex has a real Track A candidate. Position sizing is 0.75× sentinel multiplier. Hardcoded risk limits still apply.
 
 ### Smart Execution: $10K / 500-Share Threshold
 TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller orders use simple limit orders. Smart execution adds latency — for small orders the market impact is negligible.

@@ -4838,7 +4838,7 @@ function renderOpusView(d) {
   const summary     = d.claude_analysis || '';
 
   if (!analystText && !summary) {
-    el.innerHTML = '<div style="color:var(--muted2);font-size:11px">Waiting for agents to run…</div>';
+    el.innerHTML = '<div style="color:var(--muted2);font-size:11px">Waiting for Apex to synthesize…</div>';
     return;
   }
   if (tsEl) tsEl.textContent = d.last_scan || '—';
