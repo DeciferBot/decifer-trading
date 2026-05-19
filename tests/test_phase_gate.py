@@ -268,14 +268,14 @@ class TestGetStatus:
 
     def test_trades_counted_from_training_store(self, monkeypatch):
         import training_store
-        monkeypatch.setattr(training_store, "count", lambda: 3)
+        monkeypatch.setattr(training_store, "count_eligible", lambda: 3)
         cfg = _base_config(current_phase=1)
         status = get_status(cfg)
         assert status.closed_trades == 3
 
     def test_missing_trade_log_counts_zero(self, monkeypatch):
         import training_store
-        monkeypatch.setattr(training_store, "count", lambda: 0)
+        monkeypatch.setattr(training_store, "count_eligible", lambda: 0)
         cfg = _base_config(current_phase=1)
         status = get_status(cfg)
         assert status.closed_trades == 0

@@ -230,11 +230,17 @@ def _close_position_record(
     except Exception as _e:
         log.warning("_close_position_record: event_log write failed for %s: %s", key, _e)
     try:
-        from training_store import append as _ts
+        from training_store import append as _ts, classify_record_quality as _ts_classify
         _now_ts = datetime.now(UTC).isoformat()
         _cp_fp = float(_t.get("entry", 0.0))
         _cp_qty = float(_t.get("qty", 0) or 0)
         _cp_pnl_pct = round(pnl / (_cp_fp * _cp_qty), 4) if _cp_fp * _cp_qty else 0.0
+        _cp_quality = _ts_classify(_t, exit_reason)
+        if not _cp_quality["ml_eligible"]:
+            log.warning(
+                "_close_position_record %s: training record marked degraded (trade_type=%r metadata_status=%r exit_reason=%r) — ml_eligible=False",
+                key, _t.get("trade_type"), _t.get("metadata_status"), exit_reason,
+            )
         _ts({
             "trade_id": _tid,
             "symbol": _sym,
@@ -255,6 +261,7 @@ def _close_position_record(
             "entry_thesis": _t.get("entry_thesis", ""),
             "ts_fill": _t.get("open_time") or _now_ts,
             "ts_close": _now_ts,
+            **_cp_quality,
         })
     except Exception as _e:
         log.warning("_close_position_record: training_store write failed for %s: %s", key, _e)
@@ -1612,6 +1619,31 @@ def reconcile_with_ibkr(ib: IB):
         except Exception as _oe:
             log.warning(f"Reconcile: orphan alerting failed: {_oe}")
 
+        # ── Reconciliation summary ────────────────────────────────────────────
+        try:
+            with _trades_lock:
+                _all_pos = dict(active_trades)
+            _summary_total = len(_all_pos)
+            _summary_matched = sum(
+                1 for v in _all_pos.values()
+                if (v.get("trade_type") or "").upper() not in ("UNKNOWN", "")
+                and v.get("metadata_status") != "MISSING"
+            )
+            _summary_degraded = _summary_total - _summary_matched
+            log.info(
+                "Reconcile summary: total=%d matched_to_trade_id=%d metadata_degraded=%d",
+                _summary_total, _summary_matched, _summary_degraded,
+            )
+            if _summary_degraded:
+                log.warning(
+                    "Reconcile: %d position(s) have degraded metadata — "
+                    "guardrails will force-exit them as unknown_trade_type; "
+                    "resulting training records will be marked ml_eligible=False.",
+                    _summary_degraded,
+                )
+        except Exception as _sum_err:
+            log.warning("Reconcile: summary log failed: %s", _sum_err)
+
     except Exception as e:
         log.error(f"Reconciliation error: {e}")
     finally:
@@ -1809,7 +1841,13 @@ def _resolve_exiting_positions(ib: IB, price_map: dict, positions_keys: set) -> 
         except Exception as _e:
             log.warning("Deferred CLOSE event_log write failed for %s: %s", k, _e)
         try:
-            from training_store import append as _ts_dfr
+            from training_store import append as _ts_dfr, classify_record_quality as _ts_classify_dfr
+            _dfr_quality = _ts_classify_dfr(_t, _exit_reason)
+            if not _dfr_quality["ml_eligible"]:
+                log.warning(
+                    "Deferred CLOSE %s: training record marked degraded (trade_type=%r metadata_status=%r exit_reason=%r) — ml_eligible=False",
+                    k, _t.get("trade_type"), _t.get("metadata_status"), _exit_reason,
+                )
             _ts_dfr({
                 "trade_id": _trade_id,
                 "symbol": _sym,
@@ -1835,6 +1873,7 @@ def _resolve_exiting_positions(ib: IB, price_map: dict, positions_keys: set) -> 
                 "setup_type": _t.get("setup_type", ""),
                 "pattern_id": _t.get("pattern_id", ""),
                 "atr": float(_t.get("atr") or 0.0),
+                **_dfr_quality,
             })
         except Exception as _e:
             log.warning("Deferred CLOSE training_store write failed for %s: %s", k, _e)

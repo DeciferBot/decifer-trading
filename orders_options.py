@@ -270,7 +270,9 @@ def execute_buy_option(
                 open_time=_opt_open_time,
             )
         except Exception as _wal_err_opt:
-            log.warning("execute_buy_option %s: ORDER_INTENT write failed: %s", opt_key, _wal_err_opt)
+            log.error("execute_buy_option %s: ORDER_INTENT write failed — trade aborted: %s", opt_key, _wal_err_opt)
+            _safe_del_trade(opt_key)
+            return False
 
         # Options only trade during regular hours — outsideRth must be False
         entry_order = LimitOrder("BUY", n_contracts, limit_price, account=account, tif="DAY", outsideRth=False)
@@ -766,6 +768,12 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
                 _opt_fp = float(pos.get("entry", 0.0))
                 _opt_qty = float(pos.get("qty") or pos.get("contracts") or 1)
                 _opt_pnl_pct = round(round(pnl, 2) / (_opt_fp * _opt_qty), 4) if _opt_fp * _opt_qty else 0.0
+                _opt_quality = _ts_opt.classify_record_quality(pos, reason)
+                if not _opt_quality["ml_eligible"]:
+                    log.warning(
+                        "execute_sell_option %s: training record marked degraded (trade_type=%r metadata_status=%r exit_reason=%r) — ml_eligible=False",
+                        opt_key, pos.get("trade_type"), pos.get("metadata_status"), reason,
+                    )
                 _ts_opt.append({
                     "trade_id": _close_trade_id_opt, "symbol": pos["symbol"],
                     "direction": pos.get("direction", "LONG"),
@@ -782,6 +790,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
                     "score": float(pos.get("score") or pos.get("entry_score") or 0.0),
                     "ts_fill": pos.get("open_time") or _now_ts_opt,
                     "ts_close": _now_ts_opt,
+                    **_opt_quality,
                 })
             except Exception as _ts_err_opt:
                 log.warning("training_store.append failed for %s: %s", opt_key, _ts_err_opt)
