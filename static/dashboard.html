@@ -439,7 +439,7 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('orders',this)">📝 Orders</div>
   <div class="tab" onclick="switchTab('history',this)">📋 Closed Trades</div>
   <div class="tab" onclick="switchTab('growth',this)">📈 Account Growth</div>
-  <div class="tab" onclick="switchTab('agents',this)">🧠 Agents</div>
+  <div class="tab" onclick="switchTab('agents',this)">🧠 Apex</div>
   <div class="tab" onclick="switchTab('risk',this)">🛡 Risk</div>
   <div class="tab" onclick="switchTab('news',this)">📰 News</div>
   <div class="tab" onclick="switchTab('catalyst',this)">⚡ Catalyst</div>
@@ -506,14 +506,14 @@ canvas{display:block;width:100% !important}
     <!-- CENTRE: Last Decision (top) + Activity Log (bottom) -->
     <div class="col" style="border-right:1px solid var(--border);display:flex;flex-direction:column">
 
-      <!-- OPUS MARKET VIEW — always visible -->
+      <!-- APEX SYNTHESIS VIEW — always visible -->
       <div class="trade-card-panel" id="opus-view-panel">
         <div class="col-title" style="flex-shrink:0">
-          <span>Opus Market View</span>
+          <span>Apex Synthesis View</span>
           <span id="opus-view-ts" style="color:var(--muted2);font-size:9px">—</span>
         </div>
         <div id="opus-view-body" style="padding:8px 12px">
-          <div style="color:var(--muted2);font-size:11px">Waiting for agents to run…</div>
+          <div style="color:var(--muted2);font-size:11px">Waiting for Apex to synthesize…</div>
         </div>
       </div>
 
@@ -673,7 +673,7 @@ canvas{display:block;width:100% !important}
     </div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-    <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Agent Live Conversation</div>
+    <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Apex Live Conversation</div>
     <div style="display:flex;align-items:center;gap:10px">
       <div style="display:flex;align-items:center;gap:4px" id="agents-nav" style="display:none">
         <button onclick="apexConvoNav(-1)" style="font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--border);background:var(--card);color:var(--muted2);cursor:pointer">&#8592;</button>
@@ -684,7 +684,7 @@ canvas{display:block;width:100% !important}
     </div>
   </div>
   <div id="agents-convo-full">
-    <div class="empty" style="padding:30px">Agent conversation appears here after the first scan completes.</div>
+    <div class="empty" style="padding:30px">Apex synthesis log appears here after the first scan completes.</div>
   </div>
   <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
     <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:10px">Trade Actions</div>
@@ -951,17 +951,9 @@ canvas{display:block;width:100% !important}
     <div class="setting-row"><span class="setting-label">Max single position (%)</span><input class="setting-input" id="cfg-max-single" type="number" step="1" min="1" max="30"></div>
   </div>
   <div class="setting-card">
-    <div class="setting-title">Scoring &amp; Agents</div>
+    <div class="setting-title">Scoring &amp; Apex</div>
     <div class="setting-row"><span class="setting-label">Min score to trade</span><input class="setting-input" id="cfg-min-score" type="number" step="1" min="10" max="100"></div>
     <div class="setting-row"><span class="setting-label">High conviction score</span><input class="setting-input" id="cfg-high-score" type="number" step="1" min="20" max="100"></div>
-    <div class="setting-row">
-      <span class="setting-label">Agents required to agree</span>
-      <select id="agree-select" class="setting-input" style="width:60px">
-        <option value="2">2/4</option>
-        <option value="3">3/4</option>
-        <option value="4">4/4</option>
-      </select>
-    </div>
   </div>
   <div class="setting-card">
     <div class="setting-title">Options</div>
@@ -3328,7 +3320,7 @@ function buildTradeExplanation(t) {
 
 // ── Render Trade Actions — actual executed orders this session ───
 // Shows dash["trades"] (orders submitted to broker), not agent recommendations.
-// Agent recommendations are already visible in the Agent Live Conversation above.
+// Apex synthesis output is already visible in the Apex Live Conversation above.
 function renderAgents(convo) { /* no-op: agent output shown in renderAgentConvoFull */ }
 
 function renderTradeActions(trades) {
@@ -3887,7 +3879,7 @@ async function poll() {
     document.getElementById('session-name').textContent = d.session || '—';
 
     // Min score threshold display
-    const _req = d.agents_required ?? null;
+    const _req = d.settings?.min_score_to_trade ?? null;
     window._agentsRequired   = _req;
     window._lastScanTime     = d.last_scan || '';
     document.getElementById('agents-req').textContent = _req != null ? _req : '—';
@@ -3977,8 +3969,8 @@ async function poll() {
     renderTradeCard(_decisionHistory[_decisionIdx] || null);
 
     // Apex conversation history — update buffer and refresh nav, then render current entry
-    if (d.agent_conversation_history && d.agent_conversation_history.length) {
-      window._apexConvoHistory = d.agent_conversation_history;  // oldest → newest
+    if (d.apex_conversation_history && d.apex_conversation_history.length) {
+      window._apexConvoHistory = d.apex_conversation_history;  // oldest → newest
       _updateApexNavCounter();
       // If user is viewing latest, show it; otherwise leave their selected entry
       if (window._apexConvoIdx < 0) {
@@ -4132,7 +4124,6 @@ async function poll() {
       document.getElementById('cfg-max-single').value  = (s.max_single_position * 100).toFixed(0);
       document.getElementById('cfg-min-score').value   = s.min_score_to_trade;
       document.getElementById('cfg-high-score').value  = s.high_conviction_score;
-      document.getElementById('agree-select').value    = s.agents_required_to_agree;
       document.getElementById('cfg-opt-min-score').value = s.options_min_score;
       document.getElementById('cfg-opt-risk').value    = (s.options_max_risk_pct * 100).toFixed(1);
       document.getElementById('cfg-opt-ivr').value     = s.options_max_ivr;
@@ -5132,7 +5123,6 @@ function applySettings() {
     max_single_position:      parseFloat(document.getElementById('cfg-max-single').value) / 100,
     min_score_to_trade:       parseInt(document.getElementById('cfg-min-score').value),
     high_conviction_score:    parseInt(document.getElementById('cfg-high-score').value),
-    agents_required_to_agree: parseInt(document.getElementById('agree-select').value),
     options_min_score:        parseInt(document.getElementById('cfg-opt-min-score').value),
     options_max_risk_pct:     parseFloat(document.getElementById('cfg-opt-risk').value) / 100,
     options_max_ivr:          parseInt(document.getElementById('cfg-opt-ivr').value),

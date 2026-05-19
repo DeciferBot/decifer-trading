@@ -270,7 +270,6 @@ class TestBotIbkrFillHandling:
                 patch("bot_ibkr.CONFIG", _config_mod.CONFIG),
                 patch("event_log.append_fill", side_effect=_fake_append_fill),
                 patch("learning.log_order"),   # prevent JSON-serialisation crash in _log_order
-                patch("bot_voice.speak_natural"),  # prevent real TTS during tests
             ):
                 bot_ibkr._on_order_status_event(trade)
         finally:

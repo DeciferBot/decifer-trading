@@ -1109,7 +1109,7 @@ def _get_nested(cfg: dict, key_path: str):
 _REQUIRED_KEYS: list[tuple] = [
     # Core trading thresholds
     ("min_score_to_trade",              (int, float), "minimum signal score to enter a trade"),
-    ("agents_required_to_agree",        int,          "number of agents that must agree"),
+    ("agents_required_to_agree",        int,          "legacy threshold — not used by Apex synthesizer"),
     ("max_positions",                   int,          "maximum open positions allowed"),
     ("risk_pct_per_trade",              float,        "fraction of portfolio at risk per trade"),
     ("max_single_position",             float,        "max single-position exposure fraction"),
