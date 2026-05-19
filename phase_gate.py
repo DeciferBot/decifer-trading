@@ -78,10 +78,15 @@ def _is_closed_trade(t: dict) -> bool:
 
 
 def _count_closed_trades(trades_path: str) -> int:
-    """Return the number of closed trade records from training_store."""
+    """Return the number of ML-eligible closed trade records from training_store.
+
+    Uses count_eligible() so degraded-metadata records (EXT orphans, UNKNOWN
+    trade_type, restart metadata loss) do not inflate phase gate counts.
+    Legacy records without ml_eligible fields are treated as eligible.
+    """
     try:
         import training_store
-        return training_store.count()
+        return training_store.count_eligible()
     except Exception:
         return 0
 

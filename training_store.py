@@ -20,6 +20,17 @@ Each record combines three data sources:
 Both intended_price and fill_price are preserved.  Slippage is a training
 feature, not noise to be discarded.
 
+Metadata quality fields (written by callers via classify_record_quality())
+--------------------------------------------------------------------------
+  metadata_quality   : "full" | "degraded_metadata_loss"
+  ml_eligible        : bool — False for UNKNOWN trade_type, MISSING metadata, EXT orphans
+  ic_eligible        : bool — same gate as ml_eligible
+  metadata_loss      : bool — True when original metadata was lost on restart
+  training_eligible  : bool — same gate as ml_eligible
+
+Records missing these fields are legacy (pre-quarantine) and counted as eligible
+by count_eligible() to preserve backwards compatibility.
+
 Schema enforcement
 ------------------
 Required fields are checked at write time.  A missing field raises ValueError
@@ -66,6 +77,54 @@ _REQUIRED_FIELDS = frozenset({
     "ts_fill",
     "ts_close",
 })
+
+
+# ── Metadata quality classification ──────────────────────────────────────────
+
+
+def classify_record_quality(info: dict, exit_reason: str) -> dict:
+    """
+    Determine metadata quality for a closing trade given the active_trades entry
+    (info) and the exit reason string.
+
+    Call this at every training_store write site and spread the returned dict
+    into the record.  This is the single authority for what counts as degraded.
+
+    Degradation criteria (any one sufficient):
+      - trade_type is "UNKNOWN" or empty            → metadata lost on restart
+      - metadata_status is "MISSING"                → EXT orphan with no recovery
+      - exit_reason is "unknown_trade_type"         → guardrails forced exit for missing tt
+      - trade_id contains "_EXT_"                   → anchored by orphan reconcile path
+
+    Returns a dict with five boolean/string fields ready to spread into the record.
+    """
+    tt = (info.get("trade_type") or "").upper()
+    ms = (info.get("metadata_status") or "").upper()
+    tid = (info.get("trade_id") or "").lower()
+    reason_lower = (exit_reason or "").lower()
+
+    degraded = (
+        tt in ("UNKNOWN", "")
+        or ms == "MISSING"
+        or reason_lower == "unknown_trade_type"
+        or "_ext_" in tid
+    )
+
+    if degraded:
+        return {
+            "metadata_quality":  "degraded_metadata_loss",
+            "ml_eligible":       False,
+            "ic_eligible":       False,
+            "metadata_loss":     True,
+            "training_eligible": False,
+        }
+    return {
+        "metadata_quality":  "full",
+        "ml_eligible":       True,
+        "ic_eligible":       True,
+        "metadata_loss":     False,
+        "training_eligible": True,
+    }
 
 
 # ── Write ─────────────────────────────────────────────────────────────────────
@@ -156,6 +215,33 @@ def count() -> int:
                     n += 1
                 except json.JSONDecodeError:
                     pass
+    return n
+
+
+def count_eligible() -> int:
+    """
+    Count records eligible for ML training and IC validation.
+
+    A record is ineligible when ml_eligible is explicitly False (written by
+    classify_record_quality() for degraded-metadata positions).
+
+    Records that predate the quarantine system (no ml_eligible field) are
+    counted as eligible — we cannot retroactively assess their quality and
+    the phase gates were already computed against them.
+    """
+    if not _STORE_FILE.exists():
+        return 0
+    n = 0
+    with open(_STORE_FILE, encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                rec = json.loads(line)
+                if rec.get("ml_eligible", True):  # absent = legacy, treat as eligible
+                    n += 1
+            except json.JSONDecodeError:
+                pass
     return n
 
 

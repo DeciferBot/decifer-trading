@@ -2532,10 +2532,16 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             # Write confirmed closed trade to training store — only after exit confirmed.
             # Record uses actual fill_price (entry), not intended_price, for ML accuracy.
             try:
-                from training_store import append as _ts_append
+                from training_store import append as _ts_append, classify_record_quality as _ts_classify
                 _ts_fp = float(info.get("entry", 0.0))
                 _ts_qty = float(info.get("qty", 0) or 0)
                 _ts_pnl_pct = round(pnl / (_ts_fp * _ts_qty), 4) if _ts_fp * _ts_qty else 0.0
+                _ts_quality = _ts_classify(info, reason)
+                if not _ts_quality["ml_eligible"]:
+                    log.warning(
+                        "execute_sell %s: training record marked degraded (trade_type=%r metadata_status=%r exit_reason=%r) — ml_eligible=False",
+                        symbol, info.get("trade_type"), info.get("metadata_status"), reason,
+                    )
                 _ts_append({
                     "trade_id": _close_trade_id,
                     "symbol": symbol,
@@ -2561,6 +2567,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                     "setup_type": info.get("setup_type", ""),
                     "pattern_id": info.get("pattern_id", ""),
                     "atr": float(info.get("atr") or 0.0),
+                    **_ts_quality,
                 })
             except Exception as _tsa_err:
                 log.warning("execute_sell %s: training_store write failed (non-fatal): %s", symbol, _tsa_err)
