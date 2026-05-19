@@ -55,13 +55,13 @@ def _infrastructure(dash: dict) -> dict:
     if _bs.account_values_updated_at is not None:
         account_value_age_s = round(time.time() - _bs.account_values_updated_at, 1)
 
-    # Alpaca stream status: check if the stream object is live
+    # Alpaca stream: _running is the authoritative live flag on AlpacaBarStream
     alpaca_stream_ok: bool | None = None
     try:
         if _bs._bar_stream is not None:
-            alpaca_stream_ok = getattr(_bs._bar_stream, "_connected", None)
-            if alpaca_stream_ok is None:
-                alpaca_stream_ok = getattr(_bs._bar_stream, "running", None)
+            alpaca_stream_ok = bool(getattr(_bs._bar_stream, "_running", False))
+        else:
+            alpaca_stream_ok = False
     except Exception:
         pass
 
@@ -69,8 +69,27 @@ def _infrastructure(dash: dict) -> dict:
     data_feed_tier = "unknown"
     try:
         import alpaca_data as _ad
-        # _ad exposes _last_source_used if we add it; otherwise leave as unknown
         data_feed_tier = getattr(_ad, "_last_source_used", "unknown")
+    except Exception:
+        pass
+
+    # External data source availability (key configured = available)
+    fmp_key_set = False
+    alpha_vantage_key_set = False
+    try:
+        from fmp_client import is_available as _fmp_ok
+        fmp_key_set = _fmp_ok()
+    except Exception:
+        pass
+    try:
+        import os as _os
+        alpha_vantage_key_set = bool(_os.environ.get("ALPHA_VANTAGE_KEY", ""))
+    except Exception:
+        pass
+    try:
+        from config import CONFIG as _cfg
+        if not alpha_vantage_key_set:
+            alpha_vantage_key_set = bool(_cfg.get("alpha_vantage_key", ""))
     except Exception:
         pass
 
@@ -97,6 +116,8 @@ def _infrastructure(dash: dict) -> dict:
         "account_stale_warn_threshold_s": stale_warn_s,
         "alpaca_stream_ok": alpaca_stream_ok,
         "data_feed_tier": data_feed_tier,
+        "fmp_available": fmp_key_set,
+        "alpha_vantage_available": alpha_vantage_key_set,
         "reconnects_today": reconnects_today,
         "bot_status": dash.get("status", "unknown"),
         "paused": dash.get("paused", False),

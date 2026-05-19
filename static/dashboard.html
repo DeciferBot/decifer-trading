@@ -2304,7 +2304,9 @@ function loadHealth() {
       const feedOk = feedTier.includes('ALPACA') || feedTier === 'UNKNOWN';
       infraChips.innerHTML =
         _chip('IBKR', ibkrOk, ibkrOk ? 'connected' : 'DISCONNECTED') +
-        _chip('Alpaca stream', alpacaOk, alpacaOk === true ? 'streaming' : alpacaOk === false ? 'DOWN' : '?') +
+        _chip('Alpaca', alpacaOk === true, alpacaOk === true ? 'streaming' : alpacaOk === false ? 'DOWN' : '?') +
+        _chip('FMP', inf.fmp_available === true, inf.fmp_available ? 'key set' : 'NO KEY') +
+        _chip('Alpha Vantage', inf.alpha_vantage_available === true, inf.alpha_vantage_available ? 'key set' : 'NO KEY') +
         _chip('Data feed', feedOk, feedTier) +
         _chip('Bot', inf.bot_status !== 'killed' && !inf.killed, inf.paused ? 'PAUSED' : (inf.bot_status || '?'));
     }
