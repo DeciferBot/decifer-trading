@@ -85,6 +85,13 @@ _test_cfg: dict = {
 if hasattr(_cfg_mod, "CONFIG"):
     for _k, _v in _test_cfg.items():
         _cfg_mod.CONFIG.setdefault(_k, _v)
+    # setdefault only inserts missing top-level keys — nested dicts (dimension_flags)
+    # and bool flags (regime_routing_enabled) that already exist in the live CONFIG
+    # are silently skipped, which disables dimensions the tests need to be enabled.
+    # Force-write the keys this file must own so test isolation is guaranteed.
+    for _k in ("dimension_flags", "regime_routing_enabled", "mtf_gate_mode", "candle_required"):
+        if _k in _test_cfg:
+            _cfg_mod.CONFIG[_k] = _test_cfg[_k]
 else:
     _cfg_mod.CONFIG = _test_cfg
 
