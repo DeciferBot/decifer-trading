@@ -6,6 +6,26 @@
 
 ---
 
+## 2026-05-20 — Scanner-Level HMM Replacement: "Replace Entirely" Directive Superseded
+
+**Decision**: The original directive (2026-04-01) stating "HMM replaces VIX-proxy entirely when the gate is met" is formally superseded. The two-layer regime architecture now in production is intentional and locked.
+
+**Two-layer architecture (locked)**:
+
+- **Structural gating layer** — `scanner.get_market_regime()`: VIX-proxy 6-state classifier (TRENDING_UP / TRENDING_DOWN / RELIEF_RALLY / RANGE_BOUND / CAPITULATION / UNKNOWN). Real-time intraday VIX + SPY/QQQ 200d MA + breadth data. Hard execution gates: CAPITULATION blocks all entries (`position_size_multiplier = 0.0`), SHORT blocked in TRENDING_UP, SWING/POSITION removed in CAPITULATION, RELIEF_RALLY triggers 0.5× LONG size cap. Scanner failure modes are handled through stale fallback or UNKNOWN routing, with no-TTL stale cache retained as a future scanner hardening item.
+- **Weight routing layer** — `_resolve_regime_router(vix, hurst, hmm)`: 3-signal majority vote combining VIX vote, Hurst DFA, and HMM advisory. Determines momentum vs mean_reversion weight multipliers (1.3×/0.7×) for signal dimensions. Probabilistic consensus. Latency-tolerant — daily bars only.
+
+**Why scanner-level HMM replacement is not recommended**:
+
+1. **Flash-crash latency**: VIX spike threshold fires intraday (1h change > 20%). HMM uses daily close data and cannot detect an intraday crash on the day it happens. CAPITULATION must remain VIX-driven.
+2. **RELIEF_RALLY preservation**: RELIEF_RALLY is a real market phase (bear-market bounce) that triggers a hard 0.5× LONG size cap. With 2 HMM states, RELIEF_RALLY either disappears entirely or requires a new hybrid state. Disappearing the cap means oversized longs during bear-market bounces.
+3. **Label continuity**: All 406 training records carry VIX-proxy `entry_regime` labels. Switching to HMM labels mid-stream creates a training set split that degrades ML quality when Phase C/D activates.
+4. **HMM signal type mismatch**: HMM is a probabilistic slow-signal — its strength is multi-day consensus. Forcing it into hard binary execution decisions (block/allow) misuses the signal type.
+
+**Phase B final status**: HMM advisory active in signal weight router. Scanner remains VIX-proxy. Scanner-level replacement: closed as not recommended. Roadmap item `03-hmm-regime-detection.md` updated accordingly.
+
+---
+
 ## 2026-05-20 — Phase B: HMM Regime Gate Activation
 
 **Gate met**: 406 eligible training records (ml_eligible=True or absent) ≥ 200 threshold.
