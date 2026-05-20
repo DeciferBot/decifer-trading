@@ -748,14 +748,12 @@ CONFIG = {
     # upstream by news_infrastructure.HeadlineDeduplicator (used in news_sentinel,
     # alpaca_news, catalyst_engine). A count cap on top of working
     # dedup is redundant and silently discards distinct-event alpha.
-    # ── ML CONTROLLED LEARNING (reserved — not yet active) ────────
+    # ── ML CONTROLLED LEARNING ────────────────────────────────────
     # The legacy ML engine was removed 2026-05-20 (Sprint 1). See docs/ml_controlled_learning_architecture.md.
-    # Controlled self-improving ML architecture is defined in
-    # docs/ml_controlled_learning_architecture.md.
-    # These flags are reserved for the future observer and score-influence stages.
-    # Both MUST remain False until explicit Amit approval after shadow validation.
-    "ml_observer_enabled": False,        # Shadow evidence observer (Stage 1) — not yet built
-    "ml_score_influence_enabled": False, # Score adjustment from ML (Stage 3) — not yet built
+    # Sprint 3.5 (2026-05-20): ml_observer_enabled activated — evidence collection only.
+    # ml_score_influence_enabled MUST remain False until explicit Amit approval after shadow validation.
+    "ml_observer_enabled": True,         # Shadow evidence observer (Stage 1) — ACTIVE 2026-05-20 Sprint 3.5
+    "ml_score_influence_enabled": False, # Score adjustment from ML (Stage 3) — NOT activated; requires Amit approval
     "ml_data_dir": "data/ml",           # Root dir for canonical evidence ledgers (evidence only)
     # ── TELEGRAM KILL SWITCH ──────────────────────────────────────
     # Emergency stop accessible via Telegram (supplement to dashboard).

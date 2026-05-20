@@ -130,19 +130,22 @@ def test_T5_legacy_ml_config_keys_absent():
     )
 
 
-def test_T5_new_reserved_ml_keys_default_false():
-    """Reserved future ML keys must exist and default to False."""
+def test_T5_ml_gate_states_correct():
+    """
+    Sprint 3.5: ml_observer_enabled must be True (observation activated).
+    ml_score_influence_enabled must remain False (score influence NOT activated).
+    """
     for mod_name in list(sys.modules.keys()):
         if mod_name == "config":
             del sys.modules[mod_name]
 
     import config as _cfg
     cfg = _cfg.CONFIG
-    assert cfg.get("ml_observer_enabled") is False, (
-        "ml_observer_enabled must be False — shadow observer not yet built"
+    assert cfg.get("ml_observer_enabled") is True, (
+        "ml_observer_enabled must be True — Sprint 3.5 activated evidence collection"
     )
     assert cfg.get("ml_score_influence_enabled") is False, (
-        "ml_score_influence_enabled must be False — requires explicit Amit approval"
+        "ml_score_influence_enabled must remain False — requires explicit Amit approval"
     )
 
 

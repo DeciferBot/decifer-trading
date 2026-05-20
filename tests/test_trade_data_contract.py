@@ -586,10 +586,11 @@ class TestMLConfigDefaults:
         import config
         return config.CONFIG
 
-    def test_ml_observer_enabled_defaults_false(self):
+    def test_ml_observer_enabled_true_sprint35(self):
+        """Sprint 3.5: ml_observer_enabled must be True — evidence collection activated."""
         cfg = self._get_real_config()
-        assert cfg.get("ml_observer_enabled") is False, (
-            "ml_observer_enabled must default to False — shadow observer not yet built"
+        assert cfg.get("ml_observer_enabled") is True, (
+            "ml_observer_enabled must be True — Sprint 3.5 activated evidence collection"
         )
 
     def test_ml_score_influence_enabled_defaults_false(self):

@@ -1,0 +1,29 @@
+{
+  "schema_version": "sprint35_v1",
+  "checked_at_utc": "2026-05-20T13:23:31.563271+00:00",
+  "observation_file": "/Users/amitchopra/Desktop/decifer trading/data/ml/ml_observations.jsonl",
+  "observation_file_exists": false,
+  "total_observations": 0,
+  "date_range": {
+    "earliest": null,
+    "latest": null
+  },
+  "latest_timestamp_utc": null,
+  "unique_scan_ids": 0,
+  "unique_symbols": 0,
+  "records_with_observation_id": 0,
+  "records_with_scan_id": 0,
+  "records_with_signal_scores": 0,
+  "records_missing_signal_scores": 0,
+  "records_with_ranking_position": 0,
+  "records_with_ranking_total": 0,
+  "records_with_candidate_source": 0,
+  "records_with_base_score": 0,
+  "records_where_live_score_unchanged_true": 0,
+  "records_with_ml_observer_enabled_true": 0,
+  "records_with_ml_score_influence_enabled_false": 0,
+  "invalid_json_lines": 0,
+  "duplicate_observation_ids": [],
+  "top_exclusion_reasons": [],
+  "sample_latest_records": []
+}

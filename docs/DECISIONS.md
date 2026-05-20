@@ -514,3 +514,32 @@ launchctl list com.decifer.handoff-publisher            # confirm launchd remain
 ```
 
 Cloud scheduling is out of scope for this sprint and will be handled later during the cloud deployment phase.
+
+
+---
+
+### ML Observation Logging Activated — Sprint 3.5 (2026-05-20)
+**Decision (2026-05-20, Amit):**
+
+`ml_observer_enabled` set to `True` in `config.py`. This is evidence collection activation only — not ML activation.
+
+**What is active:**
+- `ml_observation_writer.write_observations()` is called from `signal_pipeline.run_signal_pipeline()` between steps 7 and 8 (after scoring + ranking complete, before signals_log append).
+- One observation record is written per scored candidate (including below-threshold candidates) to `data/ml/ml_observations.jsonl`.
+- Each record carries: `scan_id`, `observation_id`, `symbol`, `base_score`, `live_score_after_observer` (== `base_score`), `live_score_unchanged=True`, `signal_scores` (score_breakdown dict), `ranking_position`, `ranking_total`, `regime`, `vix`, `ml_observer_enabled=True`, `ml_score_influence_enabled=False`.
+
+**What is NOT active (must remain False):**
+- `ml_score_influence_enabled` — score adjustment from ML is not activated and requires explicit Amit approval after shadow validation.
+- No model training, model loading, prediction, win_prob, enhanced score, sklearn, or joblib.
+
+**Why observation-only first:**
+Sprint 3 built the outcome joiner and canonical dataset builder but had 0 live observations because the observer was never enabled. We cannot build a learning dataset from zero. Activating the observer is the minimum intervention: write evidence from the real pipeline without touching scores, ranking, eligibility, sizing, or execution.
+
+**Architecture invariants this change preserves:**
+- `live_score_after_observer == base_score` always — recorded in every observation record.
+- `live_score_unchanged = True` always — recorded in every observation record.
+- Writer is non-blocking: any failure is caught by `signal_pipeline.py`'s `try/except` and logged at DEBUG; trading never stops.
+- No third-party ML dependencies introduced: stdlib only in `ml_observation_writer.py`.
+
+**Next sprint gate:**
+After one live scan cycle writes observations, run `scripts/ml_observation_health_check.py --canary` to validate data integrity. Run `scripts/ml_outcome_joiner.py` to join observations to outcomes. The canonical learning dataset will have `ml_eligible=False` for all pass rows (no trade taken) and will have `ml_eligible=True` only for exactly-joined, closed, directional trades with signal scores — this set grows with each trading day.

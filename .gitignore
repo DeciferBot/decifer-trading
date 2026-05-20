@@ -14,6 +14,11 @@ data/historical/
 # Large / regenerable data files that must never be committed
 data/signals_log.jsonl
 data/signals_log.jsonl.*
+# ML evidence ledgers — append-only, grow unboundedly; summaries (*.json) are committed
+data/ml/ml_observations.jsonl
+data/ml/ml_observations.jsonl.*
+data/ml/canonical_learning_dataset.jsonl
+data/ml/canonical_learning_dataset.jsonl.*
 data/signals_log_historical.jsonl
 data/signals_log_archive_*.jsonl
 data/signals_typed.jsonl
