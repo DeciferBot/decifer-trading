@@ -4903,12 +4903,17 @@ function renderOpusView(d) {
     if (diffMs < 0) diffMs += 86400000; // midnight crossing
     ageMin = diffMs / 60000;
   }
-  const isStale = ageMin !== null && ageMin > 30;
+  // Don't warn-stale when market is closed — old synthesis is expected and normal
+  const marketInactive = ['CLOSED', 'WEEKEND'].includes(d.session || '');
+  const isStale = ageMin !== null && ageMin > 30 && !marketInactive;
 
   if (tsEl) {
     if (ageMin !== null && ageMin > 5) {
       const ageLabel = ageMin < 60 ? Math.round(ageMin) + 'm ago' : Math.round(ageMin / 60) + 'h ago';
-      tsEl.innerHTML = `<span style="color:${isStale ? 'var(--orange)' : 'var(--muted2)'}">${esc(rawTime)} · ${ageLabel}${isStale ? ' ⚠' : ''}</span>`;
+      const label = marketInactive
+        ? `<span style="color:var(--muted2)">${esc(rawTime)} · last session</span>`
+        : `<span style="color:${isStale ? 'var(--orange)' : 'var(--muted2)'}">${esc(rawTime)} · ${ageLabel}${isStale ? ' ⚠' : ''}</span>`;
+      tsEl.innerHTML = label;
     } else {
       tsEl.textContent = rawTime || '—';
     }

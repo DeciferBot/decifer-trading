@@ -1330,6 +1330,71 @@ def _print_score_table(scored: list, n: int = 10) -> None:
         clog("SIGNAL", f"#{i:<2} {sym:<8} {dir_short:<5} {score:>3}  DAR={dar_val:.2f}  │ {dims_str}")
 
 
+# ── Closed-session synthesis ──────────────────────────────────────────────────
+
+_CLOSED_SYNTH_MIN_INTERVAL = 20 * 60  # seconds — don't spam Apex overnight
+_last_closed_synth_ts: float = 0.0
+
+
+def _run_closed_synthesis(pv: float, pnl: float) -> None:
+    """Run a positions-only Apex synthesis when the market is CLOSED.
+
+    Keeps the Apex Synthesis View current overnight so the first thing the
+    user sees on restart is a fresh market read, not an 8-hour-old one.
+    Rate-limited to once every 20 minutes to avoid unnecessary API calls.
+    """
+    global _last_closed_synth_ts
+    import time as _time
+    now_ts = _time.monotonic()
+    if now_ts - _last_closed_synth_ts < _CLOSED_SYNTH_MIN_INTERVAL:
+        return
+    _last_closed_synth_ts = now_ts
+
+    try:
+        import json as _json
+        import pathlib as _pathlib
+        import apex_orchestrator as _aorch
+
+        open_pos = get_open_positions()
+        last_regime = dash.get("regime") or {}
+        portfolio_state = {
+            "portfolio_value": pv,
+            "daily_pnl": pnl,
+            "position_count": len(open_pos),
+            "position_slots_remaining": 0,
+            "open_positions": open_pos,
+        }
+        apex_input = _aorch.build_scan_cycle_apex_input(
+            candidates=[],
+            review_positions=[],
+            portfolio_state=portfolio_state,
+            regime=last_regime,
+        )
+        result = _aorch._run_apex_pipeline(apex_input, {}, execute=False)
+        decision = result.get("decision") or {}
+        meta = decision.get("_meta") or {}
+        now_str = datetime.now(_ET).strftime("%H:%M:%S")
+        entry = {
+            "agent": "Apex Synthesizer",
+            "role": "Overnight market-closed synthesis — positions only, no execution",
+            "time": now_str,
+            "session_character": decision.get("session_character") or "",
+            "macro_bias": decision.get("macro_bias") or "",
+            "market_read": decision.get("market_read") or "",
+            "new_entries": [],
+            "portfolio_actions": decision.get("portfolio_actions") or [],
+            "latency_ms": meta.get("latency_ms"),
+            "output_tokens": meta.get("output_tokens"),
+        }
+        dash["agent_conversation"] = [entry]
+        _alog_path = _pathlib.Path("data/apex_conversation_log.jsonl")
+        with _alog_path.open("a") as _alf:
+            _alf.write(_json.dumps(entry) + "\n")
+        clog("INFO", f"Overnight synthesis written ({now_str})")
+    except Exception as _e:
+        log.warning("_run_closed_synthesis failed — %s", _e)
+
+
 # ── Main scan ─────────────────────────────────────────────────────────────────
 
 
@@ -1440,6 +1505,7 @@ def run_scan():
 
     if get_session() == "CLOSED":
         clog("INFO", "Market closed — pipeline sleeping. Sentinel monitoring news.")
+        _run_closed_synthesis(pv, pnl)
         return
 
     check_options_positions()
