@@ -1,0 +1,59 @@
+{
+  "date": "2026-05-20",
+  "version": "4.4.0",
+  "tag": "feat(ic): Phase 2B — IC decision status tracking",
+  "what_changed": [
+    "ic_decision_writer.py (NEW): Append-only decision event writer. VALID_STATUSES frozenset enforces schema. write_event() / write_events_bulk() are best-effort — never raise into callers. Thread-safe with log rotation.",
+    "signal_pipeline.py: SignalPipelineResult gains scan_id field. run_signal_pipeline() stamps scan_id, observation_id, passed_base_threshold, session_date onto all_scored dicts so they propagate into candidates_by_symbol without extra lookups. Writes below_threshold events for symbols not clearing base threshold. log_signal_scan() records passed_base_threshold in each signals_log line.",
+    "apex_orchestrator.py: _run_apex_pipeline() writes passed_to_apex, apex_selected, apex_rejected events after Apex call + drift gate, keyed by observation_id from candidates_by_symbol payload. Wrapped in try/except — never affects execution.",
+    "signal_dispatcher.py: dispatch() writes executed or order_failed event after execute_buy returns, carrying observation_id from candidates_by_symbol payload and trade_id from active_trades when available. Wrapped in try/except — never affects dispatch.",
+    "scripts/ic_decision_report.py (NEW): Offline funnel report joining signals_log + ic_decision_events + training_records on observation_id.",
+    "tests/test_ic_decision_status.py (NEW): 31 tests across schema, Apex mapping, below-threshold, execution status, backward compatibility, no-live-change."
+  ],
+  "what_deleted": "Nothing deleted.",
+  "decisions": [
+    "Storage: data/ic_decision_events.jsonl (append-only side file). signals_log is written before Apex runs — cannot be enriched in-place for Apex decisions. Join key is observation_id.",
+    "observation_id is stamped onto all_scored dicts in run_signal_pipeline() so it propagates through pipeline.all_scored → _cut_candidates → candidates_by_symbol without extra lookups.",
+    "below_threshold = symbol was in all_scored but not in scored (did not clear base score_universe() threshold). Written as decision event in run_signal_pipeline().",
+    "apex_selected / apex_rejected determined by comparing candidates_by_symbol (shortlist sent to Apex) against would (post-drift-gate entries Apex selected). Drift-gate-killed entries count as apex_rejected.",
+    "execute_buy returns True → executed event. Returns False → order_failed event. The distinction between risk_blocked and order_failed is not reliably available at dispatch() without deeper execute_buy instrumentation — order_failed is used for all False returns.",
+    "All event writes are best-effort try/except side effects. None affect live execution, Apex selection, scoring, risk, sizing, or order routing.",
+    "Historical records with missing decision events are treated as status=scored (the absence of an event is the initial state).",
+    "IC remains advisory-only until clean-data maturity is reached and all validity gates pass."
+  ],
+  "storage": {
+    "signals_log": "data/signals_log.jsonl — adds passed_base_threshold field to new records",
+    "decision_events": "data/ic_decision_events.jsonl — append-only, keyed by observation_id",
+    "join_key": "observation_id = {scan_id}_{symbol}"
+  },
+  "decision_status_values": [
+    "scored — logged but no later decision known",
+    "below_threshold — did not clear base score_universe() threshold",
+    "passed_to_apex — included in shortlist sent to Apex",
+    "apex_selected — Apex selected for possible entry",
+    "apex_rejected — shown to Apex but not selected",
+    "risk_blocked — selected but blocked by pre-entry risk gate",
+    "executed — progressed to ORDER_INTENT / active trade creation",
+    "order_failed — selected but order placement failed",
+    "unknown — status cannot be determined safely"
+  ],
+  "traceability": "scored candidate → (below_threshold OR passed_to_apex) → (apex_selected OR apex_rejected) → (executed OR order_failed) → training_records (via observation_id from Phase 2A)",
+  "tests": "31 new, all passing. 2850 total suite. 8 pre-existing failures unchanged (test_ml_engine x3, test_quota_policy_promotion x5 — all unrelated to this work).",
+  "preexisting_failures": [
+    "test_ml_engine.py::TestDeciferML::test_prepare_data_returns_true_with_enough_trades — pre-existing",
+    "test_ml_engine.py::TestDeciferML::test_train_classifier_runs_after_prepare — pre-existing",
+    "test_ml_engine.py::TestDeciferML::test_train_regressor_runs_after_prepare — pre-existing",
+    "test_quota_policy_promotion.py::test_active_universe_has_75_candidates — pre-existing universe count mismatch",
+    "test_quota_policy_promotion.py::test_cost_included — pre-existing",
+    "test_quota_policy_promotion.py::test_msft_included — pre-existing",
+    "test_quota_policy_promotion.py::test_pg_included — pre-existing",
+    "test_quota_policy_promotion.py::test_no_executable_candidates — pre-existing"
+  ],
+  "what_next": [
+    "Allow clean-data records to accumulate through the 60-day rolling window.",
+    "Run scripts/ic_decision_report.py periodically to monitor the funnel.",
+    "Phase 3 (IC validation advancement) — awaiting Amit approval and gate check.",
+    "Investigate and fix 8 pre-existing test failures as a separate task."
+  ],
+  "written_at": "2026-05-20T00:00:00+00:00"
+}

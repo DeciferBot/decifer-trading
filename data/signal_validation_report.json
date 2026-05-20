@@ -1,0 +1,2859 @@
+{
+  "meta": {
+    "generated_at": "2026-05-20T06:32:01.976571+00:00",
+    "source_file": "data/training_records.jsonl",
+    "total_records": 453,
+    "eligible_records": 406,
+    "ineligible_excluded": 47,
+    "usable_records": 177,
+    "eligible_missing_scores": 229,
+    "dimensions_tested": [
+      "analyst_revision",
+      "breakout",
+      "catalyst",
+      "flow",
+      "insider_buying",
+      "iv_skew",
+      "momentum",
+      "mtf",
+      "news",
+      "overnight_drift",
+      "pead",
+      "reversion",
+      "short_squeeze",
+      "social",
+      "squeeze",
+      "trend"
+    ],
+    "min_n_for_ic": 30,
+    "quantile_buckets": 5,
+    "pnl_pct_convention": "direction-adjusted: positive = trade profitable regardless of LONG/SHORT. LONG: pnl_pct = (exit - fill) / fill. SHORT: pnl_pct = (fill - exit) / fill. No additional transformation applied.",
+    "selection_bias_warning": "EXECUTION IC \u2014 computed on trades the system chose to enter. Dimensions that consistently drove entry selection appear more predictive than they are. Candidate-level IC (signals_log.jsonl / factor_analysis.py) is the unbiased view. Use this report to guide walk-forward calibration, NOT to directly update live weights."
+  },
+  "dim_ic": {
+    "analyst_revision": {
+      "ic": 0.0,
+      "p_value": 1.0,
+      "ci_lo": -0.1597,
+      "ci_hi": 0.1597,
+      "n": 151,
+      "flag": "NOISE"
+    },
+    "breakout": {
+      "ic": -0.0669,
+      "p_value": 0.3762,
+      "ci_lo": -0.2123,
+      "ci_hi": 0.0814,
+      "n": 177,
+      "flag": "NEGATIVE"
+    },
+    "catalyst": {
+      "ic": 0.0,
+      "p_value": 1.0,
+      "ci_lo": -0.1533,
+      "ci_hi": 0.1533,
+      "n": 164,
+      "flag": "NOISE"
+    },
+    "flow": {
+      "ic": -0.1177,
+      "p_value": 0.1186,
+      "ci_lo": -0.2607,
+      "ci_hi": 0.0303,
+      "n": 177,
+      "flag": "NEGATIVE"
+    },
+    "insider_buying": {
+      "ic": -0.0719,
+      "p_value": 0.3802,
+      "ci_lo": -0.229,
+      "ci_hi": 0.0888,
+      "n": 151,
+      "flag": "NEGATIVE"
+    },
+    "iv_skew": {
+      "ic": -0.0032,
+      "p_value": 0.9661,
+      "ci_lo": -0.1511,
+      "ci_hi": 0.1448,
+      "n": 176,
+      "flag": "NEGATIVE"
+    },
+    "momentum": {
+      "ic": -0.013,
+      "p_value": 0.8637,
+      "ci_lo": -0.1602,
+      "ci_hi": 0.1348,
+      "n": 177,
+      "flag": "NEGATIVE"
+    },
+    "mtf": {
+      "ic": -0.1221,
+      "p_value": 0.1054,
+      "ci_lo": -0.2648,
+      "ci_hi": 0.0259,
+      "n": 177,
+      "flag": "NEGATIVE"
+    },
+    "news": {
+      "ic": -0.0231,
+      "p_value": 0.7604,
+      "ci_lo": -0.17,
+      "ci_hi": 0.1249,
+      "n": 177,
+      "flag": "NEGATIVE"
+    },
+    "overnight_drift": {
+      "ic": -0.1988,
+      "p_value": 0.0093,
+      "ci_lo": -0.3392,
+      "ci_hi": -0.0498,
+      "n": 170,
+      "flag": "NEGATIVE"
+    },
+    "pead": {
+      "ic": 0.0,
+      "p_value": 1.0,
+      "ci_lo": -0.1479,
+      "ci_hi": 0.1479,
+      "n": 176,
+      "flag": "NOISE"
+    },
+    "reversion": {
+      "ic": -0.0978,
+      "p_value": 0.1952,
+      "ci_lo": -0.2418,
+      "ci_hi": 0.0504,
+      "n": 177,
+      "flag": "NEGATIVE"
+    },
+    "short_squeeze": {
+      "ic": -0.1035,
+      "p_value": 0.1718,
+      "ci_lo": -0.2476,
+      "ci_hi": 0.0451,
+      "n": 176,
+      "flag": "NEGATIVE"
+    },
+    "social": {
+      "ic": -0.0095,
+      "p_value": 0.8999,
+      "ci_lo": -0.1568,
+      "ci_hi": 0.1382,
+      "n": 177,
+      "flag": "NEGATIVE"
+    },
+    "squeeze": {
+      "ic": 0.1002,
+      "p_value": 0.1845,
+      "ci_lo": -0.048,
+      "ci_hi": 0.2441,
+      "n": 177,
+      "flag": "MARGINAL"
+    },
+    "trend": {
+      "ic": -0.0013,
+      "p_value": 0.9859,
+      "ci_lo": -0.1488,
+      "ci_hi": 0.1462,
+      "n": 177,
+      "flag": "NEGATIVE"
+    }
+  },
+  "quantile_returns": {
+    "analyst_revision": [
+      {
+        "bucket": 5,
+        "score_range": [
+          0.0,
+          0.0
+        ],
+        "mean_score": 0.0,
+        "mean_pnl_pct": 0.1303,
+        "n": 151
+      }
+    ],
+    "breakout": [
+      {
+        "bucket": 5,
+        "score_range": [
+          0.0,
+          10.0
+        ],
+        "mean_score": 0.62,
+        "mean_pnl_pct": 0.0857,
+        "n": 177
+      }
+    ],
+    "catalyst": [
+      {
+        "bucket": 5,
+        "score_range": [
+          0.0,
+          0.0
+        ],
+        "mean_score": 0.0,
+        "mean_pnl_pct": 0.1198,
+        "n": 164
+      }
+    ],
+    "flow": [
+      {
+        "bucket": 1,
+        "score_range": [
+          2.0,
+          4.0
+        ],
+        "mean_score": 2.46,
+        "mean_pnl_pct": 0.0534,
+        "n": 13
+      },
+      {
+        "bucket": 2,
+        "score_range": [
+          4.0,
+          5.4
+        ],
+        "mean_score": 4.21,
+        "mean_pnl_pct": 0.29,
+        "n": 58
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          6.0,
+          8.0
+        ],
+        "mean_score": 6.0,
+        "mean_pnl_pct": -0.0442,
+        "n": 51
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          8.0,
+          10.0
+        ],
+        "mean_score": 8.8,
+        "mean_pnl_pct": -0.0016,
+        "n": 55
+      }
+    ],
+    "insider_buying": [
+      {
+        "bucket": 2,
+        "score_range": [
+          0.0,
+          6.0
+        ],
+        "mean_score": 0.17,
+        "mean_pnl_pct": 0.0009,
+        "n": 53
+      },
+      {
+        "bucket": 3,
+        "score_range": [
+          6.0,
+          8.0
+        ],
+        "mean_score": 6.31,
+        "mean_pnl_pct": 0.0182,
+        "n": 13
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          8.0,
+          10.0
+        ],
+        "mean_score": 8.34,
+        "mean_pnl_pct": 0.2281,
+        "n": 85
+      }
+    ],
+    "iv_skew": [
+      {
+        "bucket": 4,
+        "score_range": [
+          0.0,
+          4.0
+        ],
+        "mean_score": 0.31,
+        "mean_pnl_pct": 0.1155,
+        "n": 127
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          4.0,
+          10.0
+        ],
+        "mean_score": 5.04,
+        "mean_pnl_pct": 0.0025,
+        "n": 49
+      }
+    ],
+    "momentum": [
+      {
+        "bucket": 1,
+        "score_range": [
+          0.0,
+          6.0
+        ],
+        "mean_score": 2.48,
+        "mean_pnl_pct": -0.0513,
+        "n": 21
+      },
+      {
+        "bucket": 2,
+        "score_range": [
+          6.0,
+          7.0
+        ],
+        "mean_score": 6.0,
+        "mean_pnl_pct": -0.0011,
+        "n": 47
+      },
+      {
+        "bucket": 3,
+        "score_range": [
+          7.0,
+          8.0
+        ],
+        "mean_score": 7.0,
+        "mean_pnl_pct": -0.0947,
+        "n": 37
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          8.0,
+          10.0
+        ],
+        "mean_score": 8.0,
+        "mean_pnl_pct": 0.0036,
+        "n": 29
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          10.0,
+          13.0
+        ],
+        "mean_score": 11.05,
+        "mean_pnl_pct": 0.4582,
+        "n": 43
+      }
+    ],
+    "mtf": [
+      {
+        "bucket": 1,
+        "score_range": [
+          0.0,
+          6.0
+        ],
+        "mean_score": 0.0,
+        "mean_pnl_pct": 0.0435,
+        "n": 20
+      },
+      {
+        "bucket": 2,
+        "score_range": [
+          6.0,
+          7.0
+        ],
+        "mean_score": 6.0,
+        "mean_pnl_pct": -0.0055,
+        "n": 17
+      },
+      {
+        "bucket": 3,
+        "score_range": [
+          7.0,
+          10.0
+        ],
+        "mean_score": 7.05,
+        "mean_pnl_pct": -0.0906,
+        "n": 58
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          10.0,
+          13.0
+        ],
+        "mean_score": 11.02,
+        "mean_pnl_pct": 0.2396,
+        "n": 82
+      }
+    ],
+    "news": [
+      {
+        "bucket": 3,
+        "score_range": [
+          0.0,
+          3.0
+        ],
+        "mean_score": 0.39,
+        "mean_pnl_pct": 0.0082,
+        "n": 103
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          3.0,
+          5.0
+        ],
+        "mean_score": 3.52,
+        "mean_pnl_pct": -0.1346,
+        "n": 31
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          5.0,
+          10.0
+        ],
+        "mean_score": 6.58,
+        "mean_pnl_pct": 0.4303,
+        "n": 43
+      }
+    ],
+    "overnight_drift": [
+      {
+        "bucket": 1,
+        "score_range": [
+          0.0,
+          3.0
+        ],
+        "mean_score": 1.2,
+        "mean_pnl_pct": -0.0063,
+        "n": 25
+      },
+      {
+        "bucket": 2,
+        "score_range": [
+          3.0,
+          6.0
+        ],
+        "mean_score": 4.19,
+        "mean_pnl_pct": 0.0044,
+        "n": 32
+      },
+      {
+        "bucket": 3,
+        "score_range": [
+          6.0,
+          8.0
+        ],
+        "mean_score": 6.0,
+        "mean_pnl_pct": -0.0007,
+        "n": 17
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          8.0,
+          10.0
+        ],
+        "mean_score": 8.0,
+        "mean_pnl_pct": 0.0001,
+        "n": 29
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          10.0,
+          10.0
+        ],
+        "mean_score": 10.0,
+        "mean_pnl_pct": 0.2935,
+        "n": 67
+      }
+    ],
+    "pead": [
+      {
+        "bucket": 5,
+        "score_range": [
+          0.0,
+          0.0
+        ],
+        "mean_score": 0.0,
+        "mean_pnl_pct": 0.084,
+        "n": 176
+      }
+    ],
+    "reversion": [
+      {
+        "bucket": 5,
+        "score_range": [
+          0.0,
+          9.0
+        ],
+        "mean_score": 0.16,
+        "mean_pnl_pct": 0.0857,
+        "n": 177
+      }
+    ],
+    "short_squeeze": [
+      {
+        "bucket": 5,
+        "score_range": [
+          0.0,
+          3.0
+        ],
+        "mean_score": 0.05,
+        "mean_pnl_pct": 0.084,
+        "n": 176
+      }
+    ],
+    "social": [
+      {
+        "bucket": 3,
+        "score_range": [
+          0.0,
+          1.0
+        ],
+        "mean_score": 0.0,
+        "mean_pnl_pct": -0.0437,
+        "n": 102
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          1.0,
+          1.0
+        ],
+        "mean_score": 1.0,
+        "mean_pnl_pct": 0.2617,
+        "n": 75
+      }
+    ],
+    "squeeze": [
+      {
+        "bucket": 3,
+        "score_range": [
+          0.0,
+          2.0
+        ],
+        "mean_score": 0.0,
+        "mean_pnl_pct": -0.0454,
+        "n": 103
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          2.0,
+          3.0
+        ],
+        "mean_score": 2.0,
+        "mean_pnl_pct": -0.0485,
+        "n": 28
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          3.0,
+          13.0
+        ],
+        "mean_score": 5.22,
+        "mean_pnl_pct": 0.4611,
+        "n": 46
+      }
+    ],
+    "trend": [
+      {
+        "bucket": 1,
+        "score_range": [
+          0.0,
+          3.0
+        ],
+        "mean_score": 0.75,
+        "mean_pnl_pct": -0.0407,
+        "n": 28
+      },
+      {
+        "bucket": 2,
+        "score_range": [
+          3.0,
+          5.0
+        ],
+        "mean_score": 3.71,
+        "mean_pnl_pct": -0.094,
+        "n": 41
+      },
+      {
+        "bucket": 3,
+        "score_range": [
+          5.0,
+          6.0
+        ],
+        "mean_score": 5.0,
+        "mean_pnl_pct": 0.0628,
+        "n": 9
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          6.0,
+          8.0
+        ],
+        "mean_score": 6.1,
+        "mean_pnl_pct": 0.0041,
+        "n": 49
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          8.0,
+          13.0
+        ],
+        "mean_score": 9.14,
+        "mean_pnl_pct": 0.388,
+        "n": 50
+      }
+    ]
+  },
+  "hold_time_stratification": {
+    "medium_60to480min": {
+      "n": 39,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.3333,
+          "ci_hi": 0.3333,
+          "n": 35,
+          "flag": "NOISE"
+        },
+        "breakout": {
+          "ic": -0.014,
+          "p_value": 0.9327,
+          "ci_lo": -0.328,
+          "ci_hi": 0.3029,
+          "n": 39,
+          "flag": "NEGATIVE"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.3285,
+          "ci_hi": 0.3285,
+          "n": 36,
+          "flag": "NOISE"
+        },
+        "flow": {
+          "ic": 0.0737,
+          "p_value": 0.6557,
+          "ci_lo": -0.2476,
+          "ci_hi": 0.3804,
+          "n": 39,
+          "flag": "MARGINAL"
+        },
+        "insider_buying": {
+          "ic": 0.0154,
+          "p_value": 0.93,
+          "ci_lo": -0.3195,
+          "ci_hi": 0.3469,
+          "n": 35,
+          "flag": "NOISE"
+        },
+        "iv_skew": {
+          "ic": -0.219,
+          "p_value": 0.1804,
+          "ci_lo": -0.5,
+          "ci_hi": 0.1037,
+          "n": 39,
+          "flag": "NEGATIVE"
+        },
+        "momentum": {
+          "ic": 0.2083,
+          "p_value": 0.2032,
+          "ci_lo": -0.1148,
+          "ci_hi": 0.4915,
+          "n": 39,
+          "flag": "MARGINAL"
+        },
+        "mtf": {
+          "ic": -0.0314,
+          "p_value": 0.8496,
+          "ci_lo": -0.3435,
+          "ci_hi": 0.287,
+          "n": 39,
+          "flag": "NEGATIVE"
+        },
+        "news": {
+          "ic": 0.133,
+          "p_value": 0.4196,
+          "ci_lo": -0.1905,
+          "ci_hi": 0.4305,
+          "n": 39,
+          "flag": "MARGINAL"
+        },
+        "overnight_drift": {
+          "ic": -0.1305,
+          "p_value": 0.4347,
+          "ci_lo": -0.4322,
+          "ci_hi": 0.1974,
+          "n": 38,
+          "flag": "NEGATIVE"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.3155,
+          "ci_hi": 0.3155,
+          "n": 39,
+          "flag": "NOISE"
+        },
+        "reversion": {
+          "ic": 0.0593,
+          "p_value": 0.7198,
+          "ci_lo": -0.2611,
+          "ci_hi": 0.3679,
+          "n": 39,
+          "flag": "MARGINAL"
+        },
+        "short_squeeze": {
+          "ic": 0.0656,
+          "p_value": 0.6916,
+          "ci_lo": -0.2552,
+          "ci_hi": 0.3734,
+          "n": 39,
+          "flag": "MARGINAL"
+        },
+        "social": {
+          "ic": 0.1585,
+          "p_value": 0.3352,
+          "ci_lo": -0.1653,
+          "ci_hi": 0.4514,
+          "n": 39,
+          "flag": "MARGINAL"
+        },
+        "squeeze": {
+          "ic": 0.0057,
+          "p_value": 0.9727,
+          "ci_lo": -0.3104,
+          "ci_hi": 0.3206,
+          "n": 39,
+          "flag": "NOISE"
+        },
+        "trend": {
+          "ic": 0.1634,
+          "p_value": 0.3204,
+          "ci_lo": -0.1604,
+          "ci_hi": 0.4554,
+          "n": 39,
+          "flag": "MARGINAL"
+        }
+      }
+    },
+    "scalp_lt60min": {
+      "n": 89,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2402,
+          "ci_hi": 0.2402,
+          "n": 67,
+          "flag": "NOISE"
+        },
+        "breakout": {
+          "ic": -0.0735,
+          "p_value": 0.4937,
+          "ci_lo": -0.2775,
+          "ci_hi": 0.1369,
+          "n": 89,
+          "flag": "NEGATIVE"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2211,
+          "ci_hi": 0.2211,
+          "n": 79,
+          "flag": "NOISE"
+        },
+        "flow": {
+          "ic": -0.2533,
+          "p_value": 0.0166,
+          "ci_lo": -0.4384,
+          "ci_hi": -0.0475,
+          "n": 89,
+          "flag": "NEGATIVE"
+        },
+        "insider_buying": {
+          "ic": -0.0277,
+          "p_value": 0.8239,
+          "ci_lo": -0.2661,
+          "ci_hi": 0.2139,
+          "n": 67,
+          "flag": "NEGATIVE"
+        },
+        "iv_skew": {
+          "ic": 0.0905,
+          "p_value": 0.4019,
+          "ci_lo": -0.1213,
+          "ci_hi": 0.2943,
+          "n": 88,
+          "flag": "MARGINAL"
+        },
+        "momentum": {
+          "ic": -0.1611,
+          "p_value": 0.1315,
+          "ci_lo": -0.3574,
+          "ci_hi": 0.0488,
+          "n": 89,
+          "flag": "NEGATIVE"
+        },
+        "mtf": {
+          "ic": -0.0758,
+          "p_value": 0.4799,
+          "ci_lo": -0.2797,
+          "ci_hi": 0.1345,
+          "n": 89,
+          "flag": "NEGATIVE"
+        },
+        "news": {
+          "ic": -0.061,
+          "p_value": 0.5699,
+          "ci_lo": -0.2659,
+          "ci_hi": 0.1491,
+          "n": 89,
+          "flag": "NEGATIVE"
+        },
+        "overnight_drift": {
+          "ic": -0.1773,
+          "p_value": 0.1087,
+          "ci_lo": -0.3786,
+          "ci_hi": 0.0399,
+          "n": 83,
+          "flag": "NEGATIVE"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2094,
+          "ci_hi": 0.2094,
+          "n": 88,
+          "flag": "NOISE"
+        },
+        "reversion": {
+          "ic": -0.1104,
+          "p_value": 0.3032,
+          "ci_lo": -0.3115,
+          "ci_hi": 0.1002,
+          "n": 89,
+          "flag": "NEGATIVE"
+        },
+        "short_squeeze": {
+          "ic": -0.0894,
+          "p_value": 0.4076,
+          "ci_lo": -0.2933,
+          "ci_hi": 0.1224,
+          "n": 88,
+          "flag": "NEGATIVE"
+        },
+        "social": {
+          "ic": -0.0117,
+          "p_value": 0.9136,
+          "ci_lo": -0.2194,
+          "ci_hi": 0.1971,
+          "n": 89,
+          "flag": "NEGATIVE"
+        },
+        "squeeze": {
+          "ic": 0.1667,
+          "p_value": 0.1184,
+          "ci_lo": -0.0431,
+          "ci_hi": 0.3624,
+          "n": 89,
+          "flag": "MARGINAL"
+        },
+        "trend": {
+          "ic": 0.0007,
+          "p_value": 0.9951,
+          "ci_lo": -0.2076,
+          "ci_hi": 0.2089,
+          "n": 89,
+          "flag": "NOISE"
+        }
+      }
+    },
+    "swing_gte480min": {
+      "n": 49,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2812,
+          "ci_hi": 0.2812,
+          "n": 49,
+          "flag": "NOISE"
+        },
+        "breakout": {
+          "ic": -0.0304,
+          "p_value": 0.8357,
+          "ci_lo": -0.309,
+          "ci_hi": 0.253,
+          "n": 49,
+          "flag": "NEGATIVE"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2812,
+          "ci_hi": 0.2812,
+          "n": 49,
+          "flag": "NOISE"
+        },
+        "flow": {
+          "ic": -0.0042,
+          "p_value": 0.9772,
+          "ci_lo": -0.285,
+          "ci_hi": 0.2773,
+          "n": 49,
+          "flag": "NEGATIVE"
+        },
+        "insider_buying": {
+          "ic": -0.0045,
+          "p_value": 0.9756,
+          "ci_lo": -0.2853,
+          "ci_hi": 0.2771,
+          "n": 49,
+          "flag": "NEGATIVE"
+        },
+        "iv_skew": {
+          "ic": -0.0238,
+          "p_value": 0.8712,
+          "ci_lo": -0.303,
+          "ci_hi": 0.2592,
+          "n": 49,
+          "flag": "NEGATIVE"
+        },
+        "momentum": {
+          "ic": 0.1659,
+          "p_value": 0.2546,
+          "ci_lo": -0.1209,
+          "ci_hi": 0.4272,
+          "n": 49,
+          "flag": "MARGINAL"
+        },
+        "mtf": {
+          "ic": -0.2286,
+          "p_value": 0.1142,
+          "ci_lo": -0.479,
+          "ci_hi": 0.0562,
+          "n": 49,
+          "flag": "NEGATIVE"
+        },
+        "news": {
+          "ic": -0.0499,
+          "p_value": 0.7335,
+          "ci_lo": -0.3265,
+          "ci_hi": 0.2346,
+          "n": 49,
+          "flag": "NEGATIVE"
+        },
+        "overnight_drift": {
+          "ic": -0.2974,
+          "p_value": 0.0379,
+          "ci_lo": -0.534,
+          "ci_hi": -0.0177,
+          "n": 49,
+          "flag": "NEGATIVE"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2812,
+          "ci_hi": 0.2812,
+          "n": 49,
+          "flag": "NOISE"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2812,
+          "ci_hi": 0.2812,
+          "n": 49,
+          "flag": "NOISE"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2812,
+          "ci_hi": 0.2812,
+          "n": 49,
+          "flag": "NOISE"
+        },
+        "social": {
+          "ic": -0.0509,
+          "p_value": 0.7283,
+          "ci_lo": -0.3274,
+          "ci_hi": 0.2336,
+          "n": 49,
+          "flag": "NEGATIVE"
+        },
+        "squeeze": {
+          "ic": 0.0839,
+          "p_value": 0.5666,
+          "ci_lo": -0.2021,
+          "ci_hi": 0.3567,
+          "n": 49,
+          "flag": "MARGINAL"
+        },
+        "trend": {
+          "ic": -0.0994,
+          "p_value": 0.4969,
+          "ci_lo": -0.3702,
+          "ci_hi": 0.187,
+          "n": 49,
+          "flag": "NEGATIVE"
+        }
+      }
+    }
+  },
+  "trade_type_stratification": {
+    "INTRADAY": {
+      "n": 58,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2903,
+          "ci_hi": 0.2903,
+          "n": 46,
+          "flag": "NOISE"
+        },
+        "breakout": {
+          "ic": -0.1672,
+          "p_value": 0.2095,
+          "ci_lo": -0.4079,
+          "ci_hi": 0.0952,
+          "n": 58,
+          "flag": "NEGATIVE"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2729,
+          "ci_hi": 0.2729,
+          "n": 52,
+          "flag": "NOISE"
+        },
+        "flow": {
+          "ic": -0.3383,
+          "p_value": 0.0094,
+          "ci_lo": -0.5487,
+          "ci_hi": -0.0877,
+          "n": 58,
+          "flag": "NEGATIVE"
+        },
+        "insider_buying": {
+          "ic": -0.1618,
+          "p_value": 0.2828,
+          "ci_lo": -0.4318,
+          "ci_hi": 0.1349,
+          "n": 46,
+          "flag": "NEGATIVE"
+        },
+        "iv_skew": {
+          "ic": 0.1791,
+          "p_value": 0.1825,
+          "ci_lo": -0.0855,
+          "ci_hi": 0.4201,
+          "n": 57,
+          "flag": "MARGINAL"
+        },
+        "momentum": {
+          "ic": 0.1099,
+          "p_value": 0.4115,
+          "ci_lo": -0.1527,
+          "ci_hi": 0.358,
+          "n": 58,
+          "flag": "MARGINAL"
+        },
+        "mtf": {
+          "ic": -0.1186,
+          "p_value": 0.3753,
+          "ci_lo": -0.3657,
+          "ci_hi": 0.1441,
+          "n": 58,
+          "flag": "NEGATIVE"
+        },
+        "news": {
+          "ic": -0.0072,
+          "p_value": 0.9574,
+          "ci_lo": -0.265,
+          "ci_hi": 0.2516,
+          "n": 58,
+          "flag": "NEGATIVE"
+        },
+        "overnight_drift": {
+          "ic": -0.1112,
+          "p_value": 0.4327,
+          "ci_lo": -0.3728,
+          "ci_hi": 0.1668,
+          "n": 52,
+          "flag": "NEGATIVE"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2606,
+          "ci_hi": 0.2606,
+          "n": 57,
+          "flag": "NOISE"
+        },
+        "reversion": {
+          "ic": -0.2013,
+          "p_value": 0.1298,
+          "ci_lo": -0.4369,
+          "ci_hi": 0.0602,
+          "n": 58,
+          "flag": "NEGATIVE"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2606,
+          "ci_hi": 0.2606,
+          "n": 57,
+          "flag": "NOISE"
+        },
+        "social": {
+          "ic": -0.0166,
+          "p_value": 0.9013,
+          "ci_lo": -0.2738,
+          "ci_hi": 0.2427,
+          "n": 58,
+          "flag": "NEGATIVE"
+        },
+        "squeeze": {
+          "ic": 0.0422,
+          "p_value": 0.7533,
+          "ci_lo": -0.2185,
+          "ci_hi": 0.2972,
+          "n": 58,
+          "flag": "MARGINAL"
+        },
+        "trend": {
+          "ic": 0.0466,
+          "p_value": 0.7283,
+          "ci_lo": -0.2143,
+          "ci_hi": 0.3013,
+          "n": 58,
+          "flag": "MARGINAL"
+        }
+      }
+    },
+    "POSITION": {
+      "n": 9,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "breakout": {
+          "ic": 0.3667,
+          "p_value": 0.3317,
+          "ci_lo": -0.3932,
+          "ci_hi": 0.8289,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "flow": {
+          "ic": -0.0333,
+          "p_value": 0.9322,
+          "ci_lo": -0.6824,
+          "ci_hi": 0.6451,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "insider_buying": {
+          "ic": 0.2,
+          "p_value": 0.6059,
+          "ci_lo": -0.5352,
+          "ci_hi": 0.7628,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "iv_skew": {
+          "ic": 0.4333,
+          "p_value": 0.244,
+          "ci_lo": -0.3241,
+          "ci_hi": 0.8522,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "momentum": {
+          "ic": 0.2667,
+          "p_value": 0.4879,
+          "ci_lo": -0.483,
+          "ci_hi": 0.7908,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "mtf": {
+          "ic": -0.1333,
+          "p_value": 0.7324,
+          "ci_lo": -0.7326,
+          "ci_hi": 0.5824,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "news": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "overnight_drift": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "social": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "squeeze": {
+          "ic": 0.4167,
+          "p_value": 0.2646,
+          "ci_lo": -0.3421,
+          "ci_hi": 0.8465,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "trend": {
+          "ic": 0.05,
+          "p_value": 0.8984,
+          "ci_lo": -0.6352,
+          "ci_hi": 0.6912,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        }
+      }
+    },
+    "SCALP": {
+      "n": 15,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 2,
+          "flag": "INSUFFICIENT"
+        },
+        "breakout": {
+          "ic": -0.3357,
+          "p_value": 0.2212,
+          "ci_lo": -0.7236,
+          "ci_hi": 0.2132,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "flow": {
+          "ic": 0.1536,
+          "p_value": 0.5848,
+          "ci_lo": -0.3893,
+          "ci_hi": 0.6173,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "insider_buying": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 2,
+          "flag": "INSUFFICIENT"
+        },
+        "iv_skew": {
+          "ic": -0.675,
+          "p_value": 0.0058,
+          "ci_lo": -0.8822,
+          "ci_hi": -0.2487,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "momentum": {
+          "ic": 0.1464,
+          "p_value": 0.6025,
+          "ci_lo": -0.3955,
+          "ci_hi": 0.6127,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "mtf": {
+          "ic": -0.0393,
+          "p_value": 0.8894,
+          "ci_lo": -0.5407,
+          "ci_hi": 0.4827,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "news": {
+          "ic": 0.1393,
+          "p_value": 0.6205,
+          "ci_lo": -0.4016,
+          "ci_hi": 0.6082,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "overnight_drift": {
+          "ic": -0.7538,
+          "p_value": 0.0018,
+          "ci_lo": -0.9175,
+          "ci_hi": -0.3721,
+          "n": 14,
+          "flag": "INSUFFICIENT"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.5123,
+          "ci_hi": 0.5123,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.5123,
+          "ci_hi": 0.5123,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "short_squeeze": {
+          "ic": -0.6357,
+          "p_value": 0.0109,
+          "ci_lo": -0.866,
+          "ci_hi": -0.1831,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "social": {
+          "ic": 0.2179,
+          "p_value": 0.4354,
+          "ci_lo": -0.3314,
+          "ci_hi": 0.6568,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "squeeze": {
+          "ic": -0.325,
+          "p_value": 0.2372,
+          "ci_lo": -0.7178,
+          "ci_hi": 0.2247,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        },
+        "trend": {
+          "ic": 0.4107,
+          "p_value": 0.1283,
+          "ci_lo": -0.1286,
+          "ci_hi": 0.7625,
+          "n": 15,
+          "flag": "INSUFFICIENT"
+        }
+      }
+    },
+    "SWING": {
+      "n": 95,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2026,
+          "ci_hi": 0.2026,
+          "n": 94,
+          "flag": "NOISE"
+        },
+        "breakout": {
+          "ic": -0.1081,
+          "p_value": 0.2972,
+          "ci_lo": -0.303,
+          "ci_hi": 0.0956,
+          "n": 95,
+          "flag": "NEGATIVE"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2026,
+          "ci_hi": 0.2026,
+          "n": 94,
+          "flag": "NOISE"
+        },
+        "flow": {
+          "ic": -0.1028,
+          "p_value": 0.3216,
+          "ci_lo": -0.2982,
+          "ci_hi": 0.1009,
+          "n": 95,
+          "flag": "NEGATIVE"
+        },
+        "insider_buying": {
+          "ic": -0.0129,
+          "p_value": 0.9017,
+          "ci_lo": -0.215,
+          "ci_hi": 0.1902,
+          "n": 94,
+          "flag": "NEGATIVE"
+        },
+        "iv_skew": {
+          "ic": -0.0378,
+          "p_value": 0.7158,
+          "ci_lo": -0.2376,
+          "ci_hi": 0.165,
+          "n": 95,
+          "flag": "NEGATIVE"
+        },
+        "momentum": {
+          "ic": -0.2111,
+          "p_value": 0.04,
+          "ci_lo": -0.3958,
+          "ci_hi": -0.01,
+          "n": 95,
+          "flag": "NEGATIVE"
+        },
+        "mtf": {
+          "ic": -0.1673,
+          "p_value": 0.1052,
+          "ci_lo": -0.3568,
+          "ci_hi": 0.0355,
+          "n": 95,
+          "flag": "NEGATIVE"
+        },
+        "news": {
+          "ic": -0.0823,
+          "p_value": 0.4277,
+          "ci_lo": -0.2792,
+          "ci_hi": 0.1212,
+          "n": 95,
+          "flag": "NEGATIVE"
+        },
+        "overnight_drift": {
+          "ic": -0.267,
+          "p_value": 0.0089,
+          "ci_lo": -0.4446,
+          "ci_hi": -0.0692,
+          "n": 95,
+          "flag": "NEGATIVE"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2015,
+          "ci_hi": 0.2015,
+          "n": 95,
+          "flag": "NOISE"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2015,
+          "ci_hi": 0.2015,
+          "n": 95,
+          "flag": "NOISE"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2015,
+          "ci_hi": 0.2015,
+          "n": 95,
+          "flag": "NOISE"
+        },
+        "social": {
+          "ic": -0.0739,
+          "p_value": 0.4768,
+          "ci_lo": -0.2714,
+          "ci_hi": 0.1296,
+          "n": 95,
+          "flag": "NEGATIVE"
+        },
+        "squeeze": {
+          "ic": 0.1358,
+          "p_value": 0.1893,
+          "ci_lo": -0.0676,
+          "ci_hi": 0.3284,
+          "n": 95,
+          "flag": "MARGINAL"
+        },
+        "trend": {
+          "ic": -0.1147,
+          "p_value": 0.2682,
+          "ci_lo": -0.3091,
+          "ci_hi": 0.0889,
+          "n": 95,
+          "flag": "NEGATIVE"
+        }
+      }
+    }
+  },
+  "regime_stratification": {
+    "CHOPPY": {
+      "n": 1,
+      "dims": {
+        "analyst_revision": {
+          "ic": null,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 0,
+          "flag": "INSUFFICIENT"
+        },
+        "breakout": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 1,
+          "flag": "INSUFFICIENT"
+        },
+        "catalyst": {
+          "ic": null,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 0,
+          "flag": "INSUFFICIENT"
+        },
+        "flow": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 1,
+          "flag": "INSUFFICIENT"
+        },
+        "insider_buying": {
+          "ic": null,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 0,
+          "flag": "INSUFFICIENT"
+        },
+        "iv_skew": {
+          "ic": null,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 0,
+          "flag": "INSUFFICIENT"
+        },
+        "momentum": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 1,
+          "flag": "INSUFFICIENT"
+        },
+        "mtf": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 1,
+          "flag": "INSUFFICIENT"
+        },
+        "news": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 1,
+          "flag": "INSUFFICIENT"
+        },
+        "overnight_drift": {
+          "ic": null,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 0,
+          "flag": "INSUFFICIENT"
+        },
+        "pead": {
+          "ic": null,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 0,
+          "flag": "INSUFFICIENT"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 1,
+          "flag": "INSUFFICIENT"
+        },
+        "short_squeeze": {
+          "ic": null,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 0,
+          "flag": "INSUFFICIENT"
+        },
+        "social": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 1,
+          "flag": "INSUFFICIENT"
+        },
+        "squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 1,
+          "flag": "INSUFFICIENT"
+        },
+        "trend": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 1,
+          "flag": "INSUFFICIENT"
+        }
+      }
+    },
+    "DISTRIBUTION": {
+      "n": 3,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "breakout": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "flow": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "insider_buying": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "iv_skew": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "momentum": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "mtf": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "news": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "overnight_drift": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "social": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "trend": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        }
+      }
+    },
+    "FEAR_ELEVATED": {
+      "n": 4,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "breakout": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "flow": {
+          "ic": 0.8,
+          "p_value": 0.2,
+          "ci_lo": -0.697,
+          "ci_hi": 0.9956,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "insider_buying": {
+          "ic": -0.4,
+          "p_value": 0.6,
+          "ci_lo": -0.9831,
+          "ci_hi": 0.9115,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "iv_skew": {
+          "ic": -1.0,
+          "p_value": 0.0,
+          "ci_lo": -1.0,
+          "ci_hi": -0.995,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "momentum": {
+          "ic": -0.4,
+          "p_value": 0.6,
+          "ci_lo": -0.9831,
+          "ci_hi": 0.9115,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "mtf": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "news": {
+          "ic": -0.4,
+          "p_value": 0.6,
+          "ci_lo": -0.9831,
+          "ci_hi": 0.9115,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "overnight_drift": {
+          "ic": 0.2,
+          "p_value": 0.8,
+          "ci_lo": -0.9422,
+          "ci_hi": 0.9739,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "social": {
+          "ic": 0.2,
+          "p_value": 0.8,
+          "ci_lo": -0.9422,
+          "ci_hi": 0.9739,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "trend": {
+          "ic": -0.2,
+          "p_value": 0.8,
+          "ci_lo": -0.9739,
+          "ci_hi": 0.9422,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        }
+      }
+    },
+    "MOMENTUM_BULL": {
+      "n": 31,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.3543,
+          "ci_hi": 0.3543,
+          "n": 31,
+          "flag": "NOISE"
+        },
+        "breakout": {
+          "ic": 0.2798,
+          "p_value": 0.1273,
+          "ci_lo": -0.0827,
+          "ci_hi": 0.577,
+          "n": 31,
+          "flag": "MARGINAL"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.3543,
+          "ci_hi": 0.3543,
+          "n": 31,
+          "flag": "NOISE"
+        },
+        "flow": {
+          "ic": 0.3282,
+          "p_value": 0.0714,
+          "ci_lo": -0.0296,
+          "ci_hi": 0.6115,
+          "n": 31,
+          "flag": "MARGINAL"
+        },
+        "insider_buying": {
+          "ic": -0.1815,
+          "p_value": 0.3286,
+          "ci_lo": -0.5034,
+          "ci_hi": 0.1848,
+          "n": 31,
+          "flag": "NEGATIVE"
+        },
+        "iv_skew": {
+          "ic": -0.1758,
+          "p_value": 0.3441,
+          "ci_lo": -0.4991,
+          "ci_hi": 0.1904,
+          "n": 31,
+          "flag": "NEGATIVE"
+        },
+        "momentum": {
+          "ic": 0.1456,
+          "p_value": 0.4346,
+          "ci_lo": -0.2201,
+          "ci_hi": 0.4754,
+          "n": 31,
+          "flag": "MARGINAL"
+        },
+        "mtf": {
+          "ic": 0.2738,
+          "p_value": 0.1361,
+          "ci_lo": -0.0892,
+          "ci_hi": 0.5726,
+          "n": 31,
+          "flag": "MARGINAL"
+        },
+        "news": {
+          "ic": 0.1625,
+          "p_value": 0.3824,
+          "ci_lo": -0.2036,
+          "ci_hi": 0.4887,
+          "n": 31,
+          "flag": "MARGINAL"
+        },
+        "overnight_drift": {
+          "ic": -0.3226,
+          "p_value": 0.0767,
+          "ci_lo": -0.6075,
+          "ci_hi": 0.0359,
+          "n": 31,
+          "flag": "NEGATIVE"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.3543,
+          "ci_hi": 0.3543,
+          "n": 31,
+          "flag": "NOISE"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.3543,
+          "ci_hi": 0.3543,
+          "n": 31,
+          "flag": "NOISE"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.3543,
+          "ci_hi": 0.3543,
+          "n": 31,
+          "flag": "NOISE"
+        },
+        "social": {
+          "ic": 0.0806,
+          "p_value": 0.6663,
+          "ci_lo": -0.2818,
+          "ci_hi": 0.4229,
+          "n": 31,
+          "flag": "MARGINAL"
+        },
+        "squeeze": {
+          "ic": 0.2524,
+          "p_value": 0.1707,
+          "ci_lo": -0.1119,
+          "ci_hi": 0.5569,
+          "n": 31,
+          "flag": "MARGINAL"
+        },
+        "trend": {
+          "ic": 0.3738,
+          "p_value": 0.0383,
+          "ci_lo": 0.0224,
+          "ci_hi": 0.643,
+          "n": 31,
+          "flag": "SIGNAL"
+        }
+      }
+    },
+    "RANGE_BOUND": {
+      "n": 3,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "breakout": {
+          "ic": -0.5,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "flow": {
+          "ic": 0.5,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "insider_buying": {
+          "ic": 1.0,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "iv_skew": {
+          "ic": 1.0,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "momentum": {
+          "ic": -0.5,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "mtf": {
+          "ic": -0.5,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "news": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "overnight_drift": {
+          "ic": 0.5,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "social": {
+          "ic": 0.5,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "squeeze": {
+          "ic": 0.5,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        },
+        "trend": {
+          "ic": -0.5,
+          "p_value": null,
+          "ci_lo": null,
+          "ci_hi": null,
+          "n": 3,
+          "flag": "INSUFFICIENT"
+        }
+      }
+    },
+    "RELIEF_RALLY": {
+      "n": 9,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "breakout": {
+          "ic": -0.5167,
+          "p_value": 0.1544,
+          "ci_lo": -0.8791,
+          "ci_hi": 0.2245,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "flow": {
+          "ic": -0.9,
+          "p_value": 0.0009,
+          "ci_lo": -0.979,
+          "ci_hi": -0.5863,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "insider_buying": {
+          "ic": 0.5833,
+          "p_value": 0.0992,
+          "ci_lo": -0.1319,
+          "ci_hi": 0.8991,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "iv_skew": {
+          "ic": 0.1333,
+          "p_value": 0.7324,
+          "ci_lo": -0.5824,
+          "ci_hi": 0.7326,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "momentum": {
+          "ic": -0.3833,
+          "p_value": 0.3085,
+          "ci_lo": -0.8349,
+          "ci_hi": 0.3767,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "mtf": {
+          "ic": -0.0333,
+          "p_value": 0.9322,
+          "ci_lo": -0.6824,
+          "ci_hi": 0.6451,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "news": {
+          "ic": 0.3167,
+          "p_value": 0.4064,
+          "ci_lo": -0.44,
+          "ci_hi": 0.8104,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "overnight_drift": {
+          "ic": 0.0333,
+          "p_value": 0.9322,
+          "ci_lo": -0.6451,
+          "ci_hi": 0.6824,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.6641,
+          "ci_hi": 0.6641,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "social": {
+          "ic": -0.5167,
+          "p_value": 0.1544,
+          "ci_lo": -0.8791,
+          "ci_hi": 0.2245,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "squeeze": {
+          "ic": 0.1167,
+          "p_value": 0.765,
+          "ci_lo": -0.5934,
+          "ci_hi": 0.7246,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        },
+        "trend": {
+          "ic": -0.2,
+          "p_value": 0.6059,
+          "ci_lo": -0.7628,
+          "ci_hi": 0.5352,
+          "n": 9,
+          "flag": "INSUFFICIENT"
+        }
+      }
+    },
+    "TRENDING_BEAR": {
+      "n": 4,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "breakout": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "flow": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "insider_buying": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "iv_skew": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "momentum": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "mtf": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "news": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "overnight_drift": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "social": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        },
+        "trend": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.9611,
+          "ci_hi": 0.9611,
+          "n": 4,
+          "flag": "INSUFFICIENT"
+        }
+      }
+    },
+    "TRENDING_UP": {
+      "n": 98,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2184,
+          "ci_hi": 0.2184,
+          "n": 81,
+          "flag": "NOISE"
+        },
+        "breakout": {
+          "ic": -0.0913,
+          "p_value": 0.3711,
+          "ci_lo": -0.2846,
+          "ci_hi": 0.1091,
+          "n": 98,
+          "flag": "NEGATIVE"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.2059,
+          "ci_hi": 0.2059,
+          "n": 91,
+          "flag": "NOISE"
+        },
+        "flow": {
+          "ic": -0.2402,
+          "p_value": 0.0172,
+          "ci_lo": -0.4186,
+          "ci_hi": -0.0438,
+          "n": 98,
+          "flag": "NEGATIVE"
+        },
+        "insider_buying": {
+          "ic": -0.1028,
+          "p_value": 0.3609,
+          "ci_lo": -0.3141,
+          "ci_hi": 0.1182,
+          "n": 81,
+          "flag": "NEGATIVE"
+        },
+        "iv_skew": {
+          "ic": 0.0576,
+          "p_value": 0.5735,
+          "ci_lo": -0.1425,
+          "ci_hi": 0.2531,
+          "n": 98,
+          "flag": "MARGINAL"
+        },
+        "momentum": {
+          "ic": -0.088,
+          "p_value": 0.3891,
+          "ci_lo": -0.2815,
+          "ci_hi": 0.1124,
+          "n": 98,
+          "flag": "NEGATIVE"
+        },
+        "mtf": {
+          "ic": -0.2907,
+          "p_value": 0.0037,
+          "ci_lo": -0.4624,
+          "ci_hi": -0.0979,
+          "n": 98,
+          "flag": "NEGATIVE"
+        },
+        "news": {
+          "ic": -0.0627,
+          "p_value": 0.5395,
+          "ci_lo": -0.2579,
+          "ci_hi": 0.1374,
+          "n": 98,
+          "flag": "NEGATIVE"
+        },
+        "overnight_drift": {
+          "ic": -0.1891,
+          "p_value": 0.0636,
+          "ci_lo": -0.3744,
+          "ci_hi": 0.0108,
+          "n": 97,
+          "flag": "NEGATIVE"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.1984,
+          "ci_hi": 0.1984,
+          "n": 98,
+          "flag": "NOISE"
+        },
+        "reversion": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.1984,
+          "ci_hi": 0.1984,
+          "n": 98,
+          "flag": "NOISE"
+        },
+        "short_squeeze": {
+          "ic": -0.3074,
+          "p_value": 0.0021,
+          "ci_lo": -0.4767,
+          "ci_hi": -0.116,
+          "n": 98,
+          "flag": "NEGATIVE"
+        },
+        "social": {
+          "ic": -0.0616,
+          "p_value": 0.5468,
+          "ci_lo": -0.2569,
+          "ci_hi": 0.1385,
+          "n": 98,
+          "flag": "NEGATIVE"
+        },
+        "squeeze": {
+          "ic": 0.0872,
+          "p_value": 0.3932,
+          "ci_lo": -0.1132,
+          "ci_hi": 0.2808,
+          "n": 98,
+          "flag": "MARGINAL"
+        },
+        "trend": {
+          "ic": -0.1045,
+          "p_value": 0.3059,
+          "ci_lo": -0.2968,
+          "ci_hi": 0.0959,
+          "n": 98,
+          "flag": "NEGATIVE"
+        }
+      }
+    },
+    "UNKNOWN": {
+      "n": 24,
+      "dims": {
+        "analyst_revision": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.4957,
+          "ci_hi": 0.4957,
+          "n": 16,
+          "flag": "INSUFFICIENT"
+        },
+        "breakout": {
+          "ic": 0.0287,
+          "p_value": 0.8941,
+          "ci_lo": -0.3791,
+          "ci_hi": 0.4272,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.4542,
+          "ci_hi": 0.4542,
+          "n": 19,
+          "flag": "INSUFFICIENT"
+        },
+        "flow": {
+          "ic": 0.1096,
+          "p_value": 0.6103,
+          "ci_lo": -0.3074,
+          "ci_hi": 0.4913,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "insider_buying": {
+          "ic": 0.3735,
+          "p_value": 0.1541,
+          "ci_lo": -0.1499,
+          "ci_hi": 0.7334,
+          "n": 16,
+          "flag": "INSUFFICIENT"
+        },
+        "iv_skew": {
+          "ic": -0.0409,
+          "p_value": 0.8496,
+          "ci_lo": -0.4371,
+          "ci_hi": 0.3686,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "momentum": {
+          "ic": 0.0652,
+          "p_value": 0.7621,
+          "ci_lo": -0.3473,
+          "ci_hi": 0.4566,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "mtf": {
+          "ic": 0.1035,
+          "p_value": 0.6304,
+          "ci_lo": -0.313,
+          "ci_hi": 0.4866,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "news": {
+          "ic": -0.0652,
+          "p_value": 0.7621,
+          "ci_lo": -0.4566,
+          "ci_hi": 0.3473,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "overnight_drift": {
+          "ic": -0.2509,
+          "p_value": 0.3002,
+          "ci_lo": -0.633,
+          "ci_hi": 0.2295,
+          "n": 19,
+          "flag": "INSUFFICIENT"
+        },
+        "pead": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.4034,
+          "ci_hi": 0.4034,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "reversion": {
+          "ic": 0.0217,
+          "p_value": 0.9197,
+          "ci_lo": -0.385,
+          "ci_hi": 0.4214,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "short_squeeze": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.4034,
+          "ci_hi": 0.4034,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "social": {
+          "ic": 0.2348,
+          "p_value": 0.2695,
+          "ci_lo": -0.1863,
+          "ci_hi": 0.583,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "squeeze": {
+          "ic": 0.0096,
+          "p_value": 0.9646,
+          "ci_lo": -0.3954,
+          "ci_hi": 0.4114,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        },
+        "trend": {
+          "ic": 0.0574,
+          "p_value": 0.79,
+          "ci_lo": -0.3542,
+          "ci_hi": 0.4504,
+          "n": 24,
+          "flag": "INSUFFICIENT"
+        }
+      }
+    }
+  },
+  "candidate_vs_execution_ic": {
+    "note": "Directional comparison only \u2014 not apples-to-apples. Candidate IC: signals_log + price forward returns (all scanned candidates). Execution IC: training_records + realized pnl_pct (executed trades only, selection bias applies).",
+    "dims": {
+      "analyst_revision": {
+        "candidate_ic": 0.0,
+        "execution_ic": 0.0,
+        "divergence": null
+      },
+      "breakout": {
+        "candidate_ic": 0.0122,
+        "execution_ic": -0.0669,
+        "divergence": "SIGN_FLIP"
+      },
+      "catalyst": {
+        "candidate_ic": null,
+        "execution_ic": 0.0,
+        "divergence": null
+      },
+      "flow": {
+        "candidate_ic": -0.0097,
+        "execution_ic": -0.1177,
+        "divergence": "LARGE_GAP"
+      },
+      "insider_buying": {
+        "candidate_ic": -0.0732,
+        "execution_ic": -0.0719,
+        "divergence": null
+      },
+      "iv_skew": {
+        "candidate_ic": -0.0955,
+        "execution_ic": -0.0032,
+        "divergence": null
+      },
+      "momentum": {
+        "candidate_ic": -0.0478,
+        "execution_ic": -0.013,
+        "divergence": null
+      },
+      "mtf": {
+        "candidate_ic": -0.0315,
+        "execution_ic": -0.1221,
+        "divergence": null
+      },
+      "news": {
+        "candidate_ic": 0.1219,
+        "execution_ic": -0.0231,
+        "divergence": "SIGN_FLIP"
+      },
+      "overnight_drift": {
+        "candidate_ic": -0.076,
+        "execution_ic": -0.1988,
+        "divergence": "LARGE_GAP"
+      },
+      "pead": {
+        "candidate_ic": 0.0,
+        "execution_ic": 0.0,
+        "divergence": null
+      },
+      "reversion": {
+        "candidate_ic": 0.0207,
+        "execution_ic": -0.0978,
+        "divergence": "SIGN_FLIP"
+      },
+      "short_squeeze": {
+        "candidate_ic": 0.0105,
+        "execution_ic": -0.1035,
+        "divergence": "SIGN_FLIP"
+      },
+      "social": {
+        "candidate_ic": 0.0703,
+        "execution_ic": -0.0095,
+        "divergence": "SIGN_FLIP"
+      },
+      "squeeze": {
+        "candidate_ic": -0.046,
+        "execution_ic": 0.1002,
+        "divergence": "SIGN_FLIP"
+      },
+      "trend": {
+        "candidate_ic": 0.0223,
+        "execution_ic": -0.0013,
+        "divergence": "SIGN_FLIP"
+      }
+    }
+  },
+  "recommendations": {
+    "candidate_for_walk_forward": [],
+    "flag_for_review": [
+      "breakout",
+      "flow",
+      "insider_buying",
+      "iv_skew",
+      "momentum",
+      "mtf",
+      "news",
+      "overnight_drift",
+      "reversion",
+      "short_squeeze",
+      "social",
+      "trend"
+    ],
+    "inactive_skip": [
+      "analyst_revision",
+      "catalyst",
+      "pead"
+    ],
+    "insufficient_evidence": []
+  }
+}

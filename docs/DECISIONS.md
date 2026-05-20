@@ -6,6 +6,26 @@
 
 ---
 
+## 2026-05-20 — Walk-Forward Weight Calibration: Candidate IC Primary, Execution IC Advisory
+
+**Decision**: Candidate IC (from `ic_weights.json` / `ic_weights_live_history.jsonl`, 36k+ scanned candidates) is the primary source for weight calibration. Execution IC (from `data/signal_validation_report.json`, 177 usable trades) is advisory only — it may cap or flag a weight, but must never increase any weight above the candidate-IC-derived level.
+
+**Calibration rules (locked)**:
+1. Candidate IC derives proposed weights via `normalize_ic_weights()`.
+2. Execution IC is advisory only — cap/flag permitted, increases prohibited.
+3. overnight_drift: BLOCKED CRITICAL. Negative in both sources (candidate −0.076 consistent across 23 history entries; execution −0.199, p=0.009 statistically significant). Weight locked at 0.
+4. Sign-flip (candidate positive, execution negative, not significant p ≥ 0.05): FLAG for review, preserve candidate weight unchanged.
+5. Sign-flip (candidate positive, execution negative, significant p < 0.05 with n ≥ 30): CAP proposed weight at BASELINE_WEIGHTS[dim].
+6. Inactive (both sources zero): weight = 0, excluded from calibration.
+
+**Current proposal result**: Proposed weights are identical to candidate IC weights. No execution IC result is strong enough to trigger an advisory cap or block (other than overnight_drift which was already 0). Flagged for review (sign-flip not significant): breakout, news, reversion, short_squeeze, social, trend. These sign flips are expected from selection bias on 177 executed trades vs 36k+ scanned candidates — they do not indicate the signals are broken.
+
+**Why candidate IC is primary**: Executed-trade IC is structurally biased — it reflects only the 177 trades the system chose to enter, which are disproportionately trades where the entering signals scored high. This creates artificial upward bias for dimensions that drove entry decisions and artificial downward bias for dimensions that were less determinative. The candidate IC covers all scanned stocks regardless of whether Decifer traded them, giving an unbiased view of predictive power.
+
+**Activation**: `data/proposed_calibrated_weights.json` is a proposal only. `ic_weights.json` is unchanged. Activation requires explicit Amit approval. Scripts: `scripts/signal_validation_report.py`, `scripts/walkforward_calibration_report.py`.
+
+---
+
 ## 2026-05-20 — Scanner-Level HMM Replacement: "Replace Entirely" Directive Superseded
 
 **Decision**: The original directive (2026-04-01) stating "HMM replaces VIX-proxy entirely when the gate is met" is formally superseded. The two-layer regime architecture now in production is intentional and locked.
