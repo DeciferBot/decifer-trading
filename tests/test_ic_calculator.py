@@ -1047,3 +1047,228 @@ class TestGuardrailE_MissingOrStaleFile:
             assert BASELINE_WEIGHTS[dim] == 0.0, (
                 f"Expected BASELINE_WEIGHTS[{dim}]=0.0, got {BASELINE_WEIGHTS[dim]}"
             )
+
+
+# ---------------------------------------------------------------------------
+# TestAlpacaForwardReturns — unit tests for the Alpaca-backed fetch function
+# ---------------------------------------------------------------------------
+
+
+def _make_alpaca_bar_response(symbol: str, dates_and_closes: list[tuple]) -> "MagicMock":
+    """Build a mock Alpaca bars response for one symbol."""
+    import pandas as pd
+
+    dates = [d for d, _ in dates_and_closes]
+    closes = [c for _, c in dates_and_closes]
+    idx = pd.DatetimeIndex(pd.to_datetime(dates, utc=True))
+    df_single = pd.DataFrame({"close": closes}, index=idx)
+    # Multi-symbol response: MultiIndex (symbol, timestamp)
+    df_multi = df_single.copy()
+    df_multi.index = pd.MultiIndex.from_tuples(
+        [(symbol, t) for t in idx], names=["symbol", "timestamp"]
+    )
+    mock_bars = MagicMock()
+    mock_bars.df = df_multi
+    return mock_bars
+
+
+def _make_ic_data_record(
+    symbol: str,
+    ts: str,
+    price: float,
+    direction: str | None = "LONG",
+    fwd_return: float | None = None,
+) -> dict:
+    bd = {d: 5.0 for d in DIMS}
+    rec = {"symbol": symbol, "price": price, "ts": ts, "score": 30, "score_breakdown": bd}
+    if direction is not None:
+        rec["direction"] = direction
+    if fwd_return is not None:
+        rec["fwd_return"] = fwd_return
+    return rec
+
+
+class TestAlpacaForwardReturns:
+    """Unit tests for _fetch_forward_returns_batch (Alpaca implementation)."""
+
+    def _patch_client(self, monkeypatch, bars_response: "MagicMock"):
+        """Patch alpaca_data._get_client to return a mock that returns bars_response."""
+        mock_client = MagicMock()
+        mock_client.get_stock_bars.return_value = bars_response
+        monkeypatch.setattr("alpaca_data._get_client", lambda: mock_client)
+        return mock_client
+
+    def test_alpaca_returns_computed_for_mature_records(self, monkeypatch):
+        """Records old enough (age >= min_age_cal) get non-None forward returns."""
+        # Scan date 2025-01-01, forward horizon 1 day → offset 3 calendar days
+        # future_date = 2025-01-04; provide a bar on that date
+        bars = _make_alpaca_bar_response(
+            "AAPL",
+            [("2025-01-01", 100.0), ("2025-01-02", 101.0), ("2025-01-05", 105.0)],
+        )
+        self._patch_client(monkeypatch, bars)
+        monkeypatch.setattr("ic.data._ic_cfg", lambda key, default: 1 if key == "forward_horizon_days" else default)
+
+        recs = [_make_ic_data_record("AAPL", "2025-01-01T10:00:00+00:00", 100.0, "LONG")]
+        result = ic_data._fetch_forward_returns_batch(recs)
+        assert result[0] is not None, "Expected a forward return for a mature LONG record"
+        assert result[0] > 0, f"Price went up, expected positive return, got {result[0]}"
+
+    def test_missing_provider_returns_none_per_symbol_not_batch(self, monkeypatch):
+        """Alpaca client unavailable → None for all records, no crash."""
+        monkeypatch.setattr("alpaca_data._get_client", lambda: None)
+
+        recs = [
+            _make_ic_data_record("AAPL", "2025-01-01T10:00:00+00:00", 100.0),
+            _make_ic_data_record("MSFT", "2025-01-01T10:00:00+00:00", 200.0),
+        ]
+        result = ic_data._fetch_forward_returns_batch(recs)
+        assert result == {0: None, 1: None}, "Missing client must return None for all records"
+
+    def test_missing_symbol_data_returns_none_only_for_that_symbol(self, monkeypatch):
+        """Symbol missing from Alpaca response → only that symbol returns None; others succeed."""
+        import pandas as pd
+
+        # AAPL has data; ZZZZ has no data in the response
+        aapl_dates = [("2025-01-01", 100.0), ("2025-01-05", 108.0)]
+        idx = pd.DatetimeIndex(pd.to_datetime([d for d, _ in aapl_dates], utc=True))
+        df_multi = pd.DataFrame(
+            {"close": [c for _, c in aapl_dates]},
+            index=pd.MultiIndex.from_tuples(
+                [("AAPL", t) for t in idx], names=["symbol", "timestamp"]
+            ),
+        )
+        mock_bars = MagicMock()
+        mock_bars.df = df_multi
+        self._patch_client(monkeypatch, mock_bars)
+        monkeypatch.setattr("ic.data._ic_cfg", lambda key, default: 1 if key == "forward_horizon_days" else default)
+
+        recs = [
+            _make_ic_data_record("AAPL", "2025-01-01T10:00:00+00:00", 100.0, "LONG"),
+            _make_ic_data_record("ZZZZ", "2025-01-01T10:00:00+00:00", 50.0, "LONG"),
+        ]
+        result = ic_data._fetch_forward_returns_batch(recs)
+        assert result[0] is not None, "AAPL should have a return (data present)"
+        assert result[1] is None, "ZZZZ should be None (no data in response)"
+
+    def test_short_direction_sign_inverted_vs_long(self, monkeypatch):
+        """A SHORT record must return the negative of the equivalent LONG record."""
+        bars = _make_alpaca_bar_response(
+            "NVDA",
+            [("2025-01-01", 500.0), ("2025-01-02", 510.0), ("2025-01-05", 520.0)],
+        )
+        self._patch_client(monkeypatch, bars)
+        monkeypatch.setattr("ic.data._ic_cfg", lambda key, default: 1 if key == "forward_horizon_days" else default)
+
+        long_rec = _make_ic_data_record("NVDA", "2025-01-01T10:00:00+00:00", 500.0, "LONG")
+        short_rec = _make_ic_data_record("NVDA", "2025-01-01T10:00:00+00:00", 500.0, "SHORT")
+        result_long = ic_data._fetch_forward_returns_batch([long_rec])
+        result_short = ic_data._fetch_forward_returns_batch([short_rec])
+
+        r_long = result_long[0]
+        r_short = result_short[0]
+        assert r_long is not None and r_short is not None
+        assert abs(r_long + r_short) < 1e-9, (
+            f"SHORT return must be negative of LONG: long={r_long:.6f} short={r_short:.6f}"
+        )
+
+    def test_future_scan_date_returns_none(self, monkeypatch):
+        """Record too recent (scan_date within min_age_cal of today) → None."""
+        from datetime import datetime, UTC
+
+        future_ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        bars = _make_alpaca_bar_response("AAPL", [("2099-01-05", 200.0)])
+        self._patch_client(monkeypatch, bars)
+        monkeypatch.setattr("ic.data._ic_cfg", lambda key, default: 1 if key == "forward_horizon_days" else default)
+
+        recs = [_make_ic_data_record("AAPL", future_ts, 100.0, "LONG")]
+        result = ic_data._fetch_forward_returns_batch(recs)
+        assert result[0] is None, "Record too recent should return None (lookahead guard)"
+
+    def test_precomputed_fwd_return_bypasses_alpaca(self, monkeypatch):
+        """Records with fwd_return already set never call the Alpaca client."""
+        mock_client = MagicMock()
+        monkeypatch.setattr("alpaca_data._get_client", lambda: mock_client)
+
+        recs = [_make_ic_data_record("AAPL", "2025-01-01T10:00:00+00:00", 100.0, "LONG", fwd_return=0.05)]
+        result = ic_data._fetch_forward_returns_batch(recs)
+
+        mock_client.get_stock_bars.assert_not_called()
+        assert result[0] == pytest.approx(0.05), "Pre-computed LONG fwd_return should be returned as-is"
+
+    def test_precomputed_fwd_return_short_sign_applied(self, monkeypatch):
+        """Pre-computed fwd_return for SHORT records must have the sign inverted."""
+        mock_client = MagicMock()
+        monkeypatch.setattr("alpaca_data._get_client", lambda: mock_client)
+
+        recs = [_make_ic_data_record("AAPL", "2025-01-01T10:00:00+00:00", 100.0, "SHORT", fwd_return=0.05)]
+        result = ic_data._fetch_forward_returns_batch(recs)
+
+        mock_client.get_stock_bars.assert_not_called()
+        assert result[0] == pytest.approx(-0.05), "Pre-computed SHORT fwd_return must be negated"
+
+    def test_all_null_returns_cause_baseline_weights(self, monkeypatch, tmp_path):
+        """When no forward returns can be fetched, IC is all-None → BASELINE_WEIGHTS for live scoring."""
+        monkeypatch.setattr("alpaca_data._get_client", lambda: None)
+
+        log_file = tmp_path / "signals_log.jsonl"
+        recs = [_make_ic_data_record("AAPL", "2024-01-01T10:00:00+00:00", 100.0) for _ in range(25)]
+        with open(log_file, "w") as f:
+            for r in recs:
+                f.write(json.dumps(r) + "\n")
+
+        with patch.object(ic_core, "_spearman", side_effect=_real_spearman):
+            raw_ic = ic.compute_rolling_ic(signals_log_path=str(log_file), min_valid=1)
+
+        # All returns failed → IC all None → should normalise to equal weights (cold-start)
+        assert all(v is None for v in raw_ic.values()), "No returns → all IC must be None"
+
+        weights, meta = ic.normalize_ic_weights(raw_ic)
+        assert meta["ic_valid_for_live_scoring"] is False
+        from ic.constants import EQUAL_WEIGHTS, BASELINE_WEIGHTS
+        assert weights == EQUAL_WEIGHTS, "All-null IC should cold-start to EQUAL_WEIGHTS internally"
+        # get_current_weights() converts ic_valid=False → BASELINE_WEIGHTS
+        monkeypatch.setattr("ic.data._ic_cfg", lambda key, default: default)
+
+    def test_low_n_dates_keeps_ic_advisory_only(self, monkeypatch, tmp_path):
+        """With n_dates < min_independent_dates (60), ic_valid_for_live_scoring must be False."""
+        log_file = tmp_path / "signals_log.jsonl"
+        # All records on the same single date → n_dates = 1.
+        # Give each record a unique "trend" score so z_scores are non-zero and
+        # _spearman is called; without variation all dimensions get raw_ic=0.0 and
+        # normalize_ic_weights exits via no_positive_ic_above_threshold before the
+        # n_dates gate in update_ic_weights can fire.
+        recs = []
+        for i in range(30):
+            rec = _make_ic_data_record(f"SYM{i}", "2025-01-01T10:00:00+00:00", 100.0)
+            # Give all 15 dimensions varied scores correlated with i so every
+            # dimension gets positive IC, the concentration gates all pass, and
+            # the n_dates gate in update_ic_weights is the deciding failure.
+            for d in DIMS:
+                rec["score_breakdown"][d] = float(i)
+            recs.append(rec)
+        with open(log_file, "w") as f:
+            for r in recs:
+                f.write(json.dumps(r) + "\n")
+
+        weights_file = tmp_path / "ic_weights.json"
+        history_file = tmp_path / "ic_history.jsonl"
+        monkeypatch.setattr(ic_storage, "IC_WEIGHTS_FILE", str(weights_file))
+        monkeypatch.setattr(ic_storage, "IC_HISTORY_FILE", str(history_file))
+
+        forward_returns = {i: float(i - 15) / 100.0 for i in range(30)}
+        with (
+            patch.object(ic_core, "_fetch_forward_returns_batch", return_value=forward_returns),
+            patch.object(ic_core, "_spearman", side_effect=_real_spearman),
+        ):
+            weights = ic.update_ic_weights(
+                signals_log_path=str(log_file),
+            )
+
+        # Load persisted file and verify validity fields
+        import json as _json
+        result = _json.load(open(weights_file))
+        assert result["n_independent_dates"] == 1
+        assert result["ic_valid_for_live_scoring"] is False
+        assert result["advisory_only"] is True
+        assert "insufficient_independent_dates" in (result.get("fallback_reason") or "")

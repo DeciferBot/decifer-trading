@@ -107,118 +107,231 @@ def _dir_sign(rec: dict) -> int:
 
 def _fetch_forward_returns_batch(records: list) -> dict:
     """
-    Fetch 5-trading-day forward returns for every (symbol, scan_date) pair.
+    Fetch N-trading-day forward returns for every (symbol, scan_date) pair.
 
-    Groups records by symbol to minimise yfinance calls.
+    Data source: Alpaca SIP daily bars (split-adjusted) — same feed as live scoring.
+    All unique symbols are fetched in one batch request to minimise API calls.
+
+    Records with a pre-computed ``fwd_return`` field (historical replay) are
+    unpacked directly without any network call.
+
+    Records missing the ``direction`` field default to LONG in ``_dir_sign()``.
+    These are early-cycle records that predate direction tracking; they are not
+    excluded because the majority were LONG candidates and the directional IC
+    bias introduced by this default is minor.  The count is logged at INFO level.
+
     Returns a dict mapping record index → forward_return (float) or None.
+    None means the record is too recent, price data was unavailable for that
+    symbol, or scan_price was zero/invalid.
     """
-    import yfinance as yf
-
-    # Group record indices by symbol
-    by_symbol: dict[str, list[int]] = {}
-    for idx, rec in enumerate(records):
-        sym = rec.get("symbol")
-        if sym:
-            by_symbol.setdefault(sym, []).append(idx)
-
-    result: dict[int, float | None] = {}
+    import pandas as pd
 
     fwd_horizon: int = int(_ic_cfg("forward_horizon_days", 1))
     min_age_cal: int = fwd_horizon + 1
     fwd_offset_cal: int = fwd_horizon + 2
+    today = datetime.now(UTC).date()
+
+    # ── Fast path: pre-computed fwd_return (historical replay) ───────────────
+    result: dict[int, float | None] = {}
+    needs_fetch: list[int] = []
+    for idx, rec in enumerate(records):
+        if rec.get("fwd_return") is not None:
+            try:
+                result[idx] = _dir_sign(rec) * float(rec["fwd_return"])
+            except (TypeError, ValueError):
+                result[idx] = None
+        else:
+            needs_fetch.append(idx)
+
+    if not needs_fetch:
+        return result
+
+    # ── Log missing-direction records (informational, not an error) ──────────
+    missing_dir = sum(1 for i in needs_fetch if not records[i].get("direction"))
+    if missing_dir:
+        log.info(
+            "_fetch_forward_returns: %d/%d records lack 'direction' — defaulting "
+            "to LONG (early-cycle data predating direction tracking)",
+            missing_dir,
+            len(needs_fetch),
+        )
+
+    # ── Group by symbol and collect the global timestamp range ───────────────
+    by_symbol: dict[str, list[int]] = {}
+    all_ts: list[datetime] = []
+    for i in needs_fetch:
+        rec = records[i]
+        sym = rec.get("symbol")
+        if not sym:
+            result[i] = None
+            continue
+        by_symbol.setdefault(sym, []).append(i)
+        ts_str = rec.get("ts", "")
+        try:
+            all_ts.append(datetime.fromisoformat(ts_str.replace("Z", "+00:00")))
+        except Exception:
+            pass
+
+    if not all_ts:
+        for idx in range(len(records)):
+            result.setdefault(idx, None)
+        return result
+
+    # ── Build fetch window with explicit past-date guarantee ─────────────────
+    # end date is always ≤ yesterday — no future prices can leak into IC computation
+    earliest_dt = min(all_ts) - timedelta(days=1)
+    latest_dt = max(all_ts) + timedelta(days=15)
+
+    def _to_utc(dt: datetime) -> datetime:
+        return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
+    fetch_start = _to_utc(earliest_dt).replace(hour=0, minute=0, second=0, microsecond=0)
+    fetch_end_raw = _to_utc(latest_dt).replace(hour=23, minute=59, second=59, microsecond=0)
+    yesterday_eod = datetime.combine(today - timedelta(days=1), datetime.max.time()).replace(tzinfo=UTC)
+    fetch_end = min(fetch_end_raw, yesterday_eod)
+
+    assert fetch_end.date() < today, (
+        f"_fetch_forward_returns: fetch_end={fetch_end.date()} is not in the past — "
+        "lookahead bias guard triggered"
+    )
+
+    fetch_start_str = str(fetch_start.date())
+    fetch_end_str = str(fetch_end.date())
+
+    # ── Alpaca batch fetch ────────────────────────────────────────────────────
+    bars_by_symbol: dict[str, "pd.Series"] = {}
+    fetch_errors: list[str] = []
+
+    try:
+        from alpaca_data import _get_client
+        client = _get_client()
+    except ImportError:
+        client = None
+
+    if client is None:
+        log.warning(
+            "_fetch_forward_returns: Alpaca client unavailable — "
+            "forward returns cannot be computed (provider=alpaca)"
+        )
+        for idx in range(len(records)):
+            result.setdefault(idx, None)
+        return result
+
+    try:
+        from alpaca.data.requests import StockBarsRequest
+        from alpaca.data.timeframe import TimeFrame
+    except ImportError as exc:
+        log.warning("_fetch_forward_returns: alpaca-py not installed — %s", exc)
+        for idx in range(len(records)):
+            result.setdefault(idx, None)
+        return result
+
+    all_symbols = list(by_symbol.keys())
+    _CHUNK_SIZE = 500  # well within Alpaca SIP batch limits
+    for chunk_start in range(0, len(all_symbols), _CHUNK_SIZE):
+        chunk = all_symbols[chunk_start: chunk_start + _CHUNK_SIZE]
+        try:
+            req = StockBarsRequest(
+                symbol_or_symbols=chunk,
+                timeframe=TimeFrame.Day,
+                start=fetch_start,
+                end=fetch_end,
+                feed="sip",
+                adjustment="split",
+            )
+            bars = client.get_stock_bars(req)
+            df = bars.df
+            if df is None or df.empty:
+                fetch_errors.extend(chunk)
+                continue
+            if isinstance(df.index, pd.MultiIndex):
+                for sym in chunk:
+                    try:
+                        sym_df = df.xs(sym, level=0)
+                        close_col = "close" if "close" in sym_df.columns else "Close"
+                        if not sym_df.empty and close_col in sym_df.columns:
+                            bars_by_symbol[sym] = sym_df[close_col].dropna()
+                        else:
+                            fetch_errors.append(sym)
+                    except KeyError:
+                        fetch_errors.append(sym)
+            elif len(chunk) == 1:
+                sym_df = df
+                close_col = "close" if "close" in sym_df.columns else "Close"
+                if close_col in sym_df.columns:
+                    bars_by_symbol[chunk[0]] = sym_df[close_col].dropna()
+        except Exception as e:
+            log.debug("_fetch_forward_returns: chunk[%s…] failed — %s", chunk[0], e)
+            fetch_errors.extend(chunk)
+
+    # ── Compute forward returns per record ────────────────────────────────────
+    returns_found = 0
+    returns_missing = 0
 
     for sym, idxs in by_symbol.items():
-        # Fast path: if every record for this symbol already has a pre-computed
-        # fwd_return (e.g. historical replay records), skip the yfinance download
-        # entirely and just unpack the values.
-        if all(records[i].get("fwd_return") is not None for i in idxs):
-            for i in idxs:
-                try:
-                    raw = float(records[i]["fwd_return"])
-                    result[i] = _dir_sign(records[i]) * raw
-                except (TypeError, ValueError):
-                    result[i] = None
-            continue
-
-        # Determine the date range to download
-        ts_list = []
-        for i in idxs:
-            ts_str = records[i].get("ts", "")
-            try:
-                dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                ts_list.append(dt)
-            except Exception:
-                pass
-
-        if not ts_list:
+        close_series = bars_by_symbol.get(sym)
+        if close_series is None or close_series.empty:
             for i in idxs:
                 result[i] = None
+            returns_missing += len(idxs)
             continue
 
-        earliest = min(ts_list) - timedelta(days=1)
-        # +15 calendar days covers 5+ trading days from the latest scan
-        latest = max(ts_list) + timedelta(days=15)
-        start_str = earliest.strftime("%Y-%m-%d")
-        end_str = latest.strftime("%Y-%m-%d")
-
-        try:
-            df = yf.download(sym, start=start_str, end=end_str, interval="1d", progress=False, auto_adjust=True)
-            if df is None or len(df) < 2:
-                for i in idxs:
-                    result[i] = None
-                continue
-            # Flatten multi-level columns if present
-            if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
-                df.columns = df.columns.get_level_values(0)
-            close_series = df["Close"].dropna()
-            if len(close_series) < 2:
-                for i in idxs:
-                    result[i] = None
-                continue
-        except Exception as e:
-            log.debug("_fetch_forward_returns_batch %s: %s", sym, e)
-            for i in idxs:
-                result[i] = None
-            continue
+        # Normalise index to tz-aware UTC for consistent .date comparison
+        if hasattr(close_series.index, "tz") and close_series.index.tz is None:
+            close_series.index = close_series.index.tz_localize(UTC)
 
         for i in idxs:
             rec = records[i]
-            # Historical replay records embed the forward return directly —
-            # skip the yfinance round-trip for these.
-            if rec.get("fwd_return") is not None:
-                try:
-                    raw = float(rec["fwd_return"])
-                    result[i] = _dir_sign(rec) * raw
-                except (TypeError, ValueError):
-                    result[i] = None
-                continue
             scan_price = rec.get("price")
             ts_str = rec.get("ts", "")
             try:
                 scan_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                 scan_date = scan_dt.date()
-                if (datetime.now(UTC).date() - scan_date).days < min_age_cal:
+                if (today - scan_date).days < min_age_cal:
                     result[i] = None
+                    returns_missing += 1
                     continue
-                # Find the first trading close on or after fwd_offset_cal calendar days
                 future_date = scan_date + timedelta(days=fwd_offset_cal)
-                future_candidates = close_series[
-                    close_series.index.date >= future_date  # type: ignore[operator]
-                ]
-                if len(future_candidates) == 0:
+                idx_dates = close_series.index.date
+                future_candidates = close_series[idx_dates >= future_date]
+                if future_candidates.empty:
                     result[i] = None
+                    returns_missing += 1
                     continue
                 future_price = float(future_candidates.iloc[0])
                 sp = float(scan_price) if scan_price else 0.0
                 if sp <= 0 or future_price <= 0:
                     result[i] = None
+                    returns_missing += 1
                     continue
                 result[i] = _dir_sign(rec) * (future_price - sp) / sp
+                returns_found += 1
             except Exception as e:
-                log.debug("forward return idx=%d %s: %s", i, sym, e)
+                log.debug("_fetch_forward_returns idx=%d %s: %s", i, sym, e)
                 result[i] = None
+                returns_missing += 1
 
-    # Fill any missing indices
+    pre_computed = len(records) - len(needs_fetch)
+    log.info(
+        "_fetch_forward_returns: provider=alpaca requested=%d "
+        "found=%d (pre_computed=%d live=%d) missing=%d "
+        "n_missing_symbols=%d start=%s end=%s",
+        len(records),
+        pre_computed + returns_found,
+        pre_computed,
+        returns_found,
+        returns_missing,
+        len(fetch_errors),
+        fetch_start_str,
+        fetch_end_str,
+    )
+    if fetch_errors:
+        log.debug(
+            "_fetch_forward_returns: symbols with no data: %s%s",
+            fetch_errors[:10],
+            f" … (+{len(fetch_errors) - 10} more)" if len(fetch_errors) > 10 else "",
+        )
+
     for idx in range(len(records)):
         result.setdefault(idx, None)
 
