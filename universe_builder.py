@@ -880,7 +880,12 @@ class UniverseBuilder:
                 f"{_QUOTA['structural_position']['min']}"
             )
 
-        freshness_status = "static_bootstrap_sprint3"
+        if ec_errors:
+            freshness_status = "degraded"
+        elif adapter_snap_available:
+            freshness_status = "live"
+        else:
+            freshness_status = "live_no_adapter"
 
         return ShadowUniverse(
             schema_version=_SCHEMA_VERSION,
