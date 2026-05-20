@@ -1,0 +1,39 @@
+{
+  "date": "2026-05-20",
+  "version": "4.3.0",
+  "tag": "feat(ic): Phase 2A — IC data enrichment hygiene",
+  "what_changed": [
+    "learning.py — log_signal_scan(): Added session_date, observation_id (deterministic {scan_id}_{symbol}), ranking_position, ranking_total, candidate_source, ic_eligible, exclusion_reason to every new signals_log record. Fixed silent LONG default for missing direction — now writes UNKNOWN and sets ic_eligible=False. Schema version bumped to 2.",
+    "signal_types.py — Signal dataclass: Added scan_id, observation_id, ranking_position, ranking_total fields (optional, default empty/zero, backward-compatible). Included in to_dict() only when non-default.",
+    "signal_pipeline.py: scan_id generated once per scan cycle in run_signal_pipeline() and shared with log_signal_scan() and _scored_to_signals(). Rank map computed from all_scored (full unfiltered universe). _scored_to_signals() signature extended with scan_id, rank_map, ranking_total.",
+    "signal_dispatcher.py: Added observation_id, scan_id, signal_session_date, ranking_position, ranking_total to _enriched_ao so they flow via agent_outputs into active_trades.",
+    "orders_portfolio.py — _close_position_record(): Extracts provenance from agent_outputs at close time and writes observation_id, scan_id, signal_session_date, ranking_position, ranking_total, candidate_source, linkage_quality (full|missing), linkage_loss_reason to training_records. Never raises on missing linkage.",
+    "ic/data.py — _load_signal_records(): Skips records where ic_eligible=False. Skips records where direction=UNKNOWN. Old records without ic_eligible field pass through unchanged (None is not False).",
+    "tests/test_ic_data_enrichment.py: 31 new tests across signal log enrichment, deterministic observation_id, direction safety, backward compatibility, training record linkage, Signal object provenance, ranking correctness."
+  ],
+  "what_deleted": "Nothing deleted.",
+  "decisions": [
+    "observation_id format is {scan_id}_{symbol} — deterministic, no UUID, human-readable.",
+    "scan_id generated once per scan cycle so signals_log records and Signal objects share the same join key.",
+    "Rank computed from all_scored (full universe pre-threshold), not the above-threshold scored subset, for consistent ranking.",
+    "Historical records with missing direction are still backward-compatible and may remain in IC until they roll out of the rolling window. IC must remain advisory-only until clean-data maturity is reached and all validity gates pass.",
+    "Old records without ic_eligible field treated as eligible (None is not False) — no historical data touched or rewritten."
+  ],
+  "tests": "2799 passed, 8 pre-existing failures (unrelated to this work — listed below), 5 skipped.",
+  "preexisting_failures": [
+    "test_ml_engine.py::TestDeciferML::test_prepare_data_returns_true_with_enough_trades — pre-existing, unrelated to enrichment",
+    "test_ml_engine.py::TestDeciferML::test_train_classifier_runs_after_prepare — pre-existing, unrelated to enrichment",
+    "test_ml_engine.py::TestDeciferML::test_train_regressor_runs_after_prepare — pre-existing, unrelated to enrichment",
+    "test_quota_policy_promotion.py::test_active_universe_has_75_candidates — pre-existing universe count mismatch",
+    "test_quota_policy_promotion.py::test_cost_included — pre-existing, unrelated to enrichment",
+    "test_quota_policy_promotion.py::test_msft_included — pre-existing, unrelated to enrichment",
+    "test_quota_policy_promotion.py::test_pg_included — pre-existing, unrelated to enrichment",
+    "test_quota_policy_promotion.py::test_no_executable_candidates — pre-existing, unrelated to enrichment"
+  ],
+  "what_next": [
+    "Phase 2B — decision_status (passed_to_apex, apex_selected, apex_rejected, executed, risk_blocked) — awaiting Amit approval.",
+    "Allow clean-data records to accumulate through the 60-day rolling window before reassessing IC advisory gate.",
+    "Investigate and fix 8 pre-existing test failures as a separate task."
+  ],
+  "written_at": "2026-05-20T00:00:00+00:00"
+}
