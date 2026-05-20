@@ -745,7 +745,7 @@ canvas{display:block;width:100% !important}
     <span id="cat-count" style="font-weight:600;color:var(--orange)">— candidates</span>
     <span id="cat-live-count" style="font-size:10px;color:var(--muted2)"></span>
     <span id="cat-date" style="font-size:10px;color:var(--muted2);margin-left:auto"></span>
-    <button onclick="loadCatalyst()" style="background:none;border:1px solid var(--border);color:var(--muted2);padding:3px 10px;border-radius:3px;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer">⟳ Refresh</button>
+    <button id="cat-refresh-btn" onclick="loadCatalyst()" style="background:none;border:1px solid var(--border);color:var(--muted2);padding:3px 10px;border-radius:3px;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer">⟳ Refresh</button>
   </div>
   <div class="cat-body">
     <div id="cat-feed"><div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Loading catalyst data…</div></div>
@@ -4589,6 +4589,8 @@ function _renderMacroStrip(allItems) {
 async function loadCatalyst() {
   const feed = document.getElementById('cat-feed');
   if (!feed) return;
+  const btn = document.getElementById('cat-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
   feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Loading…</div>';
   try {
     const r = await fetch('/api/catalyst');
@@ -4607,6 +4609,7 @@ async function loadCatalyst() {
 
     if (!candidates.length && !edgar.length) {
       feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">No catalyst data yet.<br><span style="font-size:10px">Run: python -m signals.catalyst_screen -v</span></div>';
+      if (btn) { btn.textContent = '⟳ Refresh'; btn.disabled = false; }
       return;
     }
 
@@ -4694,8 +4697,10 @@ async function loadCatalyst() {
     </div>`;
 
     feed.innerHTML = cardsHtml + edgarHtml + legend;
+    if (btn) { btn.textContent = '✓ Done'; setTimeout(() => { btn.textContent = '⟳ Refresh'; btn.disabled = false; }, 1200); }
   } catch(e) {
     feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Error loading catalyst data: ' + e.message + '</div>';
+    if (btn) { btn.textContent = '⟳ Refresh'; btn.disabled = false; }
   }
 }
 
