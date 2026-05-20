@@ -490,6 +490,21 @@ def get_hmm_regime_spy() -> dict:
     if not cfg.get("enabled", False):
         return {"regime": "unknown", "source": "disabled"}
 
+    # Phase gate: require enough eligible training records before participating.
+    # Degraded records (ml_eligible=False) do not count toward this threshold.
+    min_eligible = cfg.get("gate_min_eligible_trades", 200)
+    try:
+        import training_store as _ts
+        _eligible = _ts.count_eligible()
+    except Exception:
+        _eligible = 0
+    if _eligible < min_eligible:
+        log.debug(
+            "get_hmm_regime_spy: gate not met (%d/%d eligible trades) — returning unknown",
+            _eligible, min_eligible,
+        )
+        return {"regime": "unknown", "source": "gate_not_met", "eligible_trades": _eligible}
+
     ttl = cfg.get("cache_ttl_seconds", 3600)
     lookback = cfg.get("lookback_days", 252)
     now = datetime.now(UTC)

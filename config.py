@@ -656,6 +656,10 @@ CONFIG = {
         "enabled": True,
         "lookback_days": 504,  # 2 years of daily returns — covers a full bull-bear cycle
         "cache_ttl_seconds": 3600,  # Re-fit at most once per hour
+        # Minimum eligible training records (ml_eligible=True or absent legacy) required
+        # before the HMM participates in the regime router. Checked at runtime via
+        # training_store.count_eligible(). Gate is currently MET (406 >= 200 as of 2026-05-20).
+        "gate_min_eligible_trades": 200,
     },
     # ── REGIME DETECTOR LOCK ──────────────────────────────────
     # Committed approach: "vix_proxy" (scanner.get_market_regime + signals.get_market_regime_vix)

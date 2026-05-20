@@ -1,0 +1,49 @@
+{
+  "date": "2026-05-20",
+  "session_id": "session-2026-05-20c",
+  "title": "Phase B: HMM Regime Detection Gate Activation",
+  "summary": "Gate met (406 eligible trades). Added training-store phase gate to get_hmm_regime_spy(). 20 new tests.",
+  "what_changed": [
+    {
+      "file": "config.py",
+      "change": "Added gate_min_eligible_trades: 200 to hmm_regime config block. Explicit threshold for the runtime gate check added to signals/__init__.py."
+    },
+    {
+      "file": "signals/__init__.py",
+      "change": "Added phase gate check in get_hmm_regime_spy(): calls training_store.count_eligible() at runtime; returns {regime: unknown, source: gate_not_met, eligible_trades: N} when below threshold. Degraded records (ml_eligible=False) are excluded from the count. Gate is currently met (406 >= 200) — no behavioral change in production."
+    },
+    {
+      "file": "tests/test_hmm_regime.py",
+      "change": "New test file. 20 tests across 3 classes: TestHmmFit2State (5 tests: state ordering, row-stochastic A, output shapes, bear/bull classification), TestGetHmmRegimeSpy (8 tests: required keys, bull-ending/bear-ending regimes, disabled config, insufficient data, fetch error, cache TTL, confidence validity), TestHmmGate (7 tests: below threshold, count_eligible not count, degraded records excluded, legacy records included, exactly-at-threshold passes, eligible_trades in response, configurable threshold)."
+    },
+    {
+      "file": "docs/DECISIONS.md",
+      "change": "Added 2026-05-20 entry: Phase B HMM Advisory Active. Documents gate met, architecture (advisory weight router vs scanner replacement), why count_eligible not count, live execution impact."
+    },
+    {
+      "file": "CLAUDE.md",
+      "change": "Updated Current State: Phase B line updated from Unlocked to Active. Test suite count updated to 2836. Regime detector line updated to reflect HMM advisory active in weight router."
+    }
+  ],
+  "what_was_deleted": "Nothing deleted.",
+  "decisions_made": [
+    "HMM phase gate uses training_store.count_eligible() not count(). Degraded records cannot inflate the gate count. This is consistent with the metadata preservation rule: compromised metadata = compromised training signal.",
+    "HMM activation is advisory in signal weight router (momentum vs mean_reversion multipliers), not a replacement of scanner.get_market_regime(). Scanner-level replacement is the next Tier 3 step pending Amit approval.",
+    "gate_min_eligible_trades=200 is configurable via config — not hardcoded. Allows adjustment without code changes."
+  ],
+  "data": {
+    "total_records": 453,
+    "eligible_records": 406,
+    "degraded_records": 47,
+    "degraded_breakdown": "38 with UNKNOWN/blank trade_type, 9 with _EXT_ trade_ids"
+  },
+  "tests": {
+    "new": "20 new tests in test_hmm_regime.py — all passing",
+    "full_suite": "2836 passing, 8 failing (all pre-existing, confirmed by stash run), 5 skipped"
+  },
+  "what_is_next": [
+    "Tier 3 decision required before scanner-level HMM replacement: replace scanner.get_market_regime() VIX-proxy with HMM probability output. This is the full Phase B roadmap item. Requires design approval (data contract change, regime_states tuple update, scanner rewrite).",
+    "Walk-forward weight calibration remains blocked on scanner-level HMM replacement.",
+    "Phase C/D (Alphalens, ML engine) — still awaiting Amit approval."
+  ]
+}

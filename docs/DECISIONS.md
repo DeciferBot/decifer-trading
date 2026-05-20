@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-05-20 — Phase B: HMM Regime Gate Activation
+
+**Gate met**: 406 eligible training records (ml_eligible=True or absent) ≥ 200 threshold.
+
+**Decision**: Activate HMM advisory participation in the signal weight router. Add `gate_min_eligible_trades: 200` to `config["hmm_regime"]`. Add runtime check in `get_hmm_regime_spy()` calling `training_store.count_eligible()` — returns `{"regime": "unknown", "source": "gate_not_met"}` when below threshold so degraded or absent training data cannot silently activate the model.
+
+**Architecture (advisory, not replacement)**:
+The HMM participates in `_resolve_regime_router(vix, hurst, hmm)` — the 3-signal majority vote that determines whether the signal weight multipliers favour momentum or mean_reversion dimensions. This is **separate** from `scanner.get_market_regime()` which is still VIX-proxy only (`config["regime_detector"] = "vix_proxy"`). The roadmap spec says "HMM replaces VIX-proxy" which refers to the scanner-level regime (`scanner.get_market_regime()`). The advisory weight-router activation is a prerequisite step that validates the HMM signal quality before committing to scanner replacement.
+
+**Why count_eligible() not count()**:
+The gate intentionally uses `training_store.count_eligible()` which excludes records with `ml_eligible=False` (UNKNOWN trade_type, EXT orphans, MISSING metadata). These records have compromised signal/outcome linkage — they cannot be used to validate regime signal IC. Using raw `count()` would allow degraded records to satisfy the gate without providing real validation.
+
+**Live execution impact**: None. Gate is already met (406 ≥ 200). HMM was `enabled: True` in config before this session. The gate check adds an observable no-op path for future reference when eligible count is below threshold.
+
+**File changes**: `config.py` (+4 lines in hmm_regime block), `signals/__init__.py` (+15 lines gate check in `get_hmm_regime_spy()`), `tests/test_hmm_regime.py` (new, 20 tests).
+
+---
+
 ## 2026-04-22 — Full Architecture Audit: 27 Issues, 24 Fixes (CP + BC + RB)
 
 A full architecture trace and three-round deep audit identified 27 confirmed issues across three categories. All 24 implementable fixes were shipped across two sessions. The full issue list and fix rationale is in `docs/PROCESS_ARCHITECTURE.md`. Key decisions logged below.
