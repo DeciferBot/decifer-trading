@@ -1,0 +1,42 @@
+{
+  "date": "2026-05-20",
+  "session_id": "session-2026-05-20d",
+  "title": "Phase B: Scanner-Level HMM Replacement — Option D (Two-Layer Architecture Locked)",
+  "summary": "Tier 3 design review for scanner-level HMM replacement. Four options evaluated. Approved Option D: formally document two-layer architecture as intentional and lock it. No code changes.",
+  "what_changed": [
+    {
+      "file": "docs/DECISIONS.md",
+      "change": "Added 2026-05-20 entry: 'Replace Entirely' directive superseded. Documents two-layer separation as intentional architecture: structural gating (scanner VIX-proxy, 6 states, flash-crash intraday) vs. probabilistic weight routing (HMM advisory in _resolve_regime_router). Four rationale points: flash-crash latency, RELIEF_RALLY preservation, label continuity (406 training records), HMM signal-type mismatch. Scanner failure mode wording: handled through stale fallback or UNKNOWN routing, with no-TTL stale cache retained as a future scanner hardening item."
+    },
+    {
+      "file": "roadmap/03-hmm-regime-detection.md",
+      "change": "Status updated from DEFERRED to PHASE B COMPLETE. Scanner-level replacement item marked CLOSED — not recommended. Original 'replaces VIX-proxy entirely' text struck through with superseded note. Phase B completion documented: HMM advisory active in weight router, gate met (406/453 eligible), config[regime_detector] stays vix_proxy. Full rationale section added."
+    },
+    {
+      "file": "version.py",
+      "change": "Bumped to 4.5.0."
+    }
+  ],
+  "what_was_deleted": "Nothing deleted.",
+  "decisions_made": [
+    "The 2026-04-01 'replace VIX-proxy entirely' directive is superseded. Two-layer regime architecture is intentional and locked.",
+    "scanner.get_market_regime() remains the structural hard-gating layer (real-time VIX, intraday flash-crash detection, 6 states, hard execution blocks).",
+    "HMM role is advisory 3rd vote in _resolve_regime_router() — probabilistic weight routing only, not structural execution gating.",
+    "Scanner-level HMM replacement not recommended at this stage. Roadmap item 03-hmm-regime-detection.md closed. Will only reopen if Phase C/D ML analysis specifically implicates VIX-proxy entry_regime labels."
+  ],
+  "data": {
+    "eligible_records": 406,
+    "total_records": 453,
+    "degraded_records": 47
+  },
+  "tests": {
+    "new": "No new tests — docs-only change",
+    "hmm_suite": "20/20 passing (test_hmm_regime.py — verified clean)",
+    "full_suite": "Not run — docs-only, no execution path changed"
+  },
+  "what_is_next": [
+    "Walk-forward weight calibration — still blocked on HMM (now complete) + Alphalens (pending Amit approval). Roadmap: 06-weight-calibration.md.",
+    "Phase C/D (Alphalens full factor analysis, ML engine activation) — awaiting Amit approval.",
+    "Tier D Position Research Universe Phase 2 — gate not met, awaiting tier_d_evidence_report.py Section 0b review with Amit."
+  ]
+}
