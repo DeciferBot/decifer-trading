@@ -586,23 +586,27 @@ class TestMLConfigDefaults:
         import config
         return config.CONFIG
 
-    def test_ml_enabled_defaults_false(self):
+    def test_ml_observer_enabled_defaults_false(self):
         cfg = self._get_real_config()
-        assert cfg.get("ml_enabled") is False, (
-            "ml_enabled must default to False — enhance_score() must not run in production"
+        assert cfg.get("ml_observer_enabled") is False, (
+            "ml_observer_enabled must default to False — shadow observer not yet built"
         )
 
-    def test_ml_live_multiplier_enabled_defaults_false(self):
+    def test_ml_score_influence_enabled_defaults_false(self):
         cfg = self._get_real_config()
-        assert cfg.get("ml_live_multiplier_enabled") is False
+        assert cfg.get("ml_score_influence_enabled") is False, (
+            "ml_score_influence_enabled must default to False — requires explicit Amit approval"
+        )
 
-    def test_ml_can_block_entries_defaults_false(self):
+    def test_legacy_ml_keys_absent_from_config(self):
+        """Old ml_engine.py keys must be gone — they only existed for the deleted engine."""
         cfg = self._get_real_config()
-        assert cfg.get("ml_can_block_entries") is False
-
-    def test_ml_can_size_positions_defaults_false(self):
-        cfg = self._get_real_config()
-        assert cfg.get("ml_can_size_positions") is False
+        legacy_keys = {"ml_enabled", "ml_min_trades", "ml_retrain_interval",
+                       "ml_confidence_weight", "ml_models_dir",
+                       "ml_live_multiplier_enabled", "ml_can_block_entries",
+                       "ml_can_size_positions"}
+        present = legacy_keys & cfg.keys()
+        assert not present, f"Legacy ML config keys still present: {present}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

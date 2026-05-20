@@ -1,0 +1,90 @@
+════════════════════════════════════════════════════════════════════════
+  DECIFER ROTATION PAPER VALIDATION REPORT
+════════════════════════════════════════════════════════════════════════
+  Generated : 2026-05-12T17:41:47.599410+00:00
+  Since     : 2026-05-12
+  Lookahead : 24h
+
+  VERDICT   : PAPER_VALIDATION_PENDING_OUTCOMES
+  Next step : KEEP_RUNNING_PAPER_VALIDATION
+
+  Opportunities detected  : 1
+  Opportunities evaluated : 1
+  Blocks skipped          : 7
+
+  live_rotation_allowed    : False
+  broker_connected         : False
+  order_generation_allowed : False
+════════════════════════════════════════════════════════════════════════
+
+── SKIPPED BLOCKS ──────────────────────────────────────────────────
+
+  ALL: score 37 < min_blocked_score 70.0
+  XLV: score 42 < min_blocked_score 70.0
+  IRM: score 42 < min_blocked_score 70.0
+  DVA: excluded block type 'account_values_stale_block'
+  SLB: excluded block type 'account_values_stale_block'
+  LMT: excluded block type 'account_values_stale_block'
+  TEST: excluded block type 'test'
+
+────────────────────────────────────────────────────────────────────────
+  Scenario A — exit top 1 shadow candidate(s)
+  Blocked  : DVA  score=74  gap=+16.7  book_avg=57.3
+  Block type        : margin_gross_cap_block
+  Estimated notional: $57,213 [ESTIMATE — G10 provisional]
+  Cap released      : $98,233
+  Cap sufficient    : True
+
+  Shadow exit candidates:
+    [1] XLE    score= 23  notional=$    98,233  rss=69
+
+  Outcome status    : OUTCOME_PENDING
+  Outcomes pending — lookahead window not elapsed or positions still open.
+  live_action_permitted : False
+
+────────────────────────────────────────────────────────────────────────
+  Scenario B — exit top 2 shadow candidate(s)
+  Blocked  : DVA  score=74  gap=+16.7  book_avg=57.3
+  Block type        : margin_gross_cap_block
+  Estimated notional: $57,213 [ESTIMATE — G10 provisional]
+  Cap released      : $155,645
+  Cap sufficient    : True
+
+  Shadow exit candidates:
+    [1] XLE    score= 23  notional=$    98,233  rss=69
+    [2] XLK    score= 26  notional=$    57,412  rss=69  → actual P&L $-968
+
+  Outcome status    : OUTCOME_PENDING
+  Outcomes pending — lookahead window not elapsed or positions still open.
+  live_action_permitted : False
+
+────────────────────────────────────────────────────────────────────────
+  Scenario C — exit top 3 shadow candidate(s)
+  Blocked  : DVA  score=74  gap=+16.7  book_avg=57.3
+  Block type        : margin_gross_cap_block
+  Estimated notional: $57,213 [ESTIMATE — G10 provisional]
+  Cap released      : $213,243
+  Cap sufficient    : True
+
+  Shadow exit candidates:
+    [1] XLE    score= 23  notional=$    98,233  rss=69
+    [2] XLK    score= 26  notional=$    57,412  rss=69  → actual P&L $-968
+    [3] WDC    score= 27  notional=$    57,599  rss=60
+
+  Outcome status    : OUTCOME_PENDING
+  Outcomes pending — lookahead window not elapsed or positions still open.
+  live_action_permitted : False
+────────────────────────────────────────────────────────────────────────
+
+── DATA QUALITY GAPS ────────────────────────────────────────────────
+
+  • estimated_notional = portfolio_value × max_single_pct — upper-bound estimate, not sizing-engine output (G10 provisional)
+  • shadow exit P&L = total realized P&L from original entry to close — not only the post-block portion
+  • positions.json reflects end-of-session state — positions closed intra-session may be absent from reconstruction
+
+════════════════════════════════════════════════════════════════════════
+  IMPORTANT: Paper-validation simulation only.
+  No positions are recommended for sale or entry.
+  No orders generated.  No broker connected.
+  All notional figures marked [ESTIMATE] are provisional (G10 not met).
+════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,28 @@
+{
+  "report_ts": "2026-05-12T17:39:20.170122+00:00",
+  "since": "2026-05-12",
+  "lookahead_hours": 24,
+  "verdict": "PAPER_VALIDATION_NO_OPPORTUNITIES",
+  "recommended_action": "KEEP_RUNNING_PAPER_VALIDATION",
+  "opportunities_detected": 0,
+  "opportunities_evaluated": 0,
+  "skipped_blocks": [
+    "DVA: no position snapshot found at block time",
+    "ALL: score 37 < min_blocked_score 70.0",
+    "XLV: score 42 < min_blocked_score 70.0",
+    "IRM: score 42 < min_blocked_score 70.0",
+    "DVA: excluded block type 'account_values_stale_block'",
+    "SLB: excluded block type 'account_values_stale_block'",
+    "LMT: excluded block type 'account_values_stale_block'",
+    "TEST: excluded block type 'test'"
+  ],
+  "scenarios": [],
+  "data_quality_gaps": [
+    "estimated_notional = portfolio_value \u00d7 max_single_pct \u2014 upper-bound estimate, not sizing-engine output (G10 provisional)",
+    "shadow exit P&L = total realized P&L from original entry to close \u2014 not only the post-block portion",
+    "positions.json reflects end-of-session state \u2014 positions closed intra-session may be absent from reconstruction"
+  ],
+  "live_rotation_allowed": false,
+  "broker_connected": false,
+  "order_generation_allowed": false
+}

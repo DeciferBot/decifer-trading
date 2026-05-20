@@ -1,0 +1,2823 @@
+{
+  "meta": {
+    "since": "2026-05-13",
+    "generated": "2026-05-13T17:12:01.708683+00:00",
+    "script": "rotation_shadow_report.py"
+  },
+  "section_0": {
+    "since": "2026-05-13",
+    "generated": "2026-05-13T17:12:01.616192+00:00",
+    "unique_blocked": 13,
+    "high_score_blocked": 3,
+    "open_positions": 16,
+    "tqr_artifact_loaded": false,
+    "reconstruction_confidence": "LOW"
+  },
+  "section_1": {
+    "unique_blocked": 13,
+    "high_score_blocked": 3,
+    "rows": [
+      {
+        "symbol": "NVDA",
+        "candidate_score": 71,
+        "direction": "LONG",
+        "exp_code": "account_values_stale_block",
+        "exp_reason": "Account values stale: last update 344s ago (limit: 300s)",
+        "estimated_notional": 57925.42,
+        "notional_is_estimate": true,
+        "portfolio_value": 965423.71,
+        "open_position_count": 16,
+        "block_reason": "account_values_stale_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 71.0,
+        "gap": 11.8,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Tech / AI / Semis",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "SNDK",
+        "candidate_score": 39,
+        "direction": "LONG",
+        "exp_code": "account_values_stale_block",
+        "exp_reason": "Account values stale: last update 344s ago (limit: 300s)",
+        "estimated_notional": 57925.42,
+        "notional_is_estimate": true,
+        "portfolio_value": 965423.71,
+        "open_position_count": 16,
+        "block_reason": "account_values_stale_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 52.0,
+        "gap": -7.2,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Tech / AI / Semis",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "TSLA",
+        "candidate_score": 53,
+        "direction": "LONG",
+        "exp_code": "account_values_stale_block",
+        "exp_reason": "Account values stale: last update 505s ago (limit: 300s)",
+        "estimated_notional": 57898.95,
+        "notional_is_estimate": true,
+        "portfolio_value": 964982.57,
+        "open_position_count": 16,
+        "block_reason": "account_values_stale_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 75.0,
+        "gap": 15.8,
+        "outscores_15": true,
+        "outscores_20": false,
+        "cluster": "Tech / AI / Semis",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "IREN",
+        "candidate_score": 37,
+        "direction": "LONG",
+        "exp_code": "account_values_stale_block",
+        "exp_reason": "Account values stale: last update 464s ago (limit: 300s)",
+        "estimated_notional": 57892.2,
+        "notional_is_estimate": true,
+        "portfolio_value": 964869.97,
+        "open_position_count": 16,
+        "block_reason": "account_values_stale_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 37.0,
+        "gap": -22.2,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Tech / AI / Semis",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "NBIS",
+        "candidate_score": 48,
+        "direction": "LONG",
+        "exp_code": "margin_gross_cap_block",
+        "exp_reason": "Margin gross cap: $1,005,174 deployed + $57,923 new = 110.1% (limit: 110%)",
+        "estimated_notional": 57923.21,
+        "notional_is_estimate": true,
+        "portfolio_value": 965386.91,
+        "open_position_count": 16,
+        "block_reason": "margin_gross_cap_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 85.0,
+        "gap": 25.8,
+        "outscores_15": true,
+        "outscores_20": true,
+        "cluster": "Healthcare / Biotech",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "SMH",
+        "candidate_score": 43,
+        "direction": "LONG",
+        "exp_code": "margin_gross_cap_block",
+        "exp_reason": "Margin gross cap: $1,060,129 deployed + $57,877 new = 115.9% (limit: 110%)",
+        "estimated_notional": 57877.27,
+        "notional_is_estimate": true,
+        "portfolio_value": 964621.2,
+        "open_position_count": 17,
+        "block_reason": "margin_gross_cap_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 45.0,
+        "gap": -14.2,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Tech / AI / Semis",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "MU",
+        "candidate_score": 64,
+        "direction": "LONG",
+        "exp_code": "margin_gross_cap_block",
+        "exp_reason": "Margin gross cap: $1,056,513 deployed + $57,581 new = 116.1% (limit: 110%)",
+        "estimated_notional": 57581.37,
+        "notional_is_estimate": true,
+        "portfolio_value": 959689.57,
+        "open_position_count": 17,
+        "block_reason": "margin_gross_cap_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 68.0,
+        "gap": 8.8,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Tech / AI / Semis",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "JNJ",
+        "candidate_score": 64,
+        "direction": "LONG",
+        "exp_code": "margin_gross_cap_block",
+        "exp_reason": "Margin gross cap: $1,056,476 deployed + $57,581 new = 116.1% (limit: 110%)",
+        "estimated_notional": 57581.37,
+        "notional_is_estimate": true,
+        "portfolio_value": 959689.57,
+        "open_position_count": 17,
+        "block_reason": "margin_gross_cap_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 64.0,
+        "gap": 4.8,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Other",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "XLV",
+        "candidate_score": 42,
+        "direction": "LONG",
+        "exp_code": "account_values_stale_block",
+        "exp_reason": "Account values stale: last update 364s ago (limit: 300s)",
+        "estimated_notional": 57612.64,
+        "notional_is_estimate": true,
+        "portfolio_value": 960210.64,
+        "open_position_count": 16,
+        "block_reason": "account_values_stale_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 45.0,
+        "gap": -14.2,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Other",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "ETN",
+        "candidate_score": 51,
+        "direction": "LONG",
+        "exp_code": "account_values_stale_block",
+        "exp_reason": "Account values stale: last update 374s ago (limit: 300s)",
+        "estimated_notional": 57538.58,
+        "notional_is_estimate": true,
+        "portfolio_value": 958976.4,
+        "open_position_count": 16,
+        "block_reason": "account_values_stale_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 66.0,
+        "gap": 6.8,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Power / Infrastructure",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "GS",
+        "candidate_score": 66,
+        "direction": "LONG",
+        "exp_code": "margin_gross_cap_block",
+        "exp_reason": "Margin gross cap: $1,005,205 deployed + $57,705 new = 110.5% (limit: 110%)",
+        "estimated_notional": 57704.64,
+        "notional_is_estimate": true,
+        "portfolio_value": 961743.93,
+        "open_position_count": 16,
+        "block_reason": "margin_gross_cap_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 66.0,
+        "gap": 6.8,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Financials",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "MDGL",
+        "candidate_score": 45,
+        "direction": "LONG",
+        "exp_code": "account_values_stale_block",
+        "exp_reason": "Account values stale: last update 497s ago (limit: 300s)",
+        "estimated_notional": 57837.05,
+        "notional_is_estimate": true,
+        "portfolio_value": 963950.83,
+        "open_position_count": 16,
+        "block_reason": "account_values_stale_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 57.0,
+        "gap": -2.2,
+        "outscores_15": false,
+        "outscores_20": false,
+        "cluster": "Other",
+        "spread_blocked": false
+      },
+      {
+        "symbol": "MSFT",
+        "candidate_score": 69,
+        "direction": "LONG",
+        "exp_code": "margin_gross_cap_block",
+        "exp_reason": "Margin gross cap: $1,008,407 deployed + $57,847 new = 110.6% (limit: 110%)",
+        "estimated_notional": 57846.77,
+        "notional_is_estimate": true,
+        "portfolio_value": 964112.86,
+        "open_position_count": 16,
+        "block_reason": "margin_gross_cap_block",
+        "deployed": null,
+        "new_position": null,
+        "total_pct": null,
+        "limit_pct": null,
+        "score": 75.0,
+        "gap": 15.8,
+        "outscores_15": true,
+        "outscores_20": false,
+        "cluster": "Tech / AI / Semis",
+        "spread_blocked": false
+      }
+    ],
+    "book_avg": 59.25
+  },
+  "section_2": {
+    "book_reconstructions": [
+      {
+        "blocked_symbol": "NVDA",
+        "blocked_score": 71.0,
+        "block_ts": "2026-05-13T10:45:54Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "MSFT",
+            "score": 63.0,
+            "notional": 57576.36,
+            "open_time": "2026-05-07T11:17",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "AVGO",
+            "score": 72.0,
+            "notional": 57020.95,
+            "open_time": "2026-05-12T14:41",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "SNDK",
+        "blocked_score": 52.0,
+        "block_ts": "2026-05-13T10:45:54Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "MSFT",
+            "score": 63.0,
+            "notional": 57576.36,
+            "open_time": "2026-05-07T11:17",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "AVGO",
+            "score": 72.0,
+            "notional": 57020.95,
+            "open_time": "2026-05-12T14:41",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "TSLA",
+        "blocked_score": 75.0,
+        "block_ts": "2026-05-13T11:06:35Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "MSFT",
+            "score": 63.0,
+            "notional": 57576.36,
+            "open_time": "2026-05-07T11:17",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "AVGO",
+            "score": 72.0,
+            "notional": 57020.95,
+            "open_time": "2026-05-12T14:41",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "IREN",
+        "blocked_score": 37.0,
+        "block_ts": "2026-05-13T11:26:54Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "MSFT",
+            "score": 63.0,
+            "notional": 57576.36,
+            "open_time": "2026-05-07T11:17",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "AVGO",
+            "score": 72.0,
+            "notional": 57020.95,
+            "open_time": "2026-05-12T14:41",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "NBIS",
+        "blocked_score": 85.0,
+        "block_ts": "2026-05-13T12:07:32Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "MSFT",
+            "score": 63.0,
+            "notional": 57576.36,
+            "open_time": "2026-05-07T11:17",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "AVGO",
+            "score": 72.0,
+            "notional": 57020.95,
+            "open_time": "2026-05-12T14:41",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "SMH",
+        "blocked_score": 45.0,
+        "block_ts": "2026-05-13T13:34:57Z",
+        "confidence": "HIGH",
+        "book_size": 17,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "MSFT",
+            "score": 63.0,
+            "notional": 57576.36,
+            "open_time": "2026-05-07T11:17",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "AVGO",
+            "score": 72.0,
+            "notional": 57020.95,
+            "open_time": "2026-05-12T14:41",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "NVDA",
+            "score": 55.0,
+            "notional": 57842.99,
+            "open_time": "2026-05-13T13:34",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "MU",
+        "blocked_score": 68.0,
+        "block_ts": "2026-05-13T13:46:11Z",
+        "confidence": "HIGH",
+        "book_size": 17,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "MSFT",
+            "score": 63.0,
+            "notional": 57576.36,
+            "open_time": "2026-05-07T11:17",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "AVGO",
+            "score": 72.0,
+            "notional": 57020.95,
+            "open_time": "2026-05-12T14:41",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "NVDA",
+            "score": 55.0,
+            "notional": 58017.75,
+            "open_time": "2026-05-13T13:34",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "JNJ",
+        "blocked_score": 64.0,
+        "block_ts": "2026-05-13T13:46:11Z",
+        "confidence": "HIGH",
+        "book_size": 17,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "MSFT",
+            "score": 63.0,
+            "notional": 57576.36,
+            "open_time": "2026-05-07T11:17",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "AVGO",
+            "score": 72.0,
+            "notional": 57020.95,
+            "open_time": "2026-05-12T14:41",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "NVDA",
+            "score": 55.0,
+            "notional": 58017.75,
+            "open_time": "2026-05-13T13:34",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "XLV",
+        "blocked_score": 45.0,
+        "block_ts": "2026-05-13T14:14:21Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "NVDA",
+            "score": 55.0,
+            "notional": 58017.75,
+            "open_time": "2026-05-13T13:34",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          },
+          {
+            "symbol": "JNJ",
+            "score": 56.0,
+            "notional": 57361.03,
+            "open_time": "2026-05-13T14:05",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "ETN",
+        "blocked_score": 66.0,
+        "block_ts": "2026-05-13T14:23:31Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "NVDA",
+            "score": 55.0,
+            "notional": 58017.75,
+            "open_time": "2026-05-13T13:34",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          },
+          {
+            "symbol": "JNJ",
+            "score": 56.0,
+            "notional": 57361.03,
+            "open_time": "2026-05-13T14:05",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "GS",
+        "blocked_score": 66.0,
+        "block_ts": "2026-05-13T14:42:13Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "NVDA",
+            "score": 55.0,
+            "notional": 58017.75,
+            "open_time": "2026-05-13T13:34",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          },
+          {
+            "symbol": "JNJ",
+            "score": 56.0,
+            "notional": 57361.03,
+            "open_time": "2026-05-13T14:05",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "MDGL",
+        "blocked_score": 57.0,
+        "block_ts": "2026-05-13T16:22:34Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "NVDA",
+            "score": 55.0,
+            "notional": 58017.75,
+            "open_time": "2026-05-13T13:34",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          },
+          {
+            "symbol": "JNJ",
+            "score": 56.0,
+            "notional": 57361.03,
+            "open_time": "2026-05-13T14:05",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          }
+        ]
+      },
+      {
+        "blocked_symbol": "MSFT",
+        "blocked_score": 75.0,
+        "block_ts": "2026-05-13T16:34:22Z",
+        "confidence": "HIGH",
+        "book_size": 16,
+        "book": [
+          {
+            "symbol": "AAPL",
+            "score": 85.0,
+            "notional": 57721.17,
+            "open_time": "2026-05-07T10:58",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "notional": 57598.8,
+            "open_time": "2026-05-08T20:47",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "notional": 57318.3,
+            "open_time": "2026-05-11T08:49",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "notional": 94306.26,
+            "open_time": "2026-05-11T09:32",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "IWM",
+            "score": 83.0,
+            "notional": 57036.39,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "VRT",
+            "score": 68.0,
+            "notional": 56767.18,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "notional": 57516.1,
+            "open_time": "2026-05-11T14:29",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "PWR",
+            "score": 74.0,
+            "notional": 57140.44,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Power / Infrastructure",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "USO",
+            "score": 71.0,
+            "notional": 57834.4,
+            "open_time": "2026-05-11T16:22",
+            "cluster": "Energy",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLP",
+            "score": 68.0,
+            "notional": 57598.53,
+            "open_time": "2026-05-11T16:59",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "notional": 58030.82,
+            "open_time": "2026-05-12T08:26",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "notional": 98232.75,
+            "open_time": "2026-05-12T11:25",
+            "cluster": "Energy",
+            "etf_overlap_flag": true,
+            "is_carry": true
+          },
+          {
+            "symbol": "ASML",
+            "score": 68.0,
+            "notional": 57021.14,
+            "open_time": "2026-05-12T15:09",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "notional": 57048.2,
+            "open_time": "2026-05-12T15:10",
+            "cluster": "Consumer / Defensive",
+            "etf_overlap_flag": false,
+            "is_carry": true
+          },
+          {
+            "symbol": "NVDA",
+            "score": 55.0,
+            "notional": 58017.75,
+            "open_time": "2026-05-13T13:34",
+            "cluster": "Tech / AI / Semis",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          },
+          {
+            "symbol": "JNJ",
+            "score": 56.0,
+            "notional": 57361.03,
+            "open_time": "2026-05-13T14:05",
+            "cluster": "Other",
+            "etf_overlap_flag": false,
+            "is_carry": false
+          }
+        ]
+      }
+    ]
+  },
+  "section_3": {
+    "rankings": [
+      {
+        "blocked": "TSLA",
+        "candidates": [
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "score_delta": 52.0,
+            "notional": 98232.75,
+            "rotation_shadow_score": 73.0,
+            "below_35": true,
+            "etf_overlap_below_50": true,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-12T11:25:28.318365+00:00",
+            "cluster": "Energy",
+            "hold_protected": false,
+            "rotation_shadow_rank": 1
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "score_delta": 48.0,
+            "notional": 57598.8,
+            "rotation_shadow_score": 61.0,
+            "below_35": true,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-08T20:47:27.225833+00:00",
+            "cluster": "Tech / AI / Semis",
+            "hold_protected": false,
+            "rotation_shadow_rank": 2
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "score_delta": 36.0,
+            "notional": 57318.3,
+            "rotation_shadow_score": 39.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-11T08:49:36.890694+00:00",
+            "cluster": "Tech / AI / Semis",
+            "hold_protected": false,
+            "rotation_shadow_rank": 3
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "score_delta": 31.0,
+            "notional": 94306.26,
+            "rotation_shadow_score": 34.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-11T09:32:07.050633+00:00",
+            "cluster": "Energy",
+            "hold_protected": false,
+            "rotation_shadow_rank": 4
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "score_delta": 28.0,
+            "notional": 58030.82,
+            "rotation_shadow_score": 31.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-12T08:26:31.883863+00:00",
+            "cluster": "Consumer / Defensive",
+            "hold_protected": false,
+            "rotation_shadow_rank": 5
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "score_delta": 22.0,
+            "notional": 57048.2,
+            "rotation_shadow_score": 25.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-12T15:10:02.738891+00:00",
+            "cluster": "Consumer / Defensive",
+            "hold_protected": false,
+            "rotation_shadow_rank": 6
+          }
+        ]
+      },
+      {
+        "blocked": "NBIS",
+        "candidates": [
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "score_delta": 62.0,
+            "notional": 98232.75,
+            "rotation_shadow_score": 83.0,
+            "below_35": true,
+            "etf_overlap_below_50": true,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-12T11:25:28.318365+00:00",
+            "cluster": "Energy",
+            "hold_protected": false,
+            "rotation_shadow_rank": 1
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "score_delta": 58.0,
+            "notional": 57598.8,
+            "rotation_shadow_score": 71.0,
+            "below_35": true,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-08T20:47:27.225833+00:00",
+            "cluster": "Tech / AI / Semis",
+            "hold_protected": false,
+            "rotation_shadow_rank": 2
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "score_delta": 46.0,
+            "notional": 57318.3,
+            "rotation_shadow_score": 49.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-11T08:49:36.890694+00:00",
+            "cluster": "Tech / AI / Semis",
+            "hold_protected": false,
+            "rotation_shadow_rank": 3
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "score_delta": 41.0,
+            "notional": 94306.26,
+            "rotation_shadow_score": 44.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-11T09:32:07.050633+00:00",
+            "cluster": "Energy",
+            "hold_protected": false,
+            "rotation_shadow_rank": 4
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "score_delta": 38.0,
+            "notional": 58030.82,
+            "rotation_shadow_score": 41.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-12T08:26:31.883863+00:00",
+            "cluster": "Consumer / Defensive",
+            "hold_protected": false,
+            "rotation_shadow_rank": 5
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "score_delta": 32.0,
+            "notional": 57048.2,
+            "rotation_shadow_score": 35.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-12T15:10:02.738891+00:00",
+            "cluster": "Consumer / Defensive",
+            "hold_protected": false,
+            "rotation_shadow_rank": 6
+          },
+          {
+            "symbol": "MSFT",
+            "score": 63.0,
+            "score_delta": 22.0,
+            "notional": 57576.36,
+            "rotation_shadow_score": 25.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-07T11:17:03.525963+00:00",
+            "cluster": "Tech / AI / Semis",
+            "hold_protected": false,
+            "rotation_shadow_rank": 7
+          },
+          {
+            "symbol": "XOM",
+            "score": 63.0,
+            "score_delta": 22.0,
+            "notional": 57516.1,
+            "rotation_shadow_score": 25.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-11T14:29:50.782862+00:00",
+            "cluster": "Energy",
+            "hold_protected": false,
+            "rotation_shadow_rank": 8
+          }
+        ]
+      },
+      {
+        "blocked": "MSFT",
+        "candidates": [
+          {
+            "symbol": "XLE",
+            "score": 23.0,
+            "score_delta": 52.0,
+            "notional": 98232.75,
+            "rotation_shadow_score": 73.0,
+            "below_35": true,
+            "etf_overlap_below_50": true,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-12T11:25:28.318365+00:00",
+            "cluster": "Energy",
+            "hold_protected": false,
+            "rotation_shadow_rank": 1
+          },
+          {
+            "symbol": "WDC",
+            "score": 27.0,
+            "score_delta": 48.0,
+            "notional": 57598.8,
+            "rotation_shadow_score": 61.0,
+            "below_35": true,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-08T20:47:27.225833+00:00",
+            "cluster": "Tech / AI / Semis",
+            "hold_protected": false,
+            "rotation_shadow_rank": 2
+          },
+          {
+            "symbol": "TSM",
+            "score": 39.0,
+            "score_delta": 36.0,
+            "notional": 57318.3,
+            "rotation_shadow_score": 39.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-11T08:49:36.890694+00:00",
+            "cluster": "Tech / AI / Semis",
+            "hold_protected": false,
+            "rotation_shadow_rank": 3
+          },
+          {
+            "symbol": "CVX",
+            "score": 44.0,
+            "score_delta": 31.0,
+            "notional": 94306.26,
+            "rotation_shadow_score": 34.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-11T09:32:07.050633+00:00",
+            "cluster": "Energy",
+            "hold_protected": false,
+            "rotation_shadow_rank": 4
+          },
+          {
+            "symbol": "KO",
+            "score": 47.0,
+            "score_delta": 28.0,
+            "notional": 58030.82,
+            "rotation_shadow_score": 31.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-12T08:26:31.883863+00:00",
+            "cluster": "Consumer / Defensive",
+            "hold_protected": false,
+            "rotation_shadow_rank": 5
+          },
+          {
+            "symbol": "COST",
+            "score": 53.0,
+            "score_delta": 22.0,
+            "notional": 57048.2,
+            "rotation_shadow_score": 25.0,
+            "below_35": false,
+            "etf_overlap_below_50": false,
+            "low_score_cluster": false,
+            "pru_displacement": false,
+            "is_carry": true,
+            "open_time": "2026-05-12T15:10:02.738891+00:00",
+            "cluster": "Consumer / Defensive",
+            "hold_protected": false,
+            "rotation_shadow_rank": 6
+          }
+        ]
+      }
+    ]
+  },
+  "section_4": {
+    "capacity_release": [
+      {
+        "blocked_symbol": "TSLA",
+        "top1_symbol": "XLE",
+        "top1_release": 98232.75,
+        "top2_release": 155831.55,
+        "top3_release": 213149.85,
+        "top1_pct_nlv": 10.17,
+        "top2_pct_nlv": 16.13,
+        "top3_pct_nlv": 22.06,
+        "capacity_confidence": "MEDIUM"
+      },
+      {
+        "blocked_symbol": "NBIS",
+        "top1_symbol": "XLE",
+        "top1_release": 98232.75,
+        "top2_release": 155831.55,
+        "top3_release": 213149.85,
+        "top1_pct_nlv": 10.17,
+        "top2_pct_nlv": 16.13,
+        "top3_pct_nlv": 22.06,
+        "capacity_confidence": "MEDIUM"
+      },
+      {
+        "blocked_symbol": "MSFT",
+        "top1_symbol": "XLE",
+        "top1_release": 98232.75,
+        "top2_release": 155831.55,
+        "top3_release": 213149.85,
+        "top1_pct_nlv": 10.17,
+        "top2_pct_nlv": 16.13,
+        "top3_pct_nlv": 22.06,
+        "capacity_confidence": "MEDIUM"
+      }
+    ]
+  },
+  "section_5": {
+    "etf_shadow_candidates": [
+      {
+        "symbol": "XLE",
+        "score": 23.0,
+        "overlapping_singles": [
+          "XOM",
+          "CVX"
+        ],
+        "notional": 98232.75,
+        "in_top3": true,
+        "blocked_symbols": [
+          "TSLA",
+          "NBIS",
+          "MSFT"
+        ],
+        "repeats_across_sessions": false
+      }
+    ]
+  },
+  "section_6": {
+    "clusters": {
+      "Consumer / Defensive": {
+        "symbols": [
+          "KO",
+          "COST"
+        ],
+        "avg_score": 50.0,
+        "total_notional": 345237.06,
+        "pct_nlv": 35.74,
+        "same_cluster_as_blocked": false,
+        "swap_within_cluster": false
+      },
+      "Energy": {
+        "symbols": [
+          "CVX",
+          "XOM",
+          "XLE"
+        ],
+        "avg_score": 37.7,
+        "total_notional": 635133.13,
+        "pct_nlv": 65.75,
+        "same_cluster_as_blocked": false,
+        "swap_within_cluster": false
+      },
+      "Tech / AI / Semis": {
+        "symbols": [
+          "TSM",
+          "MSFT",
+          "WDC"
+        ],
+        "avg_score": 37.3,
+        "total_notional": 402327.66,
+        "pct_nlv": 41.65,
+        "same_cluster_as_blocked": true,
+        "swap_within_cluster": true
+      }
+    }
+  },
+  "section_7": {
+    "pru_open_count": 0,
+    "pru_below_50": 0,
+    "pru_shadow_count": 0,
+    "pru_capacity_consumption": false,
+    "conclusion": "PRU_DISCOVERY_INSUFFICIENT_DATA"
+  },
+  "section_8": {
+    "strongest_blocked": {
+      "symbol": "NBIS",
+      "score": 85.0,
+      "gap": 25.8
+    },
+    "weakest_consumers": [
+      "XLE",
+      "XLE",
+      "XLE",
+      "WDC",
+      "WDC"
+    ],
+    "recurring_weak_symbols": [
+      "CVX",
+      "TSM",
+      "WDC"
+    ],
+    "top1_release": 98232.75,
+    "top2_release": 155831.55,
+    "top3_release": 213149.85,
+    "root_causes": [
+      "low book quality (2 positions below 35)",
+      "ETF overlap (1 low-score ETF flag(s))"
+    ],
+    "live_rotation_justified": false
+  },
+  "section_9": {
+    "outscores_15": 3,
+    "outscores_20": 1,
+    "weak_before_block": 8,
+    "top3_release": 213149.85,
+    "multi_session": true,
+    "verdict": "ROTATION_SHADOW_CONFIRMED",
+    "recommended_action": "DESIGN_ROTATION_POLICY_SPEC"
+  },
+  "section_10": {
+    "issues": [
+      "Warning: No trade quality report artifact found for date 2026-05-13",
+      "positions.json reflects end-of-session state only \u2014 positions closed during session are not included in book reconstruction",
+      "blocked candidate notional is not available from logs \u2014 exact capacity match is INSUFFICIENT_DATA; theoretical release is directional only",
+      "cannot distinguish protected/manual conviction positions from ordinary entries",
+      "carry vs same-session distinction uses --since date as cutoff \u2014 positions opened before market open on --since date are classified as carry"
+    ]
+  },
+  "data_quality": {
+    "missing_files": [],
+    "malformed_lines": {},
+    "warnings": [
+      "No trade quality report artifact found for date 2026-05-13"
+    ]
+  }
+}

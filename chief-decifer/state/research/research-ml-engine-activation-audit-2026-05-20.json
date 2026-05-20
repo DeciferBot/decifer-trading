@@ -1,0 +1,326 @@
+{
+  "research_id": "ml-engine-activation-audit-2026-05-20",
+  "title": "ML Engine Activation Audit — Design/Proof Sprint",
+  "date": "2026-05-20",
+  "status": "complete",
+  "sprint_type": "design_proof_only",
+  "no_live_changes_confirmed": true,
+
+  "files_inspected": [
+    "ml_engine.py",
+    "training_store.py",
+    "tests/test_ml_engine.py",
+    "signal_dispatcher.py",
+    "config.py (ML keys)",
+    "phase_gate.py",
+    "bot.py (lines 822-833)",
+    "data/training_records.jsonl",
+    "data/ml/closed_trade_training_ledger.jsonl",
+    "data/models/metadata.json"
+  ],
+
+  "existing_ml_architecture": {
+    "framework": "scikit-learn (RandomForest + GradientBoosting) — no external dependencies beyond sklearn+joblib",
+    "classes": {
+      "TradeLabeler": "Loads records from canonical ledger or training_store; labels WIN/LOSS/BREAKEVEN; extracts features. Filter: skips records without signal_scores.",
+      "DeciferML": "Trains classifier (WIN/LOSS binary) and regressor (pnl_pct). Uses TimeSeriesSplit for cross-validation.",
+      "SignalEnhancer": "Public integration class. Calls DeciferML.predict(); applies multiplier = 0.5 + win_prob to base_score. Currently disabled (ml_enabled=False).",
+      "RegimeClassifier": "ML-based regime detector. PRODUCTION_LOCKED=True — raises RuntimeError on predict_regime(). Not wired to production. Status: safe/dormant.",
+      "WeeklyReportGenerator": "Offline analytics only. Not wired to execution."
+    },
+    "models": {
+      "classifier": "RandomForestClassifier(n_estimators=100, max_depth=10) — predicts WIN probability",
+      "regressor": "GradientBoostingRegressor(n_estimators=100, max_depth=5) — predicts pnl_pct",
+      "output": "{win_prob: float, expected_return: float, confidence: float}",
+      "score_formula": "enhanced_score = base_score * (0.5 + win_prob), clamped to [0, 50]"
+    },
+    "feature_schema_current_code": [
+      "score", "vix", "time_of_day", "day_of_week", "is_after_hours",
+      "dim_trend", "dim_momentum", "dim_squeeze", "dim_flow", "dim_breakout",
+      "dim_news", "dim_social", "dim_reversion", "dim_overnight_drift",
+      "dim_pead", "dim_short_squeeze", "dim_catalyst", "dim_analyst_revision",
+      "dim_iv_skew", "dim_fx_macro", "dim_fx_momentum", "dim_insider_buying", "dim_mtf",
+      "regime_TRENDING_UP", "regime_TRENDING_DOWN", "regime_RANGE_BOUND",
+      "regime_CAPITULATION", "regime_RELIEF_RALLY", "regime_MOMENTUM_BULL",
+      "regime_FEAR_ELEVATED", "regime_DISTRIBUTION", "regime_EXTREME_STRESS",
+      "regime_TRENDING_BEAR", "regime_CHOPPY"
+    ],
+    "label_binary": "WIN=1 (pnl>0), else 0 (LOSS and BREAKEVEN merged)",
+    "label_regression": "pnl_pct (pre-computed; falls back to pnl/(price*shares))",
+    "training_data_source": "data/ml/closed_trade_training_ledger.jsonl (primary) -> data/training_records.jsonl (fallback)",
+    "model_persistence": "data/models/{classifier,regressor,scaler,features}.pkl + metadata.json"
+  },
+
+  "production_wiring_current_state": {
+    "bot_py_line_822": "imports enhance_score for availability check only (noqa: F401)",
+    "ml_enabled_config": false,
+    "production_callers_of_enhance_score": "NONE — no production code path calls enhance_score()",
+    "ml_can_block_entries": false,
+    "ml_can_size_positions": false,
+    "regime_classifier_production_locked": true,
+    "summary": "ML engine is completely dormant. No execution path touches it."
+  },
+
+  "data_readiness": {
+    "training_records_total": 453,
+    "ml_eligible": 406,
+    "ml_degraded": 47,
+    "legacy_no_field": 406,
+    "note_on_legacy": "All 406 eligible records predate the ml_eligible field. They are counted as eligible per count_eligible() backwards compatibility rule.",
+    "records_with_signal_scores": 180,
+    "records_without_signal_scores": 226,
+    "actual_usable_training_size": 180,
+    "note_on_filter": "TradeLabeler.create_dataset() skips records without signal_scores (line 247). Effective N=180, not 406.",
+    "win_loss_breakeven": {"WIN": 52, "LOSS": 84, "BREAKEVEN": 44, "WIN_rate_pct": 28.9},
+    "date_range": "2026-04-01 to 2026-05-11",
+    "span_days": 40,
+    "regime_distribution": {
+      "TRENDING_UP": 100, "MOMENTUM_BULL": 31, "RELIEF_RALLY": 9,
+      "UNKNOWN": 24, "TRENDING_BEAR": 4, "FEAR_ELEVATED": 4,
+      "DISTRIBUTION": 4, "RANGE_BOUND": 3, "CHOPPY": 1
+    },
+    "bull_concentration_pct": 72.8,
+    "canonical_ledger_records": 2,
+    "note_on_canonical_ledger": "data/ml/closed_trade_training_ledger.jsonl has 2 records. TradeLabeler will use it if present and non-empty, skipping training_records.jsonl. With only 2 records, MIN_TRADES gate (50) will fail and no model will be trained. This is currently safe — prevents accidental training."
+  },
+
+  "existing_trained_models": {
+    "path": "data/models/",
+    "train_date_metadata": "2026-04-28T23:18:28",
+    "file_mtime": "2026-05-19",
+    "inconsistency": "metadata.json shows 2026-04-28 but file mtime is 2026-05-19. One of these is wrong.",
+    "num_trades_trained_on": 431,
+    "CRITICAL_leakage_confirmed": true,
+    "leakage_detail": "holding_minutes appears in feature_importance with importance=0.275 — the highest of all features. holding_minutes is the ACTUAL hold duration (post-outcome data). A model trained on it learns 'trades that were held 5 min tend to be losses' — an outcome proxy, not an entry predictor.",
+    "current_code_fix": "prepare_data() correctly excludes holding_minutes from feature_cols (line 301 comment: 'determined by outcome, not entry signal'). The fix is in the code but the saved model is stale from before the fix.",
+    "action_required": "Existing data/models/*.pkl must be DELETED before any activation proceeds. They must never be loaded.",
+    "scaler_mtime_inconsistency": "scaler.pkl is from 2026-05-14, classifier/regressor from 2026-05-19. Components are from different training runs. Do not load any saved model until fresh retrain."
+  },
+
+  "feature_readiness": {
+    "features_available_at_entry_time": [
+      "score", "vix", "time_of_day", "day_of_week", "is_after_hours", "all 18 dim_* scores", "regime"
+    ],
+    "features_excluded_correctly": ["holding_minutes", "exit_price", "pnl", "pnl_pct"],
+    "dimension_coverage": {
+      "early_records_9_dims": "breakout, flow, momentum, mtf, news, reversion, social, squeeze, trend",
+      "all_18_dims": "adds analyst_revision, catalyst, fx_macro, fx_momentum, insider_buying, iv_skew, overnight_drift, pead, short_squeeze",
+      "zero_padding": "Records predating a dimension get 0 — model learns to down-weight zero-padded features naturally"
+    },
+    "CRITICAL_inference_gap": {
+      "description": "SignalEnhancer.enhance_score() builds inference features WITHOUT dim_* signal scores.",
+      "evidence": "Features dict passed to predict() contains only: score, vix, holding_target, time_of_day, day_of_week, is_after_hours, regime. All 18 dim_* features default to 0 at inference.",
+      "impact": "Model trained on dim_* features predicts with all dims=0. Signal dimension information — the most differentiated input — is completely ignored at inference time. Predictions are based on score, VIX, time, and regime only.",
+      "fix_required": "enhance_score() must accept and forward signal_scores dict to predict()"
+    }
+  },
+
+  "leakage_risks": [
+    {
+      "risk": "holding_minutes in existing models",
+      "severity": "CRITICAL",
+      "status": "CONFIRMED in saved models; FIXED in current code",
+      "action": "Delete data/models/ before activation. Never load existing models."
+    },
+    {
+      "risk": "Signal dims omitted at inference",
+      "severity": "HIGH",
+      "status": "BUG in SignalEnhancer.enhance_score() — dims not forwarded to predict()",
+      "action": "Fix enhance_score() to pass signal_scores dict before activation"
+    },
+    {
+      "risk": "BREAKEVEN pooled with LOSS in binary label",
+      "severity": "LOW",
+      "status": "Design choice; 44 BREAKEVEN records (24%) count as 0",
+      "action": "Consider 3-class label or separate breakeven threshold; not blocking for shadow mode"
+    },
+    {
+      "risk": "exit_price / pnl in extracted features",
+      "severity": "NONE — not in feature_cols",
+      "status": "extract_features() includes these in the features dict but prepare_data() never adds them to X",
+      "action": "No action needed but worth documenting"
+    },
+    {
+      "risk": "Regime one-hot from training data leaked into prediction",
+      "severity": "NONE",
+      "status": "Regime is available at entry time via scanner.get_market_regime(); not a future leak"
+    }
+  ],
+
+  "sample_size_risks": [
+    {
+      "risk": "Effective N=180, not 406",
+      "detail": "Only 180 of 406 eligible records have signal_scores. The 50-trade gate was calibrated against 406 total. True training size is 180.",
+      "impact": "With TimeSeriesSplit(n_splits=5), each test fold has ~36 samples. Metrics (ROC-AUC, R²) will have high variance.",
+      "recommendation": "Treat N=180 as sufficient for shadow-only mode, not for advisory influence on live entries"
+    },
+    {
+      "risk": "Bull-regime concentration (72.8%)",
+      "detail": "131 of 180 usable records are TRENDING_UP or MOMENTUM_BULL",
+      "impact": "Model effectively learns bull-market entry patterns. win_prob predictions in bear/choppy regimes extrapolate from 28 records combined. Boosted scores in a bear tape would be systematically wrong.",
+      "recommendation": "Shadow mode only until ≥2 full regime cycles are represented"
+    },
+    {
+      "risk": "40-day time window",
+      "detail": "All usable records span 2026-04-01 to 2026-05-11",
+      "impact": "TimeSeriesSplit with n_splits=5 creates folds of ~8 days each. Extremely narrow walk-forward windows. Model is essentially fitting April 2026 market conditions.",
+      "recommendation": "Minimum 90 days of signal_scores-complete records before advisory activation"
+    },
+    {
+      "risk": "Class imbalance — no class_weight specified",
+      "detail": "WIN rate 28.9%; RandomForestClassifier default = class_weight=None (uniform). LOSS-biased model.",
+      "impact": "Win probability predictions skewed low for all setups. Multiplier (0.5+win_prob) will systematically suppress scores below base.",
+      "recommendation": "Use class_weight='balanced' or class_weight={0:1, 1:2.5} before any training"
+    },
+    {
+      "risk": "Score formula implicit entry suppression",
+      "detail": "multiplier = 0.5 + win_prob. If win_prob = 0.3, multiplier = 0.8, enhanced_score = base_score * 0.8. For base_score=14 (paper min), enhanced=11.2 → below threshold → entry blocked.",
+      "impact": "Even with ml_can_block_entries=False, the score adjustment formula can block entries by pushing below min_score_to_trade. This is an implicit blocking path.",
+      "recommendation": "For shadow and advisory stages, cap downside: enhanced_score = max(base_score * 0.9, enhanced_score). No suppression below 90% of base. Only explicit boost (>1.0 multiplier) should be permitted in early stages."
+    }
+  ],
+
+  "what_ml_predicts": {
+    "primary": "WIN probability (binary classifier) — will this trade close at a positive P&L?",
+    "secondary": "pnl_pct (regressor) — expected percentage return",
+    "label_quality": "pnl_pct available for 452/453 records — good. WIN/LOSS ratio 52:84 across usable 180.",
+    "not_predicted": ["hold-time-adjusted return", "risk-adjusted return (Sharpe)", "entry quality score"],
+    "advisory_vs_live": "Currently: neither (disabled). Proposed progression: shadow → advisory → soft influence"
+  },
+
+  "proposed_activation_stages": {
+    "stage_0": {
+      "name": "Model Rebuild (offline only)",
+      "actions": [
+        "Delete data/models/*.pkl",
+        "Fix SignalEnhancer.enhance_score() to pass dim_* signal scores to predict()",
+        "Add class_weight='balanced' to RandomForestClassifier",
+        "Confirm training reads from training_records.jsonl (canonical ledger has only 2 records)",
+        "Run: python3 ml_engine.py --train from CLI",
+        "Verify metadata.json shows holding_minutes NOT in feature_importance",
+        "Verify N_trained >= 50 gate passes"
+      ],
+      "execution_impact": "NONE",
+      "gate_for_next": "Clean model rebuilt without leakage confirmed by Amit"
+    },
+    "stage_1": {
+      "name": "Shadow Prediction Logging",
+      "flag": "ml_shadow_enabled (new config key, separate from ml_enabled)",
+      "actions": [
+        "After IC-weighted score computed for each candidate in scan loop, call ML predict()",
+        "Write to data/ml/ml_shadow_predictions.jsonl: {ts, symbol, base_score, win_prob, expected_return, confidence, regime, dims_passed_count}",
+        "No score change. No execution change.",
+        "Dashboard: optionally show ML win_prob in candidate debug view (read-only)"
+      ],
+      "execution_impact": "ZERO — logging only",
+      "gate_for_next": "90+ shadow predictions with closed-trade outcomes; Brier score <= 0.25; top-tercile win rate > 35% (vs 28.9% baseline); Amit review"
+    },
+    "stage_2": {
+      "name": "Advisory Display (no score change)",
+      "flag": "ml_advisory_display_enabled",
+      "actions": [
+        "Show ML confidence in Apex tab / Trade Scout panel",
+        "Still no score changes",
+        "Log discordance: cases where ML high-confidence contradicts IC-weighted score"
+      ],
+      "execution_impact": "ZERO",
+      "gate_for_next": "60+ days of shadow observation; consistent lift across >= 2 different regime types; no systematic regime-concentration bias; Amit approval"
+    },
+    "stage_3": {
+      "name": "Soft Score Influence (capped upside only)",
+      "flag": "ml_enabled=True",
+      "score_formula_change": "enhanced_score = base_score + (base_score * max(0, win_prob - 0.5) * 0.4), clamped above at base_score * 1.2. NO DOWNSIDE. Scores cannot be reduced below base_score.",
+      "rationale": "Until the model is validated across regimes, suppress the downside risk. Only boost high-confidence setups by up to 20%.",
+      "execution_impact": "MINIMAL — can slightly increase scores for high-confidence setups; cannot block entries",
+      "gate_for_next": "Explicit Amit approval; post-Stage 2 analysis showing positive attribution"
+    },
+    "stage_4": {
+      "name": "Full advisory (original formula)",
+      "flag": "ml_enabled=True + restore multiplier formula",
+      "gate": "Explicit Amit approval only after Stage 3 validation"
+    }
+  },
+
+  "tests_required_before_activation": [
+    {
+      "id": "T1",
+      "name": "test_inference_passes_dim_features",
+      "description": "Verify SignalEnhancer.enhance_score() forwards signal_scores dict to predict() and dim_* values are non-zero when signal_scores provided",
+      "blocks": "Stage 0 — fix must be verified before any retrain"
+    },
+    {
+      "id": "T2",
+      "name": "test_no_holding_minutes_in_feature_cols",
+      "description": "Assert 'holding_minutes' not in DeciferML.prepare_data() X.columns after prepare_data()",
+      "blocks": "Stage 0"
+    },
+    {
+      "id": "T3",
+      "name": "test_stale_model_rejected_if_leaky",
+      "description": "If loaded model's feature_names include 'holding_minutes', SignalEnhancer must disable itself and log a critical warning rather than use the model",
+      "blocks": "Stage 0"
+    },
+    {
+      "id": "T4",
+      "name": "test_ml_eligible_filter_in_training",
+      "description": "TradeLabeler.load_trades() and create_dataset() must exclude records where ml_eligible=False",
+      "blocks": "Stage 0"
+    },
+    {
+      "id": "T5",
+      "name": "test_class_weight_balanced_in_classifier",
+      "description": "Assert RandomForestClassifier is initialized with class_weight='balanced'",
+      "blocks": "Stage 0"
+    },
+    {
+      "id": "T6",
+      "name": "test_shadow_log_written_no_score_change",
+      "description": "In shadow mode, verify ml_shadow_predictions.jsonl is written and the returned score equals base_score",
+      "blocks": "Stage 1"
+    },
+    {
+      "id": "T7",
+      "name": "test_shadow_mode_no_execution_path_change",
+      "description": "Shadow mode must not affect dispatch_signals() output — same orders produced with shadow enabled vs disabled",
+      "blocks": "Stage 1"
+    },
+    {
+      "id": "T8",
+      "name": "test_enhanced_score_floor",
+      "description": "In Stage 3 formula: enhanced_score >= base_score always. Verify with win_prob=0.0 and win_prob=0.5",
+      "blocks": "Stage 3"
+    },
+    {
+      "id": "T9",
+      "name": "test_enhanced_score_ceiling",
+      "description": "Enhanced score does not exceed base_score * 1.2 in Stage 3 formula",
+      "blocks": "Stage 3"
+    },
+    {
+      "id": "T10",
+      "name": "test_canonical_ledger_count_used_correctly",
+      "description": "When closed_trade_training_ledger.jsonl has < MIN_TRADES records, TradeLabeler falls through to training_records.jsonl",
+      "blocks": "Stage 0"
+    }
+  ],
+
+  "explicit_no_live_change_confirmation": {
+    "confirmed": true,
+    "current_session_changes": "NONE — this is a design/proof audit only",
+    "no_code_changes_made": true,
+    "no_config_changes_made": true,
+    "no_ic_weights_changes": true,
+    "no_execution_path_changes": true,
+    "ml_enabled_remains": false,
+    "models_pkl_not_modified": true,
+    "training_records_not_modified": true
+  },
+
+  "open_decisions_requiring_amit_approval": [
+    "Approve Stage 0: delete existing models, rebuild clean. Blocking prereq: fix SignalEnhancer dim forwarding first.",
+    "Approve shadow prediction logging (Stage 1) and where to surface win_prob in dashboard.",
+    "Set shadow gate thresholds (90 outcomes, Brier ≤ 0.25, win-rate lift) or adjust per judgment.",
+    "Decide if BREAKEVEN should be a third class or remain pooled with LOSS.",
+    "Decide score floor formula for Stage 3 (no-downside boost vs original ±multiplier)."
+  ]
+}

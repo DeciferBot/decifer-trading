@@ -1,0 +1,42 @@
+════════════════════════════════════════════════════════════════════════
+  DECIFER ROTATION PAPER VALIDATION REPORT
+════════════════════════════════════════════════════════════════════════
+  Generated : 2026-05-12T17:39:20.170122+00:00
+  Since     : 2026-05-12
+  Lookahead : 24h
+
+  VERDICT   : PAPER_VALIDATION_NO_OPPORTUNITIES
+  Next step : KEEP_RUNNING_PAPER_VALIDATION
+
+  Opportunities detected  : 0
+  Opportunities evaluated : 0
+  Blocks skipped          : 8
+
+  live_rotation_allowed    : False
+  broker_connected         : False
+  order_generation_allowed : False
+════════════════════════════════════════════════════════════════════════
+
+── SKIPPED BLOCKS ──────────────────────────────────────────────────
+
+  DVA: no position snapshot found at block time
+  ALL: score 37 < min_blocked_score 70.0
+  XLV: score 42 < min_blocked_score 70.0
+  IRM: score 42 < min_blocked_score 70.0
+  DVA: excluded block type 'account_values_stale_block'
+  SLB: excluded block type 'account_values_stale_block'
+  LMT: excluded block type 'account_values_stale_block'
+  TEST: excluded block type 'test'
+
+── DATA QUALITY GAPS ────────────────────────────────────────────────
+
+  • estimated_notional = portfolio_value × max_single_pct — upper-bound estimate, not sizing-engine output (G10 provisional)
+  • shadow exit P&L = total realized P&L from original entry to close — not only the post-block portion
+  • positions.json reflects end-of-session state — positions closed intra-session may be absent from reconstruction
+
+════════════════════════════════════════════════════════════════════════
+  IMPORTANT: Paper-validation simulation only.
+  No positions are recommended for sale or entry.
+  No orders generated.  No broker connected.
+  All notional figures marked [ESTIMATE] are provisional (G10 not met).
+════════════════════════════════════════════════════════════════════════

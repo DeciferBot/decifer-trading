@@ -1025,6 +1025,24 @@ def run_signal_pipeline(
         ranking_total=len(all_scored),
     )
 
+    # 7b. ML Observation Writer (Sprint 2) — inert unless ml_observer_enabled=True.
+    #     Writes one record per scored candidate (ALL candidates, including below-threshold)
+    #     to data/ml/ml_observations.jsonl for future training linkage.
+    #     Non-blocking: any failure is logged at DEBUG level and trading continues.
+    try:
+        from ml_observation_writer import write_observations as _write_obs
+        from config import CONFIG as _ml_obs_cfg
+        _write_obs(
+            all_scored=all_scored,
+            rank_map=_rank_map_all,
+            scan_id=_scan_id,
+            regime=regime_name,
+            vix=_vix,
+            config=_ml_obs_cfg,
+        )
+    except Exception as _obs_exc:
+        log.debug("ML observation writer failed (non-fatal): %s", _obs_exc)
+
     # 8. Append to signals_log.jsonl for IC calculator
     _append_signals_log(signals, log_path=signals_log_path)
 

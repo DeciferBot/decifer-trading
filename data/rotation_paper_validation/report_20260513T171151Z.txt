@@ -1,0 +1,212 @@
+════════════════════════════════════════════════════════════════════════
+  DECIFER ROTATION PAPER VALIDATION REPORT
+════════════════════════════════════════════════════════════════════════
+  Generated : 2026-05-13T17:11:51.021615+00:00
+  Since     : 2026-05-12
+  Lookahead : 24h
+
+  VERDICT   : PAPER_VALIDATION_PENDING_OUTCOMES
+  Next step : KEEP_RUNNING_PAPER_VALIDATION
+
+  Opportunities detected  : 2
+  Opportunities evaluated : 2
+  Blocks skipped          : 81
+
+  live_rotation_allowed    : False
+  broker_connected         : False
+  order_generation_allowed : False
+════════════════════════════════════════════════════════════════════════
+
+── SKIPPED BLOCKS ──────────────────────────────────────────────────
+
+  ALL: score 37 < min_blocked_score 70.0
+  XLV: score 42 < min_blocked_score 70.0
+  IRM: score 42 < min_blocked_score 70.0
+  DVA: excluded block type 'account_values_stale_block'
+  SLB: excluded block type 'account_values_stale_block'
+  LMT: excluded block type 'account_values_stale_block'
+  TEST: excluded block type 'test'
+  TEST: excluded block type 'test'
+  TEST: excluded block type 'test'
+  TEST: excluded block type 'test'
+  NVDA: excluded block type 'account_values_stale_block'
+  SNDK: excluded block type 'account_values_stale_block'
+  TSLA: excluded block type 'account_values_stale_block'
+  NVDA: excluded block type 'account_values_stale_block'
+  IREN: excluded block type 'account_values_stale_block'
+  TSLA: excluded block type 'account_values_stale_block'
+  NBIS: score 48 < min_blocked_score 70.0
+  IREN: score 37 < min_blocked_score 70.0
+  NBIS: excluded block type 'account_values_stale_block'
+  NVDA: excluded block type 'account_values_stale_block'
+  NVDA: score 49 < min_blocked_score 70.0
+  NVDA: excluded block type 'account_values_stale_block'
+  NBIS: excluded block type 'account_values_stale_block'
+  NVDA: score 56 < min_blocked_score 70.0
+  SMH: score 43 < min_blocked_score 70.0
+  TSLA: score 64 < min_blocked_score 70.0
+  MU: score 64 < min_blocked_score 70.0
+  JNJ: score 64 < min_blocked_score 70.0
+  MU: score 68 < min_blocked_score 70.0
+  JNJ: score 64 < min_blocked_score 70.0
+  SMH: score 43 < min_blocked_score 70.0
+  MU: score 55 < min_blocked_score 70.0
+  MU: excluded block type 'account_values_stale_block'
+  SMH: excluded block type 'account_values_stale_block'
+  XLV: excluded block type 'account_values_stale_block'
+  ETN: excluded block type 'account_values_stale_block'
+  XLV: excluded block type 'account_values_stale_block'
+  TSLA: excluded block type 'account_values_stale_block'
+  SMH: excluded block type 'account_values_stale_block'
+  NBIS: duplicate opportunity (same symbol+date) — first qualifying block used
+  GS: score 66 < min_blocked_score 70.0
+  TSLA: score 63 < min_blocked_score 70.0
+  NBIS: excluded block type 'account_values_stale_block'
+  TSLA: excluded block type 'account_values_stale_block'
+  GS: excluded block type 'account_values_stale_block'
+  NBIS: excluded block type 'account_values_stale_block'
+  GS: excluded block type 'account_values_stale_block'
+  NBIS: excluded block type 'account_values_stale_block'
+  GS: excluded block type 'account_values_stale_block'
+  TSLA: excluded block type 'account_values_stale_block'
+  NBIS: duplicate opportunity (same symbol+date) — first qualifying block used
+  TSLA: score 63 < min_blocked_score 70.0
+  GS: score 45 < min_blocked_score 70.0
+  NBIS: excluded block type 'account_values_stale_block'
+  TSLA: excluded block type 'account_values_stale_block'
+  MU: excluded block type 'account_values_stale_block'
+  NBIS: excluded block type 'account_values_stale_block'
+  MU: excluded block type 'account_values_stale_block'
+  TSLA: excluded block type 'account_values_stale_block'
+  GS: excluded block type 'account_values_stale_block'
+  NBIS: excluded block type 'account_values_stale_block'
+  GS: excluded block type 'account_values_stale_block'
+  MU: score 64 < min_blocked_score 70.0
+  NBIS: excluded block type 'account_values_stale_block'
+  TSLA: excluded block type 'account_values_stale_block'
+  GS: excluded block type 'account_values_stale_block'
+  NBIS: excluded block type 'account_values_stale_block'
+  GS: excluded block type 'account_values_stale_block'
+  MDGL: excluded block type 'account_values_stale_block'
+  NBIS: duplicate opportunity (same symbol+date) — first qualifying block used
+  MSFT: score 69 < min_blocked_score 70.0
+  ETN: score 66 < min_blocked_score 70.0
+  MSFT: excluded block type 'account_values_stale_block'
+  NBIS: excluded block type 'account_values_stale_block'
+  GS: excluded block type 'account_values_stale_block'
+  TSLA: excluded block type 'account_values_stale_block'
+  MSFT: excluded block type 'account_values_stale_block'
+  SMH: excluded block type 'account_values_stale_block'
+  NBIS: duplicate opportunity (same symbol+date) — first qualifying block used
+  MSFT: gap 12.2 < min_gap_vs_book 15.0
+  TSLA: score 63 < min_blocked_score 70.0
+
+────────────────────────────────────────────────────────────────────────
+  Scenario A — exit top 1 shadow candidate(s)
+  Blocked  : DVA  score=74  gap=+16.7  book_avg=57.3
+  Block type        : margin_gross_cap_block
+  Estimated notional: $57,213 [ESTIMATE — G10 provisional]
+  Cap released      : $98,233
+  Cap sufficient    : True
+
+  Shadow exit candidates:
+    [1] XLE    score= 23  notional=$    98,233  rss=69
+
+  Outcome status    : OUTCOME_PENDING
+  Outcomes pending — lookahead window not elapsed or positions still open.
+  live_action_permitted : False
+
+────────────────────────────────────────────────────────────────────────
+  Scenario B — exit top 2 shadow candidate(s)
+  Blocked  : DVA  score=74  gap=+16.7  book_avg=57.3
+  Block type        : margin_gross_cap_block
+  Estimated notional: $57,213 [ESTIMATE — G10 provisional]
+  Cap released      : $155,645
+  Cap sufficient    : True
+
+  Shadow exit candidates:
+    [1] XLE    score= 23  notional=$    98,233  rss=69
+    [2] XLK    score= 26  notional=$    57,412  rss=69  → actual P&L $-968
+
+  Outcome status    : OUTCOME_PENDING
+  Outcomes pending — lookahead window not elapsed or positions still open.
+  live_action_permitted : False
+
+────────────────────────────────────────────────────────────────────────
+  Scenario C — exit top 3 shadow candidate(s)
+  Blocked  : DVA  score=74  gap=+16.7  book_avg=57.3
+  Block type        : margin_gross_cap_block
+  Estimated notional: $57,213 [ESTIMATE — G10 provisional]
+  Cap released      : $213,243
+  Cap sufficient    : True
+
+  Shadow exit candidates:
+    [1] XLE    score= 23  notional=$    98,233  rss=69
+    [2] XLK    score= 26  notional=$    57,412  rss=69  → actual P&L $-968
+    [3] WDC    score= 27  notional=$    57,599  rss=60
+
+  Outcome status    : OUTCOME_PENDING
+  Outcomes pending — lookahead window not elapsed or positions still open.
+  live_action_permitted : False
+
+────────────────────────────────────────────────────────────────────────
+  Scenario A — exit top 1 shadow candidate(s)
+  Blocked  : NBIS  score=85  gap=+25.8  book_avg=59.2
+  Block type        : margin_gross_cap_block
+  Estimated notional: $57,853 [ESTIMATE — G10 provisional]
+  Cap released      : $98,233
+  Cap sufficient    : True
+
+  Shadow exit candidates:
+    [1] XLE    score= 23  notional=$    98,233  rss=83
+
+  Outcome status    : OUTCOME_PENDING
+  Outcomes pending — lookahead window not elapsed or positions still open.
+  live_action_permitted : False
+
+────────────────────────────────────────────────────────────────────────
+  Scenario B — exit top 2 shadow candidate(s)
+  Blocked  : NBIS  score=85  gap=+25.8  book_avg=59.2
+  Block type        : margin_gross_cap_block
+  Estimated notional: $57,853 [ESTIMATE — G10 provisional]
+  Cap released      : $155,832
+  Cap sufficient    : True
+
+  Shadow exit candidates:
+    [1] XLE    score= 23  notional=$    98,233  rss=83
+    [2] WDC    score= 27  notional=$    57,599  rss=71
+
+  Outcome status    : OUTCOME_PENDING
+  Outcomes pending — lookahead window not elapsed or positions still open.
+  live_action_permitted : False
+
+────────────────────────────────────────────────────────────────────────
+  Scenario C — exit top 3 shadow candidate(s)
+  Blocked  : NBIS  score=85  gap=+25.8  book_avg=59.2
+  Block type        : margin_gross_cap_block
+  Estimated notional: $57,853 [ESTIMATE — G10 provisional]
+  Cap released      : $213,150
+  Cap sufficient    : True
+
+  Shadow exit candidates:
+    [1] XLE    score= 23  notional=$    98,233  rss=83
+    [2] WDC    score= 27  notional=$    57,599  rss=71
+    [3] TSM    score= 39  notional=$    57,318  rss=49
+
+  Outcome status    : OUTCOME_PENDING
+  Outcomes pending — lookahead window not elapsed or positions still open.
+  live_action_permitted : False
+────────────────────────────────────────────────────────────────────────
+
+── DATA QUALITY GAPS ────────────────────────────────────────────────
+
+  • estimated_notional = portfolio_value × max_single_pct — upper-bound estimate, not sizing-engine output (G10 provisional)
+  • shadow exit P&L = total realized P&L from original entry to close — not only the post-block portion
+  • positions.json reflects end-of-session state — positions closed intra-session may be absent from reconstruction
+
+════════════════════════════════════════════════════════════════════════
+  IMPORTANT: Paper-validation simulation only.
+  No positions are recommended for sale or entry.
+  No orders generated.  No broker connected.
+  All notional figures marked [ESTIMATE] are provisional (G10 not met).
+════════════════════════════════════════════════════════════════════════

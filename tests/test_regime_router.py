@@ -651,15 +651,6 @@ def _load_real_config() -> dict:
 
 _REAL_CONFIG = _load_real_config()
 
-try:
-    from sklearn.ensemble import RandomForestClassifier as _RFC  # noqa: F401
-    _SKLEARN_AVAILABLE = True
-except ImportError:
-    _SKLEARN_AVAILABLE = False
-
-from ml_engine import RegimeClassifier
-
-
 def test_regime_detector_config_is_vix_proxy():
     """config['regime_detector'] must be 'vix_proxy' — changing it is gate-guarded."""
     assert _REAL_CONFIG["regime_detector"] == "vix_proxy", (
@@ -674,23 +665,6 @@ def test_canonical_regime_states_declared_in_config():
     assert isinstance(states, (tuple, list, frozenset))
     required = {"TRENDING_UP", "TRENDING_DOWN", "RELIEF_RALLY", "RANGE_BOUND", "CAPITULATION", "UNKNOWN"}
     assert required.issubset(set(states)), f"Missing canonical regime states: {required - set(states)}"
-
-
-@pytest.mark.skipif(not _SKLEARN_AVAILABLE, reason="scikit-learn not installed")
-def test_ml_regime_classifier_is_production_locked():
-    """RegimeClassifier.PRODUCTION_LOCKED must be True — not wired into live pipeline."""
-    assert RegimeClassifier.PRODUCTION_LOCKED is True, (
-        "RegimeClassifier.PRODUCTION_LOCKED was set to False. "
-        "Do not connect to production without gate review. See DECISIONS.md Action #9."
-    )
-
-
-@pytest.mark.skipif(not _SKLEARN_AVAILABLE, reason="scikit-learn not installed")
-def test_ml_regime_classifier_predict_raises_runtime_error():
-    """predict_regime() must raise RuntimeError while PRODUCTION_LOCKED is True."""
-    clf = RegimeClassifier()
-    with pytest.raises(RuntimeError, match="production"):
-        clf.predict_regime({"returns": 0.01, "volatility": 0.5, "volume_ma_ratio": 1.0})
 
 
 def test_regime_threshold_covers_all_canonical_states(monkeypatch):

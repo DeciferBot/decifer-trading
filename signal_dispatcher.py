@@ -564,6 +564,10 @@ def dispatch_signals(
                         market_read=market_read,
                         entry_context=_entry_ctx,
                         extension_at_entry=signal.extension_at_entry,
+                        # Sprint 2: top-level linkage so outcome joiner can join
+                        # directly on ORDER_INTENT["observation_id"] without nesting.
+                        observation_id=_enriched_ao.get("observation_id"),
+                        scan_id=_enriched_ao.get("scan_id"),
                     )
                 else:
                     success = False
@@ -607,6 +611,10 @@ def dispatch_signals(
                         pattern_id=pattern_id,
                         market_read=market_read,
                         entry_context=_entry_ctx,
+                        # Sprint 2: top-level linkage so outcome joiner can join
+                        # directly on ORDER_INTENT["observation_id"] without nesting.
+                        observation_id=_enriched_ao.get("observation_id"),
+                        scan_id=_enriched_ao.get("scan_id"),
                     )
                 else:
                     success = False

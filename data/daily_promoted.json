@@ -1,5 +1,5 @@
 {
-  "promoted_at": "2026-05-20T04:00:03.961453+00:00",
+  "promoted_at": "2026-05-20T12:15:04.358512+00:00",
   "count": 50,
   "symbols": [
     {
@@ -30,24 +30,6 @@
       "reason": "gap=+2.4%+relvol=50.0x"
     },
     {
-      "ticker": "GNRC",
-      "score": 106.378,
-      "gap_pct": -0.0213,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 243.97,
-      "reason": "gap=-2.1%+relvol=50.0x"
-    },
-    {
-      "ticker": "FICO",
-      "score": 106.166,
-      "gap_pct": 0.0206,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 1186.15,
-      "reason": "gap=+2.1%+relvol=50.0x"
-    },
-    {
       "ticker": "CRUS",
       "score": 105.447,
       "gap_pct": -0.0182,
@@ -75,30 +57,12 @@
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "MYRG",
-      "score": 105.167,
-      "gap_pct": -0.0172,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 440.68,
-      "reason": "relvol=50.0x"
-    },
-    {
       "ticker": "EMR",
       "score": 104.856,
       "gap_pct": -0.0162,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
       "price": 130.65,
-      "reason": "relvol=50.0x"
-    },
-    {
-      "ticker": "AME",
-      "score": 104.852,
-      "gap_pct": -0.0162,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 221.28,
       "reason": "relvol=50.0x"
     },
     {
@@ -111,39 +75,12 @@
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "CMI",
-      "score": 104.541,
-      "gap_pct": -0.0151,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 659.46,
-      "reason": "relvol=50.0x"
-    },
-    {
-      "ticker": "XMTR",
-      "score": 104.536,
-      "gap_pct": -0.0151,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 86.77,
-      "reason": "relvol=50.0x"
-    },
-    {
       "ticker": "NTAP",
       "score": 104.502,
       "gap_pct": -0.015,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
       "price": 120.59,
-      "reason": "relvol=50.0x"
-    },
-    {
-      "ticker": "TTMI",
-      "score": 104.495,
-      "gap_pct": -0.015,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 161.41,
       "reason": "relvol=50.0x"
     },
     {
@@ -165,39 +102,12 @@
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "MSCI",
-      "score": 104.037,
-      "gap_pct": 0.0135,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 577.69,
-      "reason": "relvol=50.0x"
-    },
-    {
       "ticker": "CE",
       "score": 104.036,
       "gap_pct": -0.0135,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
       "price": 53.49,
-      "reason": "relvol=50.0x"
-    },
-    {
-      "ticker": "BR",
-      "score": 104.003,
-      "gap_pct": 0.0133,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 149.43,
-      "reason": "relvol=50.0x"
-    },
-    {
-      "ticker": "FLUT",
-      "score": 103.762,
-      "gap_pct": 0.0125,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 97.5,
       "reason": "relvol=50.0x"
     },
     {
@@ -237,15 +147,6 @@
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "RGLD",
-      "score": 103.607,
-      "gap_pct": -0.012,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 218.93,
-      "reason": "relvol=50.0x"
-    },
-    {
       "ticker": "BG",
       "score": 103.538,
       "gap_pct": -0.0118,
@@ -255,39 +156,12 @@
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "TEL",
-      "score": 103.501,
-      "gap_pct": -0.0117,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 196.07,
-      "reason": "relvol=50.0x"
-    },
-    {
       "ticker": "MNST",
       "score": 103.422,
       "gap_pct": -0.0114,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
       "price": 86.35,
-      "reason": "relvol=50.0x"
-    },
-    {
-      "ticker": "LYB",
-      "score": 103.238,
-      "gap_pct": 0.0108,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 73.04,
-      "reason": "relvol=50.0x"
-    },
-    {
-      "ticker": "CELC",
-      "score": 103.132,
-      "gap_pct": -0.0104,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 130.96,
       "reason": "relvol=50.0x"
     },
     {
@@ -336,15 +210,6 @@
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "RL",
-      "score": 102.651,
-      "gap_pct": 0.0088,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 320.69,
-      "reason": "relvol=50.0x"
-    },
-    {
       "ticker": "DLR",
       "score": 102.626,
       "gap_pct": -0.0088,
@@ -390,15 +255,6 @@
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "CTVA",
-      "score": 102.22,
-      "gap_pct": -0.0074,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 78.99,
-      "reason": "relvol=50.0x"
-    },
-    {
       "ticker": "DOV",
       "score": 102.177,
       "gap_pct": -0.0073,
@@ -417,15 +273,6 @@
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "JCI",
-      "score": 102.163,
-      "gap_pct": -0.0072,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 135.42,
-      "reason": "relvol=50.0x"
-    },
-    {
       "ticker": "WWD",
       "score": 102.069,
       "gap_pct": -0.0069,
@@ -435,21 +282,174 @@
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "KRYS",
-      "score": 102.026,
-      "gap_pct": -0.0068,
+      "ticker": "IR",
+      "score": 101.929,
+      "gap_pct": -0.0064,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 293.3,
+      "price": 68.54,
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "CNH",
-      "score": 102.0,
-      "gap_pct": -0.0067,
+      "ticker": "TT",
+      "score": 101.883,
+      "gap_pct": -0.0063,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 10.23,
+      "price": 448.01,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "MRSH",
+      "score": 101.844,
+      "gap_pct": 0.0061,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 166.07,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "WPC",
+      "score": 101.786,
+      "gap_pct": -0.006,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 74.55,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "H",
+      "score": 101.753,
+      "gap_pct": -0.0058,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 164.4,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "RMD",
+      "score": 101.69,
+      "gap_pct": -0.0056,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 207.78,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "ITW",
+      "score": 101.575,
+      "gap_pct": -0.0053,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 247.37,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "AMH",
+      "score": 101.505,
+      "gap_pct": -0.005,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 31.71,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "PODD",
+      "score": 101.456,
+      "gap_pct": 0.0049,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 154.61,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "RVTY",
+      "score": 101.445,
+      "gap_pct": -0.0048,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 95.87,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "ARES",
+      "score": 101.382,
+      "gap_pct": -0.0046,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 121.11,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "CRL",
+      "score": 101.321,
+      "gap_pct": 0.0044,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 152.43,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "CP",
+      "score": 101.305,
+      "gap_pct": -0.0043,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 86.13,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "TKO",
+      "score": 101.221,
+      "gap_pct": 0.0041,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 193.07,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "ALLE",
+      "score": 101.214,
+      "gap_pct": -0.004,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 126.16,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "IDXX",
+      "score": 101.209,
+      "gap_pct": 0.004,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 546.49,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "LAMR",
+      "score": 101.139,
+      "gap_pct": 0.0038,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 149.41,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "PFGC",
+      "score": 101.123,
+      "gap_pct": -0.0037,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 93.89,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "MTD",
+      "score": 101.041,
+      "gap_pct": -0.0035,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 1050.77,
       "reason": "relvol=50.0x"
     }
   ]

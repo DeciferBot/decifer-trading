@@ -4325,6 +4325,11 @@ setInterval(async () => {
 setInterval(fetchPrices, 1000);  // live price updates between full polls
 setInterval(loadNews, 90_000);   // auto-refresh news every 90 s
 loadNews();                       // load immediately on page open
+setInterval(() => {               // auto-refresh Catalyst 4× per trading day (~97 min)
+  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay(), mins = et.getHours() * 60 + et.getMinutes();
+  if (day >= 1 && day <= 5 && mins >= 570 && mins < 960) loadCatalyst();
+}, 97 * 60 * 1000);
 
 // ── News rendering ─────────────────────────────────────────
 let _allNewsItems = [];

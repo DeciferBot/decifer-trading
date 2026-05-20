@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-20T12:45:00Z",
+  "mode": "live_market_data",
+  "active_drivers": [
+    "ai_capex_growth",
+    "ai_compute_demand",
+    "yields_rising",
+    "oil_supply_shock"
+  ],
+  "blocked_conditions": [],
+  "evidence": {
+    "smh_5d_ret": -0.030806,
+    "nvda_5d_ret": -0.00077,
+    "ief_5d_ret": -0.012829,
+    "uso_5d_ret": 0.060014,
+    "spy_5d_ret": -0.006028,
+    "ita_5d_ret": -0.031368,
+    "uvxy_5d_ret": -0.012871,
+    "hyg_5d_ret": -0.006511,
+    "lqd_5d_ret": -0.013265,
+    "ai_capex_growth_reason": "SMH 5d=-3.08% > -8% threshold",
+    "ai_compute_demand_reason": "NVDA 5d=-0.08% > -5% threshold",
+    "yields_rising_reason": "IEF 5d=-1.28% < -0.4% (yields rising)",
+    "oil_supply_shock_reason": "USO 5d=6.00% \u2014 shock threshold crossed",
+    "geopolitical_reason": "ITA vs SPY=-2.53% \u2014 no defence outperformance",
+    "credit_stress_reason": "HYG-LQD spread=-0.68% \u2014 credit contained",
+    "risk_off_reason": "UVXY=-1.29% SPY=-0.60% \u2014 no risk-off signal"
+  },
+  "warnings": [],
+  "live_output_changed": false,
+  "broker_called": false,
+  "llm_used": false
+}

@@ -15,8 +15,8 @@ alpaca-py>=0.13.0            # Alpaca Algo Trader Plus — real-time quotes, opt
 yfinance>=0.2.40             # Free market data — OHLCV, options chains, fundamentals (signals.py, scanner.py, options.py, options_scanner.py, data_collector.py, portfolio_optimizer.py)
 
 # ── Data / Numerical ──
-pandas>=2.0.0                # DataFrames (signals.py, data_collector.py, ml_engine.py, backtester.py, portfolio_optimizer.py, ibkr_streaming.py)
-numpy>=1.24.0                # Numerical computation (signals.py, options.py, ml_engine.py, backtester.py, portfolio_optimizer.py, smart_execution.py, ibkr_streaming.py)
+pandas>=2.0.0                # DataFrames (signals.py, data_collector.py, backtester.py, portfolio_optimizer.py, ibkr_streaming.py)
+numpy>=1.24.0                # Numerical computation (signals.py, options.py, backtester.py, portfolio_optimizer.py, smart_execution.py, ibkr_streaming.py)
 pyarrow>=14.0.0              # Parquet file format for historical ML training data (data_collector.py)
 
 # ── Technical Analysis ──
@@ -26,8 +26,8 @@ TA-Lib>=0.4.28               # Technical indicators — requires C library: brew
 py_vollib>=1.0.1             # Black-Scholes Greeks (delta, gamma, theta, vega) for options analysis (options.py)
 
 # ── ML / AI Learning Loop ──
-scikit-learn>=1.3.0          # RandomForest + GradientBoosting for trade prediction (ml_engine.py). Optional — graceful fallback if missing
-joblib>=1.3.0                # Model persistence — save/load trained .pkl models (ml_engine.py). Optional — graceful fallback if missing
+scikit-learn>=1.3.0          # Optional — used by audit_trade_ledger_data_path.py for offline model evaluation. Graceful fallback if missing.
+joblib>=1.3.0                # Optional — used by audit_trade_ledger_data_path.py for offline model loading. Graceful fallback if missing.
 statsmodels>=0.14.0          # ADF test for mean-reversion gating in REVERSION dimension (signals.py). Optional — graceful fallback if missing
 
 # ── NLP / Sentiment ──

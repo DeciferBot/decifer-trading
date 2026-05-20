@@ -9,7 +9,7 @@
 # Root cause this addresses
 # ─────────────────────────
 # The feature plan tracks 25 features across Phases 1–5. Modules
-# from Phase 3 (ml_engine), Phase 4 (social_sentiment), and Phase 5
+# from Phase 3 (legacy ML, removed Sprint 1), Phase 4 (social_sentiment), and Phase 5
 # (smart_execution, options_scanner) were built before Phase 1
 # (paper trading validation) produced a single closed trade.
 # config.py already contains live_1 / live_2 / aggregate_accounts —

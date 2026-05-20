@@ -1,0 +1,325 @@
+════════════════════════════════════════════════════════════════════
+  DECIFER ROTATION SHADOW REPORT  |  2026-05-11
+════════════════════════════════════════════════════════════════════
+── SECTION 0: SESSION HEADER ──────────────────────────────────────────
+  Report generated : 2026-05-12T14:50:54Z
+  Session date     : 2026-05-11
+
+  Data files read:
+    /Users/amitchopra/Desktop/decifer trading/data/positions.json
+    /Users/amitchopra/Desktop/decifer trading/data/apex_decision_audit.jsonl
+    /Users/amitchopra/Desktop/decifer trading/data/tier_d_funnel.jsonl
+    /Users/amitchopra/Desktop/decifer trading/logs/decifer.log
+  Trade quality report artifacts used:
+    /Users/amitchopra/Desktop/decifer trading/data/trade_quality_reports/report_20260512T030858Z.json
+
+  Margin-blocked candidates analysed : 6
+  High-score blocked (gap >15)       : 1
+  Open positions analysed            : 16
+  NLV (from TQR artifact)            : $972,841.25
+  Reconstruction confidence          : MEDIUM
+
+── SECTION 1: BLOCKED CANDIDATE SUMMARY ──────────────────────────────
+  Book avg score (open positions) : 59.1
+
+  SYMBOL    SCORE   BOOK_AVG   GAP     GAP_THRESH    CLUSTER       TIMESTAMP           
+  ─────────────────────────────────────────────────────────────────────────────────────
+  ASML      74      59.1       +14.9   neither       Tech / AI /   2026-05-12T16:06    
+  SMH       49      59.1       -10.1   neither       Tech / AI /   2026-05-12T16:06    
+  AVGO      80      59.1       +20.9   >20 ⚑⚑        Tech / AI /   2026-05-12T17:25    
+  AMD       46      59.1       -13.1   neither       Tech / AI /   2026-05-12T18:04    
+  COST      53      59.1       -6.1    neither       Consumer / D  2026-05-12T18:41    
+  MU        45      59.1       -14.1   neither       Tech / AI /   2026-05-12T18:41    
+
+  Spread-blocked symbols (excluded from margin analysis): ['AVGO', 'GD', 'IRM']
+  High-score blocked (gap >15)  : 1
+
+── SECTION 2: OPEN BOOK AT TIME OF BLOCK ─────────────────────────────
+
+  Blocked: ASML  score=74.0  ts=2026-05-12T16:06:28Z  confidence=HIGH
+  Book at block time (16 position(s)):
+
+    SYM     OPEN_TIME            SCORE   NOTIONAL     NLV%      CLUSTER                   ETF_FLAG  CARRY   
+    ───────────────────────────────────────────────────────────────────────────────────────────────
+    AAPL    2026-05-07T10:58     85      $59,223      6.2%      Tech / AI / Semis         —         carry   
+    MSFT    2026-05-07T11:17     63      $56,385      5.9%      Tech / AI / Semis         —         carry   
+    WDC     2026-05-08T20:47     27      $59,095      6.2%      Tech / AI / Semis         —         carry   
+    CEG     2026-05-11T08:28     59      $95,378      9.9%      Power / Infrastructure    —         session 
+    TSM     2026-05-11T08:49     39      $55,937      5.8%      Tech / AI / Semis         —         session 
+    CVX     2026-05-11T09:32     44      $95,565      10.0%     Energy                    —         session 
+    XLK     2026-05-11T09:32     26      $56,920      5.9%      Tech / AI / Semis         ETF_OVER  session 
+    IWM     2026-05-11T14:29     83      $55,806      5.8%      Other                     —         session 
+    VRT     2026-05-11T14:29     68      $56,521      5.9%      Power / Infrastructure    —         session 
+    XOM     2026-05-11T14:29     63      $58,699      6.1%      Energy                    —         session 
+    PWR     2026-05-11T16:22     74      $56,699      5.9%      Power / Infrastructure    —         session 
+    USO     2026-05-11T16:22     71      $59,519      6.2%      Energy                    —         session 
+    XLP     2026-05-11T16:59     68      $58,265      6.1%      Consumer / Defensive      —         session 
+    KO      2026-05-12T08:26     47      $58,295      6.1%      Consumer / Defensive      —         session 
+    XLE     2026-05-12T11:25     23      $57,504      6.0%      Energy                    ETF_OVER  session 
+    AVGO    2026-05-12T14:41     72      $56,947      5.9%      Tech / AI / Semis         —         session 
+
+  Blocked: SMH  score=49.0  ts=2026-05-12T16:06:28Z  confidence=HIGH
+  Book at block time (16 position(s)):
+
+    SYM     OPEN_TIME            SCORE   NOTIONAL     NLV%      CLUSTER                   ETF_FLAG  CARRY   
+    ───────────────────────────────────────────────────────────────────────────────────────────────
+    AAPL    2026-05-07T10:58     85      $59,223      6.2%      Tech / AI / Semis         —         carry   
+    MSFT    2026-05-07T11:17     63      $56,385      5.9%      Tech / AI / Semis         —         carry   
+    WDC     2026-05-08T20:47     27      $59,095      6.2%      Tech / AI / Semis         —         carry   
+    CEG     2026-05-11T08:28     59      $95,378      9.9%      Power / Infrastructure    —         session 
+    TSM     2026-05-11T08:49     39      $55,937      5.8%      Tech / AI / Semis         —         session 
+    CVX     2026-05-11T09:32     44      $95,565      10.0%     Energy                    —         session 
+    XLK     2026-05-11T09:32     26      $56,920      5.9%      Tech / AI / Semis         ETF_OVER  session 
+    IWM     2026-05-11T14:29     83      $55,806      5.8%      Other                     —         session 
+    VRT     2026-05-11T14:29     68      $56,521      5.9%      Power / Infrastructure    —         session 
+    XOM     2026-05-11T14:29     63      $58,699      6.1%      Energy                    —         session 
+    PWR     2026-05-11T16:22     74      $56,699      5.9%      Power / Infrastructure    —         session 
+    USO     2026-05-11T16:22     71      $59,519      6.2%      Energy                    —         session 
+    XLP     2026-05-11T16:59     68      $58,265      6.1%      Consumer / Defensive      —         session 
+    KO      2026-05-12T08:26     47      $58,295      6.1%      Consumer / Defensive      —         session 
+    XLE     2026-05-12T11:25     23      $57,504      6.0%      Energy                    ETF_OVER  session 
+    AVGO    2026-05-12T14:41     72      $56,947      5.9%      Tech / AI / Semis         —         session 
+
+  Blocked: AVGO  score=80.0  ts=2026-05-12T17:25:45Z  confidence=HIGH
+  Book at block time (16 position(s)):
+
+    SYM     OPEN_TIME            SCORE   NOTIONAL     NLV%      CLUSTER                   ETF_FLAG  CARRY   
+    ───────────────────────────────────────────────────────────────────────────────────────────────
+    AAPL    2026-05-07T10:58     85      $59,223      6.2%      Tech / AI / Semis         —         carry   
+    MSFT    2026-05-07T11:17     63      $56,385      5.9%      Tech / AI / Semis         —         carry   
+    WDC     2026-05-08T20:47     27      $59,095      6.2%      Tech / AI / Semis         —         carry   
+    CEG     2026-05-11T08:28     59      $95,378      9.9%      Power / Infrastructure    —         session 
+    TSM     2026-05-11T08:49     39      $55,937      5.8%      Tech / AI / Semis         —         session 
+    CVX     2026-05-11T09:32     44      $95,565      10.0%     Energy                    —         session 
+    XLK     2026-05-11T09:32     26      $56,920      5.9%      Tech / AI / Semis         ETF_OVER  session 
+    IWM     2026-05-11T14:29     83      $55,806      5.8%      Other                     —         session 
+    VRT     2026-05-11T14:29     68      $56,521      5.9%      Power / Infrastructure    —         session 
+    XOM     2026-05-11T14:29     63      $58,699      6.1%      Energy                    —         session 
+    PWR     2026-05-11T16:22     74      $56,699      5.9%      Power / Infrastructure    —         session 
+    USO     2026-05-11T16:22     71      $59,519      6.2%      Energy                    —         session 
+    XLP     2026-05-11T16:59     68      $58,265      6.1%      Consumer / Defensive      —         session 
+    KO      2026-05-12T08:26     47      $58,295      6.1%      Consumer / Defensive      —         session 
+    XLE     2026-05-12T11:25     23      $57,504      6.0%      Energy                    ETF_OVER  session 
+    AVGO    2026-05-12T14:41     72      $56,947      5.9%      Tech / AI / Semis         —         session 
+
+  Blocked: AMD  score=46.0  ts=2026-05-12T18:04:09Z  confidence=HIGH
+  Book at block time (16 position(s)):
+
+    SYM     OPEN_TIME            SCORE   NOTIONAL     NLV%      CLUSTER                   ETF_FLAG  CARRY   
+    ───────────────────────────────────────────────────────────────────────────────────────────────
+    AAPL    2026-05-07T10:58     85      $59,223      6.2%      Tech / AI / Semis         —         carry   
+    MSFT    2026-05-07T11:17     63      $56,385      5.9%      Tech / AI / Semis         —         carry   
+    WDC     2026-05-08T20:47     27      $59,095      6.2%      Tech / AI / Semis         —         carry   
+    CEG     2026-05-11T08:28     59      $95,378      9.9%      Power / Infrastructure    —         session 
+    TSM     2026-05-11T08:49     39      $55,937      5.8%      Tech / AI / Semis         —         session 
+    CVX     2026-05-11T09:32     44      $95,565      10.0%     Energy                    —         session 
+    XLK     2026-05-11T09:32     26      $56,920      5.9%      Tech / AI / Semis         ETF_OVER  session 
+    IWM     2026-05-11T14:29     83      $55,806      5.8%      Other                     —         session 
+    VRT     2026-05-11T14:29     68      $56,521      5.9%      Power / Infrastructure    —         session 
+    XOM     2026-05-11T14:29     63      $58,699      6.1%      Energy                    —         session 
+    PWR     2026-05-11T16:22     74      $56,699      5.9%      Power / Infrastructure    —         session 
+    USO     2026-05-11T16:22     71      $59,519      6.2%      Energy                    —         session 
+    XLP     2026-05-11T16:59     68      $58,265      6.1%      Consumer / Defensive      —         session 
+    KO      2026-05-12T08:26     47      $58,295      6.1%      Consumer / Defensive      —         session 
+    XLE     2026-05-12T11:25     23      $57,504      6.0%      Energy                    ETF_OVER  session 
+    AVGO    2026-05-12T14:41     72      $56,947      5.9%      Tech / AI / Semis         —         session 
+
+  Blocked: COST  score=53.0  ts=2026-05-12T18:41:17Z  confidence=HIGH
+  Book at block time (16 position(s)):
+
+    SYM     OPEN_TIME            SCORE   NOTIONAL     NLV%      CLUSTER                   ETF_FLAG  CARRY   
+    ───────────────────────────────────────────────────────────────────────────────────────────────
+    AAPL    2026-05-07T10:58     85      $59,223      6.2%      Tech / AI / Semis         —         carry   
+    MSFT    2026-05-07T11:17     63      $56,385      5.9%      Tech / AI / Semis         —         carry   
+    WDC     2026-05-08T20:47     27      $59,095      6.2%      Tech / AI / Semis         —         carry   
+    CEG     2026-05-11T08:28     59      $95,378      9.9%      Power / Infrastructure    —         session 
+    TSM     2026-05-11T08:49     39      $55,937      5.8%      Tech / AI / Semis         —         session 
+    CVX     2026-05-11T09:32     44      $95,565      10.0%     Energy                    —         session 
+    XLK     2026-05-11T09:32     26      $56,920      5.9%      Tech / AI / Semis         ETF_OVER  session 
+    IWM     2026-05-11T14:29     83      $55,806      5.8%      Other                     —         session 
+    VRT     2026-05-11T14:29     68      $56,521      5.9%      Power / Infrastructure    —         session 
+    XOM     2026-05-11T14:29     63      $58,699      6.1%      Energy                    —         session 
+    PWR     2026-05-11T16:22     74      $56,699      5.9%      Power / Infrastructure    —         session 
+    USO     2026-05-11T16:22     71      $59,519      6.2%      Energy                    —         session 
+    XLP     2026-05-11T16:59     68      $58,265      6.1%      Consumer / Defensive      —         session 
+    KO      2026-05-12T08:26     47      $58,295      6.1%      Consumer / Defensive      —         session 
+    XLE     2026-05-12T11:25     23      $57,504      6.0%      Energy                    ETF_OVER  session 
+    AVGO    2026-05-12T14:41     72      $56,947      5.9%      Tech / AI / Semis         —         session 
+
+  Blocked: MU  score=45.0  ts=2026-05-12T18:41:17Z  confidence=HIGH
+  Book at block time (16 position(s)):
+
+    SYM     OPEN_TIME            SCORE   NOTIONAL     NLV%      CLUSTER                   ETF_FLAG  CARRY   
+    ───────────────────────────────────────────────────────────────────────────────────────────────
+    AAPL    2026-05-07T10:58     85      $59,223      6.2%      Tech / AI / Semis         —         carry   
+    MSFT    2026-05-07T11:17     63      $56,385      5.9%      Tech / AI / Semis         —         carry   
+    WDC     2026-05-08T20:47     27      $59,095      6.2%      Tech / AI / Semis         —         carry   
+    CEG     2026-05-11T08:28     59      $95,378      9.9%      Power / Infrastructure    —         session 
+    TSM     2026-05-11T08:49     39      $55,937      5.8%      Tech / AI / Semis         —         session 
+    CVX     2026-05-11T09:32     44      $95,565      10.0%     Energy                    —         session 
+    XLK     2026-05-11T09:32     26      $56,920      5.9%      Tech / AI / Semis         ETF_OVER  session 
+    IWM     2026-05-11T14:29     83      $55,806      5.8%      Other                     —         session 
+    VRT     2026-05-11T14:29     68      $56,521      5.9%      Power / Infrastructure    —         session 
+    XOM     2026-05-11T14:29     63      $58,699      6.1%      Energy                    —         session 
+    PWR     2026-05-11T16:22     74      $56,699      5.9%      Power / Infrastructure    —         session 
+    USO     2026-05-11T16:22     71      $59,519      6.2%      Energy                    —         session 
+    XLP     2026-05-11T16:59     68      $58,265      6.1%      Consumer / Defensive      —         session 
+    KO      2026-05-12T08:26     47      $58,295      6.1%      Consumer / Defensive      —         session 
+    XLE     2026-05-12T11:25     23      $57,504      6.0%      Energy                    ETF_OVER  session 
+    AVGO    2026-05-12T14:41     72      $56,947      5.9%      Tech / AI / Semis         —         session 
+
+── SECTION 3: SHADOW ROTATION CANDIDATE RANKING ──────────────────────
+  Ranking formula (transparent and deterministic):
+    rotation_shadow_score =
+      score_delta (blocked_score − position_score)
+      + 10  if position score below 35
+      + 8   if ETF overlap flag and ETF score below 50
+      + 5   if low-score cluster flag
+      + 5   if PRU/discovery displacement flag
+      + 3   if position is older than current session (carry)
+
+  This is a diagnostic counterfactual only.
+  NEVER interpreted as a sell recommendation or rotation execution.
+
+  ── Blocked: AVGO  score=80.0  gap=+20.9  (gap >20) ──
+
+    SYM     SCORE   Δ_SCORE    NOTIONAL     ETF_OV   CLUSTER_F   PRU_FLAG   RSR_SCORE   CARRY     RNK 
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    XLE     23      +57        $57,504      Y        n           n          75.0        sess      1   
+    XLK     26      +54        $56,920      Y        n           n          72.0        sess      2   
+    WDC     27      +53        $59,095      n        n           n          66.0        carry     3   
+    TSM     39      +41        $55,937      n        n           n          41.0        sess      4   
+    CVX     44      +36        $95,565      n        n           n          36.0        sess      5   
+    KO      47      +33        $58,295      n        n           n          33.0        sess      6   
+    CEG     59      +21        $95,378      n        n           n          21.0        sess      7   
+
+
+── SECTION 4: THEORETICAL CAPACITY RELEASE ───────────────────────────
+  Diagnostic only — not an execution recommendation.
+  'Shadow rotation candidate' language only.
+
+  ── Blocked: AVGO ──
+    Blocked candidate notional    : INSUFFICIENT_DATA (not available from logs)
+    Top 1 shadow candidate        : XLE  $57,504  (6.0% NLV)  [theoretical freed capacity]
+    Top 1+2 combined              : $114,424  (11.9% NLV)  [theoretical freed capacity]
+    Top 1+2+3 combined            : $173,519  (18.1% NLV)  [theoretical freed capacity]
+    Capacity confidence            : MEDIUM
+    Note: capacity is theoretical — shadow rotation, not execution.
+
+
+── SECTION 5: ETF OVERLAP WITHIN ROTATION ────────────────────────────
+  ETF suppression is NOT implemented. This is a diagnostic flag only.
+
+  ETF     SCORE   OVERLAPPING_SINGLES       NOTIONAL     IN_TOP3       REPEAT  CATEGORY
+  ────────────────────────────────────────────────────────────────────────────────
+  XLE     23      ['XOM', 'CVX']            $57,504      YES           new     low-scor
+  XLK     26      ['AAPL', 'MSFT', 'AVGO']  $56,920      YES           new     low-scor
+
+  ETF suppression is not implemented. No action recommended.
+  These ETF positions appear as shadow rotation candidates due to:
+    - low entry score (<50)
+    - overlap with held single-name positions
+
+── SECTION 6: CLUSTER QUALITY WITHIN ROTATION ────────────────────────
+
+  Consumer / Defensive
+    Shadow candidates  : 1  ['KO']
+    Avg score          : 47.0
+    Total notional     : $58295  (6.1% NLV)
+    Blocked candidate same cluster : True
+    Concentration note : Freeing these would swap within cluster — concentration unchanged
+
+  Energy
+    Shadow candidates  : 2  ['XLE', 'CVX']
+    Avg score          : 33.5
+    Total notional     : $153070  (16.0% NLV)
+    Blocked candidate same cluster : False
+    Concentration note : Freeing these would reduce cluster concentration
+
+  Power / Infrastructure
+    Shadow candidates  : 1  ['CEG']
+    Avg score          : 59.0
+    Total notional     : $95378  (9.9% NLV)
+    Blocked candidate same cluster : False
+    Concentration note : Freeing these would reduce cluster concentration
+
+  Tech / AI / Semis
+    Shadow candidates  : 3  ['WDC', 'XLK', 'TSM']
+    Avg score          : 30.7
+    Total notional     : $171951  (17.9% NLV)
+    Blocked candidate same cluster : True
+    Concentration note : Freeing these would swap within cluster — concentration unchanged
+
+
+── SECTION 7: PRU / DISCOVERY WITHIN ROTATION ────────────────────────
+  (Legacy 'Tier D' labels treated as source metadata only.)
+  (No tier-led allocation, promotion, or suppression is recommended.)
+
+  PRU/discovery positions in open book       : 0
+  PRU/discovery positions scoring below 50   : 0
+  PRU/discovery appearing as shadow candidates: 0
+
+  PRU_DISCOVERY_INSUFFICIENT_DATA: no PRU/discovery labels available.
+
+  Conclusion : PRU_DISCOVERY_INSUFFICIENT_DATA
+  No PRU rescue, tier promotion, or tier suppression is recommended.
+
+── SECTION 8: COUNTERFACTUAL SESSION SUMMARY ─────────────────────────
+
+  1. Strongest missed opportunity (highest-score blocked candidate):
+     AVGO  score=80.0  gap=+20.9 vs book avg
+
+  2. Weakest capacity consumers (lowest-score shadow candidates):
+     XLE     score=23.0  $57,504  rank=1
+     XLK     score=26.0  $56,920  rank=2
+     WDC     score=27.0  $59,095  rank=3
+     TSM     score=39.0  $55,937  rank=4
+     CVX     score=44.0  $95,565  rank=5
+
+  3. Weak positions recurring across sessions:
+     none identified from prior session data
+
+  4. Would removing top 1 shadow candidate free material capacity?
+     Top 1 theoretical release: $57,504  — YES, material
+
+  5. Would removing top 2 or top 3 shadow candidates free more?
+     Top 2: $114,424  Top 3: $173,519
+
+  6. Root cause categorisation:
+     Primary: low book quality (3 positions below 35), ETF overlap (2 low-score ETF flag(s))
+
+  7. Is live rotation justified today?
+     No live rotation yet. Shadow evidence only.
+     Moving from shadow report to rotation policy specification
+     requires explicit Amit approval of the policy design.
+
+── SECTION 9: SHADOW VERDICT ─────────────────────────────────────────
+
+  A. High-score blocked (gap >15)        : 1
+  B. High-score blocked (gap >20)        : 1
+  C. Weak shadow candidates found        : 7
+  D. Top-3 theoretical NLV release       : $173,519
+  E. Multi-session pattern detected      : False
+  F. Reconstruction confidence           : MEDIUM
+
+  Shadow Verdict           : ROTATION_WATCH
+  Recommended next action  : RUN_ONE_MORE_SESSION
+
+  ROTATION_WATCH: threshold met on one session.
+  Run one more session before designing rotation policy.
+
+── SECTION 10: DATA QUALITY AND OBSERVABILITY GAPS ──────────────────
+  • positions.json reflects end-of-session state only — positions closed during session are not included in book reconstruction
+  • blocked candidate notional is not available from logs — exact capacity match is INSUFFICIENT_DATA; theoretical release is directional only
+  • cannot distinguish protected/manual conviction positions from ordinary entries
+  • carry vs same-session distinction uses --since date as cutoff — positions opened before market open on --since date are classified as carry
+
+════════════════════════════════════════════════════════════════════
+
+  IMPORTANT: This report is diagnostic only.
+  No position in this report is recommended for sale or rotation.
+  All rankings are labelled 'shadow rotation candidate'.
+  All capacity estimates are labelled 'theoretical'.
+  Live rotation requires explicit policy specification and Amit approval.
+
+════════════════════════════════════════════════════════════════════

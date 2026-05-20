@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "since": "2026-05-13",
+    "generated": "2026-05-12T17:19:14.999112+00:00",
+    "script": "rotation_shadow_report.py"
+  },
+  "section_0": {
+    "since": "2026-05-13",
+    "generated": "2026-05-12T17:19:14.997769+00:00",
+    "unique_blocked": 0,
+    "high_score_blocked": 0,
+    "open_positions": 17,
+    "tqr_artifact_loaded": false,
+    "reconstruction_confidence": "LOW"
+  },
+  "section_1": {
+    "unique_blocked": 0,
+    "rows": [],
+    "book_avg": 57.294117647058826,
+    "high_score_blocked": 0
+  },
+  "section_2": {
+    "book_reconstructions": []
+  },
+  "section_3": {
+    "rankings": []
+  },
+  "section_4": {
+    "capacity_release": []
+  },
+  "section_5": {
+    "etf_shadow_candidates": []
+  },
+  "section_6": {
+    "clusters": {}
+  },
+  "section_7": {
+    "pru_open_count": 0,
+    "pru_below_50": 0,
+    "pru_shadow_count": 0,
+    "pru_capacity_consumption": false,
+    "conclusion": "PRU_DISCOVERY_INSUFFICIENT_DATA"
+  },
+  "section_8": {
+    "strongest_blocked": {
+      "symbol": null,
+      "score": null,
+      "gap": null
+    },
+    "weakest_consumers": [],
+    "recurring_weak_symbols": [],
+    "top1_release": 0.0,
+    "top2_release": 0.0,
+    "top3_release": 0.0,
+    "root_causes": [
+      "low book quality (3 positions below 35)",
+      "ETF overlap (2 low-score ETF flag(s))"
+    ],
+    "live_rotation_justified": false
+  },
+  "section_9": {
+    "outscores_15": 0,
+    "outscores_20": 0,
+    "weak_before_block": 0,
+    "top3_release": 0.0,
+    "multi_session": true,
+    "verdict": "NO_ROTATION_EVIDENCE",
+    "recommended_action": "KEEP OBSERVING"
+  },
+  "section_10": {
+    "issues": [
+      "Warning: No trade quality report artifact found for date 2026-05-13",
+      "NLV not found in log \u2014 NLV% columns will show '?' \u2014 capacity analysis is absolute-only",
+      "positions.json reflects end-of-session state only \u2014 positions closed during session are not included in book reconstruction",
+      "blocked candidate notional is not available from logs \u2014 exact capacity match is INSUFFICIENT_DATA; theoretical release is directional only",
+      "cannot distinguish protected/manual conviction positions from ordinary entries",
+      "carry vs same-session distinction uses --since date as cutoff \u2014 positions opened before market open on --since date are classified as carry"
+    ]
+  },
+  "data_quality": {
+    "missing_files": [],
+    "malformed_lines": {},
+    "warnings": [
+      "No trade quality report artifact found for date 2026-05-13"
+    ]
+  }
+}

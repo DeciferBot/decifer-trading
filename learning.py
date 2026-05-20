@@ -426,7 +426,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
         "symbol": trade.get("symbol"),
         "direction": trade.get("direction", "LONG"),
         "qty": trade.get("qty"),
-        "shares": trade.get("qty"),  # ML engine alias — TradeLabeler reads "shares"
+        "shares": trade.get("qty"),
         "entry_time": _entry_time,
         "exit_time": _exit_time,
         "entry_price": trade.get("entry"),

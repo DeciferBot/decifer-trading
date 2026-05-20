@@ -1,0 +1,203 @@
+
+════════════════════════════════════════════════════════════════════
+  DECIFER TRADE QUALITY REPORT  |  2026-05-12
+════════════════════════════════════════════════════════════════════
+── SECTION 0: SESSION HEADER ─────────────────────────────────────────
+  Report generated : 2026-05-12T14:22:13Z
+  Session date     : 2026-05-12
+  Regime           : TRENDING_UP
+
+  Data files read:
+    /Users/amitchopra/Desktop/decifer trading/data/apex_decision_audit.jsonl
+    /Users/amitchopra/Desktop/decifer trading/data/training_records.jsonl
+    /Users/amitchopra/Desktop/decifer trading/data/positions.json
+    /Users/amitchopra/Desktop/decifer trading/data/tier_d_funnel.jsonl
+    /Users/amitchopra/Desktop/decifer trading/logs/decifer.log
+
+  Apex cycles analysed : 24
+  Candidates observed  : 357
+  Apex selections      : 63
+  Open positions       : 16
+  Closed trades        : 5
+
+  Open P&L    : $-4,029.24
+  Closed P&L  : $+4,050.42
+  Session P&L : $+21.18
+
+── SECTION 1: CAPITAL DEPLOYMENT SEQUENCE ────────────────────────────
+  SYMBOL  OPEN_TIME            SCORE   QTY    ENTRY_PX  NOTIONAL     CUM_NOTIONAL   CUM_EXP%  TYPE     
+  ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  AAPL    2026-05-07T10:58     85      201    287.17    $59,219      $59,219        6.1%      POSITION 
+  MSFT    2026-05-07T11:17     63      138    417.22    $56,591      $115,810       12.0%     POSITION 
+  SNDK    2026-05-08T19:46     37      37     1555.40   $53,993      $169,803       17.6%     POSITION 
+  WDC     2026-05-08T20:47     27      120    479.99    $59,875      $229,678       23.8%     POSITION 
+  CEG     2026-05-11T08:28     59      327    310.20    $96,777      $326,455       33.9%     SWING    
+  TSM     2026-05-11T08:49     39      142    403.65    $56,167      $382,623       39.7%     SWING    
+  CVX     2026-05-11T09:32     44      514    183.48    $95,440      $478,062       49.6%     SWING    
+  XLK     2026-05-11T09:32     26      326    176.11    $57,324      $535,386       55.6%     SWING    
+  IWM     2026-05-11T14:29     83      199    286.62    $56,128      $591,514       61.4%     SWING    
+  VRT     2026-05-11T14:29     68      158    359.29    $56,614      $648,128       67.3%     SWING    
+  XOM     2026-05-11T14:29     63      391    147.10    $58,652      $706,780       73.4%     SWING    
+  PWR     2026-05-11T16:22     74      74     772.17    $56,843      $763,622       79.3%     SWING    
+  USO     2026-05-11T16:22     71      415    139.36    $59,523      $823,146       85.4%     SWING    
+  XLP     2026-05-11T16:59     68      694    83.00     $58,030      $881,175       91.5%     SWING    
+  KO      2026-05-12T08:26     47      736    78.85     $58,004      $939,180       97.5%     SWING    
+  XLE     2026-05-12T11:25     23      1004   57.75     $57,529      $996,709       103.5%    SWING    
+
+  NLV (latest margin snapshot) : $963,329.70
+  Final gross exposure         : 103.5%
+
+── SECTION 2: FILLED SCORE vs BLOCKED-BY-MARGIN SCORE ───────────────
+  Note: Spread-blocked candidates are excluded from this section.
+  Reconstruction confidence : MEDIUM
+  Book avg score (end-of-session) : 54.8
+  Unique symbols blocked by margin cap : 4
+
+  SYMBOL    SCORE   BOOK_AVG   GAP      OUTSCORES_BOOK_15+  TOTAL_%   
+  ────────────────────────────────────────────────────────────────────────
+  ASML      62      54.8       +7.2     no                  115.7%    
+  SMH       49      54.8       -5.8     no                  115.7%    
+  AVGO      80      54.8       +25.2    YES                 115.8%    
+  AMD       45      54.8       -9.8     no                  115.7%    
+
+  Blocked-candidate avg score : 59.0
+  Book avg score              : 54.8
+  Delta (blocked − book)      : +4.2
+  Blocked candidates outscoring book by >15 pts : 1
+  Blocked candidates outscoring book by >20 pts : 1
+
+── SECTION 3: HIGH-SCORE DISPLACEMENT ANALYSIS ────────────────────────
+  Total high_score_skip records : 54
+  Top 20 by score_gap:
+
+  SKIPPED   SCORE   SELECTED  SEL_SC   GAP      REASON_CATEGORY       SOURCE  
+  ────────────────────────────────────────────────────────────────────────────────
+  ASML      47      AMD       15       32       no_reason_provided    PRU/DISC
+  AVGO      51      XLE       23       28       catalyst_quality      normal  
+  QQQ       64      AMD       38       26       catalyst_quality      PRU/DISC
+  QQQ       60      AMD       34       26       weak_tape             PRU/DISC
+  QQQ       63      SMH       43       20       catalyst_quality      normal  
+  ETN       33      AMD       15       18       no_reason_provided    PRU/DISC
+  SMH       39      OXY       23       16       portfolio_fit         normal  
+  QQQ       39      OXY       23       16       no_reason_provided    normal  
+  PEP       30      AMD       15       15       no_reason_provided    PRU/DISC
+  QQQ       57      TSLA      42       15       weak_tape             normal  
+  DVA       60      AMD       45       15       no_reason_provided    PRU/DISC
+  SMH       49      AMD       34       15       no_reason_provided    PRU/DISC
+  XLU       29      AMD       15       14       no_reason_provided    PRU/DISC
+  XLE       29      AMD       15       14       no_reason_provided    PRU/DISC
+  QQQ       51      NBIS      37       14       weak_tape             PRU/DISC
+  QQQ       27      AMD       15       12       no_reason_provided    PRU/DISC
+  SPY       48      NBIS      37       11       no_reason_provided    PRU/DISC
+  ASML      45      AMD       34       11       no_reason_provided    PRU/DISC
+  OXY       23      AMD       15       8        no_reason_provided    PRU/DISC
+  QQQ       39      NBIS      31       8        portfolio_fit         PRU/DISC
+
+  ⚑  PRU_SOURCE_DISPLACEMENT_WATCH : 4 case(s)
+     A PRU-sourced or discovery-labelled candidate was selected
+     over a higher-scoring normal-path candidate (gap > 15).
+     Diagnostic flag only. No action recommended.
+
+── SECTION 4: ENTRY SCORE DISTRIBUTION ───────────────────────────────
+  Open positions:
+    QUESTIONABLE (<35)   :   3  ['WDC', 'XLK', 'XLE']  $174,728
+    LOW (35-49)          :   4  ['SNDK', 'TSM', 'CVX', 'KO']  $263,604
+    MEDIUM (50-64)       :   3  ['MSFT', 'CEG', 'XOM']  $212,020
+    HIGH (65+)           :   6  ['AAPL', 'IWM', 'VRT', 'PWR', 'USO', 'XLP']  $346,356
+
+  Closed trades (training_records):
+    QUESTIONABLE (<35)   :   2  avg_pnl=$-196       total=$-393  W/L=0/2
+    LOW (35-49)          :   0  avg_pnl=—           total=$+0  W/L=0/0
+    MEDIUM (50-64)       :   1  avg_pnl=$+103       total=$+103  W/L=1/0
+    HIGH (65+)           :   2  avg_pnl=$+2,170     total=$+4,340  W/L=2/0
+
+── SECTION 5: ETF vs SINGLE-NAME OVERLAP FLAG ───────────────────────
+  IWM     score=83    overlapping_singles=[]  ok
+  USO     score=71    overlapping_singles=['XOM', 'CVX', 'XLE']  ok
+  XLE     score=23    overlapping_singles=['XOM', 'CVX']  ⚑ ETF_OVERLAP_FLAG
+  XLK     score=26    overlapping_singles=['AAPL', 'MSFT']  ⚑ ETF_OVERLAP_FLAG
+  XLP     score=68    overlapping_singles=['KO']  ok
+
+  ETF_OVERLAP_FLAG: ETF below score 50 with overlapping single-name positions.
+  Diagnostic flag only. No suppression logic implemented.
+
+── SECTION 6: CLUSTER CONCENTRATION ─────────────────────────────────
+  Consumer / Defensive             2 pos  $   116,034  12.0%  NLV  avg=57.5  [47.0-68.0]
+    Symbols: ['XLP', 'KO']
+  Energy                           4 pos  $   271,144  28.1%  NLV  avg=50.2  [23.0-71.0]
+    Symbols: ['CVX', 'XOM', 'USO', 'XLE']
+  Other                            1 pos  $    56,128  5.8%   NLV  avg=83.0  [83.0-83.0]
+    Symbols: ['IWM']
+  Power / Infrastructure           3 pos  $   210,234  21.8%  NLV  avg=67.0  [59.0-74.0]
+    Symbols: ['CEG', 'VRT', 'PWR']
+  Tech / AI / Semis                6 pos  $   343,169  35.6%  NLV  avg=46.2  [26.0-85.0]
+    Symbols: ['AAPL', 'MSFT', 'SNDK', 'WDC', 'TSM', 'XLK']
+
+  Flags (diagnostic only):
+    ⚑ Energy: DUPLICATE_THEME_WATCH ['CVX', 'XLE']
+    ⚑ Tech / AI / Semis: LOW_SCORE_CLUSTER_WATCH, DUPLICATE_THEME_WATCH ['SNDK', 'WDC', 'TSM', 'XLK']
+
+── SECTION 7: PRU / DISCOVERY SOURCE LABEL DIAGNOSTIC ───────────────
+  (Legacy 'Tier D' labels treated as source metadata only.)
+  (No tier-led allocation or selection priority is recommended.)
+
+  PRU/discovery candidates in Apex shortlist : 62
+  Normal-path candidates in Apex shortlist   : 295
+  PRU/discovery selected by Apex             : 7
+  Normal-path selected by Apex               : 56
+
+  PRU/disc avg raw score          : 13.5
+  PRU/disc avg effective score    : 14.9
+  PRU/disc avg score (selected)   : 34.6
+  Normal-path avg score (selected): 53.0
+
+  apex_cap funnel events (tier_d_funnel.jsonl) : 24
+  PRU/disc selected over higher normal-path candidate (gap>15): 4
+
+  Conclusion : PRU_DISCOVERY_OVERSELECTION_WATCH
+
+── SECTION 8: SESSION VERDICT ────────────────────────────────────────
+  A. Book avg score (open positions) : 54.8
+  B. Positions below score 35        : 3
+  C. Positions score 35-49           : 4
+  D. Blocked-by-margin avg score     : 59.0
+  E. Blocked outscoring book by >15  : 1
+  F. ETF overlap flags               : 2
+  G. PRU displacement watch flags    : 4
+
+  Verdict                  : WEAK_ENTRIES_DETECTED
+  Recommended next action  : KEEP OBSERVING
+
+── SECTION 9: DATA QUALITY AND OBSERVABILITY GAPS ───────────────────
+  • entry_score field missing or empty in 5/5 training records — normalized from score field.
+  • Section 2 book-state reconstruction uses end-of-session positions, not intraday snapshots. Score gap analysis is directionally correct; temporal ordering is best-effort (MEDIUM confidence).
+  • Log timestamps use local timezone offset; UTC audit record timestamps are not correlated exactly. Symbol-to-score lookup uses max score seen in file as an approximation.
+
+── SECTION 10: FINAL HUMAN SUMMARY ──────────────────────────────────
+
+  1. Did the bot deploy capital well?
+     Partially. Book avg score=54.8; 3 position(s) below score 35. Sequencing pressure detected.
+
+  2. Were weak entries detected?
+     Yes. 3 positions below score 35: ['WDC', 'XLK', 'XLE'].
+
+  3. Were stronger candidates blocked later?
+     Yes. 1 margin-blocked candidate(s) outscored the open book by >15 pts (blocked avg=59.0).
+
+  4. Was the issue Apex selection quality or capital sequencing?
+     Capital sequencing. Apex identified stronger candidates in later cycles but margin capacity was consumed by earlier lower-quality entries. Apex selection quality appears sound.
+
+  5. Is PRU/discovery helping, hurting, or inconclusive?
+     PRU_DISCOVERY_OVERSELECTION_WATCH.
+     PRU/discovery source labels are worth continued observation.
+
+  6. Is Track B within the problem scope?
+     No. Track B exit management is operating correctly. The sequencing issue is an entry/capacity problem, not a PM problem.
+
+  7. Is any live strategy change justified today?
+     No. One session is insufficient evidence for any strategy change. Run this report across 3-5 more sessions before evaluating rotation, ETF suppression, or threshold adjustments.
+
+  Session verdict: WEAK_ENTRIES_DETECTED
+
+
+════════════════════════════════════════════════════════════════════

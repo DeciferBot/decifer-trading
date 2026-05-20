@@ -108,7 +108,6 @@ for _mod_name in [
     "theme_tracker",
     "sentinel_agents",
     "social_sentiment",
-    "ml_engine",
     "portfolio_optimizer",
 ]:
     _stub = _make_stub(_mod_name)

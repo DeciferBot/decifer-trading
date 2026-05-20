@@ -6,6 +6,82 @@
 
 ---
 
+## 2026-05-20 — ML Clean-Slate Sprint 2: Main-Frame Signal Observation Writer
+
+**Decision**: Build the first real component of the controlled learning loop — a lightweight main-frame signal observation writer attached to the production signal pipeline.
+
+**What was built**:
+- `ml_observation_writer.py` — stdlib-only module (~170 lines). Inert when `ml_observer_enabled=False`. No ML imports, no model loading, no score changes. Appends one JSONL record per scored candidate to `data/ml/ml_observations.jsonl`.
+- `signal_pipeline.py` — observation writer attached between steps 7 (Signal objects built) and 8 (signals_log append) in `run_signal_pipeline()`. All of `all_scored` (including below-threshold candidates) is passed to the writer, eliminating selection bias.
+- `signal_dispatcher.py` — `observation_id` and `scan_id` added as top-level kwargs to `execute_buy()` and `execute_short()` calls, so ORDER_INTENT records now carry `observation_id` at the top level (previously nested inside `agent_outputs`).
+
+**Why all_scored (not just above-threshold signals)**:
+The architecture doc (§2.1) requires observations for ALL candidates whether or not a trade is taken, to eliminate the selection bias that plagued the legacy engine's executed-trade-only training set. Signal objects (from `_scored_to_signals`) only cover above-threshold candidates. `all_scored` covers every scored candidate.
+
+**Why top-level observation_id in ORDER_INTENT**:
+`observation_id` was already present nested inside `agent_outputs["observation_id"]`. The Sprint 3 outcome joiner needs `record["observation_id"]` directly, not `record["agent_outputs"]["observation_id"]`. Adding it as a top-level kwarg via `**intent_extras` makes the join key directly accessible without nesting.
+
+**Observation record schema (sprint2_v1)**:
+`schema_version`, `timestamp_utc`, `session_date`, `scan_id`, `observation_id`, `symbol`, `direction`, `candidate_source`, `base_score`, `live_score_after_observer`, `live_score_unchanged=True`, `ranking_position`, `ranking_total`, `signal_scores`, `dim_*` (flattened), `regime`, `vix`, `time_of_day`, `day_of_week`, `is_after_hours`, `passed_base_threshold`, `ml_observer_enabled`, `ml_score_influence_enabled`, `ml_inference_eligible=False`, `exclusion_reason`, `order_intent_linked=False`.
+
+**Live trading impact**: None. `ml_observer_enabled=False` by default. No scores, rankings, order eligibility, sizing, or execution paths changed.
+
+**Tests added**: `tests/test_ml_observation_writer.py` — 20 tests (T1–T20). All pass.
+
+**Files created**: `ml_observation_writer.py`, `tests/test_ml_observation_writer.py`.
+**Files modified**: `signal_pipeline.py` (step 7b insertion), `signal_dispatcher.py` (top-level linkage kwargs).
+
+---
+
+## 2026-05-20 — ML Clean-Slate Sprint 1: Legacy Engine Removed, Controlled Learning Architecture Defined
+
+**Decision**: `ml_engine.py` deleted in full. All saved model files quarantined. New controlled learning architecture defined in `docs/ml_controlled_learning_architecture.md`. No ML influence is active.
+
+**What was removed**:
+- `ml_engine.py` (1000 lines): `TradeLabeler`, `DeciferML` (RandomForest + GradientBoosting), `SignalEnhancer`, `RegimeClassifier`, `WeeklyReportGenerator`. Contained confirmed leakage (holding_minutes importance = 0.275), broken inference path (signal dims defaulted to 0 at prediction time), and a score formula that could implicitly block entries even with `ml_can_block_entries=False`.
+- `tests/test_ml_engine.py`: Tests for the deleted engine.
+- 8 legacy ML config keys: `ml_enabled`, `ml_min_trades`, `ml_retrain_interval`, `ml_confidence_weight`, `ml_models_dir`, `ml_live_multiplier_enabled`, `ml_can_block_entries`, `ml_can_size_positions`.
+- ML startup hook in `bot.py` (lines 822–833).
+
+**What was quarantined** (not deleted — preserved as evidence):
+- `data/models/classifier.pkl`, `regressor.pkl`, `scaler.pkl`, `features.pkl`, `metadata.json` → `data/quarantine/leaky_ml_models_2026_05_20/`
+- `QUARANTINE_README.md` explains leakage, prohibits any use, documents metadata confirming the contamination.
+
+**What replaced the old config keys**:
+```python
+"ml_observer_enabled": False,        # Shadow evidence observer (Stage 1) — not yet built
+"ml_score_influence_enabled": False, # Score adjustment from ML (Stage 3) — requires explicit Amit approval
+"ml_data_dir": "data/ml",           # Root dir for canonical evidence ledgers
+```
+
+**Why the engine had to be deleted, not patched**:
+1. **holding_minutes leakage is in saved models, not just code**: Even after fixing `prepare_data()`, all existing `.pkl` files were trained with the leaky feature. Any inference call would return win_prob values biased by post-outcome data.
+2. **Inference gap**: `SignalEnhancer.enhance_score()` never passed `dim_*` signal scores to `predict()`. The model trained on 18 signal dimensions but always predicted with them set to 0. No patch could fix a model trained under that condition.
+3. **Effective training N = 180**: Only 180 of 406 eligible records have `signal_scores`. The model was trained on a biased subset without the system knowing.
+4. **Score suppression risk**: `base_score * (0.5 + win_prob)` allows 0.5× score compression regardless of the `ml_can_block_entries` config flag.
+
+**New architecture: controlled self-improving** (not yet implemented):
+- Collects evidence passively via side-effect writers (observation records before each trade decision).
+- Retrains offline, never during a scan cycle.
+- Shadow-validates candidate models before any live influence.
+- Live score influence requires explicit Amit approval + `ml_score_influence_enabled = True` set manually.
+- No model may be auto-promoted. No model may reduce a score below `base_score` until 90+ days validated.
+- Full specification in `docs/ml_controlled_learning_architecture.md`.
+
+**Proof tests (permanent regression suite — `tests/test_ml_legacy_removed.py`)**:
+T1: ml_engine.py file deleted. T2: enhance_score cannot be imported. T3: no pkl in data/models/, quarantine README exists. T4: no production file imports ml_engine. T5: legacy config keys absent, new reserved keys default False. T6: legacy score formula absent from production code. T7: holding_minutes not in ML feature builder paths. T8: evidence files (training_records.jsonl, closed_trade_ledger, signals log) preserved. T9: config and training_store load without ml_engine. T10: orders_core and orders_state have no ML references.
+
+**Evidence preserved (explicitly not deleted)**:
+`data/training_records.jsonl`, `data/ml/closed_trade_training_ledger.jsonl`, `data/signals_typed.jsonl`, all trade ledgers, order records, execution records, Apex logs, IC reports, signal validation reports.
+
+**Files changed**: `bot.py`, `config.py`, `learning.py`, `requirements.txt`, `requirements-prod.txt`, `scripts/audit_trade_ledger_data_path.py`, `tests/test_regime_router.py`, `tests/test_reconnect.py`, `tests/test_trade_data_contract.py`, `tests/test_audit_trade_ledger_data_path.py`.
+
+**Files created**: `tests/test_ml_legacy_removed.py`, `docs/ml_controlled_learning_architecture.md`, `data/quarantine/leaky_ml_models_2026_05_20/QUARANTINE_README.md`.
+
+**Live trading impact**: None. ML was `ml_enabled=False` before this sprint. No scoring path, order path, or execution path touched.
+
+---
+
 ## 2026-05-20 — Walk-Forward Weight Calibration: Candidate IC Primary, Execution IC Advisory
 
 **Decision**: Candidate IC (from `ic_weights.json` / `ic_weights_live_history.jsonl`, 36k+ scanned candidates) is the primary source for weight calibration. Execution IC (from `data/signal_validation_report.json`, 177 usable trades) is advisory only — it may cap or flag a weight, but must never increase any weight above the candidate-IC-derived level.

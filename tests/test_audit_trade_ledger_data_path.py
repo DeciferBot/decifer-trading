@@ -397,6 +397,7 @@ class TestSchemaDrift:
 
 class TestMLLogicCorrectness:
     def test_ml_logic_verdict_key_present_in_output(self, tmp_path):
+        """After Sprint 1 removal, verdict must be ML_ENGINE_REMOVED."""
         paths = {
             "training_records": str(tmp_path / "tr.jsonl"),
             "trade_events": str(tmp_path / "ev.jsonl"),
@@ -411,23 +412,42 @@ class TestMLLogicCorrectness:
         result = audit.audit_ml_logic_correctness(paths)
         assert "ml_logic_verdict" in result
         assert result["ml_logic_verdict"] in {
+            "ML_ENGINE_REMOVED",
             "ML LOGIC CORRECT, DATA/SIGNAL WEAK",
             "ML LOGIC NEEDS FIXES BEFORE TRUSTING RESULTS",
             "ML LOGIC INVALID",
         }
 
+    def test_ml_engine_file_deleted(self):
+        """ml_engine.py must not exist — Sprint 1 clean removal proof."""
+        assert not (audit._REPO / "ml_engine.py").exists(), (
+            "ml_engine.py still exists. Sprint 1 requires full deletion of the legacy ML engine."
+        )
+
+    def test_leaky_models_quarantined_not_in_runtime_path(self):
+        """data/models/ must have no .pkl files — leaky models quarantined."""
+        models_dir = audit._REPO / "data" / "models"
+        pkl_files = list(models_dir.glob("*.pkl")) if models_dir.exists() else []
+        assert not pkl_files, (
+            f"Found .pkl files in data/models/: {[f.name for f in pkl_files]}. "
+            "These models contain holding_minutes leakage and must be quarantined."
+        )
+
     def test_holding_minutes_not_in_feature_cols(self):
-        ml_src = audit._read_source_text(str(audit._REPO / "ml_engine.py"))
+        """After removal, ml_engine.py is gone — no feature_cols to check."""
+        ml_engine_path = audit._REPO / "ml_engine.py"
+        if not ml_engine_path.exists():
+            return  # ml_engine.py deleted — no feature cols to inspect
+        ml_src = audit._read_source_text(str(ml_engine_path))
         feature_section = audit._extract_feature_cols_section(ml_src)
-        # holding_minutes must NOT appear in the feature_cols list
         assert "holding_minutes" not in feature_section
 
-    def test_timeseries_split_is_used(self):
-        ml_src = audit._read_source_text(str(audit._REPO / "ml_engine.py"))
-        assert "TimeSeriesSplit" in ml_src
-
     def test_no_random_train_test_split(self):
-        ml_src = audit._read_source_text(str(audit._REPO / "ml_engine.py"))
+        """After removal, ml_engine.py is gone — no random split to check."""
+        ml_engine_path = audit._REPO / "ml_engine.py"
+        if not ml_engine_path.exists():
+            return  # ml_engine.py deleted — nothing to check
+        ml_src = audit._read_source_text(str(ml_engine_path))
         assert "train_test_split" not in ml_src
 
     def test_ml_enabled_default_flagged(self):
@@ -438,12 +458,10 @@ class TestMLLogicCorrectness:
         }
         result = audit.audit_ml_logic_correctness(paths)
         ai = result.get("apex_integration_safety", {})
-        # ml_enabled: True in config.py is a known risk — it must be flagged
         if ai.get("ml_enabled_default_true_in_config"):
             assert "RISK" in ai.get("ml_enabled_risk", "")
 
     def test_inverted_auc_check_runs_without_raising(self, tmp_path):
-        # With no saved model, model_evaluation should return SKIPPED, not raise
         paths = {
             "training_records": str(tmp_path / "tr.jsonl"),
             "models_dir": str(tmp_path / "models"),
@@ -457,15 +475,16 @@ class TestMLLogicCorrectness:
         except Exception as exc:
             pytest.fail(f"audit_ml_logic_correctness raised unexpectedly: {exc}")
 
-    def test_label_correctness_checks_all_pass_on_good_source(self):
-        ml_src = audit._read_source_text(str(audit._REPO / "ml_engine.py"))
-        checks = {
-            "win_eq_pnl_positive": "pnl > 0" in ml_src,
-            "loss_eq_pnl_negative": "pnl < 0" in ml_src,
-            "y_win_eq_1": '== "WIN"' in ml_src and ".astype(int)" in ml_src,
+    def test_audit_returns_removed_verdict_when_ml_engine_absent(self, tmp_path):
+        """When ml_engine.py is absent, verdict must be ML_ENGINE_REMOVED."""
+        paths = {
+            "training_records": str(tmp_path / "tr.jsonl"),
+            "models_dir": str(tmp_path / "models"),
+            "ml_engine_src": str(tmp_path / "ml_engine.py"),  # points to non-existent path
+            "config_src": str(audit._REPO / "config.py"),
         }
-        failures = [k for k, v in checks.items() if not v]
-        assert not failures, f"Label correctness checks failed: {failures}"
+        result = audit.audit_ml_logic_correctness(paths)
+        assert result["ml_logic_verdict"] == "ML_ENGINE_REMOVED"
 
 
 # ── TestOutputs ───────────────────────────────────────────────────────────────
@@ -500,7 +519,7 @@ class TestOutputs:
         _write_jsonl(tr, records)
         json_out = tmp_path / "audit.json"
         md_out = tmp_path / "audit.md"
-        monkeypatch.setattr(audit, "_REPO", Path(audit._REPO))  # keep real repo for ml_engine.py
+        monkeypatch.setattr(audit, "_REPO", Path(audit._REPO))  # keep real repo path
         result = audit.main(json_out=str(json_out), md_out=str(md_out))
         assert json_out.exists()
 

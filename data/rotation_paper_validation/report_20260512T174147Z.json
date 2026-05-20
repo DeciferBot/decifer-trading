@@ -1,0 +1,165 @@
+{
+  "report_ts": "2026-05-12T17:41:47.599410+00:00",
+  "since": "2026-05-12",
+  "lookahead_hours": 24,
+  "verdict": "PAPER_VALIDATION_PENDING_OUTCOMES",
+  "recommended_action": "KEEP_RUNNING_PAPER_VALIDATION",
+  "opportunities_detected": 1,
+  "opportunities_evaluated": 1,
+  "skipped_blocks": [
+    "ALL: score 37 < min_blocked_score 70.0",
+    "XLV: score 42 < min_blocked_score 70.0",
+    "IRM: score 42 < min_blocked_score 70.0",
+    "DVA: excluded block type 'account_values_stale_block'",
+    "SLB: excluded block type 'account_values_stale_block'",
+    "LMT: excluded block type 'account_values_stale_block'",
+    "TEST: excluded block type 'test'"
+  ],
+  "scenarios": [
+    {
+      "scenario": "A",
+      "exit_set_size": 1,
+      "block_ts": "2026-05-12T17:03:48.718319+00:00",
+      "blocked_symbol": "DVA",
+      "blocked_score": 74.0,
+      "block_type": "margin_gross_cap_block",
+      "book_avg_score": 57.29,
+      "gap_vs_book": 16.71,
+      "estimated_notional": 57212.64,
+      "notional_is_estimate": true,
+      "shadow_exit_candidates": [
+        {
+          "symbol": "XLE",
+          "score": 23.0,
+          "notional": 98232.75,
+          "rotation_shadow_score": 69.0,
+          "rank": 1,
+          "outcome": null
+        }
+      ],
+      "theoretical_capacity_released": 98232.75,
+      "capacity_sufficient_estimated": true,
+      "actual_outcome_available": false,
+      "blocked_candidate_outcome": null,
+      "actual_book_forward_result": null,
+      "hypothetical_forward_result": null,
+      "relative_uplift": null,
+      "outcome_status": "OUTCOME_PENDING",
+      "live_action_permitted": false
+    },
+    {
+      "scenario": "B",
+      "exit_set_size": 2,
+      "block_ts": "2026-05-12T17:03:48.718319+00:00",
+      "blocked_symbol": "DVA",
+      "blocked_score": 74.0,
+      "block_type": "margin_gross_cap_block",
+      "book_avg_score": 57.29,
+      "gap_vs_book": 16.71,
+      "estimated_notional": 57212.64,
+      "notional_is_estimate": true,
+      "shadow_exit_candidates": [
+        {
+          "symbol": "XLE",
+          "score": 23.0,
+          "notional": 98232.75,
+          "rotation_shadow_score": 69.0,
+          "rank": 1,
+          "outcome": null
+        },
+        {
+          "symbol": "XLK",
+          "score": 26.0,
+          "notional": 57411.86,
+          "rotation_shadow_score": 69.0,
+          "rank": 2,
+          "outcome": {
+            "outcome_type": "POSITION_CLOSED_AFTER_BLOCK",
+            "ts_fill": "2026-05-11T09:32:21.199174+00:00",
+            "ts_close": "2026-05-12T17:41:11.199147+00:00",
+            "pnl": -968.22,
+            "pnl_pct": -0.0169,
+            "fill_price": 176.11,
+            "exit_price": 173.14,
+            "hold_minutes": 0,
+            "note": "total realized P&L (not only the post-block portion)"
+          }
+        }
+      ],
+      "theoretical_capacity_released": 155644.61,
+      "capacity_sufficient_estimated": true,
+      "actual_outcome_available": false,
+      "blocked_candidate_outcome": null,
+      "actual_book_forward_result": null,
+      "hypothetical_forward_result": null,
+      "relative_uplift": null,
+      "outcome_status": "OUTCOME_PENDING",
+      "live_action_permitted": false
+    },
+    {
+      "scenario": "C",
+      "exit_set_size": 3,
+      "block_ts": "2026-05-12T17:03:48.718319+00:00",
+      "blocked_symbol": "DVA",
+      "blocked_score": 74.0,
+      "block_type": "margin_gross_cap_block",
+      "book_avg_score": 57.29,
+      "gap_vs_book": 16.71,
+      "estimated_notional": 57212.64,
+      "notional_is_estimate": true,
+      "shadow_exit_candidates": [
+        {
+          "symbol": "XLE",
+          "score": 23.0,
+          "notional": 98232.75,
+          "rotation_shadow_score": 69.0,
+          "rank": 1,
+          "outcome": null
+        },
+        {
+          "symbol": "XLK",
+          "score": 26.0,
+          "notional": 57411.86,
+          "rotation_shadow_score": 69.0,
+          "rank": 2,
+          "outcome": {
+            "outcome_type": "POSITION_CLOSED_AFTER_BLOCK",
+            "ts_fill": "2026-05-11T09:32:21.199174+00:00",
+            "ts_close": "2026-05-12T17:41:11.199147+00:00",
+            "pnl": -968.22,
+            "pnl_pct": -0.0169,
+            "fill_price": 176.11,
+            "exit_price": 173.14,
+            "hold_minutes": 0,
+            "note": "total realized P&L (not only the post-block portion)"
+          }
+        },
+        {
+          "symbol": "WDC",
+          "score": 27.0,
+          "notional": 57598.8,
+          "rotation_shadow_score": 60.0,
+          "rank": 3,
+          "outcome": null
+        }
+      ],
+      "theoretical_capacity_released": 213243.41,
+      "capacity_sufficient_estimated": true,
+      "actual_outcome_available": false,
+      "blocked_candidate_outcome": null,
+      "actual_book_forward_result": null,
+      "hypothetical_forward_result": null,
+      "relative_uplift": null,
+      "outcome_status": "OUTCOME_PENDING",
+      "live_action_permitted": false
+    }
+  ],
+  "data_quality_gaps": [
+    "estimated_notional = portfolio_value \u00d7 max_single_pct \u2014 upper-bound estimate, not sizing-engine output (G10 provisional)",
+    "shadow exit P&L = total realized P&L from original entry to close \u2014 not only the post-block portion",
+    "positions.json reflects end-of-session state \u2014 positions closed intra-session may be absent from reconstruction"
+  ],
+  "live_rotation_allowed": false,
+  "broker_connected": false,
+  "order_generation_allowed": false
+}

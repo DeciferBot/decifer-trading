@@ -819,19 +819,6 @@ def main():
     else:
         clog("INFO", "📱 Telegram kill switch not configured (set TELEGRAM_BOT_TOKEN + authorized_chat_ids)")
 
-    # ── Start ML Signal Enhancement ───────────────────────────────────────────
-    try:
-        from ml_engine import enhance_score as _enhance_score  # noqa: F401 — import tests availability
-
-        if CONFIG.get("ml_enabled", False):
-            clog("INFO", "ML signal enhancement active (will enhance scores when models trained)")
-        else:
-            clog("INFO", "ML engine available but disabled (ml_enabled=False)")
-    except ImportError:
-        clog("INFO", "ML engine not installed — skipping")
-    except Exception as e:
-        clog("ERROR", f"ML engine startup error: {e}")
-
     # ── iCloud backup sync (every 5 min, runs in this process so FDA inherited) ─
     _ICLOUD_SYNC_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "icloud-sync.sh")
 

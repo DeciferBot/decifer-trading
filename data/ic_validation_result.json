@@ -1,13 +1,15 @@
 {
   "sample_gate_passed": true,
-  "ic_gate_passed": true,
+  "ic_gate_passed": false,
   "sharpe_gate_passed": true,
-  "n_valid_records": 36484,
-  "mean_positive_ic": 0.050536,
+  "n_valid_records": 36913,
+  "mean_positive_ic": 0.049457,
   "n_positive_dims": 5,
   "walkforward_sharpe": 6.69,
-  "ic_quality": "STRONG",
-  "failures": [],
-  "ready_for_live": true,
-  "checked_at": "2026-05-20T04:01:07.426584+00:00"
+  "ic_quality": "MODERATE",
+  "failures": [
+    "IC GATE: mean positive IC 0.0495 < threshold 0.0500. Dimensions are barely predictive."
+  ],
+  "ready_for_live": false,
+  "checked_at": "2026-05-20T12:45:37.780032+00:00"
 }

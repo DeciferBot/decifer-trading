@@ -930,8 +930,31 @@ def audit_ml_logic_correctness(paths: dict) -> dict:
         if p.exists():
             ml_files.append({"path": str(p.relative_to(_REPO)), "exists": True})
     models_dir = Path(paths.get("models_dir", str(_REPO / "data" / "models")))
-    model_files = [f.name for f in models_dir.glob("*")] if models_dir.exists() else []
+    model_files = [f.name for f in models_dir.glob("*") if f.name != "QUARANTINE_README.md"] if models_dir.exists() else []
     result["ml_script_inventory"] = {"source_files": ml_files, "saved_model_files": model_files}
+
+    # ── Early exit: ml_engine.py deleted (Sprint 1 clean removal) ────────────
+    ml_engine_path = Path(paths.get("ml_engine_src", str(_REPO / "ml_engine.py")))
+    if not ml_engine_path.exists():
+        result["ml_logic_verdict"] = "ML_ENGINE_REMOVED"
+        result["ml_logic_verdict_reason"] = (
+            "ml_engine.py was deleted in Sprint 1 (2026-05-20). "
+            "Leaky saved models quarantined in data/quarantine/leaky_ml_models_2026_05_20/. "
+            "New controlled learning architecture defined in docs/ml_controlled_learning_architecture.md."
+        )
+        result["label_correctness"] = {"checks": {}, "all_pass": True, "failures": [], "note": "ml_engine.py removed"}
+        result["feature_alignment"] = {"checks": {}, "all_pass": True, "failures": [], "note": "ml_engine.py removed"}
+        result["validation_method"] = {"checks": {}, "all_pass": True, "walk_forward_used": False, "note": "ml_engine.py removed"}
+        result["model_evaluation"] = {"status": "SKIPPED", "reason": "ml_engine.py removed — no model to evaluate"}
+        result["model_configuration"] = {"note": "ml_engine.py removed"}
+        result["apex_integration_safety"] = {
+            "enhance_score_references": [],
+            "ml_enabled_default_true_in_config": False,
+            "ml_enabled_risk": "OK — ml_engine.py deleted, enhance_score() no longer exists",
+            "live_multiplier_active": False,
+        }
+        result["reproducibility"] = {"note": "ml_engine.py removed"}
+        return result
 
     # ── 2. Target and label correctness (code inspection) ────────────────────
     ml_src = _read_source_text(paths.get("ml_engine_src", ""))
