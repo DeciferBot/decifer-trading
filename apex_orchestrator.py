@@ -647,6 +647,43 @@ def _run_apex_pipeline(
             except Exception as _ae:
                 log.debug("apex: floor rule audit write failed — %s", _ae)
 
+    # ── IC decision events — passed_to_apex / apex_selected / apex_rejected ──
+    # Written once per pipeline call (shadow or execute) so the research reader
+    # can count the full Apex funnel without double-counting.
+    try:
+        from ic_decision_writer import write_events_bulk as _write_ide_bulk
+        _ide_now = datetime.now(UTC).isoformat()
+        _selected_syms: set[str] = {
+            e.get("symbol")
+            for e in (would or [])
+            if e.get("symbol")
+        }
+        _ide_events: list[dict] = []
+        for _c_sym, _c_payload in candidates_by_symbol.items():
+            _obs_id = _c_payload.get("observation_id")
+            _c_scan_id = _c_payload.get("scan_id")
+            _obs_id = _obs_id or (f"{_c_scan_id}_{_c_sym}" if _c_scan_id else None)
+            _base = {
+                "ts_utc": _ide_now,
+                "observation_id": _obs_id,
+                "scan_id": _c_scan_id,
+                "symbol": _c_sym,
+                "session_date": _c_payload.get("session_date"),
+                "candidate_source": _c_payload.get("candidate_source"),
+                "ranking_position": _c_payload.get("ranking_position"),
+                "ranking_total": _c_payload.get("ranking_total"),
+            }
+            _ide_events.append({**_base, "decision_status": "passed_to_apex"})
+            if _c_sym in _selected_syms:
+                _ide_events.append({**_base, "decision_status": "apex_selected"})
+            else:
+                _ide_events.append({**_base, "decision_status": "apex_rejected",
+                                    "reason": "not_in_apex_new_entries"})
+        if _ide_events:
+            _write_ide_bulk(_ide_events)
+    except Exception as _ide_exc:
+        log.debug("apex_orchestrator: IC decision event write failed (non-fatal): %s", _ide_exc)
+
     result: dict[str, Any] = {
         "decision": decision,
         "would_dispatch": would,

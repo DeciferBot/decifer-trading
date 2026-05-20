@@ -374,6 +374,10 @@ def log_signal_scan(scored: list, regime: dict, scan_id: str | None = None) -> N
                     "candidate_source": sig.get("candidate_source", "unknown"),
                     "ic_eligible": _ic_eligible,
                     "exclusion_reason": _exclusion_reason,
+                    # passed_base_threshold: True when symbol cleared score_universe() base
+                    # threshold. Stamped by run_signal_pipeline(); defaults True when called
+                    # standalone (e.g. tests, sentinel path) so old callers are unaffected.
+                    "passed_base_threshold": sig.get("passed_base_threshold", True),
                 }
                 f.write(json.dumps(record) + "\n")
     except Exception as e:

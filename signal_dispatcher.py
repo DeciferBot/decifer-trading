@@ -1029,6 +1029,33 @@ def dispatch(
                     ok = False
                     report["errors"].append(f"{sym}: unknown direction {direction!r}")
             rec["executed"] = bool(ok)
+            # IC decision event — best-effort, never affects execution.
+            try:
+                from ic_decision_writer import write_event as _write_ide
+                _ide_payload = candidates_by_symbol.get(sym) or {}
+                _obs_id = _ide_payload.get("observation_id")
+                _c_scan_id = _ide_payload.get("scan_id")
+                _obs_id = _obs_id or (f"{_c_scan_id}_{sym}" if _c_scan_id else None)
+                # Attempt to recover trade_id from active_trades after execute_buy sets it.
+                try:
+                    from orders_portfolio import active_trades as _at
+                    _trade_id = (_at.get(sym) or {}).get("trade_id")
+                except Exception:
+                    _trade_id = None
+                _write_ide(
+                    observation_id=_obs_id,
+                    scan_id=_c_scan_id,
+                    symbol=sym,
+                    decision_status="executed" if ok else "order_failed",
+                    session_date=_ide_payload.get("session_date"),
+                    candidate_source=_ide_payload.get("candidate_source"),
+                    ranking_position=_ide_payload.get("ranking_position"),
+                    ranking_total=_ide_payload.get("ranking_total"),
+                    reason=None if ok else "execute_buy_returned_false",
+                    trade_id=_trade_id if ok else None,
+                )
+            except Exception as _ide_exc:
+                log.debug("dispatch: IC decision event write failed (non-fatal): %s", _ide_exc)
         except Exception as exc:
             report["errors"].append(f"{sym}: execute failed — {exc}")
         report["new_entries"].append(rec)

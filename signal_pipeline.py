@@ -191,6 +191,7 @@ class SignalPipelineResult:
     sensor_payloads: list = field(default_factory=list)  # list[SensorPayload] — Decifer 3.0 Apex Agent inputs
     status: str = "OK"  # "OK" | "MONITOR_ONLY"
     tier_d_funnel: dict = field(default_factory=dict)  # per-cycle Tier D attrition counts (stages 1-6)
+    scan_id: str = ""  # YYYYMMDDTHHmmss — shared across signals_log and ic_decision_events
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
@@ -979,7 +980,40 @@ def run_signal_pipeline(
         )
         if s.get("symbol")
     }
+    # Stamp scan provenance onto all_scored dicts so observation_id flows downstream
+    # into candidates_by_symbol without needing separate lookup.  Also stamp
+    # passed_base_threshold so the signals_log record and decision events agree.
+    _scored_syms: set[str] = {s.get("symbol") for s in scored if s.get("symbol")}
+    _session_date_str = datetime.now(UTC).date().isoformat()
+    for _s in all_scored:
+        _sym = _s.get("symbol")
+        _s["scan_id"] = _scan_id
+        _s["observation_id"] = f"{_scan_id}_{_sym}" if _sym else None
+        _s["passed_base_threshold"] = _sym in _scored_syms if _sym else False
+        _s["session_date"] = _session_date_str
     log_signal_scan(all_scored, regime, scan_id=_scan_id)
+    # Write below_threshold decision events for symbols that didn't clear base threshold.
+    try:
+        from ic_decision_writer import write_events_bulk as _write_de_bulk
+        _below_events = [
+            {
+                "observation_id": _s.get("observation_id"),
+                "scan_id": _scan_id,
+                "symbol": _s.get("symbol"),
+                "decision_status": "below_threshold",
+                "session_date": _session_date_str,
+                "candidate_source": _s.get("candidate_source", "unknown"),
+                "ranking_position": _rank_map_all.get(_s.get("symbol")),
+                "ranking_total": len(all_scored),
+                "reason": "score_below_base_threshold",
+            }
+            for _s in all_scored
+            if not _s.get("passed_base_threshold") and _s.get("symbol")
+        ]
+        if _below_events:
+            _write_de_bulk(_below_events)
+    except Exception as _de_exc:
+        log.debug("signal_pipeline: below_threshold event write failed (non-fatal): %s", _de_exc)
 
     # 7. Build typed Signal objects (governance_map attaches handoff provenance when available)
     signals = _scored_to_signals(
@@ -1069,4 +1103,5 @@ def run_signal_pipeline(
         sensor_payloads=sensor_payloads,
         status="OK",
         tier_d_funnel=_td_funnel,
+        scan_id=_scan_id,
     )
