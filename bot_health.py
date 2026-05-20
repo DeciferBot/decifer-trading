@@ -470,8 +470,9 @@ def _stage_execution() -> dict:
     except Exception:
         pass
 
-    has_issues = bool(bracket_gaps) or stuck_count > 0 or fail_sentinels > 0 or (disk_free_pct is not None and disk_free_pct < 10)
+    has_issues = bool(bracket_gaps) or stuck_count > 0 or fail_sentinels > 0
     status = "warn" if has_issues else "ok"
+    disk_low = disk_free_pct is not None and disk_free_pct < 10
 
     return {
         "name": "Execution",
@@ -485,6 +486,7 @@ def _stage_execution() -> dict:
         "stuck_intent_count": stuck_count,
         "disk_free_gb": disk_free_gb,
         "disk_free_pct": disk_free_pct,
+        "disk_low": disk_low,
         "fail_sentinel_count": fail_sentinels,
     }
 
