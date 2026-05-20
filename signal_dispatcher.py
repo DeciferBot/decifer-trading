@@ -522,6 +522,13 @@ def dispatch_signals(
                   else "legacy_scanner")
         )
         _enriched_ao["handoff_source_labels"] = getattr(signal, "handoff_source_labels", None) or []
+        # Observation linkage — enables training_records → signals_log JOIN via observation_id.
+        _sig_scan_id = getattr(signal, "scan_id", "") or ""
+        _enriched_ao["observation_id"] = getattr(signal, "observation_id", None) or None
+        _enriched_ao["scan_id"] = _sig_scan_id or None
+        _enriched_ao["signal_session_date"] = _sig_scan_id[:8] if _sig_scan_id else None
+        _enriched_ao["ranking_position"] = getattr(signal, "ranking_position", 0) or None
+        _enriched_ao["ranking_total"] = getattr(signal, "ranking_total", 0) or None
 
         if signal.direction == "LONG" and "LONG" in allowed_dirs:
             try:

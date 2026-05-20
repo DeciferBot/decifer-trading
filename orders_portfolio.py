@@ -241,6 +241,11 @@ def _close_position_record(
                 "_close_position_record %s: training record marked degraded (trade_type=%r metadata_status=%r exit_reason=%r) — ml_eligible=False",
                 key, _t.get("trade_type"), _t.get("metadata_status"), exit_reason,
             )
+        # Extract scan provenance from agent_outputs for signals_log → training_record JOIN.
+        _ao = _t.get("agent_outputs") or {}
+        _obs_id = _ao.get("observation_id")
+        _linkage_quality = "full" if _obs_id else "missing"
+        _linkage_loss_reason = None if _obs_id else "observation_id_not_in_agent_outputs"
         _ts({
             "trade_id": _tid,
             "symbol": _sym,
@@ -261,6 +266,14 @@ def _close_position_record(
             "entry_thesis": _t.get("entry_thesis", ""),
             "ts_fill": _t.get("open_time") or _now_ts,
             "ts_close": _now_ts,
+            "observation_id": _obs_id,
+            "scan_id": _ao.get("scan_id"),
+            "signal_session_date": _ao.get("signal_session_date"),
+            "ranking_position": _ao.get("ranking_position"),
+            "ranking_total": _ao.get("ranking_total"),
+            "candidate_source": _ao.get("candidate_source"),
+            "linkage_quality": _linkage_quality,
+            "linkage_loss_reason": _linkage_loss_reason,
             **_cp_quality,
         })
     except Exception as _e:

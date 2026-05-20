@@ -662,10 +662,23 @@ def _apply_tier_d_scoring_cap(
     return new_filtered, counters
 
 
-def _scored_to_signals(scored: list, regime_name: str, governance_map: dict | None = None) -> list:
-    """Convert score_universe() raw dicts → typed Signal objects."""
+def _scored_to_signals(
+    scored: list,
+    regime_name: str,
+    governance_map: dict | None = None,
+    scan_id: str = "",
+    rank_map: dict | None = None,
+    ranking_total: int = 0,
+) -> list:
+    """Convert score_universe() raw dicts → typed Signal objects.
+
+    scan_id, rank_map, and ranking_total are provided by run_signal_pipeline()
+    so Signal objects carry the same scan provenance as the signals_log records.
+    """
     now = datetime.now(UTC)
     gov = governance_map or {}
+    _rank_map = rank_map or {}
+    _ranking_total = ranking_total or len(scored)
     signals = []
     for s in scored:
         direction = s.get("direction", "NEUTRAL")
@@ -673,6 +686,7 @@ def _scored_to_signals(scored: list, regime_name: str, governance_map: dict | No
             direction = "NEUTRAL"
         sym = s["symbol"]
         candidate = gov.get(sym)
+        _obs_id = f"{scan_id}_{sym}" if scan_id and sym else ""
         signals.append(
             Signal(
                 symbol=sym,
@@ -693,6 +707,10 @@ def _scored_to_signals(scored: list, regime_name: str, governance_map: dict | No
                 handoff_reason_to_care=candidate.get("reason_to_care") if candidate else None,
                 handoff_freshness_status=candidate.get("freshness_status") if candidate else None,
                 handoff_candidate_id=candidate.get("candidate_id") if candidate else None,
+                scan_id=scan_id,
+                observation_id=_obs_id,
+                ranking_position=_rank_map.get(sym, 0),
+                ranking_total=_ranking_total,
             )
         )
     return signals
@@ -952,11 +970,26 @@ def run_signal_pipeline(
     _td_rescued = _td_pipeline_output - len(_td_pre_rescue_in_scored)
     _td_dropped_final = _td_rescue_pool - _td_rescued
 
-    # 6. IC audit log — write all scored symbols for forward-return tracking
-    log_signal_scan(all_scored, regime)
+    # 6. IC audit log — generate scan_id once for cross-log correlation, then write.
+    _scan_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    _rank_map_all: dict[str, int] = {
+        s.get("symbol"): i + 1
+        for i, s in enumerate(
+            sorted(all_scored, key=lambda x: float(x.get("score") or 0), reverse=True)
+        )
+        if s.get("symbol")
+    }
+    log_signal_scan(all_scored, regime, scan_id=_scan_id)
 
     # 7. Build typed Signal objects (governance_map attaches handoff provenance when available)
-    signals = _scored_to_signals(scored, regime_name, governance_map=governance_map)
+    signals = _scored_to_signals(
+        scored,
+        regime_name,
+        governance_map=governance_map,
+        scan_id=_scan_id,
+        rank_map=_rank_map_all,
+        ranking_total=len(all_scored),
+    )
 
     # 8. Append to signals_log.jsonl for IC calculator
     _append_signals_log(signals, log_path=signals_log_path)

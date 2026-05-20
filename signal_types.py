@@ -61,6 +61,12 @@ class Signal:
     handoff_reason_to_care: str | None = None
     handoff_freshness_status: str | None = None
     handoff_candidate_id: str | None = None
+    # Scan provenance — populated by signal_pipeline._scored_to_signals() for training linkage.
+    # observation_id joins this signal to its signals_log.jsonl record and any derived training record.
+    scan_id: str = ""
+    observation_id: str = ""   # deterministic: "{scan_id}_{symbol}"
+    ranking_position: int = 0  # rank within all scored symbols (1 = highest score)
+    ranking_total: int = 0     # total symbols scored this scan cycle
 
     def to_dict(self) -> dict:
         """Serialise to a JSON-safe dict (timestamp as ISO string)."""
@@ -86,6 +92,14 @@ class Signal:
             d["handoff_freshness_status"] = self.handoff_freshness_status
         if self.handoff_candidate_id is not None:
             d["handoff_candidate_id"] = self.handoff_candidate_id
+        if self.scan_id:
+            d["scan_id"] = self.scan_id
+        if self.observation_id:
+            d["observation_id"] = self.observation_id
+        if self.ranking_position:
+            d["ranking_position"] = self.ranking_position
+        if self.ranking_total:
+            d["ranking_total"] = self.ranking_total
         return d
 
     def to_json(self) -> str:

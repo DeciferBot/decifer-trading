@@ -60,6 +60,14 @@ def _load_signal_records(
                     except ValueError as _ve:
                         log.warning("_load_signal_records: skipping bad signal record: %s", _ve)
                         continue
+                    # Skip records explicitly marked ineligible (new-format records only).
+                    # Old records without ic_eligible pass through unchanged (None is not False).
+                    if rec.get("ic_eligible") is False:
+                        continue
+                    # Skip records with explicit UNKNOWN direction (new-format records).
+                    # Old records missing direction are still included; _dir_sign() defaults them to LONG.
+                    if rec.get("direction") == "UNKNOWN":
+                        continue
                     bd = rec.get("score_breakdown", {})
                     # Accept records with at least the 9 core dimensions.
                     # Newer dimensions (iv_skew, pead, short_squeeze) are

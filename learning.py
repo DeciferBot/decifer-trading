@@ -302,7 +302,7 @@ def _rotate_signals_log() -> None:
         log.warning(f"signals_log rotation failed (non-fatal): {exc}")
 
 
-def log_signal_scan(scored: list, regime: dict) -> None:
+def log_signal_scan(scored: list, regime: dict, scan_id: str | None = None) -> None:
     """
     Append one line per scored symbol to signals_log.jsonl after each scan cycle.
     Each line records the full 9-dimension breakdown alongside regime context so
@@ -310,23 +310,53 @@ def log_signal_scan(scored: list, regime: dict) -> None:
 
     Expects the full universe from score_universe() (the all_scored return value),
     not the above-threshold subset — so the IC distribution is untruncated.
+
+    scan_id: caller-supplied ID (YYYYMMDDTHHmmss) for cross-log correlation.
+             Generated from current time when not provided.
     """
     if not scored:
         return
     _rotate_signals_log()  # archive if file has grown past 50 MB
-    scan_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    _scan_id = scan_id or datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    _now = datetime.now(UTC)
+    _ts = _now.isoformat()
+    _session_date = _now.date().isoformat()
+    _ranking_total = len(scored)
+    # Rank by score descending — 1 = highest scored symbol in this scan.
+    _rank_map: dict[str, int] = {
+        s.get("symbol"): i + 1
+        for i, s in enumerate(sorted(scored, key=lambda x: float(x.get("score") or 0), reverse=True))
+        if s.get("symbol")
+    }
+    _required_ic_fields = {"symbol", "score", "score_breakdown"}
     try:
         with open(SIGNALS_LOG_FILE, "a") as f:
             for sig in scored:
+                sym = sig.get("symbol")
                 _nd = sig.get("news") or {}
+                # Direction: explicit UNKNOWN when missing — never silently defaults to LONG.
+                _raw_dir = sig.get("direction")
+                _direction = _raw_dir if _raw_dir in ("LONG", "SHORT", "NEUTRAL") else "UNKNOWN"
+                # ic_eligible: true only when required fields are present and direction is known.
+                _has_required = bool(sym and sig.get("score") is not None and sig.get("score_breakdown"))
+                _ic_eligible = _has_required and _direction in ("LONG", "SHORT")
+                if not _ic_eligible:
+                    _exclusion_reason = (
+                        "missing_direction" if _has_required and _direction == "UNKNOWN"
+                        else "missing_required_fields"
+                    )
+                else:
+                    _exclusion_reason = None
                 record = {
-                    "_schema_version": 1,
-                    "ts": datetime.now(UTC).isoformat(),
-                    "scan_id": scan_id,
-                    "symbol": sig.get("symbol"),
+                    "_schema_version": 2,
+                    "ts": _ts,
+                    "session_date": _session_date,
+                    "scan_id": _scan_id,
+                    "observation_id": f"{_scan_id}_{sym}" if sym else None,
+                    "symbol": sym,
                     "score": sig.get("score"),
                     "price": sig.get("price"),
-                    "direction": sig.get("direction", "LONG"),
+                    "direction": _direction,
                     "regime": regime.get("session_character") or regime.get("regime"),
                     "vix": regime.get("vix"),
                     "score_breakdown": sig.get("score_breakdown", {}),
@@ -339,6 +369,11 @@ def log_signal_scan(scored: list, regime: dict) -> None:
                         "claude_sentiment": _nd.get("claude_sentiment", ""),
                         "av_sentiment_label": _nd.get("av_sentiment_label", ""),
                     } if _nd else {},
+                    "ranking_position": _rank_map.get(sym),
+                    "ranking_total": _ranking_total,
+                    "candidate_source": sig.get("candidate_source", "unknown"),
+                    "ic_eligible": _ic_eligible,
+                    "exclusion_reason": _exclusion_reason,
                 }
                 f.write(json.dumps(record) + "\n")
     except Exception as e:
