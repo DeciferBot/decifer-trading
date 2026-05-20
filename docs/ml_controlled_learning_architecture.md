@@ -292,12 +292,68 @@ available at that point in the pipeline.
 - `order_intent_linked=False` on observation records — Sprint 3 confirms linkage retroactively.
 
 ### What Sprint 3 should build
-The outcome joiner / canonical learning dataset builder:
-1. Offline join: `ml_observations.jsonl` + `trade_events.jsonl` + `training_records.jsonl`
-   via `observation_id` as the join key.
-2. For candidates where no trade was taken, write a "pass" record with `trade_taken=False`.
-3. Produce a joined training dataset: signal state at entry + realised outcome.
-4. Clean label creation from `pnl_pct` vs `BREAKEVEN_THRESHOLD`.
-5. Dataset eligibility filtering per §4.2.
+→ **Sprint 3 is now complete. See §7.**
 
-Sprint 3 must not train models, must not load models, must not produce scores.
+---
+
+## 7. Sprint 3 — Implemented (2026-05-20)
+
+Sprint 3 built the offline outcome joiner. All T1–T20 tests pass.
+
+### Files created
+- `scripts/ml_outcome_joiner.py` — stdlib-only offline outcome joiner. Never imported
+  by the live bot. Run via `python3 scripts/ml_outcome_joiner.py [--dry-run]`.
+- `tests/test_ml_outcome_joiner.py` — T1–T20 proof tests (20 tests, all passing).
+
+### Input files
+| File | Role |
+|------|------|
+| `data/ml/ml_observations.jsonl` | Primary anchor — one record per scored candidate (Sprint 2) |
+| `data/trade_events.jsonl` | ORDER_INTENT / ORDER_FILLED / POSITION_CLOSED events |
+| `data/training_records.jsonl` | Outcome source (older records, simpler schema) |
+| `data/ml/closed_trade_training_ledger.jsonl` | Outcome source (newer, richer schema — takes precedence) |
+
+### Output files
+| File | Description |
+|------|-------------|
+| `data/ml/canonical_learning_dataset.jsonl` | One record per observation, fully joined |
+| `data/ml/canonical_learning_dataset_summary.json` | Aggregate counts and distribution statistics |
+
+### Join key hierarchy
+1. **Exact join** (`join_quality="exact"`): ORDER_INTENT has `observation_id` matching the
+   observation record (top-level field added in Sprint 2). Only exact-join records are
+   eligible for ML training.
+2. **Fallback join** (`join_quality="fallback"`): No `observation_id` in ORDER_INTENT
+   (pre-Sprint 2 records). Matched by symbol + direction + timestamp within ±300 s.
+   Fallback-joined records are stored but `ml_eligible=False` — origin unverifiable.
+3. **No match** (`join_quality="no_match"`): Pass row — `trade_taken=False`, `outcome_label=None`.
+
+### ml_eligible=True requires ALL
+- `observation_id` exists
+- `signal_scores` not empty
+- `direction` is LONG or SHORT
+- `trade_taken=True`, `order_filled=True`, `position_closed=True`
+- `realised_pnl_pct` not null
+- `join_quality="exact"`
+
+### Outcome labels
+`pnl_pct > 0 → WIN` | `pnl_pct < 0 → LOSS` | `pnl_pct == 0.0 → BREAKEVEN`
+BREAKEVEN is never WIN. Non-traded pass rows → `outcome_label=None`.
+
+### LEAKAGE_FIELDS (stored but never model inputs)
+`hold_minutes`, `exit_price`, `exit_reason`, `realised_pnl`, `realised_pnl_pct`,
+`outcome_label`, `position_closed`, `exit_timestamp`.
+
+### Current output (2026-05-20)
+Zero canonical records. `ml_observations.jsonl` does not yet exist — `ml_observer_enabled=False`
+in config by default. All existing trades predate Sprint 2's observation writer.
+The joiner handles the empty-observations case and writes an empty dataset without error.
+
+### What Sprint 4 should build
+Shadow logging infrastructure:
+1. `ml_shadow_predictions.jsonl` writer — log `win_prob`, `expected_return`, `confidence`,
+   `model_id` alongside each scan without changing scores.
+2. Activated by `ml_observer_enabled=True` (existing gate) + a candidate model in
+   `data/ml/registry/` with `status="shadow"`.
+3. Sprint 4 must not change scores, rankings, or execution paths.
+4. Brier score tracking for shadow calibration (offline, not runtime).

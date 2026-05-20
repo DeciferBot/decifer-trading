@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-05-20 — ML Clean-Slate Sprint 3: Offline Outcome Joiner and Canonical Learning Dataset Builder
+
+**Decision**: Build the offline outcome joiner that links signal observations to realised trade outcomes, producing the canonical learning dataset. No model training, no model loading, no live influence.
+
+**What was built**:
+- `scripts/ml_outcome_joiner.py` — stdlib-only offline script (~370 lines). Reads `data/ml/ml_observations.jsonl` + `data/trade_events.jsonl` + `data/training_records.jsonl` + `data/ml/closed_trade_training_ledger.jsonl`. Writes `data/ml/canonical_learning_dataset.jsonl` + `data/ml/canonical_learning_dataset_summary.json`.
+- `tests/test_ml_outcome_joiner.py` — 20 tests (T1–T20). All pass.
+
+**Join key hierarchy**:
+1. **Exact join** (`join_quality="exact"`): ORDER_INTENT has `observation_id` matching the observation record. This is the Sprint 2 linkage field added to ORDER_INTENT as a top-level key.
+2. **Fallback join** (`join_quality="fallback"`): No `observation_id` in ORDER_INTENT (pre-Sprint 2 records). Match by symbol + direction + ORDER_INTENT timestamp within ±300 seconds of observation timestamp.
+3. **No match** (`join_quality="no_match"`): Observation with no trade. Written as a pass row (`trade_taken=False`, `outcome_label=None`).
+
+**ml_eligible=True** requires ALL: observation_id exists, signal_scores not empty, direction LONG/SHORT, trade_taken=True, order_filled=True, position_closed=True, realised_pnl_pct not null, join_quality="exact". Fallback-joined records are stored but never eligible for training (origin cannot be verified with certainty).
+
+**Outcome label rules**: `pnl_pct > 0 → WIN`, `pnl_pct < 0 → LOSS`, `pnl_pct == 0.0 → BREAKEVEN`. BREAKEVEN is not WIN. Non-traded pass rows always have `outcome_label=None`.
+
+**LEAKAGE_FIELDS** (stored in output but never model inputs): `hold_minutes`, `exit_price`, `exit_reason`, `realised_pnl`, `realised_pnl_pct`, `outcome_label`, `position_closed`, `exit_timestamp`. These are post-outcome fields — using them as model inputs would replicate the leakage bug in the deleted legacy engine.
+
+**Outcome source priority**: `closed_trade_training_ledger.jsonl` (richer schema, newer) takes precedence over `training_records.jsonl` when both have the same `trade_id`.
+
+**Expected output now (2026-05-20)**: 0 canonical records. The `ml_observations.jsonl` file does not yet exist — `ml_observer_enabled=False` in config. All existing trades predate Sprint 2's observation writer. The script correctly handles the empty-observations case and writes an empty dataset without error.
+
+**Hard constraints respected**: no model training, no model loading, no score influence, no order routing changes, no runtime import by the live bot, stdlib only.
+
+**Files created**: `scripts/ml_outcome_joiner.py`, `tests/test_ml_outcome_joiner.py`.
+
+**Tests**: T1 (no ML imports), T2 (empty obs), T3 (missing file), T4 (pass row), T5 (exact join), T6 (fallback join), T7 (full chain ml_eligible=True), T8 (missing signal_scores), T9 (neutral direction), T10 (fallback not eligible), T11 (LEAKAGE ∩ FEATURE = ∅), T12 (WIN/LOSS/BREAKEVEN), T13 (BREAKEVEN ≠ WIN), T14 (hold_minutes not in features), T15 (summary counts), T16 (output files created), T17 (pass rows null label), T18 (null pnl_pct), T19 (training_records source), T20 (ledger precedence).
+
+---
+
 ## 2026-05-20 — ML Clean-Slate Sprint 2: Main-Frame Signal Observation Writer
 
 **Decision**: Build the first real component of the controlled learning loop — a lightweight main-frame signal observation writer attached to the production signal pipeline.
