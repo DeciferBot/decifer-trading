@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -38,6 +39,10 @@ _NEWS_CACHE_TTL = 60  # seconds
 
 _catalyst_payload_cache: dict = {"data": None, "fetched_at": 0.0}
 _CATALYST_CACHE_TTL = 30  # seconds
+
+# ── Intelligence pipeline trigger state ──────────────────────────────────────
+_intel_pipeline_lock = threading.Lock()
+_intel_pipeline_state: dict = {"running": False, "triggered_at": None, "error": None}
 
 # ── Macro event classifier cache ──────────────────────────────────────────────
 _macro_cache: dict = {}  # headline_hash → list of macro classifications
@@ -684,6 +689,43 @@ import training_store as _training_store
 
 _TR_CACHE: list = []
 _TR_CACHE_MTIME: float = 0.0
+
+_REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
+def _run_intelligence_pipeline() -> None:
+    """Run run_intelligence_pipeline.py as a subprocess. Called in a daemon thread."""
+    import time as _t
+    with _intel_pipeline_lock:
+        _intel_pipeline_state["running"] = True
+        _intel_pipeline_state["triggered_at"] = _t.time()
+        _intel_pipeline_state["error"] = None
+    try:
+        result = subprocess.run(
+            [sys.executable, "run_intelligence_pipeline.py"],
+            cwd=_REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout or "")[:500]
+            with _intel_pipeline_lock:
+                _intel_pipeline_state["error"] = err
+            clog("ERROR", f"Intelligence pipeline failed (rc={result.returncode}): {err[:200]}")
+        else:
+            clog("INFO", "✓ Intelligence pipeline completed successfully")
+    except subprocess.TimeoutExpired:
+        with _intel_pipeline_lock:
+            _intel_pipeline_state["error"] = "timeout after 600s"
+        clog("ERROR", "Intelligence pipeline timed out after 600s")
+    except Exception as exc:
+        with _intel_pipeline_lock:
+            _intel_pipeline_state["error"] = str(exc)
+        clog("ERROR", f"Intelligence pipeline error: {exc}")
+    finally:
+        with _intel_pipeline_lock:
+            _intel_pipeline_state["running"] = False
 
 
 def _load_training_records() -> list:
@@ -1351,6 +1393,9 @@ class DashHandler(BaseHTTPRequestHandler):
             try:
                 from bot_health import build_health_report
                 payload = build_health_report()
+                with _intel_pipeline_lock:
+                    payload["pipeline_running"] = _intel_pipeline_state["running"]
+                    payload["pipeline_error"] = _intel_pipeline_state["error"]
             except Exception as exc:
                 log.warning("[dashboard][/api/health] error: %s", exc)
                 payload = {"error": str(exc), "ts": ""}
@@ -1622,6 +1667,21 @@ class DashHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"ok": True}).encode())
             clog("INFO", "⚡ Force scan triggered via dashboard")
             threading.Thread(target=run_scan, daemon=True).start()
+        elif self.path == "/api/trigger/intelligence-pipeline":
+            with _intel_pipeline_lock:
+                already_running = _intel_pipeline_state["running"]
+            if already_running:
+                self.send_response(409)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "msg": "Pipeline already running"}).encode())
+            else:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": True, "msg": "Intelligence pipeline triggered"}).encode())
+                clog("INFO", "▶ Intelligence pipeline triggered via dashboard")
+                threading.Thread(target=_run_intelligence_pipeline, daemon=True).start()
         elif self.path == "/api/settings":
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length)) if length else {}

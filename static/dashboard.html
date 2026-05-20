@@ -2436,6 +2436,21 @@ function _stageDetail(s) {
         }).join('') +
       `</div>`;
     }
+    // Manual trigger button — useful when the scheduled 16:45 run was missed
+    const btnLabel = _intelPipelineRunning ? 'Running…' : 'Run Now';
+    const btnDisabled = _intelPipelineRunning ? 'disabled' : '';
+    const btnOpacity = _intelPipelineRunning ? '0.5' : '1';
+    rows += `<div style="margin-top:10px">
+      <button ${btnDisabled} onclick="triggerIntelPipeline(this)" style="
+        padding:4px 12px;font-size:10px;font-family:'JetBrains Mono',monospace;
+        background:transparent;border:1px solid var(--muted);border-radius:3px;
+        color:var(--muted2);cursor:pointer;opacity:${btnOpacity};letter-spacing:.5px;
+        transition:border-color .15s,color .15s"
+        onmouseover="if(!this.disabled){this.style.borderColor='var(--text)';this.style.color='var(--text)'}"
+        onmouseout="this.style.borderColor='var(--muted)';this.style.color='var(--muted2)'"
+      >${btnLabel}</button>
+      <span style="font-size:9px;color:var(--muted2);margin-left:8px">Refresh intelligence · triggers run_intelligence_pipeline.py</span>
+    </div>`;
   }
 
   if (name === 'Handoff') {
@@ -2695,6 +2710,8 @@ function loadHealth() {
     // ── Issues summary ────────────────────────────────────
     const issuesEl = document.getElementById('hlth-issues');
     const stages = d.stages || [];
+    // Sync pipeline running state from server so button reflects reality after page reload
+    _intelPipelineRunning = !!d.pipeline_running;
     if (issuesEl) {
       const issues = _buildIssues(stages);
       if (issues.length) {
@@ -2764,6 +2781,28 @@ function forceScan() {
     document.getElementById('bot-status').textContent = 'Scanning...';
     document.getElementById('trades-list').innerHTML = '<div class="empty">Scanning...</div>';
   });
+}
+
+let _intelPipelineRunning = false;
+function triggerIntelPipeline(btn) {
+  if (_intelPipelineRunning) return;
+  _intelPipelineRunning = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; btn.style.opacity = '0.6'; }
+  fetch('/api/trigger/intelligence-pipeline', {method: 'POST'})
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) {
+        _intelPipelineRunning = false;
+        if (btn) { btn.disabled = false; btn.textContent = 'Run Now'; btn.style.opacity = '1'; }
+        alert(d.msg || 'Failed to trigger pipeline');
+      }
+      // On success: leave button in Running state; loadHealth (every 5s) will clear it
+      // when pipeline_running returns false from the server.
+    })
+    .catch(() => {
+      _intelPipelineRunning = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Run Now'; btn.style.opacity = '1'; }
+    });
 }
 function restartBot() {
   if (confirm('Restart Decifer? Bot will stop, then restart in 3 seconds. Positions are held in IBKR.')) {

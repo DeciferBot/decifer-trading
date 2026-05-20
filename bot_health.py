@@ -2,9 +2,9 @@
 bot_health.py — 7-stage pipeline health report for /api/health endpoint.
 
 Pipeline funnel:
-  Stage 1: Intelligence Pipeline  (manual → intelligence/*.json)
+  Stage 1: Intelligence Pipeline  (daily pre-market → intelligence/*.json)
   Stage 2: Universe Builders      (launchd weekly/daily → universe files)
-  Stage 3: Handoff Publisher      (launchd 10min → live/ + heartbeats/)
+  Stage 3: Handoff Publisher      (daily pre-market → live/ session-valid to 22:00 UTC)
   Stage 4: Bot Core               (always-on → IBKR + Alpaca + process)
   Stage 5: Scan Engine            (scan cycle → Apex + signal funnel)
   Stage 6: Execution              (positions + bracket integrity + disk)
@@ -75,8 +75,8 @@ def _agg_status(artifacts: list[dict]) -> str:
 # ── Stage builders ────────────────────────────────────────────────────────────
 
 def _stage_intelligence() -> dict:
-    """Stage 1 — Intelligence Pipeline (manual-only refresh)."""
-    SLA = 3600
+    """Stage 1 — Intelligence Pipeline (pre-market daily refresh, session-valid all day)."""
+    SLA = 8 * 3600  # once-daily run; alert only if overdue, not after 1h
     artifacts = [
         _file_age("intelligence/live_driver_state.json",      SLA, "Market Map (live drivers)"),
         _file_age("intelligence/economic_candidate_feed.json", SLA, "Economic candidate feed"),
@@ -173,8 +173,8 @@ def _stage_universe() -> dict:
 
 
 def _stage_handoff() -> dict:
-    """Stage 3 — Handoff Publisher (run_intelligence_pipeline.py output)."""
-    SLA = 3600
+    """Stage 3 — Handoff Publisher (written once at pre-market, session-valid to 22:00 UTC)."""
+    SLA = 8 * 3600  # manifest expires_at = 22:00 UTC; alert only if overdue
     artifacts = [
         _file_age("live/active_opportunity_universe.json", SLA, "Active opportunity universe"),
         _file_age("live/current_manifest.json",            SLA, "Handoff manifest"),
