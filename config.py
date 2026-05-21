@@ -1030,7 +1030,7 @@ CONFIG = {
     # Minimum gap (blocked_score − book_avg) to trigger evaluation.
     "ROTATION_LIVE_MIN_GAP_VS_BOOK":   0,   # candidate only needs to beat book avg
     # Maximum score an exit candidate may have (weak position threshold).
-    "ROTATION_LIVE_EXIT_SCORE_MAX":    35,
+    "ROTATION_LIVE_EXIT_SCORE_MAX":    50,
     # Maximum notional of the exit candidate expressed as a fraction of NLV.
     "ROTATION_LIVE_MAX_NLV_PCT":       0.02,
 }
