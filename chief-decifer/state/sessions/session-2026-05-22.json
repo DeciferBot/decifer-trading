@@ -1,0 +1,49 @@
+{
+  "date": "2026-05-22",
+  "session_id": "session-2026-05-22",
+  "title": "Production Incident: 72/72 Scoring Pipeline Failure — Batch Prefetch + Bounded Concurrency Fix",
+  "summary": "Production incident at 14:23 ET (and recurring through 3:30 PM ET) where every scan cycle failed with '72/72 symbols failed data fetch.' Root cause diagnosed and fixed. Bot restarted with new code. Market-open proof scan scheduled.",
+  "what_changed": [
+    {
+      "file": "alpaca_data.py",
+      "change": "Added fetch_bars_batch() for multi-symbol batched Alpaca REST calls (single API call per 50-symbol chunk). Added _CYCLE_CACHE (3-min TTL, keyed by symbol/period/interval) to deduplicate fetches within a scan cycle. Added _is_http_rate_limit() and _is_http_server_error() helpers. Improved retry logic: 429 -> 2^(attempt+1)+jitter, 5xx -> 2^attempt+jitter, transient TCP/timeout -> 0.5*2^attempt+jitter. _MAX_FETCH_RETRIES 3->4."
+    },
+    {
+      "file": "signals/__init__.py",
+      "change": "_SCORE_WORKERS 16->6, _ALPACA_SEM BoundedSemaphore 16->6 (was no-op — semaphore equaled worker count). Added batch prefetch block before ThreadPoolExecutor: two fetch_bars_batch() calls (1d + 1wk) convert N×2 individual REST calls into 2 batch calls on cold start. Added circuit breaker (_CB_STATE): opens after 3 consecutive full-failure cycles, auto-closes after 300s, only blocks new entries (PM/exits/risk continue). Added get_score_universe_status() and _check_and_record_circuit_breaker(). score_universe() returns DATA_FETCH_BLOCKED (not silent empty list) when >80% symbols fail. Added structured telemetry log per scan: scan_id, requested/successful/failed counts, fetch_mode, retry_count, 429_count, timeout_count, connection_error_count, elapsed_ms."
+    },
+    {
+      "file": "signal_pipeline.py",
+      "change": "Added DATA_FETCH_BLOCKED propagation — reads get_score_universe_status() after score_universe() and returns SignalPipelineResult(status='DATA_FETCH_BLOCKED') so the orchestrator can distinguish data failure from risk gate or zero-signal scan."
+    },
+    {
+      "file": "tests/test_fetch_reliability.py",
+      "change": "New file. 18 tests covering: cycle cache deduplication, batch path uses 1 API call not N, 429/timeout retry with backoff, _SCORE_WORKERS <= 8 assertion, partial success (50/72), all-failure produces DATA_FETCH_BLOCKED not RISK_BLOCKED, circuit breaker open/close, pipeline status propagation."
+    },
+    {
+      "file": "docs/DECISIONS.md",
+      "change": "Appended production incident post-mortem (2026-05-22): root cause (semaphore == worker count -> 48 simultaneous Alpaca REST calls -> urllib3 pool overload), 6-point fix summary, what was NOT changed."
+    },
+    {
+      "file": "version.py",
+      "change": "Bumped to 4.16.2."
+    }
+  ],
+  "what_was_deleted": "Nothing deleted.",
+  "decisions_made": [
+    "Scoring pipeline overload fix: batch prefetch + bounded concurrency (6 workers) is the canonical approach. _SCORE_WORKERS must not exceed 8 without re-evaluating urllib3 pool size (10 connections to data.alpaca.markets). Documented in docs/DECISIONS.md.",
+    "DATA_FETCH_BLOCKED is the canonical status for data-layer failures — it is NOT a risk gate and does not suppress portfolio management, exits, or risk monitoring."
+  ],
+  "tests": {
+    "new": 18,
+    "targeted_passing": 67,
+    "suite_note": "18 new in test_fetch_reliability.py + 19 alpaca_data + 30 signal_pipeline. Pre-existing failures unchanged."
+  },
+  "what_is_next": "Post-restart scoring reliability proof — capture first 3 scan cycles after market open (9:30 AM ET, 17:30 UTC+4 on 2026-05-22) and confirm DATA_FETCH_BLOCKED error does not recur. ScheduleWakeup active.",
+  "bot_state": {
+    "pid_at_session_close": 18800,
+    "ibkr_account": "DUP481326",
+    "positions_reconciled": 24,
+    "restart_time_utc4": "2026-05-22 00:05:52 +04"
+  }
+}
