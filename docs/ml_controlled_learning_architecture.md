@@ -344,13 +344,56 @@ BREAKEVEN is never WIN. Non-traded pass rows → `outcome_label=None`.
 `hold_minutes`, `exit_price`, `exit_reason`, `realised_pnl`, `realised_pnl_pct`,
 `outcome_label`, `position_closed`, `exit_timestamp`.
 
-### Current output (2026-05-20)
-Zero canonical records. `ml_observations.jsonl` does not yet exist — `ml_observer_enabled=False`
-in config by default. All existing trades predate Sprint 2's observation writer.
-The joiner handles the empty-observations case and writes an empty dataset without error.
+---
+
+## Training-Readiness Gate (replaces retired 50-trade gate)
+
+**The old 50-trade ML activation gate is retired.** It belonged to `ml_engine.py` which was
+deleted in Sprint 3 (ML Clean-Slate Sprint 1). Any reference to "ML engine activation (gate met:
+50+ trades)" is incorrect — that gate no longer exists in the codebase.
+
+**ML activation is not yet eligible.** Under the controlled learning architecture, the gate
+that must be met before any model training, shadow deployment, or live influence is:
+
+`canonical_learning_dataset.jsonl` must contain **at least 200 `ml_eligible=true` exact
+closed-trade records** satisfying ALL of the following conditions:
+
+| Condition | Field / check |
+|-----------|--------------|
+| Exact identity linkage | `join_quality="exact"` — `observation_id` linked from observation → ORDER_INTENT → closed outcome |
+| Trade was executed | `trade_taken=true` |
+| Order was filled | `order_filled=true` |
+| Position was closed | `position_closed=true` |
+| Outcome is known | `realised_pnl_pct` present and not null |
+| Regime diversity | At least 2 distinct regimes represented |
+| No regime concentration | No single regime above 75% of eligible records |
+| Label distribution | WIN / LOSS / BREAKEVEN counts reported and non-degenerate |
+| No leakage in features | No `LEAKAGE_FIELDS` in model input feature matrix |
+| Source accuracy validated | No `candidate_source="unknown"` records in post-Sprint-3.7 scans |
+| Linkage validated end-to-end | `observation_id` chain confirmed: observation → ORDER_INTENT → closed trade |
+
+**Research-only experiments** may be allowed earlier but must be explicitly labelled:
+- `research-only` — not production
+- not shadow
+- not eligible for live influence
+
+No model training. No model loading. No prediction. No advisory scoring. No live trading
+behaviour changes until the gate above is met and Amit approves.
+
+---
+
+### Current output (2026-05-21, post-Sprint-3.7)
+`ml_observations.jsonl` exists and is actively populated. `ml_observer_enabled=True` in config.
+As of 2026-05-21: 4,118 observation records across 92 scan IDs. `schema_version=sprint37_v1`
+on all records written after Sprint 3.7 deployment. `candidate_source` will be `"handoff_reader"`
+or `"scanner"` on post-Sprint-3.7 records (pre-Sprint-3.6 records show `"unknown"`).
+
+Canonical learning dataset (`canonical_learning_dataset.jsonl`): zero `ml_eligible=true` records.
+Exact-joined closed-trade records will accumulate as post-Sprint-3.7 bot cycles produce trades
+that carry `observation_id` in ORDER_INTENT and subsequently close with confirmed outcomes.
 
 ### What Sprint 4 should build
-Shadow logging infrastructure:
+Shadow logging infrastructure (requires training-readiness gate met first):
 1. `ml_shadow_predictions.jsonl` writer — log `win_prob`, `expected_return`, `confidence`,
    `model_id` alongside each scan without changing scores.
 2. Activated by `ml_observer_enabled=True` (existing gate) + a candidate model in

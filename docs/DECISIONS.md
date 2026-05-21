@@ -6,6 +6,42 @@
 
 ---
 
+## 2026-05-21 — ML Sprint 3.7: Candidate Source Accuracy + Canary Baseline + Old 50-Trade Gate Retired
+
+**Decision**: Move `write_observations()` to `bot_trading.py` after handoff enrichment so `candidate_source` is accurate. Expose `rank_map`, `ranking_total`, `vix` on `SignalPipelineResult`. Update `SCHEMA_VERSION` to `sprint37_v1`. Add `--since-scan-id` baseline to canary mode. Explicitly retire the legacy 50-trade ML activation gate.
+
+**What was built**:
+- `signal_pipeline.py`: Removed `write_observations()` call. Added `rank_map: dict`, `ranking_total: int`, `vix: float` to `SignalPipelineResult` so callers have all fields without re-reading config.
+- `bot_trading.py`: Added `write_observations()` call immediately after the handoff enrichment loop that promotes `candidate_source` to `"handoff_reader"`. This is the correct location — observations now record the final promoted source rather than the conservative `"scanner"` stamp that `signal_pipeline` applies.
+- `ml_observation_writer.py`: `SCHEMA_VERSION = "sprint37_v1"`.
+- `scripts/ml_observation_health_check.py`: `--since-scan-id SCAN_ID` argument added. Canary duplicate check is scoped to records with `scan_id >= SCAN_ID`. Integrity checks (missing fields, score mutation) still run on ALL records. Full summary unchanged. Fixes permanent CANARY FAIL caused by 2026-05-20 startup artifact `20260520T133247_AAPL`.
+- `tests/test_ml_sprint37_source_accuracy.py`: 16 tests (T1–T16). All pass.
+
+**Legacy 50-trade ML activation gate — RETIRED**:
+The old `phase_gate.py` gate (≥50 closed trades → activate `ml_engine.py`) is retired. `ml_engine.py` was deleted in Sprint 3 (ML Clean-Slate Sprint 1). The 50-trade count gate and the `phase_gate.py` gating mechanism no longer exist in the codebase. Any documentation or summary language referencing "ML engine activation (gate met: 50+ trades)" is incorrect and must be replaced with the canonical training-readiness gate below.
+
+**Canonical training-readiness gate (replaces old 50-trade gate)**:
+ML activation is not yet eligible. The new gate requires `canonical_learning_dataset.jsonl` to contain at least 200 `ml_eligible=true` exact closed-trade records satisfying ALL of:
+- `join_quality="exact"` — observation_id linked from observation → ORDER_INTENT → closed outcome
+- `trade_taken=true`, `order_filled=true`, `position_closed=true`
+- `realised_pnl_pct` present and not null
+- At least 2 distinct regimes represented
+- No single regime above 75% of eligible records
+- WIN / LOSS / BREAKEVEN distribution reported and non-degenerate
+- No leakage fields in model input features
+- `candidate_source` accuracy validated (no `"unknown"` records in post-Sprint-3.7 scans)
+- `observation_id` linkage validated end-to-end (observation → ORDER_INTENT → closed trade)
+
+Research-only experiments may be allowed earlier but must be explicitly labelled research-only, not production, not shadow, not eligible for live influence. No model training. No model loading. No prediction. No advisory scoring. No live trading behaviour changes.
+
+**Current status**: Pending. Post-Sprint-3.7 live bot cycles needed to generate `sprint37_v1` records with accurate `candidate_source`. No exact-joined closed-trade records exist yet.
+
+**Files changed**: `signal_pipeline.py`, `bot_trading.py`, `ml_observation_writer.py`, `scripts/ml_observation_health_check.py`, `tests/test_ml_sprint36_identity_linkage.py`.
+**Files created**: `tests/test_ml_sprint37_source_accuracy.py`.
+**Live trading impact**: None. All changes are observation-side only. No scoring path, order path, or execution path touched.
+
+---
+
 ## 2026-05-20 — ML Clean-Slate Sprint 3: Offline Outcome Joiner and Canonical Learning Dataset Builder
 
 **Decision**: Build the offline outcome joiner that links signal observations to realised trade outcomes, producing the canonical learning dataset. No model training, no model loading, no live influence.
