@@ -5039,12 +5039,15 @@ function renderOpusView(d) {
     ageMin = (Date.now() / 1000 - latest.ts_utc) / 60;
     if (ageMin < 0) ageMin = 0;
   } else if (rawTime && /^\d{2}:\d{2}:\d{2}$/.test(rawTime)) {
-    // Fallback for legacy entries without ts_utc
+    // Fallback for legacy entries without ts_utc.
+    // rawTime is stored in ET. Compare against current ET time so local machine
+    // timezone doesn't skew the result.
     const [h, m, s] = rawTime.split(':').map(Number);
-    const now = new Date();
-    let diffMs = now.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s).getTime();
-    if (diffMs < 0) diffMs += 86400000; // midnight crossing
-    ageMin = diffMs / 60000;
+    const etStr = new Date().toLocaleString('en-US', {timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
+    const [etH, etM, etS] = etStr.split(':').map(Number);
+    let diffS = (etH * 3600 + etM * 60 + etS) - (h * 3600 + m * 60 + s);
+    if (diffS < 0) diffS += 86400; // midnight crossing
+    ageMin = diffS / 60;
   }
   // Don't warn-stale when market is closed — old synthesis is expected and normal
   const marketInactive = ['CLOSED', 'WEEKEND'].includes(d.session || '');
