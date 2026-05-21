@@ -2670,17 +2670,50 @@ function loadIntelligence() {
     if (themesEl) {
       const themes = d.themes || [];
       if (themes.length) {
-        const active = themes.filter(t => { const st = (t.state || t.status || '').toLowerCase(); return st === 'active' || st === 'activated'; });
+        const stateOrder = ['activated','strengthening','watchlist','weakening','crowded','dormant','invalidated'];
+        const sorted = [...themes].sort((a,b) => {
+          const ai = stateOrder.indexOf((a.state||'').toLowerCase()), bi = stateOrder.indexOf((b.state||'').toLowerCase());
+          return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+        });
+        const stateBadge = st => {
+          const s = (st||'').toLowerCase();
+          if (s==='activated'||s==='active')   return {label:'ACTIVE',   bg:'rgba(0,200,100,0.15)', border:'rgba(0,200,100,0.5)', color:'var(--green)'};
+          if (s==='strengthening')             return {label:'STRENGT',  bg:'rgba(0,200,100,0.08)', border:'rgba(0,200,100,0.35)', color:'#4fd'};
+          if (s==='watchlist')                 return {label:'WATCH',    bg:'rgba(255,160,0,0.12)', border:'rgba(255,160,0,0.5)',  color:'var(--orange)'};
+          if (s==='weakening')                 return {label:'WEAK',     bg:'rgba(255,80,80,0.12)', border:'rgba(255,80,80,0.45)', color:'#f77'};
+          if (s==='crowded')                   return {label:'CROWDED',  bg:'rgba(200,100,0,0.12)', border:'rgba(200,100,0,0.4)',  color:'#c80'};
+          if (s==='invalidated')               return {label:'INVAL',    bg:'rgba(120,0,0,0.12)',   border:'rgba(200,0,0,0.3)',    color:'#944'};
+          return                                       {label:'DORMANT',  bg:'transparent',          border:'rgba(80,80,100,0.3)', color:'var(--muted2)'};
+        };
+        const activeCount = themes.filter(t => { const s=(t.state||'').toLowerCase(); return s==='activated'||s==='active'||s==='strengthening'; }).length;
         themesEl.innerHTML =
-          `<div style="font-size:10px;color:var(--muted2);margin-bottom:5px">${active.length} of ${themes.length} active</div>` +
-          themes.map(t => {
-            const _st = (t.state || t.status || '').toLowerCase();
-            const isActive = (_st === 'active' || _st === 'activated');
-            const col = isActive ? 'var(--green)' : 'var(--muted)';
-            const name = t.name || t.theme_id || '?';
-            return `<div style="display:flex;align-items:center;gap:5px;padding:1px 0;font-size:10px">
-              <span style="color:${col};font-size:8px">${isActive ? '●' : '○'}</span>
-              <span style="color:${isActive ? 'var(--text)' : 'var(--muted2)'}">${esc(name)}</span>
+          `<div style="font-size:10px;color:var(--muted2);margin-bottom:6px">${activeCount} of ${themes.length} active · <span style="color:var(--muted2)">${themes.filter(t=>(t.direction||'').toLowerCase()==='headwind').length} headwinds</span></div>` +
+          sorted.map(t => {
+            const st = (t.state || t.status || '').toLowerCase();
+            const b = stateBadge(st);
+            const isDim = st === 'dormant' || st === 'invalidated';
+            const name = (t.name || t.theme_id || '?').replace(/_/g,' ');
+            const conf = t.confidence != null ? Math.round((t.confidence||0) * 100) : null;
+            const cands = t.candidate_count != null ? t.candidate_count : null;
+            const dir = (t.direction||'').toLowerCase();
+            const dirTag = dir === 'headwind' ? '↓' : dir === 'tailwind' ? '↑' : '';
+            const dirColor = dir === 'headwind' ? '#f77' : dir === 'tailwind' ? 'var(--green)' : 'var(--muted2)';
+            const confBar = conf != null && !isDim
+              ? `<div style="flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.06);overflow:hidden;min-width:30px">
+                   <div style="height:100%;width:${conf}%;background:${b.color};border-radius:2px;opacity:0.7"></div>
+                 </div>`
+              : `<div style="flex:1"></div>`;
+            const candPill = cands != null && cands > 0
+              ? `<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.06);color:var(--muted2);white-space:nowrap">${cands}</span>`
+              : '';
+            return `<div style="display:grid;grid-template-columns:52px 1fr auto auto;align-items:center;gap:5px;padding:3px 0;${isDim?'opacity:0.45':''}">
+              <span style="font-size:8px;font-family:'JetBrains Mono',monospace;padding:1px 4px;border-radius:3px;background:${b.bg};border:1px solid ${b.border};color:${b.color};text-align:center;letter-spacing:0.03em">${b.label}</span>
+              <span style="font-size:10px;color:${isDim?'var(--muted2)':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</span>
+              ${confBar}
+              <div style="display:flex;align-items:center;gap:4px">
+                ${candPill}
+                ${dirTag ? `<span style="font-size:11px;color:${dirColor}">${dirTag}</span>` : ''}
+              </div>
             </div>`;
           }).join('');
       } else {
