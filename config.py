@@ -1022,13 +1022,13 @@ CONFIG = {
     "ENABLE_ROTATION_LIVE_V1":         False,
     # Maximum rotation events per calendar day (UTC). Hard ceiling regardless of
     # how many strong candidates are blocked.
-    "ROTATION_LIVE_MAX_PER_DAY":       1,
+    "ROTATION_LIVE_MAX_PER_DAY":       999,  # effectively unlimited
     # Maximum positions exited per rotation event.
     "ROTATION_LIVE_MAX_EXITS":         1,
     # Minimum score the blocked candidate must have to trigger evaluation.
     "ROTATION_LIVE_MIN_BLOCKED_SCORE": 35,
     # Minimum gap (blocked_score − book_avg) to trigger evaluation.
-    "ROTATION_LIVE_MIN_GAP_VS_BOOK":   7,
+    "ROTATION_LIVE_MIN_GAP_VS_BOOK":   0,   # candidate only needs to beat book avg
     # Maximum score an exit candidate may have (weak position threshold).
     "ROTATION_LIVE_EXIT_SCORE_MAX":    35,
     # Maximum notional of the exit candidate expressed as a fraction of NLV.
