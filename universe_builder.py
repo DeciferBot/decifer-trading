@@ -9,6 +9,12 @@ No live bot wiring. No mutations of any existing source file. Shadow only.
 All symbols from approved roster, existing current sources, held positions,
 or manual conviction lists.
 
+File naming note: the output file name ("_shadow") is a legacy internal name.
+This file is an intermediate staging artifact only — it is NEVER read directly
+by the live bot.  run_intelligence_pipeline.py promotes it to the production
+handoff at data/live/active_opportunity_universe.json, which is the only path
+consumed by handoff_reader.load_production_handoff() and bot_trading.py.
+
 Public surface:
     UniverseBuilder          — builds the shadow universe
     ShadowCandidate          — per-symbol output dataclass

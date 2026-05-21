@@ -404,7 +404,7 @@ class CandidateResolver:
                     transmission_rules_fired=list(rule_ids),
                     market_confirmation_required=market_confirmation_required,
                     generated_at=generated_at,
-                    mode="shadow_report_only",
+                    mode="intelligence_advisory_feed",
                     live_output_changed=False,
                 ))
 
@@ -415,7 +415,7 @@ class CandidateResolver:
             schema_version=_SCHEMA_VERSION,
             generated_at=generated_at,
             fresh_until=fresh_until,
-            mode="shadow_report_only",
+            mode="intelligence_advisory_feed",
             source_files=[self._taxonomy_path, self._roster_path],
             candidates=candidates,
             warnings=warnings,
