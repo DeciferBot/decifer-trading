@@ -2299,6 +2299,7 @@ function switchTab(id, el) {
 
 // ── Health tab ─────────────────────────────────────────────
 let _healthRefreshTimer = null;
+let _openHealthStages = new Set();
 
 function _startHealthRefresh() {
   _stopHealthRefresh();
@@ -2306,6 +2307,12 @@ function _startHealthRefresh() {
 }
 function _stopHealthRefresh() {
   if (_healthRefreshTimer) { clearInterval(_healthRefreshTimer); _healthRefreshTimer = null; }
+}
+function _toggleHealthStage(headerEl, stageName) {
+  const det = headerEl.nextElementSibling;
+  const open = det.style.display !== 'none';
+  det.style.display = open ? 'none' : 'block';
+  if (open) _openHealthStages.delete(stageName); else _openHealthStages.add(stageName);
 }
 
 // ── Rotation tab ───────────────────────────────────────────
@@ -2823,8 +2830,8 @@ function loadHealth() {
     const verdictEl = document.getElementById('hlth-verdict');
     if (verdictEl) {
       const vv = v.verdict || 'UNKNOWN';
-      const vc = vv === 'TRADING' ? 'var(--green)' : vv === 'DEGRADED' ? 'var(--orange)' : vv === 'NOT TRADING' ? 'var(--red)' : 'var(--muted2)';
-      const vi = vv === 'TRADING' ? '●' : vv === 'DEGRADED' ? '▲' : '✗';
+      const vc = vv === 'TRADING' ? 'var(--green)' : vv === 'WARN' ? 'var(--orange)' : vv === 'DEGRADED' ? 'var(--orange)' : vv === 'NOT TRADING' ? 'var(--red)' : 'var(--muted2)';
+      const vi = vv === 'TRADING' ? '●' : (vv === 'WARN' || vv === 'DEGRADED') ? '▲' : '✗';
       verdictEl.style.borderColor = vc;
       verdictEl.style.background = `${vc}11`;
       verdictEl.innerHTML = `
@@ -2881,9 +2888,10 @@ function loadHealth() {
       const connector = i < stages.length - 1
         ? `<div style="display:flex;justify-content:center;height:14px;color:var(--muted);font-size:11px;line-height:14px">│</div>`
         : '';
+      const initOpen = s.status !== 'ok' || _openHealthStages.has(s.name);
       return `<div style="border:1px solid var(--border2);border-radius:5px;background:var(--bg2);overflow:hidden">
         <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer"
-             onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+             onclick="_toggleHealthStage(this,'${s.name.replace(/'/g,"\\'")}')">
           <span style="font-size:9px;color:var(--muted2);min-width:24px;text-align:right">S${i+1}</span>
           <span style="color:${sc};font-size:13px;line-height:1">${si}</span>
           <div style="flex:1;min-width:0">
@@ -2892,7 +2900,7 @@ function loadHealth() {
           </div>
           <span style="font-size:10px;font-weight:700;color:${sc};letter-spacing:1px">${sl}</span>
         </div>
-        <div style="display:${s.status !== 'ok' ? 'block' : 'none'};border-top:1px solid var(--border);padding:8px 14px 10px 48px">
+        <div style="display:${initOpen ? 'block' : 'none'};border-top:1px solid var(--border);padding:8px 14px 10px 48px">
           ${detail || '<span style="font-size:10px;color:var(--muted2)">—</span>'}
         </div>
       </div>${connector}`;
