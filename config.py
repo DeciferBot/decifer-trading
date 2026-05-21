@@ -270,7 +270,7 @@ CONFIG = {
     "margin_exposure": {
         "enabled": True,                         # ACTIVATED 2026-05-05 — conservative margin entry
         "equity_gross_cap": 1.0,                 # equity mode gross cap (mirrors max_portfolio_allocation)
-        "margin_gross_cap": 1.10,                # margin mode gross cap (110% of NetLiquidation)
+        "margin_gross_cap": 1.50,                # margin mode gross cap (150% of NetLiquidation)
         "excess_liquidity_buffer": 0.01,         # block if ExcessLiquidity < 1% of NetLiquidation
         "available_funds_buffer": 0.01,          # block if AvailableFunds < 1% of NetLiquidation
         "max_account_values_age_seconds": 300,   # block if account_values older than 5 min in margin mode
@@ -1028,7 +1028,7 @@ CONFIG = {
     # Minimum score the blocked candidate must have to trigger evaluation.
     "ROTATION_LIVE_MIN_BLOCKED_SCORE": 35,
     # Minimum gap (blocked_score − book_avg) to trigger evaluation.
-    "ROTATION_LIVE_MIN_GAP_VS_BOOK":   15,
+    "ROTATION_LIVE_MIN_GAP_VS_BOOK":   7,
     # Maximum score an exit candidate may have (weak position threshold).
     "ROTATION_LIVE_EXIT_SCORE_MAX":    35,
     # Maximum notional of the exit candidate expressed as a fraction of NLV.
