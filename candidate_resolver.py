@@ -365,6 +365,10 @@ class CandidateResolver:
                 if sym not in all_symbols:
                     all_symbols.append(sym)
 
+            # Trim to max_candidates per theme before processing
+            max_per_theme = roster_entry.get("max_candidates", 10)
+            all_symbols = all_symbols[:max_per_theme]
+
             theme_name = theme_entry.get("name", theme_id)
 
             for symbol in all_symbols:
@@ -404,6 +408,9 @@ class CandidateResolver:
                     live_output_changed=False,
                 ))
 
+        # Deduplicate: one candidate per symbol, merge cross-theme entries
+        candidates = _deduplicate_candidates(candidates)
+
         return CandidateFeed(
             schema_version=_SCHEMA_VERSION,
             generated_at=generated_at,
@@ -415,6 +422,46 @@ class CandidateResolver:
             errors=errors,
             live_output_changed=False,
         )
+
+
+def _deduplicate_candidates(candidates: list[ResolvedCandidate]) -> list[ResolvedCandidate]:
+    """
+    One candidate per symbol. When a symbol appears in multiple themes,
+    keep the highest-confidence entry and merge theme names, reasons, and rules.
+    """
+    import dataclasses as _dc
+    by_symbol: dict[str, ResolvedCandidate] = {}
+    for c in candidates:
+        sym = c.symbol
+        if sym not in by_symbol:
+            by_symbol[sym] = c
+        else:
+            existing = by_symbol[sym]
+            # Keep highest confidence; if tie, keep direct_beneficiary over etf_proxy
+            role_rank = {"direct_beneficiary": 0, "second_order_beneficiary": 1, "etf_proxy": 2, "pressure_candidate": 3}
+            if (c.confidence, -role_rank.get(c.role, 9)) > (existing.confidence, -role_rank.get(existing.role, 9)):
+                primary, secondary = c, existing
+            else:
+                primary, secondary = existing, c
+            # Merge theme, reason, rules — append secondary info to primary
+            merged_theme = primary.theme if secondary.theme == primary.theme else f"{primary.theme}, {secondary.theme}"
+            merged_rtc = (
+                primary.reason_to_care
+                if secondary.reason_to_care in primary.reason_to_care
+                else f"{primary.reason_to_care} | Also: {secondary.reason_to_care}"
+            )
+            merged_rules = list(dict.fromkeys(primary.transmission_rules_fired + secondary.transmission_rules_fired))
+            merged_sources = list(dict.fromkeys(primary.source_labels + secondary.source_labels))
+            merged_risk = list(dict.fromkeys(primary.risk_flags + secondary.risk_flags))
+            by_symbol[sym] = _dc.replace(
+                primary,
+                theme=merged_theme,
+                reason_to_care=merged_rtc,
+                transmission_rules_fired=merged_rules,
+                source_labels=merged_sources,
+                risk_flags=merged_risk,
+            )
+    return list(by_symbol.values())
 
 
 def resolve_candidates(
@@ -471,9 +518,9 @@ def generate_feed(
                 "blocked_conditions": _live_state.get("blocked_conditions", []),
             }
         else:
-            # Fallback: structurally persistent drivers only
+            # No live driver state available — fail closed, no economic candidates
             _driver_state = {
-                "active_drivers": ["ai_capex_growth", "ai_compute_demand"],
+                "active_drivers": [],
                 "blocked_conditions": [],
             }
         result = matrix.fire(_driver_state)

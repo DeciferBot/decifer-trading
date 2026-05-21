@@ -10,12 +10,31 @@ Intelligence). It replaces the hard-coded driver list that was previously
 baked into candidate_resolver.generate_feed().
 
 No LLM. No broker. No IBKR. No .env inspection.
-Falls back to safe conservative defaults on any data failure so the
-intelligence pipeline never crashes due to a market data outage.
+Fails closed on data failure — no default-to-AI fallback. If all sensors fail,
+returns empty active_drivers with mode="no_data_available". If some sensors
+succeed, evaluates what it can with mode="degraded_partial_data".
 
 Public surface:
     resolve(output_path) -> dict   writes live_driver_state.json, returns it
     load()               -> dict   load most-recent live_driver_state.json
+
+Drivers resolved (deterministic, no LLM):
+  ai_capex_growth       — SMH 5d return > -8%  (structural; off only on AI capex collapse)
+  ai_compute_demand     — NVDA 5d return > -5%  (off only on severe NVDA decline)
+  yields_rising         — IEF 5d return < -0.4% (bond price falling = yields rising)
+  yields_falling        — IEF 5d return > +0.4% (bond price rising = yields falling)
+  oil_supply_shock      — USO 5d return > 4% or < -6% (price shock in either direction)
+  geopolitical_risk_rising — ITA outperforms SPY by > 2% (defence outperformance)
+  credit_stress_rising  — HYG underperforms LQD by > 0.4% over 5d
+  risk_off_rotation     — UVXY 5d return > 15% OR SPY 5d return < -2.5%
+  risk_on_rotation      — UVXY 5d return < -10% AND SPY 5d return > +1.5%
+  gold_safe_haven_bid   — GLD 5d return > +2%
+  credit_stress_easing  — HYG outperforms LQD by > 0.4% over 5d
+  small_cap_risk_on     — IWM outperforms SPY by > 1.5% over 5d
+
+blocked_conditions:
+  credit_stress_rising  — added when that driver fires (blocks banks rule)
+  smh_tactical_weakness — added when SMH 5d return between -4% and -8%
 """
 from __future__ import annotations
 
@@ -30,13 +49,10 @@ log = logging.getLogger("decifer.live_driver_resolver")
 _OUTPUT_PATH = os.path.join("data", "intelligence", "live_driver_state.json")
 _SCHEMA_VERSION = "1.0"
 
-# ── Conservative fallback — used when live data is unavailable ────────────────
-# These are the structurally persistent drivers that are almost always true.
-# They produce a reasonable universe even when market data cannot be fetched.
-_FALLBACK_ACTIVE_DRIVERS = [
-    "ai_capex_growth",
-    "ai_compute_demand",
-]
+# ── Fail-closed defaults — no data, no drivers ───────────────────────────────
+# Never default to AI drivers. If live data is unavailable, return empty.
+# This prevents stale AI-only universe generation when market data fails.
+_FALLBACK_ACTIVE_DRIVERS: list[str] = []
 _FALLBACK_BLOCKED: list[str] = []
 
 
@@ -79,23 +95,18 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
     """
     Fetch live market data, compute driver states, write live_driver_state.json.
 
-    Driver rules (all deterministic, no LLM):
-      ai_capex_growth      — SMH 5d return > -8%  (structural; off only on AI capex collapse)
-      ai_compute_demand    — NVDA 5d return > -5%  (off only on severe NVDA decline)
-      yields_rising        — IEF 5d return < -0.4% (bond price falling = yields rising)
-      oil_supply_shock     — USO 5d return > 4% or < -6% (price shock in either direction)
-      geopolitical_risk    — ITA 5d return outperforms SPY by > 2% (defence outperformance)
-      credit_stress_rising — HYG underperforms LQD by > 0.4% over 5d (credit spread widening)
-      risk_off_rotation    — VIX proxy (UVXY) 5d return > 15% OR SPY 5d return < -2.5%
+    Fails closed: if all sensors fail, returns empty active_drivers and
+    mode="no_data_available". Never defaults to AI drivers.
+    If 1-10 sensors succeed, evaluates available drivers with
+    mode="degraded_partial_data" warning.
 
-    blocked_conditions: if credit_stress_rising is active, add it to blocked_conditions
-    so the banks transmission rule fires conditionally (it has blocked_if: credit_stress_rising).
+    See module docstring for full driver list and thresholds.
     """
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     evidence: dict[str, Any] = {}
     warnings: list[str] = []
 
-    # ── Fetch all required bars ───────────────────────────────────────────────
+    # ── Fetch all required bars (11 sensors) ─────────────────────────────────
     smh_ret  = _fetch_5d_return("SMH")
     nvda_ret = _fetch_5d_return("NVDA")
     ief_ret  = _fetch_5d_return("IEF")
@@ -105,6 +116,8 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
     uvxy_ret = _fetch_5d_return("UVXY")
     hyg_ret  = _fetch_5d_return("HYG")
     lqd_ret  = _fetch_5d_return("LQD")
+    gld_ret  = _fetch_5d_return("GLD")
+    iwm_ret  = _fetch_5d_return("IWM")
 
     evidence = {
         "smh_5d_ret":  smh_ret,
@@ -116,39 +129,64 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
         "uvxy_5d_ret": uvxy_ret,
         "hyg_5d_ret":  hyg_ret,
         "lqd_5d_ret":  lqd_ret,
+        "gld_5d_ret":  gld_ret,
+        "iwm_5d_ret":  iwm_ret,
     }
 
     fetch_ok = sum(1 for v in evidence.values() if v is not None)
-    if fetch_ok < 4:
-        warnings.append(
-            f"Only {fetch_ok}/9 data fetches succeeded — using fallback driver list"
-        )
-        log.warning("live_driver_resolver: insufficient data (%d/9) — using fallback", fetch_ok)
+
+    # ── Fail closed if no data available ─────────────────────────────────────
+    if fetch_ok == 0:
+        warnings.append("All 11 data fetches failed — no drivers resolved (fail-closed)")
+        log.warning("live_driver_resolver: all sensors failed — returning no_data_available")
         result = _build_result(
-            now_iso, _FALLBACK_ACTIVE_DRIVERS, _FALLBACK_BLOCKED,
-            evidence, warnings, fallback=True
+            now_iso, [], [],
+            evidence, warnings, mode="no_data_available"
         )
         _write(result, output_path)
         return result
 
-    # ── Evaluate each driver ─────────────────────────────────────────────────
+    # ── Degraded warning if partial data ─────────────────────────────────────
+    _total_sensors = 11
+    if fetch_ok < _total_sensors:
+        warnings.append(
+            f"Only {fetch_ok}/{_total_sensors} data fetches succeeded — "
+            f"evaluating available drivers (degraded_partial_data)"
+        )
+        log.warning(
+            "live_driver_resolver: partial data (%d/%d) — evaluating available sensors",
+            fetch_ok, _total_sensors
+        )
+
+    # ── Evaluate each driver — only when its sensor(s) are available ─────────
     active_drivers: list[str] = []
     blocked_conditions: list[str] = []
 
     # ai_capex_growth: SMH structural tailwind (off only if SMH down >8% in 5d)
-    if smh_ret is None or smh_ret > -0.08:
+    if smh_ret is not None and smh_ret > -0.08:
         active_drivers.append("ai_capex_growth")
         evidence["ai_capex_growth_reason"] = f"SMH 5d={_pct(smh_ret)} > -8% threshold"
-    else:
+    elif smh_ret is not None:
         evidence["ai_capex_growth_reason"] = f"SMH 5d={_pct(smh_ret)} collapsed — driver inactive"
         warnings.append("ai_capex_growth inactive: SMH collapsed")
+    else:
+        evidence["ai_capex_growth_reason"] = "SMH unavailable — driver skipped"
 
     # ai_compute_demand: NVDA structural (off only if NVDA down >5%)
-    if nvda_ret is None or nvda_ret > -0.05:
+    if nvda_ret is not None and nvda_ret > -0.05:
         active_drivers.append("ai_compute_demand")
         evidence["ai_compute_demand_reason"] = f"NVDA 5d={_pct(nvda_ret)} > -5% threshold"
-    else:
+    elif nvda_ret is not None:
         evidence["ai_compute_demand_reason"] = f"NVDA 5d={_pct(nvda_ret)} collapsed — driver inactive"
+    else:
+        evidence["ai_compute_demand_reason"] = "NVDA unavailable — driver skipped"
+
+    # smh_tactical_weakness: blocked condition (not a driver) when SMH between -4% and -8%
+    if smh_ret is not None and smh_ret < -0.04:
+        blocked_conditions.append("smh_tactical_weakness")
+        evidence["smh_tactical_weakness_reason"] = (
+            f"SMH 5d={_pct(smh_ret)} between -4% and -8% — tactical weakness blocker"
+        )
 
     # yields_rising: IEF price falling = yields rising
     if ief_ret is not None and ief_ret < -0.004:
@@ -156,6 +194,13 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
         evidence["yields_rising_reason"] = f"IEF 5d={_pct(ief_ret)} < -0.4% (yields rising)"
     elif ief_ret is not None:
         evidence["yields_rising_reason"] = f"IEF 5d={_pct(ief_ret)} — yields not rising"
+
+    # yields_falling: IEF price rising = yields falling
+    if ief_ret is not None and ief_ret > 0.004:
+        active_drivers.append("yields_falling")
+        evidence["yields_falling_reason"] = f"IEF 5d={_pct(ief_ret)} > +0.4% (yields falling)"
+    else:
+        evidence["yields_falling_reason"] = f"IEF 5d={_pct(ief_ret)} — yields not falling"
 
     # oil_supply_shock: significant oil move in either direction
     if uso_ret is not None and (uso_ret > 0.04 or uso_ret < -0.06):
@@ -174,7 +219,6 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
             evidence["geopolitical_reason"] = f"ITA vs SPY={_pct(ita_vs_spy)} — no defence outperformance"
 
     # credit_stress_rising: HYG underperforms LQD by >0.4%
-    credit_stressed = False
     if hyg_ret is not None and lqd_ret is not None:
         credit_spread = lqd_ret - hyg_ret  # positive = stress
         credit_stressed = credit_spread > 0.004
@@ -200,13 +244,49 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
     if risk_off:
         active_drivers.append("risk_off_rotation")
 
+    # risk_on_rotation: UVXY falling and SPY rising
+    if uvxy_ret is not None and spy_ret is not None and uvxy_ret < -0.10 and spy_ret > 0.015:
+        active_drivers.append("risk_on_rotation")
+        evidence["risk_on_reason"] = f"UVXY={_pct(uvxy_ret)} < -10% AND SPY={_pct(spy_ret)} > +1.5%"
+    else:
+        evidence["risk_on_reason"] = f"UVXY={_pct(uvxy_ret)} SPY={_pct(spy_ret)} — no risk-on signal"
+
+    # gold_safe_haven_bid: GLD up meaningfully
+    if gld_ret is not None and gld_ret > 0.02:
+        active_drivers.append("gold_safe_haven_bid")
+        evidence["gold_reason"] = f"GLD 5d={_pct(gld_ret)} > +2% — safe-haven bid"
+    elif gld_ret is not None:
+        evidence["gold_reason"] = f"GLD 5d={_pct(gld_ret)} — no safe-haven signal"
+    else:
+        evidence["gold_reason"] = "GLD unavailable"
+
+    # credit_stress_easing: HYG outperforms LQD (opposite of credit_stress_rising)
+    if hyg_ret is not None and lqd_ret is not None:
+        credit_improvement = hyg_ret - lqd_ret  # positive = HYG outperforming = easing
+        if credit_improvement > 0.004:
+            active_drivers.append("credit_stress_easing")
+            evidence["credit_easing_reason"] = f"HYG outperforms LQD by {_pct(credit_improvement)} — credit easing"
+        else:
+            evidence["credit_easing_reason"] = f"HYG-LQD={_pct(credit_improvement)} — credit not easing"
+
+    # small_cap_risk_on: IWM outperforms SPY meaningfully
+    if iwm_ret is not None and spy_ret is not None:
+        iwm_vs_spy = iwm_ret - spy_ret
+        if iwm_vs_spy > 0.015:
+            active_drivers.append("small_cap_risk_on")
+            evidence["small_cap_risk_on_reason"] = f"IWM vs SPY={_pct(iwm_vs_spy)} > +1.5%"
+        else:
+            evidence["small_cap_risk_on_reason"] = f"IWM vs SPY={_pct(iwm_vs_spy)} — no small-cap leadership"
+
+    mode = "live_market_data" if fetch_ok == _total_sensors else "degraded_partial_data"
+
     log.info(
-        "live_driver_resolver: active_drivers=%s blocked=%s (fetch_ok=%d/9)",
-        active_drivers, blocked_conditions, fetch_ok
+        "live_driver_resolver: active_drivers=%s blocked=%s (fetch_ok=%d/%d)",
+        active_drivers, blocked_conditions, fetch_ok, _total_sensors
     )
 
     result = _build_result(
-        now_iso, active_drivers, blocked_conditions, evidence, warnings, fallback=False
+        now_iso, active_drivers, blocked_conditions, evidence, warnings, mode=mode
     )
     _write(result, output_path)
     return result
@@ -222,12 +302,12 @@ def _build_result(
     blocked_conditions: list[str],
     evidence: dict,
     warnings: list[str],
-    fallback: bool,
+    mode: str = "live_market_data",
 ) -> dict:
     return {
         "schema_version": _SCHEMA_VERSION,
         "generated_at": generated_at,
-        "mode": "fallback_conservative" if fallback else "live_market_data",
+        "mode": mode,
         "active_drivers": active_drivers,
         "blocked_conditions": blocked_conditions,
         "evidence": evidence,

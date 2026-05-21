@@ -151,35 +151,178 @@
       "theme_id": "memory_storage",
       "core_symbols": [
         "SNDK",
-        "WDC"
+        "WDC",
+        "STX"
       ],
       "etf_proxies": [],
       "route_bias": "swing_or_watchlist",
       "minimum_liquidity_class": "high",
       "max_candidates": 4,
-      "notes": "Approved memory/storage names with recurring advisory gap evidence. SNDK (SanDisk) and WDC (Western Digital) approved via coverage_gap_review: 22 occurrences each as advisory_unresolved current candidates. MU already covered under semiconductors. STX remains review_required pending additional coverage evidence.",
-      "last_reviewed": "2026-05-07",
+      "notes": "Approved memory/storage names with recurring advisory gap evidence. SNDK (SanDisk) and WDC (Western Digital) approved via coverage_gap_review: 22 occurrences each as advisory_unresolved current candidates. MU already covered under semiconductors. STX (Seagate Technology) approved: enterprise storage beneficiary with strong data-centre demand exposure.",
+      "last_reviewed": "2026-05-21",
       "source_label": "reference_data_approved_theme",
-      "approval_source": "coverage_gap_review",
-      "review_required_symbols": [
-        "STX"
-      ]
+      "approval_source": "coverage_gap_review"
     },
     {
       "theme_id": "ai_compute_infrastructure",
       "core_symbols": [
-        "IREN"
+        "IREN",
+        "SMCI",
+        "DELL"
       ],
       "etf_proxies": [],
       "route_bias": "watchlist_or_swing",
-      "minimum_liquidity_class": "medium",
-      "max_candidates": 3,
-      "notes": "Approved AI compute infrastructure names. IREN approved with caution via coverage_gap_review: 10 occurrences as advisory_unresolved current candidates. IREN is a power-constrained neocloud/compute operator with speculative risk profile. Approval does not imply all neocloud, bitcoin-miner or power-compute names are approved. NBIS and DOCN are already covered by the advisory system and do not require roster changes. Additional names remain review_required.",
-      "last_reviewed": "2026-05-07",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 4,
+      "notes": "Approved AI compute infrastructure names. IREN approved with caution via coverage_gap_review: power-constrained neocloud/compute operator with speculative risk profile. SMCI (Super Micro Computer) added: high-density server and rack-scale solutions for AI data centres. DELL (Dell Technologies) added: server and storage infrastructure for enterprise AI workloads. Approval does not imply all neocloud, bitcoin-miner or power-compute names are approved.",
+      "last_reviewed": "2026-05-21",
       "source_label": "reference_data_approved_theme",
       "approval_source": "coverage_gap_review",
       "review_required_symbols": []
+    },
+    {
+      "theme_id": "software_cloud",
+      "core_symbols": ["CRM", "NOW", "ADBE", "DDOG"],
+      "etf_proxies": ["IGV"],
+      "route_bias": "position_or_swing",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "SaaS and enterprise cloud platforms benefiting from falling yields and risk-on rotation. CRM (Salesforce), NOW (ServiceNow), ADBE (Adobe), DDOG (Datadog). IGV as iShares Expanded Tech-Software ETF proxy. MSFT covered separately in quality_cash_flow where its defensive quality angle is primary.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "cybersecurity",
+      "core_symbols": ["CRWD", "PANW", "FTNT", "ZS"],
+      "etf_proxies": ["CIBR"],
+      "route_bias": "position_or_swing",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "Cybersecurity platform vendors benefiting from AI-driven expansion of attack surface and enterprise security spend. CRWD (CrowdStrike), PANW (Palo Alto Networks), FTNT (Fortinet), ZS (Zscaler). CIBR as First Trust NASDAQ Cybersecurity ETF proxy.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "mega_cap_platforms",
+      "core_symbols": ["GOOGL", "META", "NFLX"],
+      "etf_proxies": ["XLC"],
+      "route_bias": "position_or_swing",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 4,
+      "notes": "Mega-cap digital platforms with advertising leverage and content. GOOGL (Alphabet — search, cloud, YouTube), META (Facebook/Instagram/WhatsApp ad platform), NFLX (streaming content, ad tier growing). XLC as Communication Services SPDR ETF proxy.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "consumer_discretionary_strength",
+      "core_symbols": ["AMZN", "HD", "MCD", "NKE"],
+      "etf_proxies": ["XLY"],
+      "route_bias": "swing_only",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "Consumer discretionary names benefiting from risk-on rotation and consumer confidence. AMZN (retail + AWS growth optionality), HD (home improvement, consumer spend), MCD (resilient fast food with consumer upswing), NKE (aspirational brand, consumer confidence proxy). XLY as Consumer Discretionary SPDR ETF proxy.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "travel_leisure",
+      "core_symbols": ["BKNG", "MAR", "DAL", "ABNB"],
+      "etf_proxies": ["JETS"],
+      "route_bias": "swing_only",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "Travel and hospitality names for risk-on rotation. BKNG (Booking Holdings — online travel, strong FCF), MAR (Marriott — hotel operator, RevPAR leverage), DAL (Delta — airline, operational leverage), ABNB (Airbnb — platform model, asset-light). JETS as US Global Jets ETF proxy. Note: rule is blocked if oil_supply_shock fires — oil shock headwind takes precedence.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "defensive_healthcare",
+      "core_symbols": ["UNH", "LLY", "ABBV", "TMO"],
+      "etf_proxies": ["XLV"],
+      "route_bias": "position_or_swing",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "Large-cap defensive healthcare for risk-off rotation. UNH (UnitedHealth — managed care, resilient earnings), LLY (Eli Lilly — GLP-1/obesity franchise, earnings momentum), ABBV (AbbVie — diversified pharma, dividend), TMO (Thermo Fisher — healthcare infrastructure, defensive revenue). XLV as Health Care SPDR ETF proxy. Note: JNJ covered in defensive_quality.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "biotech_risk_on",
+      "core_symbols": ["REGN", "VRTX", "AMGN"],
+      "etf_proxies": ["XBI"],
+      "route_bias": "swing_only",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 4,
+      "notes": "Large-cap biotech for risk-on environments. REGN (Regeneron), VRTX (Vertex Pharmaceuticals — cystic fibrosis franchise), AMGN (Amgen — diversified large-cap biotech). XBI as SPDR S&P Biotech ETF proxy for broader biotech exposure. Swing only — binary catalyst risk means position sizing must be managed.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "regional_banks",
+      "core_symbols": ["RF", "CFG", "FITB"],
+      "etf_proxies": ["KRE"],
+      "route_bias": "swing_only",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 4,
+      "notes": "Regional bank names for credit easing and risk-on environments. RF (Regions Financial), CFG (Citizens Financial), FITB (Fifth Third Bancorp). KRE as SPDR S&P Regional Banking ETF proxy. Swing only — regional banks are more volatile than large-cap and require credit quality confirmation.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "infrastructure_reshoring",
+      "core_symbols": ["CAT", "DE", "GE", "URI"],
+      "etf_proxies": ["XLI"],
+      "route_bias": "position_or_swing",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "Industrial infrastructure and reshoring beneficiaries. CAT (Caterpillar — heavy machinery, infrastructure spend), DE (Deere — agriculture and construction equipment), GE (GE Aerospace — jet engines, defence), URI (United Rentals — equipment rental, construction activity proxy). XLI as Industrial Select Sector SPDR ETF proxy. Note: PWR and ETN covered in data_centre_power for the AI-specific electrical infrastructure angle.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "gold_precious_metals",
+      "core_symbols": ["NEM", "AEM"],
+      "etf_proxies": ["GLD", "GDX"],
+      "route_bias": "swing_or_watchlist",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 4,
+      "notes": "Gold and precious metals for safe-haven bid and risk-off rotation. NEM (Newmont — largest gold miner), AEM (Agnico Eagle — diversified gold miner). GLD (SPDR Gold Shares) as direct gold price proxy ETF. GDX (VanEck Gold Miners ETF) as sector proxy. Note: GLD classified as etf_proxy to get appropriate confidence scaling.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "copper_electrification",
+      "core_symbols": ["FCX", "SCCO"],
+      "etf_proxies": ["XLB"],
+      "route_bias": "swing_or_watchlist",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 3,
+      "notes": "Copper and electrification materials for risk-on and industrial demand. FCX (Freeport-McMoRan — largest US copper miner), SCCO (Southern Copper — pure-play copper with high dividend). XLB as Materials Select Sector SPDR ETF proxy for broader materials exposure.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "reits_falling_yield",
+      "core_symbols": ["PLD", "AMT", "EQIX"],
+      "etf_proxies": ["XLRE"],
+      "route_bias": "swing_or_watchlist",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 4,
+      "notes": "REIT names for falling yield tailwind. PLD (Prologis — industrial REIT, logistics/e-commerce), AMT (American Tower — cell tower REIT, infrastructure), EQIX (Equinix — data centre REIT, AI infrastructure angle). XLRE as Real Estate Select Sector SPDR ETF proxy. Note: yields_rising_to_reits_headwind rule generates these as pressure_candidates when yields are rising.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "small_cap_risk_on",
+      "core_symbols": [],
+      "etf_proxies": ["IWM", "IJR"],
+      "route_bias": "swing_only",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 2,
+      "notes": "Small-cap exposure for risk-on and credit-easing environments. IWM (iShares Russell 2000 ETF) and IJR (iShares Core S&P Small-Cap ETF) as liquid ETF proxies only. No individual small-cap selection — individual selection requires additional intelligence layer not yet built. Note: distinct from the existing small_caps headwind theme which fires under credit stress.",
+      "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
     }
   ],
-  "last_updated": "2026-05-07"
+  "last_updated": "2026-05-21"
 }
