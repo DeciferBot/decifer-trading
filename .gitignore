@@ -20,6 +20,7 @@ data/ml/ml_observations.jsonl.*
 data/ml/canonical_learning_dataset.jsonl
 data/ml/canonical_learning_dataset.jsonl.*
 data/signals_log_historical.jsonl
+data/archive/cold_storage/signals_log_historical.jsonl
 data/signals_log_archive_*.jsonl
 data/signals_typed.jsonl
 data/audit_log.jsonl

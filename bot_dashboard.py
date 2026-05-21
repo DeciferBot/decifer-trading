@@ -418,14 +418,23 @@ def _calendar_macro_fallback(articles: list) -> None:
 
 
 def _get_held_symbols() -> set[str]:
-    """Return symbols with currently open positions from data/trades.json."""
+    """Return symbols with currently open positions from the live position state.
+
+    Uses get_open_positions() — the in-memory active_trades dict reconciled
+    against IBKR at startup — which is the single authoritative source for live
+    position state.  data/positions.json is a crash-fallback that may be stale
+    between restarts and is NOT a reliable source for this function.
+
+    Returns an empty set on any error so the caller (news card tagging) degrades
+    gracefully rather than crashing the dashboard.
+    """
     try:
-        trades_path = os.path.join(os.path.dirname(__file__), "data", "trades.json")
-        with open(trades_path) as f:
-            trades = json.load(f)
-        opened = {t["symbol"] for t in trades if t.get("action") in ("OPEN", "ENTRY", "BUY")}
-        closed = {t["symbol"] for t in trades if t.get("action") in ("CLOSE", "SELL")}
-        return opened - closed
+        positions = get_open_positions()
+        return {
+            v["symbol"]
+            for v in positions.values()
+            if v.get("symbol") and int(v.get("qty", 0)) != 0
+        }
     except Exception:
         return set()
 

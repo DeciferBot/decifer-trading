@@ -140,6 +140,98 @@ class TestGetCatalystPayloadLogging:
         assert len(payload["edgar_events"]) == 1
 
 
+class TestGetHeldSymbols:
+    """
+    _get_held_symbols() must read live position state via get_open_positions(),
+    not data/trades.json.
+
+    The authoritative position state is the in-memory active_trades dict exposed
+    by get_open_positions() (reconciled against IBKR at startup).
+    data/positions.json is a stale crash-fallback and is NOT used here.
+    """
+
+    # ------------------------------------------------------------------ helpers
+    @staticmethod
+    def _make_positions(*symbols_qtys):
+        """Build a mock get_open_positions() return dict.
+
+        symbols_qtys: iterable of (symbol, qty) tuples.
+        Dict is keyed by trade_id (arbitrary); each value has 'symbol' and 'qty'.
+        """
+        return {
+            f"{sym}_tid": {"symbol": sym, "qty": qty}
+            for sym, qty in symbols_qtys
+        }
+
+    # ------------------------------------------------------------------ tests
+    def test_returns_symbols_from_live_positions(self):
+        """Happy path: active positions are returned as a set of symbols."""
+        mock_positions = self._make_positions(
+            ("AAPL", 188), ("AMD", 132), ("SMCI", 1791)
+        )
+        with patch("bot_dashboard.get_open_positions", return_value=mock_positions):
+            result = bd._get_held_symbols()
+
+        assert result == {"AAPL", "AMD", "SMCI"}
+
+    def test_excludes_zero_quantity_positions(self):
+        """Positions with qty=0 must not appear in the held-symbol set."""
+        mock_positions = self._make_positions(
+            ("AAPL", 188),
+            ("TE", 0),      # closed — qty zeroed but still in dict
+            ("RKLB", 443),
+        )
+        with patch("bot_dashboard.get_open_positions", return_value=mock_positions):
+            result = bd._get_held_symbols()
+
+        assert "TE" not in result
+        assert result == {"AAPL", "RKLB"}
+
+    def test_returns_empty_set_when_get_open_positions_raises(self):
+        """If get_open_positions() raises (covers missing/unreadable state),
+        _get_held_symbols() must return an empty set — not raise."""
+        with patch(
+            "bot_dashboard.get_open_positions",
+            side_effect=RuntimeError("IBKR not connected"),
+        ):
+            result = bd._get_held_symbols()
+
+        assert result == set()
+
+    def test_returns_empty_set_when_positions_dict_is_empty(self):
+        """No open positions → empty set, no error."""
+        with patch("bot_dashboard.get_open_positions", return_value={}):
+            result = bd._get_held_symbols()
+
+        assert result == set()
+
+    def test_does_not_read_trades_json(self, tmp_path):
+        """trades.json must NOT be opened for held-symbol detection.
+
+        We verify by patching open() and asserting it is never called with
+        a path that contains 'trades.json'.
+        """
+        mock_positions = self._make_positions(("AAPL", 100))
+
+        real_open = open  # keep a reference to the real built-in
+
+        opened_paths: list[str] = []
+
+        def tracking_open(path, *args, **kwargs):
+            opened_paths.append(str(path))
+            return real_open(path, *args, **kwargs)
+
+        with patch("bot_dashboard.get_open_positions", return_value=mock_positions):
+            with patch("builtins.open", side_effect=tracking_open):
+                bd._get_held_symbols()
+
+        trades_json_reads = [p for p in opened_paths if "trades.json" in p]
+        assert trades_json_reads == [], (
+            f"_get_held_symbols() must not read trades.json; "
+            f"found opens: {trades_json_reads}"
+        )
+
+
 class TestIcWeightsLogging:
     """
     The ic_weights.json read in the IC weights API handler must log a WARNING

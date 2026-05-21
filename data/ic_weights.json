@@ -1,5 +1,5 @@
 {
-  "updated": "2026-05-20T12:45:22.751795+00:00",
+  "updated": "2026-05-21T16:27:07.586994+00:00",
   "raw_ic": {
     "trend": 0.022286005632568093,
     "momentum": -0.047792454584132275,
@@ -34,10 +34,10 @@
     "analyst_revision": 0.0,
     "insider_buying": 0.0
   },
-  "n_records": 36913,
-  "n_independent_dates": 23,
+  "n_records": 40610,
+  "n_independent_dates": 24,
   "ic_valid_for_live_scoring": false,
-  "fallback_reason": "insufficient_independent_dates:23<60",
+  "fallback_reason": "insufficient_independent_dates:24<60",
   "fallback_weights_source": "ic",
   "advisory_only": true,
   "using_equal_weights": false,

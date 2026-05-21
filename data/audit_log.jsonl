@@ -10164,3 +10164,189 @@
 {"ts": "2026-05-20T12:53:09.620061Z", "event": "SUBMITTED", "symbol": "VRT", "order_id": 20002, "side": "SELL", "qty": 171, "order_type": "STP LMT", "limit_price": 299.67, "fill_price": null}
 {"ts": "2026-05-20T12:53:10.468836Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 20004, "side": "SELL", "qty": 188, "order_type": "LMT", "limit_price": 314.02, "fill_price": null}
 {"ts": "2026-05-20T12:53:11.787997Z", "event": "SUBMITTED", "symbol": "AVGO", "order_id": 20006, "side": "SELL", "qty": 134, "order_type": "STP LMT", "limit_price": 394.17, "fill_price": null}
+{"ts": "2026-05-20T13:10:20.977919Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 20020, "side": "SELL", "qty": 188, "order_type": "STP LMT", "limit_price": 288.06, "fill_price": null}
+{"ts": "2026-05-20T13:10:21.769722Z", "event": "SUBMITTED", "symbol": "AVGO", "order_id": 20022, "side": "SELL", "qty": 134, "order_type": "LMT", "limit_price": 456.94, "fill_price": null}
+{"ts": "2026-05-20T13:11:19.352448Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:ASML,AVGO", "actions": [], "ts": "2026-05-20T09:11:42.714614-04:00"}
+{"ts": "2026-05-20T13:15:11.812408Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T13:18:38.402054Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "held_score_rise:SNDK; news_hit:DD,SNDK,WDC,TSM,SPY,ASML; stale_position:APP,DD,SNDK,WDC", "actions": [], "ts": "2026-05-20T09:19:01.495883-04:00"}
+{"ts": "2026-05-20T13:19:58.794777Z", "event": "SUBMITTED", "symbol": "TE", "order_id": 20037, "side": "BUY", "qty": 7651, "order_type": "LMT", "limit_price": 7.39, "fill_price": null}
+{"ts": "2026-05-20T13:19:59.862959Z", "event": "fill_watcher_started", "symbol": "TE", "order_id": 20037, "original_limit": 7.39, "price_boundary": 7.43, "side": "BUY"}
+{"ts": "2026-05-20T13:20:03.711875Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 20041, "side": "BUY", "qty": 132, "order_type": "LMT", "limit_price": 425.46, "fill_price": null}
+{"ts": "2026-05-20T13:20:03.909301Z", "event": "fill_watcher_started", "symbol": "AMD", "order_id": 20041, "original_limit": 425.46, "price_boundary": 427.59, "side": "BUY"}
+{"ts": "2026-05-20T13:20:19.733449Z", "event": "SUBMITTED", "symbol": "PWR", "order_id": 20045, "side": "BUY", "qty": 77, "order_type": "LMT", "limit_price": 725.45, "fill_price": null}
+{"ts": "2026-05-20T13:20:21.518593Z", "event": "fill_watcher_started", "symbol": "PWR", "order_id": 20045, "original_limit": 725.45, "price_boundary": 729.08, "side": "BUY"}
+{"ts": "2026-05-20T13:20:44.864287Z", "event": "fill_watcher_filled", "symbol": "TE", "order_id": 20037, "attempts": 0, "fill_limit": 7.39}
+{"ts": "2026-05-20T13:20:49.242389Z", "event": "fill_watcher_adjusted", "symbol": "AMD", "order_id": 20041, "new_limit": 425.89, "attempt": 1}
+{"ts": "2026-05-20T13:21:06.858983Z", "event": "fill_watcher_adjusted", "symbol": "PWR", "order_id": 20045, "new_limit": 726.18, "attempt": 1}
+{"ts": "2026-05-20T13:21:14.254020Z", "event": "fill_watcher_filled", "symbol": "AMD", "order_id": 20041, "attempts": 1, "fill_limit": 425.89}
+{"ts": "2026-05-20T13:21:32.194674Z", "event": "fill_watcher_adjusted", "symbol": "PWR", "order_id": 20045, "new_limit": 726.91, "attempt": 2}
+{"ts": "2026-05-20T13:21:57.206131Z", "event": "fill_watcher_max_attempts", "symbol": "PWR", "order_id": 20045, "attempts": 2, "final_limit": 726.91}
+{"ts": "2026-05-20T13:21:58.481021Z", "event": "SUBMITTED", "symbol": "PWR", "order_id": 20059, "side": "BUY", "qty": 77, "order_type": "LMT", "limit_price": 729.09, "fill_price": null}
+{"ts": "2026-05-20T13:21:59.913747Z", "event": "fill_watcher_market_fallback", "symbol": "PWR", "order_id": 20045, "final_limit": 726.91, "new_order_id": 20059}
+{"ts": "2026-05-20T13:22:43.208891Z", "event": "SUBMITTED", "symbol": "TE", "order_id": 20064, "side": "SELL", "qty": 7651, "order_type": "STP LMT", "limit_price": 6.38, "fill_price": null}
+{"ts": "2026-05-20T13:22:43.966925Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 20066, "side": "SELL", "qty": 132, "order_type": "STP LMT", "limit_price": 381.3, "fill_price": null}
+{"ts": "2026-05-20T13:22:44.526237Z", "event": "SUBMITTED", "symbol": "PWR", "order_id": 20068, "side": "SELL", "qty": 40, "order_type": "STP LMT", "limit_price": 670.8, "fill_price": null}
+{"ts": "2026-05-20T13:24:06.528047Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T13:24:58.456210Z", "event": "SUBMITTED", "symbol": "MU", "order_id": 20073, "side": "BUY", "qty": 76, "order_type": "LMT", "limit_price": 737.77, "fill_price": null}
+{"ts": "2026-05-20T13:24:58.582182Z", "event": "fill_watcher_started", "symbol": "MU", "order_id": 20073, "original_limit": 737.77, "price_boundary": 741.46, "side": "BUY"}
+{"ts": "2026-05-20T13:25:09.526501Z", "event": "SUBMITTED", "symbol": "USO", "order_id": 20079, "side": "BUY", "qty": 379, "order_type": "LMT", "limit_price": 149.19, "fill_price": null}
+{"ts": "2026-05-20T13:25:09.678466Z", "event": "fill_watcher_started", "symbol": "USO", "order_id": 20079, "original_limit": 149.19, "price_boundary": 149.94, "side": "BUY"}
+{"ts": "2026-05-20T13:25:43.639432Z", "event": "fill_watcher_filled", "symbol": "MU", "order_id": 20073, "attempts": 0, "fill_limit": 737.77}
+{"ts": "2026-05-20T13:25:54.681053Z", "event": "fill_watcher_filled", "symbol": "USO", "order_id": 20079, "attempts": 0, "fill_limit": 149.19}
+{"ts": "2026-05-20T13:27:33.213563Z", "event": "SUBMITTED", "symbol": "MU", "order_id": 20087, "side": "SELL", "qty": 76, "order_type": "STP LMT", "limit_price": 646.44, "fill_price": null}
+{"ts": "2026-05-20T13:27:34.067451Z", "event": "SUBMITTED", "symbol": "USO", "order_id": 20089, "side": "SELL", "qty": 379, "order_type": "STP LMT", "limit_price": 139.63, "fill_price": null}
+{"ts": "2026-05-20T13:28:56.649308Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T13:32:01.623330Z", "event": "SUBMITTED", "symbol": "TE", "order_id": 20095, "side": "SELL", "qty": 7651, "order_type": "LMT", "limit_price": 8.79, "fill_price": null}
+{"ts": "2026-05-20T13:32:02.491969Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 20097, "side": "SELL", "qty": 132, "order_type": "LMT", "limit_price": 489.89, "fill_price": null}
+{"ts": "2026-05-20T13:32:03.164806Z", "event": "SUBMITTED", "symbol": "PWR", "order_id": 20099, "side": "SELL", "qty": 40, "order_type": "LMT", "limit_price": 803.8, "fill_price": null}
+{"ts": "2026-05-20T13:33:36.568649Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T13:34:25.592528Z", "event": "SUBMITTED", "symbol": "SMCI", "order_id": 20106, "side": "SELL", "qty": 1791, "order_type": "STP LMT", "limit_price": 29.15, "fill_price": null}
+{"ts": "2026-05-20T13:34:25.758836Z", "event": "SUBMITTED", "symbol": "SMCI", "order_id": 20105, "side": "BUY", "qty": 1791, "order_type": "LMT", "limit_price": 31.54, "fill_price": null}
+{"ts": "2026-05-20T13:34:29.815437Z", "event": "fill_watcher_started", "symbol": "SMCI", "order_id": 20105, "original_limit": 31.54, "price_boundary": 31.7, "side": "BUY"}
+{"ts": "2026-05-20T13:35:14.819310Z", "event": "fill_watcher_filled", "symbol": "SMCI", "order_id": 20105, "attempts": 0, "fill_limit": 31.54}
+{"ts": "2026-05-20T13:39:54.117594Z", "event": "SUBMITTED", "symbol": "TE", "order_id": 20110, "side": "SELL", "qty": 7651, "order_type": "STP LMT", "limit_price": 6.9, "fill_price": null}
+{"ts": "2026-05-20T13:39:54.717365Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 20112, "side": "SELL", "qty": 132, "order_type": "STP LMT", "limit_price": 385.7, "fill_price": null}
+{"ts": "2026-05-20T13:39:55.355655Z", "event": "SUBMITTED", "symbol": "PWR", "order_id": 20114, "side": "SELL", "qty": 40, "order_type": "STP LMT", "limit_price": 667.92, "fill_price": null}
+{"ts": "2026-05-20T13:39:56.412116Z", "event": "SUBMITTED", "symbol": "MU", "order_id": 20116, "side": "SELL", "qty": 76, "order_type": "LMT", "limit_price": 873.34, "fill_price": null}
+{"ts": "2026-05-20T13:39:57.208802Z", "event": "SUBMITTED", "symbol": "USO", "order_id": 20118, "side": "SELL", "qty": 379, "order_type": "LMT", "limit_price": 163.29, "fill_price": null}
+{"ts": "2026-05-20T13:39:58.268000Z", "event": "SUBMITTED", "symbol": "SMCI", "order_id": 20120, "side": "SELL", "qty": 1791, "order_type": "LMT", "limit_price": 36.71, "fill_price": null}
+{"ts": "2026-05-20T13:41:21.088027Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T13:47:31.023991Z", "event": "SUBMITTED", "symbol": "MU", "order_id": 20124, "side": "SELL", "qty": 76, "order_type": "STP LMT", "limit_price": 632.85, "fill_price": null}
+{"ts": "2026-05-20T13:47:31.670615Z", "event": "SUBMITTED", "symbol": "SMCI", "order_id": 20126, "side": "SELL", "qty": 1791, "order_type": "STP LMT", "limit_price": 28.58, "fill_price": null}
+{"ts": "2026-05-20T13:48:31.107166Z", "event": "options_scan", "symbols_scanned": 12, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T13:53:26.324496Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:TE,AMD,MU,USO", "actions": [], "ts": "2026-05-20T09:53:53.988984-04:00"}
+{"ts": "2026-05-20T13:58:30.711897Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:03:00.029135Z", "event": "SCORING_GAP", "consecutive_zero_scans": 3, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:03:17.287012Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 0, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:07:46.001581Z", "event": "SCORING_GAP", "consecutive_zero_scans": 4, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:08:02.977665Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:12:27.479066Z", "event": "SCORING_GAP", "consecutive_zero_scans": 5, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:12:43.994163Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:17:10.383907Z", "event": "SCORING_GAP", "consecutive_zero_scans": 6, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:17:28.131939Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:18:51.962237Z", "event": "SCORING_GAP", "consecutive_zero_scans": 7, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:19:08.460078Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:23:35.986790Z", "event": "SCORING_GAP", "consecutive_zero_scans": 8, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:23:52.690526Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:TE,AMD,MU,USO", "actions": [], "ts": "2026-05-20T10:24:23.188173-04:00"}
+{"ts": "2026-05-20T14:28:43.883800Z", "event": "SCORING_GAP", "consecutive_zero_scans": 9, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:29:00.826958Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:33:24.659655Z", "event": "SCORING_GAP", "consecutive_zero_scans": 10, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:33:41.414435Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:38:06.944749Z", "event": "SCORING_GAP", "consecutive_zero_scans": 11, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:38:24.212641Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:42:53.017497Z", "event": "SCORING_GAP", "consecutive_zero_scans": 12, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:43:09.761850Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:47:36.224592Z", "event": "SCORING_GAP", "consecutive_zero_scans": 13, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:47:53.781640Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:52:17.117699Z", "event": "SCORING_GAP", "consecutive_zero_scans": 14, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:52:32.623940Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:56:57.547832Z", "event": "SCORING_GAP", "consecutive_zero_scans": 15, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T14:57:14.252991Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:ASML,AMD,MU,USO", "actions": [], "ts": "2026-05-20T10:57:44.785567-04:00"}
+{"ts": "2026-05-20T15:02:13.315869Z", "event": "SCORING_GAP", "consecutive_zero_scans": 16, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:02:29.034910Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:06:53.871488Z", "event": "SCORING_GAP", "consecutive_zero_scans": 17, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:07:09.812964Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:11:34.664986Z", "event": "SCORING_GAP", "consecutive_zero_scans": 18, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:11:50.898233Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:16:18.999586Z", "event": "SCORING_GAP", "consecutive_zero_scans": 19, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:16:35.568507Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:18:12.170416Z", "event": "SCORING_GAP", "consecutive_zero_scans": 20, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:18:28.545604Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:22:54.600686Z", "event": "SCORING_GAP", "consecutive_zero_scans": 21, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:23:11.372767Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:27:33.845043Z", "event": "SCORING_GAP", "consecutive_zero_scans": 22, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:27:49.254825Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:SPY,AMD,MU,USO", "actions": [], "ts": "2026-05-20T11:28:19.170639-04:00"}
+{"ts": "2026-05-20T15:32:41.703866Z", "event": "SCORING_GAP", "consecutive_zero_scans": 23, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:32:57.470489Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:39:22.565377Z", "event": "SCORING_GAP", "consecutive_zero_scans": 24, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:39:38.325024Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:46:04.388056Z", "event": "SCORING_GAP", "consecutive_zero_scans": 25, "universe_size": 73, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:46:20.386049Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:53:30.224294Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T15:54:20.308495Z", "event": "SUBMITTED", "symbol": "TE", "order_id": 20187, "side": "SELL", "qty": 6787, "order_type": "STP LMT", "limit_price": 7.75, "fill_price": null}
+{"ts": "2026-05-20T15:54:20.455233Z", "event": "SUBMITTED", "symbol": "TE", "order_id": 20186, "side": "BUY", "qty": 6787, "order_type": "LMT", "limit_price": 8.52, "fill_price": null}
+{"ts": "2026-05-20T15:54:21.929213Z", "event": "fill_watcher_started", "symbol": "TE", "order_id": 20186, "original_limit": 8.52, "price_boundary": 8.56, "side": "BUY"}
+{"ts": "2026-05-20T15:55:07.260115Z", "event": "fill_watcher_adjusted", "symbol": "TE", "order_id": 20186, "new_limit": 8.53, "attempt": 1}
+{"ts": "2026-05-20T15:55:32.606950Z", "event": "fill_watcher_adjusted", "symbol": "TE", "order_id": 20186, "new_limit": 8.54, "attempt": 2}
+{"ts": "2026-05-20T15:55:57.615622Z", "event": "fill_watcher_max_attempts", "symbol": "TE", "order_id": 20186, "attempts": 2, "final_limit": 8.54}
+{"ts": "2026-05-20T15:55:58.812332Z", "event": "CANCELLED", "symbol": "TE", "order_id": 20188, "side": "BUY", "qty": 6787, "order_type": "MKT", "limit_price": 0, "fill_price": null}
+{"ts": "2026-05-20T15:56:00.296660Z", "event": "fill_watcher_market_fallback", "symbol": "TE", "order_id": 20186, "final_limit": 8.54, "new_order_id": 20188}
+{"ts": "2026-05-20T15:59:55.952245Z", "event": "SUBMITTED", "symbol": "TE", "order_id": 20192, "side": "SELL", "qty": 6787, "order_type": "STP LMT", "limit_price": 7.6, "fill_price": null}
+{"ts": "2026-05-20T16:01:23.811318Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 1, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "held_score_rise:TE; news_hit:AMD,MU,USO,TE", "actions": [], "ts": "2026-05-20T12:01:56.353229-04:00"}
+{"ts": "2026-05-20T16:08:10.607093Z", "event": "SUBMITTED", "symbol": "TE", "order_id": 20197, "side": "SELL", "qty": 6787, "order_type": "LMT", "limit_price": 10.19, "fill_price": null}
+{"ts": "2026-05-20T16:09:38.216502Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T16:15:50.027943Z", "event": "SUBMITTED", "symbol": "TE", "order_id": 20201, "side": "SELL", "qty": 6787, "order_type": "STP LMT", "limit_price": 8.05, "fill_price": null}
+{"ts": "2026-05-20T16:17:15.216823Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T16:24:56.791029Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T16:32:31.747900Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:SPY,AMD,MU,USO,TE; stale_position:AMD,MU,USO", "actions": [], "ts": "2026-05-20T12:33:04.119354-04:00"}
+{"ts": "2026-05-20T16:40:37.194781Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T16:48:11.442602Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T16:55:46.292886Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-20T17:03:27.456268Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 1, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:SPY,ASML,AMD,MU,USO,TE; stale_position:AMD,MU,USO", "actions": [], "ts": "2026-05-20T13:04:06.033161-04:00"}
+{"ts": "2026-05-20T17:12:19.381043Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:APP,DD,SNDK,WDC,PWR,MU,SMCI,TE; stale_position:APP,DD,SNDK,WDC,SMH,TSM,SPY,ASML,RKLB,VRT,AAPL,AVGO,AMD,PWR,MU,USO,SMCI,TE", "actions": [], "ts": "2026-05-20T16:32:07.753083-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:APP,DD,WDC,AAPL,PWR,MU,SMCI,TE; stale_position:APP,DD,SNDK,WDC,SMH,TSM,SPY,ASML,RKLB,VRT,AAPL,AVGO,AMD,PWR,MU,USO,SMCI,TE", "actions": [], "ts": "2026-05-20T16:52:56.473144-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:SNDK", "actions": [], "ts": "2026-05-20T18:01:24.250611-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:APP,DD,SNDK,WDC,AAPL,PWR,MU,TE; stale_position:APP,DD,SNDK,WDC,SMH,TSM,SPY,ASML,RKLB,VRT,AAPL,AVGO,AMD,PWR,MU,USO,SMCI,TE", "actions": [], "ts": "2026-05-20T18:19:08.635883-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-05-21T04:31:03.545479-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:DD", "actions": [], "ts": "2026-05-21T05:37:11.305409-04:00"}
+{"ts": "2026-05-21T10:09:32.794577Z", "event": "SCORING_GAP", "consecutive_zero_scans": 3, "universe_size": 72, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T10:25:50.128516Z", "event": "SCORING_GAP", "consecutive_zero_scans": 4, "universe_size": 72, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:AAPL; stale_position:APP,DD,SNDK,WDC,SMH,TSM,SPY,ASML,RKLB,VRT,AAPL,AVGO,AMD,PWR,MU,USO,SMCI,TE", "actions": [], "ts": "2026-05-21T08:42:38.996266-04:00"}
+{"ts": "2026-05-21T13:16:21.770846Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "held_score_rise:USO", "actions": [], "ts": "2026-05-21T09:16:46.463532-04:00"}
+{"ts": "2026-05-21T13:20:43.698318Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T13:24:36.734567Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T13:28:35.685467Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T13:38:16.514491Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T13:45:46.748092Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T13:51:19.466797Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "held_score_rise:WDC,VRT", "actions": [], "ts": "2026-05-21T09:51:46.502364-04:00"}
+{"ts": "2026-05-21T13:57:35.586959Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:02:38.304078Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:07:38.931075Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:12:45.798516Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:17:48.335860Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:22:48.543037Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 1, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:AAPL", "actions": [], "ts": "2026-05-21T10:23:14.426820-04:00"}
+{"ts": "2026-05-21T14:28:28.343753Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:33:36.917155Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:38:42.166644Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:43:50.777340Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:48:59.626192Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 5, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T14:54:06.216422Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "held_score_rise:SNDK; news_hit:RKLB", "actions": [], "ts": "2026-05-21T10:54:31.930240-04:00"}
+{"ts": "2026-05-21T14:59:42.244023Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 4, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T15:04:50.488811Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T15:10:06.663774Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T15:15:17.877364Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T15:20:29.493298Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T15:25:38.828032Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "held_score_rise:WDC,VRT", "actions": [], "ts": "2026-05-21T11:26:02.665923-04:00"}
+{"ts": "2026-05-21T15:31:14.231390Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T15:38:22.419157Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T15:45:32.127135Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T15:52:47.878585Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T16:00:24.752411Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T16:07:52.662124Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:AMD", "actions": [], "ts": "2026-05-21T12:08:18.580636-04:00"}
+{"ts": "2026-05-21T16:15:48.321837Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 1, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T16:23:07.992608Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T16:30:24.457941Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T16:37:56.849232Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T16:46:03.734668Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T16:54:11.706846Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T17:02:19.643656Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 4, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T17:10:45.187814Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "held_score_rise:SNDK", "actions": [], "ts": "2026-05-21T13:11:12.963150-04:00"}
+{"ts": "2026-05-21T17:19:21.288195Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-21T17:27:39.020831Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 2, "regime": "TRENDING_UP"}
