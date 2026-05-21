@@ -448,6 +448,7 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('analytics',this)">📊 Analytics</div>
   <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
   <div class="tab" onclick="switchTab('health',this)">🏥 Health</div>
+  <div class="tab" onclick="switchTab('rotation',this)">🔄 Rotation</div>
 </div>
 
 <!-- VIEW 1: LIVE -->
@@ -1214,6 +1215,50 @@ canvas{display:block;width:100% !important}
 
 </div>
 <!-- END VIEW: HEALTH ───────────────────────────────────────────────────────── -->
+
+<!-- VIEW: ROTATION ──────────────────────────────────────────────────────────── -->
+<div class="view" id="view-rotation" style="flex-direction:column;padding:16px 20px;gap:0;overflow-y:auto">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase">Rotation Live V1</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="rot-ts" style="font-size:10px;color:var(--muted2)">—</span>
+      <button onclick="loadRotation()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
+    </div>
+  </div>
+
+  <!-- Config pills -->
+  <div id="rot-config" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>
+
+  <!-- Summary banner -->
+  <div id="rot-summary" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
+    Loading…
+  </div>
+
+  <!-- Decisions table -->
+  <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Recent decisions (newest first)</div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:'JetBrains Mono',monospace">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:9px;letter-spacing:.5px;text-transform:uppercase">
+          <th style="text-align:left;padding:4px 8px;white-space:nowrap">Time</th>
+          <th style="text-align:left;padding:4px 8px">Blocked</th>
+          <th style="text-align:right;padding:4px 8px">Score</th>
+          <th style="text-align:left;padding:4px 8px">Failed Gate</th>
+          <th style="text-align:left;padding:4px 8px;white-space:nowrap">Reason</th>
+          <th style="text-align:left;padding:4px 8px">Exit Sym</th>
+          <th style="text-align:right;padding:4px 8px">Exit Score</th>
+          <th style="text-align:left;padding:4px 8px">Status</th>
+        </tr>
+      </thead>
+      <tbody id="rot-tbody"></tbody>
+    </table>
+  </div>
+  <div id="rot-empty" style="display:none;color:var(--muted2);font-size:11px;padding:16px 0">No rotation decisions logged yet.</div>
+
+</div>
+<!-- END VIEW: ROTATION ─────────────────────────────────────────────────────── -->
 
 <script>
 // ── State ──────────────────────────────────────────────────
@@ -2247,6 +2292,9 @@ function switchTab(id, el) {
   } else {
     _stopHealthRefresh();
   }
+
+  // Rotation tab: load on open
+  if (id === 'rotation') loadRotation();
 }
 
 // ── Health tab ─────────────────────────────────────────────
@@ -2258,6 +2306,88 @@ function _startHealthRefresh() {
 }
 function _stopHealthRefresh() {
   if (_healthRefreshTimer) { clearInterval(_healthRefreshTimer); _healthRefreshTimer = null; }
+}
+
+// ── Rotation tab ───────────────────────────────────────────
+function loadRotation() {
+  fetch('/api/rotation').then(r => r.json()).then(d => {
+    const ts = document.getElementById('rot-ts');
+    if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+    // Config pills
+    const cfg = d.config || {};
+    const cfgEl = document.getElementById('rot-config');
+    if (cfgEl) {
+      const onColor = cfg.enabled ? 'var(--green)' : 'var(--red)';
+      cfgEl.innerHTML = [
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:${onColor}">● ${cfg.enabled ? 'LIVE' : 'DISABLED'}</span>`,
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Min blocked score: <span style="color:var(--text)">${cfg.min_blocked_score ?? '—'}</span></span>`,
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Exit score max: <span style="color:var(--text)">${cfg.exit_score_max ?? '—'}</span></span>`,
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Min gap: <span style="color:var(--text)">${cfg.min_gap ?? '—'}</span></span>`,
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Max/day: <span style="color:var(--text)">${cfg.max_per_day ?? '—'}</span></span>`,
+      ].join('');
+    }
+
+    // Summary banner
+    const decisions = d.decisions || [];
+    const total = d.total || 0;
+    const exits = decisions.filter(r => r.final_status === 'EXIT_OK_AWAITING_NEXT_SCAN').length;
+    const failed = decisions.filter(r => r.final_status === 'EXIT_FAILED').length;
+    const blocked = decisions.filter(r => r.final_status === 'GATE_BLOCKED').length;
+    const sumEl = document.getElementById('rot-summary');
+    if (sumEl) {
+      sumEl.innerHTML = `<span style="color:var(--text);font-weight:700">${total}</span> total decisions — ` +
+        `<span style="color:var(--green)">${exits} executed</span> · ` +
+        `<span style="color:var(--muted2)">${blocked} gate-blocked</span>` +
+        (failed ? ` · <span style="color:var(--red)">${failed} failed</span>` : '');
+    }
+
+    // Table
+    const tbody = document.getElementById('rot-tbody');
+    const empty = document.getElementById('rot-empty');
+    if (!tbody) return;
+    if (!decisions.length) {
+      tbody.innerHTML = '';
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+
+    const _statusColor = s => {
+      if (s === 'EXIT_OK_AWAITING_NEXT_SCAN') return 'var(--green)';
+      if (s === 'EXIT_FAILED') return 'var(--red)';
+      if (s === 'HYPOTHETICAL') return 'var(--orange)';
+      return 'var(--muted2)';
+    };
+    const _statusLabel = s => {
+      if (s === 'EXIT_OK_AWAITING_NEXT_SCAN') return 'EXIT OK';
+      if (s === 'EXIT_FAILED') return 'FAILED';
+      if (s === 'GATE_BLOCKED') return 'BLOCKED';
+      if (s === 'HYPOTHETICAL') return 'HYPOTHETICAL';
+      return s || '—';
+    };
+
+    tbody.innerHTML = decisions.map(r => {
+      let t = '—';
+      try { t = new Date(r.ts).toLocaleTimeString(); } catch(e) {}
+      const gatesPassed = (r.gates_passed || []).join(' ');
+      const failedGate = r.failed_gate ? `${r.failed_gate}` : '—';
+      const reason = (r.failed_reason || '').substring(0, 40) + ((r.failed_reason || '').length > 40 ? '…' : '');
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:5px 8px;color:var(--muted2);white-space:nowrap">${t}</td>
+        <td style="padding:5px 8px;color:var(--text);font-weight:600">${r.blocked_symbol || '—'}</td>
+        <td style="padding:5px 8px;text-align:right;color:var(--orange)">${r.blocked_score ?? '—'}</td>
+        <td style="padding:5px 8px;color:var(--muted2)">${failedGate}${gatesPassed ? ' <span style="color:var(--muted)">✓'+gatesPassed+'</span>' : ''}</td>
+        <td style="padding:5px 8px;color:var(--muted2);font-size:10px">${reason || '—'}</td>
+        <td style="padding:5px 8px;color:var(--text)">${r.exit_symbol || '—'}</td>
+        <td style="padding:5px 8px;text-align:right;color:var(--muted2)">${r.exit_score != null ? r.exit_score : '—'}</td>
+        <td style="padding:5px 8px;color:${_statusColor(r.final_status)};font-weight:600">${_statusLabel(r.final_status)}</td>
+      </tr>`;
+    }).join('');
+  }).catch(e => {
+    const sumEl = document.getElementById('rot-summary');
+    if (sumEl) sumEl.textContent = 'Error loading rotation data: ' + e;
+  });
 }
 
 // Status colour + icon helpers

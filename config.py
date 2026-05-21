@@ -958,10 +958,8 @@ CONFIG = {
         "swing_min_catalyst_score":          5.0,    # Phase 1 Change 6: raised 3.0→5.0; live: 3.0
         "score_zero_swing_position_blocks":  True,   # Phase 1 Change 5: block SWING/POSITION entries with score=0 (no signal data);
                                                     # 18% of historical SWING trades entered at score=0; set False to disable
-        "swing_news_alone_blocks":           False,  # Phase 1 Change 6: SHADOW MODE — catalyst fields 0% populated in historical data;
-                                                    # set True only after Phase 5 Apex prompt ships and ≥80% of SWING entries
-                                                    # populate catalyst_type in trade_context (currently 0/97 = 0%)
-        "swing_news_alone_blocks_shadow":    True,   # Log would-have-blocked but do not reject (for field population monitoring)
+        "swing_news_alone_blocks":           True,   # Phase 1 Change 6: blocks SWING entries where news is the sole signal (News IC=-0.253)
+        "swing_news_alone_blocks_shadow":    True,   # Log would-have-blocked for additional observability
         "swing_short_bearish_regimes_only":  True,   # Phase 1 Change 7: SWING SHORT only in TRENDING_DOWN/RELIEF_RALLY/CAPITULATION
         "position_long_only":                True,   # Phase 1 Change 8: POSITION = LONG direction only
         "position_equity_only":              True,   # Phase 1 Change 8: POSITION = equities only (no options)
@@ -1028,7 +1026,7 @@ CONFIG = {
     # Maximum positions exited per rotation event.
     "ROTATION_LIVE_MAX_EXITS":         1,
     # Minimum score the blocked candidate must have to trigger evaluation.
-    "ROTATION_LIVE_MIN_BLOCKED_SCORE": 75,
+    "ROTATION_LIVE_MIN_BLOCKED_SCORE": 35,
     # Minimum gap (blocked_score − book_avg) to trigger evaluation.
     "ROTATION_LIVE_MIN_GAP_VS_BOOK":   15,
     # Maximum score an exit candidate may have (weak position threshold).

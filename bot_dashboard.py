@@ -1460,6 +1460,43 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("[dashboard][/api/intelligence] error: %s", exc)
                 payload = {"available": False, "error": str(exc), "ts": ""}
             self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/rotation":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                _rot_path = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "data", "rotation_live_v1", "decisions.jsonl",
+                )
+                _rot_records: list = []
+                if os.path.exists(_rot_path):
+                    with open(_rot_path, encoding="utf-8") as _rf:
+                        for _line in _rf:
+                            _line = _line.strip()
+                            if _line:
+                                try:
+                                    _rot_records.append(json.loads(_line))
+                                except Exception:
+                                    pass
+                # Return last 100 records, newest first
+                payload = {
+                    "decisions": list(reversed(_rot_records[-100:])),
+                    "total": len(_rot_records),
+                    "config": {
+                        "enabled": bool(CONFIG.get("ENABLE_ROTATION_LIVE_V1", False)),
+                        "min_blocked_score": int(CONFIG.get("ROTATION_LIVE_MIN_BLOCKED_SCORE", 35)),
+                        "max_per_day": int(CONFIG.get("ROTATION_LIVE_MAX_PER_DAY", 1)),
+                        "exit_score_max": int(CONFIG.get("ROTATION_LIVE_EXIT_SCORE_MAX", 35)),
+                        "min_gap": float(CONFIG.get("ROTATION_LIVE_MIN_GAP_VS_BOOK", 15)),
+                        "max_nlv_pct": float(CONFIG.get("ROTATION_LIVE_MAX_NLV_PCT", 0.02)),
+                    },
+                }
+            except Exception as exc:
+                log.warning("[dashboard][/api/rotation] error: %s", exc)
+                payload = {"decisions": [], "total": 0, "error": str(exc)}
+            self.wfile.write(json.dumps(payload, default=str).encode())
         else:
             self.send_response(404)
             self.end_headers()
