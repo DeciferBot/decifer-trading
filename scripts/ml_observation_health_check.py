@@ -16,7 +16,7 @@
 Offline health check for data/ml/ml_observations.jsonl.
 
 Usage:
-    python3 scripts/ml_observation_health_check.py [--canary] [--verbose]
+    python3 scripts/ml_observation_health_check.py [--canary] [--since-scan-id SCAN_ID] [--verbose]
 
 Canary mode exits with code 1 if any integrity invariant is violated:
   - Invalid JSON lines in the file
@@ -25,6 +25,11 @@ Canary mode exits with code 1 if any integrity invariant is violated:
   - Any record is missing observation_id, scan_id, symbol, or base_score
   - Duplicate observation_id within the same scan_id
   - ranking_position missing where ranking_total exists
+
+--since-scan-id SCAN_ID restricts the duplicate-observation check to records
+whose scan_id >= SCAN_ID (YYYYMMDDTHHmmss).  Integrity checks still run on all
+records.  Use this to skip known historical startup artifacts while still
+catching new duplicates in post-baseline scans.
 
 Missing signal_scores is reported as a warning, not a canary failure, because
 the pipeline legitimately emits some candidates without a full score_breakdown.
@@ -327,6 +332,7 @@ def _write_markdown_report(summary: dict, path: Path) -> None:
 def run_canary_validation(
     obs_path: Path | None = None,
     missing_signal_scores_threshold: float = MISSING_SIGNAL_SCORES_WARN_THRESHOLD,
+    since_scan_id: str | None = None,
 ) -> tuple[bool, list[str]]:
     """
     Canary validation mode.
@@ -334,13 +340,19 @@ def run_canary_validation(
     Returns (passed, failures) where passed=True means all invariants hold.
     If the file does not exist yet, canary passes (no evidence = no violation).
 
+    since_scan_id: if provided, the duplicate-observation check is restricted to
+    records whose scan_id >= since_scan_id (lexicographic — YYYYMMDDTHHmmss format
+    sorts correctly as strings).  Integrity checks (missing fields, score mutation)
+    still run on ALL records.  This lets callers skip known historical startup
+    artifacts without ignoring real violations in newer scans.
+
     Checks:
-      1. Invalid JSON lines
-      2. live_score_unchanged != true on any record
-      3. ml_score_influence_enabled != false on any record
-      4. Missing observation_id, scan_id, symbol, or base_score on any record
-      5. Duplicate observation_id within the same scan_id
-      6. ranking_position missing where ranking_total exists
+      1. Invalid JSON lines (all records)
+      2. live_score_unchanged != true on any record (all records)
+      3. ml_score_influence_enabled != false on any record (all records)
+      4. Missing observation_id, scan_id, symbol, or base_score on any record (all records)
+      5. Duplicate observation_id within the same scan_id (filtered by since_scan_id)
+      6. ranking_position missing where ranking_total exists (all records)
       Missing signal_scores is a warning, not a failure.
     """
     obs_file = obs_path or _obs_path()
@@ -379,7 +391,20 @@ def run_canary_validation(
         if rec.get("ranking_total") is not None and rec.get("ranking_position") is None:
             failures.append(f"{sym}: ranking_position missing where ranking_total exists")
 
-    dupes = _find_duplicate_obs_ids(records)
+    # Duplicate check — optionally scoped to records at or after since_scan_id.
+    if since_scan_id:
+        filtered_for_dupe_check = [
+            r for r in records if (r.get("scan_id") or "") >= since_scan_id
+        ]
+        log.info(
+            "ml_observation_health_check canary: duplicate check scoped to %d records "
+            "(since_scan_id=%s, total_records=%d)",
+            len(filtered_for_dupe_check), since_scan_id, len(records),
+        )
+    else:
+        filtered_for_dupe_check = records
+
+    dupes = _find_duplicate_obs_ids(filtered_for_dupe_check)
     if dupes:
         failures.append(f"duplicate_observation_ids_within_scan: {dupes}")
 
@@ -413,6 +438,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Canary validation mode: exit 1 if any integrity invariant is violated",
     )
     p.add_argument(
+        "--since-scan-id",
+        metavar="SCAN_ID",
+        default=None,
+        help=(
+            "Restrict the canary duplicate-observation check to records whose "
+            "scan_id >= SCAN_ID (YYYYMMDDTHHmmss).  Integrity checks still run "
+            "on all records.  Use to skip known historical startup artifacts."
+        ),
+    )
+    p.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable DEBUG logging",
@@ -429,9 +464,13 @@ def main() -> int:
     )
 
     if args.canary:
-        passed, failures = run_canary_validation()
+        since = getattr(args, "since_scan_id", None)
+        passed, failures = run_canary_validation(since_scan_id=since)
         if passed:
-            print("CANARY PASS — all observation integrity invariants hold")
+            msg = "CANARY PASS — all observation integrity invariants hold"
+            if since:
+                msg += f" (duplicate check scoped since {since})"
+            print(msg)
             return 0
         print(f"CANARY FAIL — {len(failures)} violation(s):")
         for f in failures:

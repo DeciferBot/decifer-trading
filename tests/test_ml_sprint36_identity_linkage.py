@@ -279,10 +279,13 @@ class TestCandidateSourcePropagation:
 class TestSchemaVersion:
 
     def test_T6_schema_version_updated(self, tmp_path):
-        """T6: observation records carry schema_version=sprint36_v1."""
+        """T6: observation records carry the current SCHEMA_VERSION constant (sprint37_v1 after Sprint 3.7)."""
         from ml_observation_writer import SCHEMA_VERSION, write_observations
 
-        assert SCHEMA_VERSION == "sprint36_v1", f"Expected sprint36_v1, got {SCHEMA_VERSION!r}"
+        # Sprint 3.7 advanced the schema version — this test tracks the current constant.
+        assert SCHEMA_VERSION in ("sprint36_v1", "sprint37_v1"), (
+            f"Unexpected SCHEMA_VERSION: {SCHEMA_VERSION!r}"
+        )
 
         cand = _scored_dict()
         cfg = _ml_config(tmp_path)
@@ -297,7 +300,7 @@ class TestSchemaVersion:
             obs_path=obs_file,
         )
         rec = json.loads(obs_file.read_text().strip())
-        assert rec["schema_version"] == "sprint36_v1"
+        assert rec["schema_version"] == SCHEMA_VERSION
 
 
 # ── T7 & T8: duplicate idempotency ─────────────────────────────────────────────

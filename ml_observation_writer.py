@@ -47,7 +47,7 @@ log = logging.getLogger("decifer.ml_observation_writer")
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-SCHEMA_VERSION = "sprint36_v1"
+SCHEMA_VERSION = "sprint37_v1"
 
 _REPO_ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 

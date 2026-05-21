@@ -192,6 +192,9 @@ class SignalPipelineResult:
     status: str = "OK"  # "OK" | "MONITOR_ONLY"
     tier_d_funnel: dict = field(default_factory=dict)  # per-cycle Tier D attrition counts (stages 1-6)
     scan_id: str = ""  # YYYYMMDDTHHmmss — shared across signals_log and ic_decision_events
+    rank_map: dict = field(default_factory=dict)  # {symbol: rank_position} for all scored candidates
+    ranking_total: int = 0  # total candidates scored this cycle
+    vix: float = 0.0  # VIX value at scan time
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
@@ -1039,23 +1042,10 @@ def run_signal_pipeline(
         ranking_total=len(all_scored),
     )
 
-    # 7b. ML Observation Writer (Sprint 2) — inert unless ml_observer_enabled=True.
-    #     Writes one record per scored candidate (ALL candidates, including below-threshold)
-    #     to data/ml/ml_observations.jsonl for future training linkage.
-    #     Non-blocking: any failure is logged at DEBUG level and trading continues.
-    try:
-        from ml_observation_writer import write_observations as _write_obs
-        from config import CONFIG as _ml_obs_cfg
-        _write_obs(
-            all_scored=all_scored,
-            rank_map=_rank_map_all,
-            scan_id=_scan_id,
-            regime=regime_name,
-            vix=_vix,
-            config=_ml_obs_cfg,
-        )
-    except Exception as _obs_exc:
-        log.debug("ML observation writer failed (non-fatal): %s", _obs_exc)
+    # 7b. ML Observation Writer — moved to bot_trading.py (Sprint 3.7).
+    #     rank_map, ranking_total, and vix are now exposed on SignalPipelineResult
+    #     so bot_trading.py can call write_observations() AFTER handoff enrichment
+    #     has promoted candidate_source to "handoff_reader" for handoff candidates.
 
     # 8. Append to signals_log.jsonl for IC calculator
     _append_signals_log(signals, log_path=signals_log_path)
@@ -1136,4 +1126,7 @@ def run_signal_pipeline(
         status="OK",
         tier_d_funnel=_td_funnel,
         scan_id=_scan_id,
+        rank_map=_rank_map_all,
+        ranking_total=_ranking_total,
+        vix=_vix,
     )

@@ -1793,6 +1793,22 @@ def run_scan():
                 # signal_pipeline stamps "scanner" conservatively; this is the correction.
                 _sd["candidate_source"] = "handoff_reader"
 
+    # Sprint 3.7 — ML observation write runs here, after handoff enrichment has
+    # promoted candidate_source to "handoff_reader" for handoff candidates.
+    # Non-blocking: any failure is logged and trading continues.
+    try:
+        from ml_observation_writer import write_observations as _write_obs
+        _write_obs(
+            all_scored=pipeline.all_scored,
+            rank_map=pipeline.rank_map,
+            scan_id=pipeline.scan_id,
+            regime=regime_name,
+            vix=pipeline.vix,
+            config=CONFIG,
+        )
+    except Exception as _obs_exc:
+        log.debug("ML observation writer failed (non-fatal): %s", _obs_exc)
+
     # BACK-007 — update directional skew display each scan
     try:
         from learning import get_directional_skew_multi
