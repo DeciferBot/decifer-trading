@@ -993,6 +993,15 @@ def dispatch(
                     "apex_path":                         "track_a_main",
                     "entry_gate_reason":                 payload.get("entry_gate_reason"),
                     "extension_at_entry":                payload.get("extension_at_entry"),
+                    # Sprint 3.6: ML observation identity linkage — these fields
+                    # were stamped onto the scored dict by signal_pipeline and flow
+                    # through candidates_by_symbol. Forwarding them here wires the
+                    # chain: ml_observations.jsonl → ORDER_INTENT → outcome joiner.
+                    "observation_id":                    payload.get("observation_id") or None,
+                    "scan_id":                           payload.get("scan_id") or None,
+                    "ranking_position":                  payload.get("ranking_position") or None,
+                    "ranking_total":                     payload.get("ranking_total") or None,
+                    "candidate_source":                  payload.get("candidate_source") or None,
                 }.items() if v is not None
             }
 

@@ -315,7 +315,7 @@ def _classify_eligible(rec: dict) -> tuple[bool, str | None]:
     if rec.get("realised_pnl_pct") is None:
         return False, "pnl_pct_missing"
     if rec.get("join_quality") != "exact":
-        return False, "fallback_join_not_eligible"
+        return False, "fallback_join_not_training_grade"
     return True, None
 
 

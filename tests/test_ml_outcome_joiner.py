@@ -503,7 +503,7 @@ def test_t10_fallback_join_not_ml_eligible():
         rec = records[0]
         assert rec["join_quality"] == "fallback"
         assert rec["ml_eligible"] is False
-        assert rec["exclusion_reason"] == "fallback_join_not_eligible"
+        assert rec["exclusion_reason"] == "fallback_join_not_training_grade"
 
 
 # ── T11: LEAKAGE_FIELDS ∩ ML_FEATURE_FIELDS = ∅ ──────────────────────────────

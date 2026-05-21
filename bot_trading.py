@@ -1789,6 +1789,9 @@ def run_scan():
                 _sd["handoff_source_labels"] = _gov.get("source_labels")
                 _sd["handoff_quota_group"] = _gov.get("quota", {}).get("group") if isinstance(_gov.get("quota"), dict) else None
                 _sd["handoff_executable"] = False
+                # Promote candidate_source to handoff_reader now that provenance is confirmed.
+                # signal_pipeline stamps "scanner" conservatively; this is the correction.
+                _sd["candidate_source"] = "handoff_reader"
 
     # BACK-007 — update directional skew display each scan
     try:

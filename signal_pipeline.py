@@ -983,14 +983,28 @@ def run_signal_pipeline(
     # Stamp scan provenance onto all_scored dicts so observation_id flows downstream
     # into candidates_by_symbol without needing separate lookup.  Also stamp
     # passed_base_threshold so the signals_log record and decision events agree.
+    # ranking_position / ranking_total / candidate_source are stamped here so
+    # ORDER_INTENT receives them via _origin_extras in signal_dispatcher.dispatch().
     _scored_syms: set[str] = {s.get("symbol") for s in scored if s.get("symbol")}
     _session_date_str = datetime.now(UTC).date().isoformat()
+    _ranking_total = len(all_scored)
     for _s in all_scored:
         _sym = _s.get("symbol")
         _s["scan_id"] = _scan_id
         _s["observation_id"] = f"{_scan_id}_{_sym}" if _sym else None
         _s["passed_base_threshold"] = _sym in _scored_syms if _sym else False
         _s["session_date"] = _session_date_str
+        _s["ranking_position"] = _rank_map_all.get(_sym, 0) if _sym else 0
+        _s["ranking_total"] = _ranking_total
+        # candidate_source: determined from scanner_tier at pipeline time.
+        # bot_trading.py updates this to "handoff_reader" for handoff-sourced
+        # candidates after the pipeline returns (observation records get "scanner"
+        # since the writer runs inside run_signal_pipeline before that enrichment).
+        if not _s.get("candidate_source"):
+            if _s.get("scanner_tier") == "D":
+                _s["candidate_source"] = "position_research_universe"
+            else:
+                _s["candidate_source"] = "scanner"
     log_signal_scan(all_scored, regime, scan_id=_scan_id)
     # Write below_threshold decision events for symbols that didn't clear base threshold.
     try:

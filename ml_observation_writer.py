@@ -47,7 +47,7 @@ log = logging.getLogger("decifer.ml_observation_writer")
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-SCHEMA_VERSION = "sprint2_v1"
+SCHEMA_VERSION = "sprint36_v1"
 
 _REPO_ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -238,12 +238,23 @@ def write_observations(
     ranking_total = len(all_scored)
 
     # ── Build all records before touching the file ────────────────────────────
+    # Within-call dedup: skip a (scan_id, observation_id) pair already written
+    # this invocation. Prevents startup double-writes from producing duplicate rows.
+    # Historical duplicates are intentionally preserved (health check still reports them).
+    _seen_obs_ids: set[str] = set()
     records: list[dict] = []
     for s in all_scored:
         try:
-            records.append(
-                _build_record(s, rank_map, ranking_total, regime, vix, session_date, ts, config)
-            )
+            rec = _build_record(s, rank_map, ranking_total, regime, vix, session_date, ts, config)
+            _dedup_key = f"{rec.get('scan_id', '')}|{rec.get('observation_id', '')}"
+            if _dedup_key and _dedup_key in _seen_obs_ids:
+                log.debug(
+                    "ml_observation_writer: skipping duplicate observation_id '%s' within scan '%s'",
+                    rec.get("observation_id"), rec.get("scan_id"),
+                )
+                continue
+            _seen_obs_ids.add(_dedup_key)
+            records.append(rec)
         except Exception as exc:
             sym = s.get("symbol", "?") if isinstance(s, dict) else "?"
             log.warning("ml_observation_writer: skipped candidate '%s': %s", sym, exc)
