@@ -1046,6 +1046,19 @@ def dispatch(
                     ok = False
                     report["errors"].append(f"{sym}: unknown direction {direction!r}")
             rec["executed"] = bool(ok)
+            if ok:
+                try:
+                    from bot_voice import speak_natural as _speak_entry
+                    _speak_entry(
+                        "entry",
+                        fallback=f"I just entered {'long' if direction == 'LONG' else 'short'} on {sym}.",
+                        symbol=sym,
+                        direction=direction,
+                        reason=rationale or "signal strength",
+                        news="none",
+                    )
+                except Exception:
+                    pass
             # IC decision event — best-effort, never affects execution.
             try:
                 from ic_decision_writer import write_event as _write_ide

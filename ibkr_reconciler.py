@@ -290,6 +290,8 @@ def _build_record(
         "signal_scores": intent.get("signal_scores", {}),
         "ic_weights_at_entry": intent.get("ic_weights_at_entry", {}),
         "entry_thesis": intent.get("entry_thesis") or intent.get("reasoning", ""),
+        "reasoning": intent.get("reasoning", ""),
+        "score_breakdown": intent.get("signal_scores", {}),
         "conviction": intent.get("conviction", 0.0),
         "setup_type": intent.get("setup_type", ""),
         # Reconciliation metadata

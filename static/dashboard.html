@@ -3403,10 +3403,16 @@ function buildTradeExplanation(t) {
   const isBackfill = (t.source === 'ibkr_backfill') || (t.source === 'manual_backfill') ||
                      (t.reasoning || '').toLowerCase().includes('backfill') ||
                      (t.reasoning || '').toLowerCase().includes('reconciled');
-  const rawReasoning = (t.reasoning || '')
+  let rawReasoning = (t.reasoning || '')
     .replace(/\[SENTINEL\]/g, '')
     .replace(/\[CATALYST:[^\]]*\]/g, '')
     .trim();
+  // Fallback: extract the "setup:" clause from entry_thesis for trades that
+  // predate the reasoning field being plumbed through.
+  if (!rawReasoning && t.entry_thesis) {
+    const m = t.entry_thesis.match(/\|\s*setup:\s*([^|]+)/);
+    if (m) rawReasoning = m[1].trim();
+  }
 
   let story = '';
 

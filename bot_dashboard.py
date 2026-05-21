@@ -815,6 +815,9 @@ def _todays_closed_trades_from_events() -> list:
                 "hold_minutes": rec.get("hold_minutes", 0),
                 "score": intent.get("score", 0),
                 "qty": fill.get("fill_qty") or intent.get("qty") or 0,
+                "reasoning": intent.get("reasoning", ""),
+                "entry_thesis": intent.get("entry_thesis", ""),
+                "score_breakdown": intent.get("signal_scores", {}),
             })
     return results
 
