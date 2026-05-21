@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import random as _random
 import threading
 import time
 from datetime import UTC, datetime, timedelta
@@ -27,14 +28,61 @@ from config import CONFIG
 log = logging.getLogger("decifer.alpaca_data")
 
 # Transient TCP errors that warrant a retry; includes requests.ConnectionError
-# when alpaca-py (which depends on requests) is present.
+# and timeout variants when alpaca-py (which depends on requests) is present.
 try:
     import requests.exceptions as _req_exc
-    _TRANSIENT_ERRORS = (OSError, _req_exc.ConnectionError)
+    _transient_exc_types = [OSError, _req_exc.ConnectionError]
+    for _attr in ("Timeout", "ReadTimeout", "ChunkedEncodingError"):
+        _cls = getattr(_req_exc, _attr, None)
+        if _cls is not None:
+            _transient_exc_types.append(_cls)
+    _TRANSIENT_ERRORS = tuple(_transient_exc_types)
+    del _transient_exc_types, _attr, _cls
 except ImportError:
     _TRANSIENT_ERRORS = (OSError,)
 
-_MAX_FETCH_RETRIES = 3
+_MAX_FETCH_RETRIES = 4
+
+
+def _is_http_rate_limit(exc: Exception) -> bool:
+    """Return True if the exception indicates HTTP 429 / too many requests."""
+    msg = str(exc).lower()
+    return "429" in msg or "too many requests" in msg
+
+
+def _is_http_server_error(exc: Exception) -> bool:
+    """Return True if the exception indicates an HTTP 5xx server error."""
+    msg = str(exc)
+    return any(code in msg for code in ("500", "502", "503", "504"))
+
+
+# ── In-cycle bar cache (3-minute TTL) ────────────────────────────────────────
+# Populated by fetch_bars_batch() before the ThreadPoolExecutor runs.
+# Workers call fetch_bars() as normal; the cache intercepts daily/weekly bar
+# fetches so only 5m bars reach the network during a scan cycle.
+_CYCLE_CACHE: dict = {}
+_CYCLE_CACHE_LOCK = threading.Lock()
+_CYCLE_CACHE_TTL = 180  # seconds — refreshed each scan cycle
+
+
+def _cycle_cache_get(symbol: str, period: str, interval: str) -> "pd.DataFrame | None":
+    """Return a cached DataFrame if the entry is fresh, else None."""
+    key = (symbol, period, interval)
+    with _CYCLE_CACHE_LOCK:
+        entry = _CYCLE_CACHE.get(key)
+    if entry is None:
+        return None
+    df, fetched_at = entry
+    if time.monotonic() - fetched_at < _CYCLE_CACHE_TTL:
+        return df
+    return None
+
+
+def _cycle_cache_set(symbol: str, period: str, interval: str, df: "pd.DataFrame | None") -> None:
+    """Store df in the cycle cache with the current monotonic timestamp."""
+    key = (symbol, period, interval)
+    with _CYCLE_CACHE_LOCK:
+        _CYCLE_CACHE[key] = (df, time.monotonic())
 
 
 # ── Lazy client singleton ─────────────────────────────────────────────────────
@@ -236,6 +284,10 @@ def fetch_bars(symbol: str, period: str = "60d", interval: str = "1d") -> pd.Dat
     Uses the SIP consolidated tape (all US exchanges) and split-adjusted
     prices — same quality as what Algo Trader Plus streams in real time.
 
+    Checks the in-cycle cache first (populated by fetch_bars_batch).  On a
+    cache hit the API is not called.  On a miss, retries HTTP 429, 5xx, and
+    transient connection/timeout errors with exponential backoff + jitter.
+
     Args:
         symbol:   Ticker e.g. "AAPL"
         period:   Lookback window in yfinance notation: "5d", "60d", "6mo", "1y"
@@ -245,6 +297,11 @@ def fetch_bars(symbol: str, period: str = "60d", interval: str = "1d") -> pd.Dat
         DataFrame with columns [Open, High, Low, Close, Volume] and UTC
         DatetimeIndex, or None if Alpaca is unavailable or request fails.
     """
+    # ── In-cycle cache check ──────────────────────────────────────────────────
+    cached = _cycle_cache_get(symbol, period, interval)
+    if cached is not None:
+        return cached
+
     client = _get_client()
     if client is None:
         return None
@@ -272,15 +329,41 @@ def fetch_bars(symbol: str, period: str = "60d", interval: str = "1d") -> pd.Dat
             feed="sip",
             adjustment="split",
         )
+        bars = None
         for _attempt in range(_MAX_FETCH_RETRIES):
             try:
                 bars = client.get_stock_bars(request)
                 break
-            except _TRANSIENT_ERRORS:
+            except Exception as _exc:
+                if _is_http_rate_limit(_exc):
+                    # 429 — back off longer to let Alpaca rate-limit window clear
+                    _delay = (2 ** (_attempt + 1)) + _random.uniform(0, 1)
+                    log.debug(
+                        "fetch_bars: 429 rate-limit for %s (attempt %d) — sleeping %.2fs",
+                        symbol, _attempt + 1, _delay,
+                    )
+                    time.sleep(_delay)
+                elif _is_http_server_error(_exc):
+                    _delay = 1.0 * (2 ** _attempt) + _random.uniform(0, 0.5)
+                    log.debug(
+                        "fetch_bars: 5xx server error for %s (attempt %d) — sleeping %.2fs",
+                        symbol, _attempt + 1, _delay,
+                    )
+                    time.sleep(_delay)
+                elif isinstance(_exc, _TRANSIENT_ERRORS):
+                    _delay = 0.5 * (2 ** _attempt) + _random.uniform(0, 0.1)
+                    log.debug(
+                        "fetch_bars: transient error for %s (attempt %d) — sleeping %.2fs",
+                        symbol, _attempt + 1, _delay,
+                    )
+                    time.sleep(_delay)
+                else:
+                    raise
                 if _attempt == _MAX_FETCH_RETRIES - 1:
                     raise
-                time.sleep(0.5 * (2 ** _attempt))
 
+        if bars is None:
+            return None
         df = bars.df
 
         if df is None or df.empty:
@@ -305,7 +388,11 @@ def fetch_bars(symbol: str, period: str = "60d", interval: str = "1d") -> pd.Dat
 
         # Return only canonical OHLCV columns (drop Alpaca extras: trade_count, vwap)
         cols = [c for c in ("Open", "High", "Low", "Close", "Volume") if c in df.columns]
-        return df[cols]
+        result = df[cols]
+
+        # Populate cycle cache so other workers skip this fetch
+        _cycle_cache_set(symbol, period, interval, result)
+        return result
 
     except ImportError:
         log.debug("fetch_bars: alpaca-py not installed")
@@ -313,6 +400,180 @@ def fetch_bars(symbol: str, period: str = "60d", interval: str = "1d") -> pd.Dat
     except Exception as exc:
         log.debug(f"fetch_bars: {symbol} {interval}/{period} failed — {exc}")
         return None
+
+
+def fetch_bars_batch(
+    symbols: list,
+    period: str = "60d",
+    interval: str = "1d",
+    batch_size: int = 50,
+) -> dict:
+    """
+    Fetch historical OHLCV bars for multiple symbols in batched Alpaca requests.
+
+    Converts N individual REST calls into ceil(N / batch_size) batch calls.
+    Results are stored in the in-cycle cache so subsequent fetch_bars() calls
+    for the same (symbol, period, interval) return immediately without hitting
+    the network.
+
+    Args:
+        symbols:    List of ticker strings.
+        period:     Lookback window in yfinance notation: "60d", "1y", etc.
+        interval:   Bar size: "1d" (daily), "1wk" (weekly), "1h", "5m", "1m".
+        batch_size: Maximum symbols per Alpaca request (Alpaca URL-length limit).
+
+    Returns:
+        {symbol: DataFrame} for all symbols that were successfully fetched.
+        Symbols that failed are absent from the dict.
+    """
+    if not symbols:
+        return {}
+
+    # De-duplicate while preserving order
+    seen: set = set()
+    unique = [s for s in symbols if not (s in seen or seen.add(s))]
+
+    # Check cycle cache first — collect only symbols that need a network fetch
+    cached_results: dict = {}
+    missing: list = []
+    for sym in unique:
+        hit = _cycle_cache_get(sym, period, interval)
+        if hit is not None:
+            cached_results[sym] = hit
+        else:
+            missing.append(sym)
+
+    if not missing:
+        log.info(
+            "fetch_bars_batch: period=%s interval=%s requested=%d cache_hits=%d fetched=0 failed=0",
+            period, interval, len(unique), len(cached_results),
+        )
+        return cached_results
+
+    client = _get_client()
+    if client is None:
+        log.warning("fetch_bars_batch: Alpaca client not initialised — skipping batch fetch")
+        return cached_results
+
+    try:
+        from alpaca.data.requests import StockBarsRequest
+        from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+    except ImportError:
+        log.debug("fetch_bars_batch: alpaca-py not installed")
+        return cached_results
+
+    tf_map = {
+        "1d": TimeFrame.Day,
+        "1wk": TimeFrame.Week,
+        "1h": TimeFrame.Hour,
+        "5m": TimeFrame(5, TimeFrameUnit.Minute),
+        "1m": TimeFrame.Minute,
+    }
+    tf = tf_map.get(interval)
+    if tf is None:
+        log.debug("fetch_bars_batch: unsupported interval '%s'", interval)
+        return cached_results
+
+    rename = {"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
+    fetched = 0
+    failed = 0
+
+    for i in range(0, len(missing), batch_size):
+        chunk = missing[i : i + batch_size]
+        request = StockBarsRequest(
+            symbol_or_symbols=chunk,
+            timeframe=tf,
+            start=_period_to_start(period),
+            feed="sip",
+            adjustment="split",
+        )
+        bars = None
+        for _attempt in range(_MAX_FETCH_RETRIES):
+            try:
+                bars = client.get_stock_bars(request)
+                break
+            except Exception as _exc:
+                if _is_http_rate_limit(_exc):
+                    _delay = (2 ** (_attempt + 1)) + _random.uniform(0, 1)
+                    log.debug(
+                        "fetch_bars_batch: 429 rate-limit (attempt %d) — sleeping %.2fs",
+                        _attempt + 1, _delay,
+                    )
+                    time.sleep(_delay)
+                elif _is_http_server_error(_exc):
+                    _delay = 1.0 * (2 ** _attempt) + _random.uniform(0, 0.5)
+                    log.debug(
+                        "fetch_bars_batch: 5xx error (attempt %d) — sleeping %.2fs",
+                        _attempt + 1, _delay,
+                    )
+                    time.sleep(_delay)
+                elif isinstance(_exc, _TRANSIENT_ERRORS):
+                    _delay = 0.5 * (2 ** _attempt) + _random.uniform(0, 0.1)
+                    log.debug(
+                        "fetch_bars_batch: transient error (attempt %d) — sleeping %.2fs",
+                        _attempt + 1, _delay,
+                    )
+                    time.sleep(_delay)
+                else:
+                    log.debug("fetch_bars_batch: non-retryable error — %s", _exc)
+                    bars = None
+                    failed += len(chunk)
+                    break
+                if _attempt == _MAX_FETCH_RETRIES - 1:
+                    log.debug("fetch_bars_batch: exhausted retries for chunk of %d symbols", len(chunk))
+                    bars = None
+                    failed += len(chunk)
+
+        if bars is None:
+            continue
+
+        try:
+            raw_df = bars.df
+        except Exception as _exc:
+            log.debug("fetch_bars_batch: failed to read .df from response — %s", _exc)
+            failed += len(chunk)
+            continue
+
+        if raw_df is None or raw_df.empty:
+            failed += len(chunk)
+            continue
+
+        # Multi-symbol response always has MultiIndex (symbol, timestamp)
+        if isinstance(raw_df.index, pd.MultiIndex):
+            for sym in chunk:
+                try:
+                    sym_df = raw_df.xs(sym, level=0)
+                    sym_df = sym_df.rename(columns={k: v for k, v in rename.items() if k in sym_df.columns})
+                    if not isinstance(sym_df.index, pd.DatetimeIndex):
+                        sym_df.index = pd.to_datetime(sym_df.index)
+                    cols = [c for c in ("Open", "High", "Low", "Close", "Volume") if c in sym_df.columns]
+                    result_df = sym_df[cols]
+                    cached_results[sym] = result_df
+                    _cycle_cache_set(sym, period, interval, result_df)
+                    fetched += 1
+                except KeyError:
+                    # Symbol not in response (no data for that period)
+                    failed += 1
+                except Exception as _sym_exc:
+                    log.debug("fetch_bars_batch: parse failed for %s — %s", sym, _sym_exc)
+                    failed += 1
+        else:
+            # Single-symbol batch (len == 1) — flat index
+            sym = chunk[0]
+            raw_df = raw_df.rename(columns={k: v for k, v in rename.items() if k in raw_df.columns})
+            if not isinstance(raw_df.index, pd.DatetimeIndex):
+                raw_df.index = pd.to_datetime(raw_df.index)
+            cols = [c for c in ("Open", "High", "Low", "Close", "Volume") if c in raw_df.columns]
+            result_df = raw_df[cols]
+            cached_results[sym] = result_df
+            _cycle_cache_set(sym, period, interval, result_df)
+            fetched += 1
+
+    log.info(
+        "fetch_bars_batch: period=%s interval=%s requested=%d cache_hits=%d fetched=%d failed=%d",
+        period, interval, len(unique), len(unique) - len(missing), fetched, failed,
+    )
+    return cached_results
 
 
 def get_intraday_hod(symbol: str) -> float | None:

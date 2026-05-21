@@ -579,3 +579,28 @@ Sprint 3 built the outcome joiner and canonical dataset builder but had 0 live o
 
 **Next sprint gate:**
 After one live scan cycle writes observations, run `scripts/ml_observation_health_check.py --canary` to validate data integrity. Run `scripts/ml_outcome_joiner.py` to join observations to outcomes. The canonical learning dataset will have `ml_eligible=False` for all pass rows (no trade taken) and will have `ml_eligible=True` only for exactly-joined, closed, directional trades with signal scores — this set grows with each trading day.
+
+---
+
+### Scoring Pipeline Fetch Overload — Production Incident 2026-05-21 (Alpaca Historical Bars REST)
+**Decision (2026-05-21, Amit):**
+
+**Incident:** At 14:23 ET, `score_universe()` reported "72/72 symbols failed data fetch" and aborted the scan cycle. The live quote stream and position reconciliation remained healthy throughout.
+
+**Root cause:** `_SCORE_WORKERS=16` with `_ALPACA_SEM(16)` created up to 48 simultaneous Alpaca historical bars REST calls per scan cycle (3 bar fetches per symbol × 16 concurrent workers on first/cache-cold scan). urllib3 has a 10-connection pool to data.alpaca.markets; 38 excess connections opened fresh TCP sockets. Combined with no retry for HTTP 429 or read timeouts, a transient API slowdown cascaded into a complete scan failure.
+
+**Fix (targeted, no new architecture layer):**
+
+1. **Batch prefetch**: Before the ThreadPoolExecutor, `fetch_bars_batch()` fetches 1d and 1wk bars for all universe symbols in 2 API calls (vs N×2 individual calls). Results populate an in-cycle cache (3-minute TTL). Workers hit the cache instead of the network for daily/weekly bars.
+
+2. **Reduced concurrency**: `_SCORE_WORKERS` and `_ALPACA_SEM` reduced from 16 to 6. Workers only need to fetch 5m bars (usually served from Alpaca stream cache). 6 concurrent calls stay within the 10-connection pool with headroom.
+
+3. **Retry with backoff+jitter**: `fetch_bars()` and `fetch_bars_batch()` retry HTTP 429, 5xx, and transient connection/timeout errors with exponential backoff + jitter (base delay × 2^attempt + uniform jitter).
+
+4. **Partial success**: Scan continues when successful symbols are above 20% threshold (80% failure triggers abort, unchanged). Partial candidates are scored and surfaced.
+
+5. **Circuit breaker**: After 3 consecutive full-failure cycles, new entries are paused. Portfolio management, exits, and risk monitoring are never blocked. Auto-closes after 300 seconds. Logged as `DATA_FETCH_BLOCKED`, never `RISK_BLOCKED`.
+
+6. **Structured telemetry**: Each scan logs `requested=N successful=M failed=K fetch_mode=batched|bounded_parallel|fallback elapsed_ms=T`.
+
+**What was NOT changed:** Signal scoring logic, trading thresholds, risk gates, execution pipeline, IC weights, Apex call count.

@@ -622,12 +622,15 @@ def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown", hmm_r
 #   - OS process spawn overhead (was 30–60s per scan, now ~5–10s)
 #   - yfinance cross-symbol data contamination risk
 #   - multiprocessing fork issues on some platforms
-# 5m bar fetches go to IBKR; 1d/1w stay on yfinance (no thread-safety issue at daily freq).
-# urllib3 keeps 10 persistent connections to data.alpaca.markets; workers beyond 10
-# discard pooled connections and open fresh TCP sockets (~100ms overhead each).
-# 16 workers: 6 above the pool ceiling — acceptable, and 1d/1wk bars are now
-# cached so only 5m REST calls hit Alpaca after the first scan cycle.
-_SCORE_WORKERS = 16
+# 5m bar fetches go to Alpaca; 1d/1wk bars are pre-fetched in 2 batch calls
+# by fetch_bars_batch() before the executor runs, then served from the in-cycle
+# cache.  Workers only need network access for 5m bars.
+# urllib3 keeps 10 persistent connections to data.alpaca.markets.
+# 2026-05-21 incident: 16 workers × 3 bar fetches = 48 simultaneous REST calls
+# caused connection-pool exhaustion and 72/72 symbol failure.
+# Reduced to 6: stays within the 10-connection pool with headroom for other
+# concurrent Alpaca calls (snapshots, streams).
+_SCORE_WORKERS = 6
 
 
 def _fetch_one_thread(args):
@@ -758,8 +761,9 @@ import threading as _threading
 
 _IBKR_PACING_LOCK = _threading.Lock()
 # Alpaca Algo Trader Plus market data limit: 10,000 req/min.
-# 30 concurrent at ~5s each = ~360 req/min — well within limit.
-_ALPACA_SEM = _threading.BoundedSemaphore(16)
+# Semaphore matches _SCORE_WORKERS — 6 concurrent REST calls stay within the
+# 10-connection urllib3 pool.  Reduced from 16 in the 2026-05-21 incident fix.
+_ALPACA_SEM = _threading.BoundedSemaphore(6)
 
 # ── 1d / 1wk bar cache ───────────────────────────────────────────────────────
 # Daily and weekly bars change once per day. Re-fetching them every scan cycle
@@ -770,6 +774,81 @@ _BAR_CACHE_1D: dict = {}   # symbol → (df, fetched_at_epoch)
 _BAR_CACHE_1W: dict = {}   # symbol → (df, fetched_at_epoch)
 _BAR_CACHE_TTL = 1200      # 20 minutes in seconds
 _BAR_CACHE_LOCK = _threading.Lock()
+
+# ── Data-fetch circuit breaker ────────────────────────────────────────────────
+# Opens after N consecutive full-failure scan cycles; pauses NEW ENTRIES only.
+# Portfolio management, exits, and risk monitoring are never blocked.
+# Auto-closes after `data_fetch_circuit_breaker_close_sec` seconds.
+_CB_LOCK = _threading.Lock()
+_CB_STATE: dict = {"consecutive_failures": 0, "open": False, "open_since": None}
+
+# Module-level status flag — updated after each score_universe() call.
+# "OK" | "DATA_FETCH_BLOCKED"
+_score_universe_data_status: str = "OK"
+
+
+def get_score_universe_status() -> str:
+    """Return the data-fetch status from the most recent score_universe() call.
+
+    Returns:
+        "OK"                — last scan succeeded (or no scan has run yet).
+        "DATA_FETCH_BLOCKED"— ≥80% of symbols failed data fetch last cycle.
+    """
+    return _score_universe_data_status
+
+
+def _check_and_record_circuit_breaker(all_failure: bool) -> bool:
+    """Update the circuit-breaker state and return True if the breaker is open.
+
+    Args:
+        all_failure: True when ≥80% of symbols failed data fetch this cycle.
+
+    Returns:
+        True if the circuit breaker is currently open (new entries paused).
+    """
+    threshold = CONFIG.get("data_fetch_circuit_breaker_cycles", 3)
+    auto_close_sec = CONFIG.get("data_fetch_circuit_breaker_close_sec", 300)
+
+    with _CB_LOCK:
+        cb = _CB_STATE
+
+        # Auto-close check — if breaker has been open long enough, reset it
+        if cb["open"] and cb["open_since"] is not None:
+            elapsed = _cache_time.monotonic() - cb["open_since"]
+            if elapsed > auto_close_sec:
+                log.info(
+                    "DATA_FETCH circuit breaker: auto-closing after %.0fs — "
+                    "resuming new entry evaluation",
+                    elapsed,
+                )
+                cb["open"] = False
+                cb["open_since"] = None
+                cb["consecutive_failures"] = 0
+                return False
+
+        if all_failure:
+            cb["consecutive_failures"] += 1
+            if cb["consecutive_failures"] >= threshold and not cb["open"]:
+                cb["open"] = True
+                cb["open_since"] = _cache_time.monotonic()
+                logging.critical(
+                    "DATA_FETCH_BLOCKED: circuit breaker OPEN after %d consecutive "
+                    "full-failure cycles — new entries paused; portfolio management, "
+                    "exits, and risk monitoring are NOT affected",
+                    cb["consecutive_failures"],
+                )
+        else:
+            if cb["consecutive_failures"] > 0 or cb["open"]:
+                log.info(
+                    "DATA_FETCH circuit breaker: resetting (was %s, %d consecutive failures)",
+                    "OPEN" if cb["open"] else "closed",
+                    cb["consecutive_failures"],
+                )
+            cb["consecutive_failures"] = 0
+            cb["open"] = False
+            cb["open_since"] = None
+
+        return cb["open"]
 
 
 def _get_cached_bars(cache: dict, symbol: str, fetch_fn) -> "pd.DataFrame | None":
@@ -3099,10 +3178,34 @@ def score_universe(
         else:
             regime_router = "unknown"
 
+    # ── Batch-prefetch 1d/1wk bars before parallel scoring ──────────────────
+    # Converts N×2 individual REST calls into 2 batch calls.
+    # Workers hit the in-cycle cache (3-min TTL) instead of the network for
+    # daily and weekly bars — only 5m bar fetches reach Alpaca per-worker.
+    _t_start = _cache_time.monotonic()
+    _fetch_mode = "bounded_parallel"
+    try:
+        from alpaca_data import fetch_bars_batch as _fetch_bars_batch
+        log.info(
+            "score_universe: prefetching 1d/1wk bars for %d symbols "
+            "(2 batch calls vs %d individual)",
+            len(symbols), len(symbols) * 2,
+        )
+        _fetch_bars_batch(symbols, period="60d", interval="1d")
+        _fetch_bars_batch(symbols, period="1y",  interval="1wk")
+        _fetch_mode = "batched"
+    except Exception as _pf_exc:
+        log.warning(
+            "score_universe: batch prefetch failed (%s) — falling back to per-symbol fetch",
+            _pf_exc,
+        )
+
     # ── PARALLEL SCORING via ThreadPoolExecutor ────────────────
     # IBKR reqHistoricalData is thread-safe — threads share one IB connection,
     # each making independent reqHistoricalData calls. No shared mutable globals.
-    # 1d/1w still use yfinance but at daily frequency (no thread-safety issue there).
+    # 1d/1wk bars are served from the in-cycle cache populated above.
+    # Workers only need network access for 5m bars; 6 concurrent calls stay
+    # within urllib3's 10-connection pool.
     all_results = []
     failures = 0
     args_list = [
@@ -3133,6 +3236,7 @@ def score_universe(
                     failures += 1
     except Exception as e:
         # Fallback: sequential scoring if thread pool fails
+        _fetch_mode = "fallback"
         logging.warning(f"Thread pool failed ({e}), falling back to sequential scoring")
         for sym, ns, ss, rr, _ib in args_list:
             try:
@@ -3147,12 +3251,28 @@ def score_universe(
                 failures += 1
 
     total = len(symbols)
+    _elapsed_ms = round((_cache_time.monotonic() - _t_start) * 1000)
+
+    log.info(
+        "score_universe telemetry: requested=%d successful=%d failed=%d "
+        "fetch_mode=%s elapsed_ms=%d",
+        total, total - failures, failures, _fetch_mode, _elapsed_ms,
+    )
+
+    global _score_universe_data_status
     if total > 0 and failures / total > 0.8:
+        _score_universe_data_status = "DATA_FETCH_BLOCKED"
+        _cb_open = _check_and_record_circuit_breaker(all_failure=True)
         logging.critical(
-            f"score_universe: {failures}/{total} symbols failed data fetch "
-            f"— aborting scan cycle to prevent low-confidence orders"
+            "DATA_FETCH_BLOCKED: %d/%d symbols failed data fetch "
+            "— aborting scan cycle (circuit_breaker_open=%s). "
+            "This is NOT a risk gate. Portfolio management and exits continue.",
+            failures, total, _cb_open,
         )
         return [], []
+
+    _score_universe_data_status = "OK"
+    _check_and_record_circuit_breaker(all_failure=False)
 
     # Enrich payloads with regime-level fields (computed once, applied to all symbols)
     _daily_tape: int | None = None

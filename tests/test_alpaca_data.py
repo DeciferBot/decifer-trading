@@ -130,8 +130,10 @@ def _mock_bars(df):
 
 
 def _reset_client():
-    """Reset the module-level client singleton so each test starts clean."""
+    """Reset the module-level client singleton and cycle cache so each test starts clean."""
     alpaca_data._client = None
+    with alpaca_data._CYCLE_CACHE_LOCK:
+        alpaca_data._CYCLE_CACHE.clear()
 
 
 # ── Tests: _period_to_start ────────────────────────────────────────────────────

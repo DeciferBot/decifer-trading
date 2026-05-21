@@ -867,6 +867,29 @@ def run_signal_pipeline(
     )
     log.info(f"score_universe: {len(scored)} above threshold, {len(all_scored)} total")
 
+    # Check for data-fetch failure (all_scored empty from DATA_FETCH_BLOCKED,
+    # not from a genuine zero-signal scan).  Distinguishes DATA_FETCH_BLOCKED
+    # from RISK_BLOCKED so callers can route correctly.
+    if not all_scored and len(filtered) > 0:
+        try:
+            from signals import get_score_universe_status as _get_fetch_status
+            if _get_fetch_status() == "DATA_FETCH_BLOCKED":
+                log.critical(
+                    "DATA_FETCH_BLOCKED: propagating from score_universe — "
+                    "entries paused this cycle; portfolio/exit/risk unaffected"
+                )
+                return SignalPipelineResult(
+                    signals=[],
+                    scored=[],
+                    all_scored=[],
+                    news_sentiment=news_sentiment,
+                    universe=filtered,
+                    regime_name=regime_name,
+                    status="DATA_FETCH_BLOCKED",
+                )
+        except Exception:
+            pass  # Non-critical; fall through to normal zero-signal handling
+
     # 4c. Tier D tagging — attach Position Research Universe metadata to scored dicts
     # MUST run before _apply_strategy_threshold so the gate can apply the lower Tier D floor.
     _tier_d_syms, _tier_d_meta = _get_position_research_universe()
