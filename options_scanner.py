@@ -1,13 +1,15 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  options_scanner.py                         ║
-# ║   Proactive options opportunity scanner via yfinance         ║
+# ║   Proactive options opportunity scanner                      ║
 # ║                                                              ║
 # ║   Scans for:                                                 ║
-# ║   • Unusual options volume (smart money activity)            ║
+# ║   • Unusual options volume (real volume expansion signal)    ║
 # ║   • IV rank sweeps (cheap options windows)                   ║
 # ║   • Earnings catalyst plays (3–21 DTE)                       ║
 # ║   • Call/put skew (directional flow bias)                    ║
-# ║   • Max pain levels (OI concentration)                       ║
+# ║                                                              ║
+# ║   Volume data source: Alpaca OPRA dailyBar.v (real volume)   ║
+# ║   No yfinance. No synthetic OI. No bid_size proxy.           ║
 # ║                                                              ║
 # ║   Output feeds into Apex Single-Synthesizer scan cycles      ║
 # ║   alongside stock signals — Apex selects instrument type     ║
@@ -17,13 +19,19 @@
 from __future__ import annotations
 
 import logging
-import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
+
+from options_provider import (
+    MIN_DAY_OVER_DAY_RATIO,
+    MIN_SIDE_TRADE_COUNT,
+    MIN_SIDE_VOLUME,
+    PREV_VOLUME_FLOOR,
+    get_options_flow_data,
+)
 
 try:
     from options import get_iv_rank  # module-level so tests can patch options_scanner.get_iv_rank
@@ -34,11 +42,10 @@ except (ImportError, Exception):
 
 
 log = logging.getLogger("decifer.options_scanner")
-logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 # ── Highly optionable universe ─────────────────────────────────────────
-# Liquid names with reliable options data on yfinance.
-# Scanned every cycle in addition to top TV screener hits.
+# Liquid names with reliable options data on Alpaca OPRA.
+# Scanned every cycle in addition to top stock scanner hits.
 OPTIONABLE_UNIVERSE = [
     # Mega-cap tech (tightest spreads, highest options liquidity)
     "AAPL",
@@ -85,12 +92,10 @@ OPTIONABLE_UNIVERSE = [
 ]
 
 # ── Scanner thresholds ─────────────────────────────────────────────────
-_SCAN_MIN_DTE = 5  # Wider than trading window — catches early catalyst setups
+_SCAN_MIN_DTE = 5   # Wider than trading window — catches early catalyst setups
 _SCAN_MAX_DTE = 45
-_UNUSUAL_VOL_RATIO = 0.25  # volume / OI > 25% = unusual (significant same-day activity)
-_MIN_TOTAL_VOL = 200  # Skip symbols with < 200 total options contracts traded
-_MIN_OPTIONS_SCORE = 12  # Must score at least 12 / 30 to be returned to agents
-_MAX_RESULTS = 15  # Top N signals returned per cycle
+_MIN_OPTIONS_SCORE = 12  # Must score at least 12 / 30 to be returned to Apex
+_MAX_RESULTS = 15        # Top N signals returned per cycle
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -98,100 +103,28 @@ _MAX_RESULTS = 15  # Top N signals returned per cycle
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _get_nearest_expiry(ticker_obj) -> tuple[str | None, int | None]:
+def _get_earnings_days_fmp(symbol: str) -> int | None:
     """
-    Find the nearest expiry in the _SCAN_MIN_DTE to _SCAN_MAX_DTE window.
-    Returns (expiry_str "YYYY-MM-DD", dte_int) or (None, None).
-    """
-    today = date.today()
-    try:
-        exps = ticker_obj.options
-        if not exps:
-            return None, None
-    except Exception:
-        return None, None
+    Return days until next earnings announcement via FMP, or None.
 
-    for exp in exps:
-        try:
-            exp_date = datetime.strptime(exp, "%Y-%m-%d").date()
-            dte = (exp_date - today).days
-            if _SCAN_MIN_DTE <= dte <= _SCAN_MAX_DTE:
-                return exp, dte
-        except Exception:
-            continue
-
-    return None, None
-
-
-def _get_earnings_days(ticker_obj) -> int | None:
-    """
-    Return days until next earnings announcement, or None.
-    Takes a pre-fetched yfinance Ticker object to avoid duplicate network calls.
-    Handles the various shapes yfinance.calendar returns.
+    Uses FMP earning-calendar endpoint (stable API, returns structured dates).
+    Returns None on any failure — earnings data is advisory only.
     """
     try:
-        cal = ticker_obj.calendar
-        if cal is None:
-            return None
-
-        ed = None
-        if isinstance(cal, dict):
-            ed = cal.get("Earnings Date")
-        elif isinstance(cal, pd.DataFrame):
-            if "Earnings Date" in cal.columns:
-                ed = cal["Earnings Date"].iloc[0]
-            elif "Earnings Date" in cal.index:
-                ed = cal.T["Earnings Date"].iloc[0]
-
-        if ed is None:
-            return None
-
-        if isinstance(ed, (list, pd.Series)):
-            ed = ed[0] if len(ed) > 0 else None
-        if ed is None:
-            return None
-
-        if hasattr(ed, "date"):
-            ed = ed.date()
-        elif isinstance(ed, str):
-            ed = datetime.strptime(ed[:10], "%Y-%m-%d").date()
-
-        days = (ed - date.today()).days
-        return int(days) if 0 <= days <= 60 else None
-
+        from fmp_client import get_earnings_calendar
+        items = get_earnings_calendar(symbols=[symbol], days_ahead=60)
+        for item in items:
+            if item.get("symbol", "").upper() == symbol.upper():
+                raw_date = item.get("date", "")
+                if not raw_date:
+                    continue
+                d = datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
+                days = (d - date.today()).days
+                if 0 <= days <= 60:
+                    return int(days)
     except Exception:
-        return None
-
-
-def _compute_max_pain(calls: pd.DataFrame, puts: pd.DataFrame) -> float | None:
-    """
-    Max pain = the strike where total dollar value of expiring options is minimised.
-    Market makers are naturally hedged to pin price near max pain at expiry.
-    Vectorized implementation for performance.
-    """
-    try:
-        strikes = sorted(set(calls["strike"].dropna().tolist() + puts["strike"].dropna().tolist()))
-        if len(strikes) < 3:
-            return None
-
-        test_prices = np.array(strikes)
-
-        # Vectorized: for each test_price, sum OI * max(0, test_price - strike) for calls
-        call_strikes = calls["strike"].dropna().values
-        call_oi = calls["openInterest"].dropna().values.astype(float)
-        put_strikes = puts["strike"].dropna().values
-        put_oi = puts["openInterest"].dropna().values.astype(float)
-
-        total_pain = np.zeros(len(test_prices))
-        for i, tp in enumerate(test_prices):
-            call_val = np.sum(call_oi * np.maximum(0.0, tp - call_strikes))
-            put_val = np.sum(put_oi * np.maximum(0.0, put_strikes - tp))
-            total_pain[i] = call_val + put_val
-
-        return float(test_prices[np.argmin(total_pain)])
-
-    except Exception:
-        return None
+        pass
+    return None
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -203,9 +136,12 @@ def _analyse_symbol(symbol: str, regime: dict | None = None) -> dict | None:
     """
     Run full options analysis for one symbol.
     Returns an options signal dict or None if nothing notable.
+
+    Volume metrics come from options_provider.get_options_flow_data() which
+    reads Alpaca dailyBar.v — real traded contracts, no synthetic proxies.
     """
     try:
-        # ── Price + chain: Alpaca OPRA primary, yfinance fallback ─────
+        # ── Price + contract chain: Alpaca OPRA ───────────────────
         S = calls = puts = exp_str = dte = None
 
         try:
@@ -228,58 +164,62 @@ def _analyse_symbol(symbol: str, regime: dict | None = None) -> dict | None:
             pass
 
         if S is None or calls is None:
-            # yfinance fallback
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="2d", interval="1d")
-            if hist is None or hist.empty:
-                return None
-            S = float(hist["Close"].iloc[-1])
-            if S <= 0:
-                return None
-            exp_str, dte = _get_nearest_expiry(ticker)
-            if exp_str is None:
-                return None
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                _chain_yf = ticker.option_chain(exp_str)
-            calls = _chain_yf.calls.copy()
-            puts = _chain_yf.puts.copy()
+            return None
 
-        # ── Earnings calendar (yfinance — lightweight, no chain needed) ──
-        earnings_days = None
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                _ticker_cal = yf.Ticker(symbol)
-            earnings_days = _get_earnings_days(_ticker_cal)
-        except Exception:
-            pass
+        # ── Earnings calendar: FMP ────────────────────────────────
+        earnings_days = _get_earnings_days_fmp(symbol)
 
         if calls.empty and puts.empty:
             return None
 
-        # ── Volume & OI totals ────────────────────────────────────────
-        call_vol = float(calls["volume"].fillna(0).sum())
-        put_vol = float(puts["volume"].fillna(0).sum())
-        call_oi = float(calls["openInterest"].fillna(0).sum())
-        put_oi = float(puts["openInterest"].fillna(0).sum())
-        total_vol = call_vol + put_vol
+        # ── Options flow data: real volume from Alpaca dailyBar ───
+        flow_data = get_options_flow_data(symbol, _SCAN_MIN_DTE, _SCAN_MAX_DTE)
 
-        if total_vol < _MIN_TOTAL_VOL:
+        if flow_data is None or not flow_data.flow_metrics_available:
+            unusual_calls = False
+            unusual_puts = False
+            unusual_eval_reason = "missing_approved_options_flow_provider"
+            provider_status = "NULL"
+            call_vol = put_vol = call_tc = put_tc = call_prev = put_prev = 0.0
+        else:
+            call_vol = flow_data.call_volume
+            put_vol = flow_data.put_volume
+            call_tc = flow_data.call_trade_count
+            put_tc = flow_data.put_trade_count
+            call_prev = flow_data.call_prev_volume
+            put_prev = flow_data.put_prev_volume
+            provider_status = flow_data.provider_status
+
+            # Volume expansion detection:
+            #   1. Side must exceed MIN_SIDE_VOLUME (absolute floor)
+            #   2. Trade count must exceed MIN_SIDE_TRADE_COUNT (quality gate)
+            #   3. Today / prev ratio >= MIN_DAY_OVER_DAY_RATIO (expansion gate)
+            #      prev is floored at PREV_VOLUME_FLOOR to avoid tiny denominators
+            unusual_calls = (
+                call_vol >= MIN_SIDE_VOLUME
+                and call_tc >= MIN_SIDE_TRADE_COUNT
+                and call_vol / max(call_prev, PREV_VOLUME_FLOOR) >= MIN_DAY_OVER_DAY_RATIO
+            )
+            unusual_puts = (
+                put_vol >= MIN_SIDE_VOLUME
+                and put_tc >= MIN_SIDE_TRADE_COUNT
+                and put_vol / max(put_prev, PREV_VOLUME_FLOOR) >= MIN_DAY_OVER_DAY_RATIO
+            )
+            unusual_eval_reason = (
+                f"vol_expansion: calls={int(call_vol)} prev={int(call_prev)} "
+                f"puts={int(put_vol)} prev={int(put_prev)}"
+            )
+
+        # ── Call/Put volume ratio ─────────────────────────────────
+        # Uses flow_data volumes for directional skew assessment
+        total_vol = call_vol + put_vol
+        if total_vol < MIN_SIDE_VOLUME:
             return None  # Not enough activity to be meaningful
 
-        # ── Call/Put ratio (by volume) ────────────────────────────────
         cp_ratio = round(call_vol / put_vol, 2) if put_vol > 10 else 10.0
         pc_ratio = round(put_vol / call_vol, 2) if call_vol > 10 else 10.0
 
-        # ── Unusual volume detection ──────────────────────────────────
-        # "Unusual" = today's volume is > 25% of total open interest
-        unusual_calls = (call_oi > 0) and (call_vol / call_oi >= _UNUSUAL_VOL_RATIO)
-        unusual_puts = (put_oi > 0) and (put_vol / put_oi >= _UNUSUAL_VOL_RATIO)
-
-        # ── Dominant strike (most active contract today) ──────────────
+        # ── Dominant strike (most active contract today by volume) ─
         all_c = pd.concat([calls.assign(opt_type="call"), puts.assign(opt_type="put")], ignore_index=True)
         all_c["volume"] = all_c["volume"].fillna(0)
         dom_row = all_c.loc[all_c["volume"].idxmax()]
@@ -294,46 +234,44 @@ def _analyse_symbol(symbol: str, regime: dict | None = None) -> dict | None:
         if not (0 < dom_iv < 5):
             dom_iv = 0.30
 
-        # ── IV Rank (uses options.py proxy) ───────────────────────────
+        # ── IV Rank (uses options.py proxy) ───────────────────────
         iv_rank = get_iv_rank(symbol, dom_iv)
-
-        # ── Earnings catalyst (already fetched at top of function) ───
-
-        # ── Max pain ──────────────────────────────────────────────────
-        max_pain = _compute_max_pain(calls, puts)
 
         # ══════════════════════════════════════════════════════════════
         # SCORING  (0 – 30)
         # ══════════════════════════════════════════════════════════════
         score = 0
-        reasons = []
+        reasons: list[str] = []
 
         # 1. Unusual volume  (0–10)
-        # Both sides unusual: award based on which side dominates by magnitude
+        # Evaluated using volume expansion (today vs prev day) not OI ratio.
+        # Both sides unusual: award based on which side dominates by magnitude.
         if unusual_calls and unusual_puts:
             if cp_ratio >= 1.5:  # Call-dominated both-unusual
                 score += 9
                 reasons.append(
                     f"unusual vol both sides, CALL-led — C/P={cp_ratio:.1f}x "
-                    f"(call {call_vol / call_oi * 100:.0f}%, put {put_vol / put_oi * 100:.0f}% of OI)"
+                    f"(calls={int(call_vol)} {call_vol/max(call_prev,PREV_VOLUME_FLOOR):.1f}x prev, "
+                    f"puts={int(put_vol)} {put_vol/max(put_prev,PREV_VOLUME_FLOOR):.1f}x prev)"
                 )
             elif pc_ratio >= 1.5:  # Put-dominated both-unusual
                 score += 9
                 reasons.append(
                     f"unusual vol both sides, PUT-led — C/P={cp_ratio:.1f}x "
-                    f"(put {put_vol / put_oi * 100:.0f}%, call {call_vol / call_oi * 100:.0f}% of OI)"
+                    f"(puts={int(put_vol)} {put_vol/max(put_prev,PREV_VOLUME_FLOOR):.1f}x prev, "
+                    f"calls={int(call_vol)} {call_vol/max(call_prev,PREV_VOLUME_FLOOR):.1f}x prev)"
                 )
             else:  # Balanced — event/uncertainty hedging
                 score += 7
                 reasons.append(f"unusual vol both sides balanced — C/P={cp_ratio:.1f}x (likely event/catalyst hedging)")
         elif unusual_calls:
             score += 10
-            reasons.append(
-                f"unusual CALL volume — {call_vol / call_oi * 100:.0f}% of call OI ({int(call_vol):,} contracts)"
-            )
+            ratio_str = f"{call_vol/max(call_prev,PREV_VOLUME_FLOOR):.1f}x prev"
+            reasons.append(f"unusual CALL volume — {int(call_vol):,} contracts ({ratio_str})")
         elif unusual_puts:
             score += 9
-            reasons.append(f"unusual PUT volume — {put_vol / put_oi * 100:.0f}% of put OI ({int(put_vol):,} contracts)")
+            ratio_str = f"{put_vol/max(put_prev,PREV_VOLUME_FLOOR):.1f}x prev"
+            reasons.append(f"unusual PUT volume — {int(put_vol):,} contracts ({ratio_str})")
 
         # 2. IV rank  (0–8)
         if iv_rank is not None:
@@ -375,20 +313,20 @@ def _analyse_symbol(symbol: str, regime: dict | None = None) -> dict | None:
         if score < _MIN_OPTIONS_SCORE:
             return None
 
-        # ── Direction signal ──────────────────────────────────────────
+        # ── Direction signal (Part 8) ─────────────────────────────
+        # EARNINGS_PLAY and MIXED_FLOW are advisory signals only — they are
+        # never executed deterministically (options_entries blocks them).
+        # CALL_BUYER and PUT_BUYER require confirmed unusual flow on the
+        # correct side AND directional skew.
         if earnings_days is not None and earnings_days <= 10:
             signal = "EARNINGS_PLAY"
-        elif unusual_calls and unusual_puts and cp_ratio >= 1.5:
+        elif unusual_calls and unusual_puts and call_vol >= 1.5 * max(put_vol, 1):
             signal = "CALL_BUYER"
-        elif unusual_calls and unusual_puts and pc_ratio >= 1.5:
+        elif unusual_calls and unusual_puts and put_vol >= 1.5 * max(call_vol, 1):
             signal = "PUT_BUYER"
-        elif unusual_calls and cp_ratio >= 1.5:
+        elif unusual_calls and call_vol >= 1.5 * max(put_vol, 1):
             signal = "CALL_BUYER"
-        elif unusual_puts and pc_ratio >= 1.5:
-            signal = "PUT_BUYER"
-        elif cp_ratio >= 2.5:
-            signal = "CALL_BUYER"
-        elif pc_ratio >= 2.5:
+        elif unusual_puts and put_vol >= 1.5 * max(call_vol, 1):
             signal = "PUT_BUYER"
         else:
             signal = "MIXED_FLOW"
@@ -396,7 +334,7 @@ def _analyse_symbol(symbol: str, regime: dict | None = None) -> dict | None:
         reasoning = (
             f"{symbol} @ ${S:.2f} | {' | '.join(reasons)} | "
             f"dominant: ${dom_strike:.0f} {dom_type.upper()} | "
-            f"{dte} DTE ({exp_str})" + (f" | max_pain=${max_pain:.0f}" if max_pain else "")
+            f"{dte} DTE ({exp_str})"
         )
 
         return {
@@ -404,22 +342,42 @@ def _analyse_symbol(symbol: str, regime: dict | None = None) -> dict | None:
             "price": round(S, 2),
             "options_score": score,
             "signal": signal,
-            "call_vol": int(call_vol),
-            "put_vol": int(put_vol),
-            "call_oi": int(call_oi),
-            "put_oi": int(put_oi),
-            "cp_ratio": cp_ratio,
+            "provider": flow_data.provider if flow_data else "null",
+            "provider_status": provider_status,
+            "flow_definition": flow_data.flow_definition if flow_data else "NONE",
+            "call_volume": int(call_vol),
+            "call_volume_source": flow_data.call_volume_source if flow_data else "unavailable",
+            "call_open_interest": flow_data.call_open_interest if flow_data else None,
+            "call_open_interest_source": flow_data.call_open_interest_source if flow_data else "unavailable",
+            "call_prev_volume": int(call_prev),
+            "call_prev_volume_source": flow_data.call_prev_volume_source if flow_data else "unavailable",
+            "put_volume": int(put_vol),
+            "put_volume_source": flow_data.put_volume_source if flow_data else "unavailable",
+            "put_open_interest": flow_data.put_open_interest if flow_data else None,
+            "put_open_interest_source": flow_data.put_open_interest_source if flow_data else "unavailable",
+            "put_prev_volume": int(put_prev),
+            "put_prev_volume_source": flow_data.put_prev_volume_source if flow_data else "unavailable",
             "unusual_calls": unusual_calls,
             "unusual_puts": unusual_puts,
+            "unusual_eval_reason": unusual_eval_reason,
+            # Contract selection fields — populated later by find_best_contract in entries
+            "selected_contract_symbol": None,
+            "selected_contract_volume": None,
+            "selected_contract_spread_pct": None,
+            "selected_contract_delta": None,
+            "selected_contract_dte": None,
             "iv_rank": iv_rank,
             "dom_strike": dom_strike,
             "dom_type": dom_type,
             "dom_iv": round(dom_iv, 3),
             "earnings_days": earnings_days,
-            "max_pain": max_pain,
             "expiry": exp_str,
             "dte": dte,
             "reasoning": reasoning,
+            # Expression router fields — populated by expression_router when evaluated in entries
+            "expression_route": None,
+            "expression_reason": None,
+            "entry_skip_reason": None,
         }
 
     except Exception as e:
@@ -436,7 +394,7 @@ def scan_options_universe(extra_symbols: list | None = None, regime: dict | None
     """
     Scan the optionable universe for notable options setups.
 
-    extra_symbols:  high-scoring symbols from the TradingView stock scanner —
+    extra_symbols:  high-scoring symbols from the stock scanner —
                     these are appended to OPTIONABLE_UNIVERSE so the scanner
                     automatically considers anything the stock side is excited about
     regime:         current market regime (affects which signals are surfaced)

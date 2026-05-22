@@ -16,6 +16,14 @@
 # ║     build_option_symbol(symbol, expiry_ibkr, right, strike)  ║
 # ║       → OCC symbol string                                    ║
 # ║                                                              ║
+# ║   Volume provenance (as of audit 2026-05-22):                ║
+# ║     dailyBar.v  = real daily traded contracts (REAL volume)  ║
+# ║     dailyBar.n  = real trade count                           ║
+# ║     prevDailyBar.v = prior day volume (~80% of contracts)    ║
+# ║     latestQuote.bs/as = bid/ask SIZE — quote liquidity only, ║
+# ║       NOT traded volume; stored in quote_size column only    ║
+# ║     openInterest = None — not available from Alpaca API      ║
+# ║                                                              ║
 # ║   No trading logic. No signals. Data only.                   ║
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
@@ -33,13 +41,20 @@ from config import CONFIG
 
 log = logging.getLogger("decifer.alpaca_options")
 
-# ── Lazy client singleton ─────────────────────────────────────────────
+# ── Alpaca request class (bound at import time so test stubs can't shadow it) ─
+try:
+    from alpaca.data.requests import OptionChainRequest as _OptionChainRequest
+except ImportError:
+    _OptionChainRequest = None  # alpaca-py not installed
+
+# ── Lazy client singletons ────────────────────────────────────────────
 _client_lock = threading.Lock()
-_options_client = None
+_options_client = None     # SDK objects (for get_snapshot_greeks)
+_raw_client = None         # raw_data=True (for get_all_chains — returns real volume)
 
 
 def _get_client():
-    """Return a lazily-created OptionHistoricalDataClient, or None if keys missing."""
+    """Return a lazily-created OptionHistoricalDataClient (SDK mode), or None if keys missing."""
     global _options_client
     if _options_client is not None:
         return _options_client
@@ -58,10 +73,44 @@ def _get_client():
             return None
         try:
             _options_client = OptionHistoricalDataClient(api_key, secret_key)
-            log.info("alpaca_options: OptionHistoricalDataClient initialised")
+            log.info("alpaca_options: OptionHistoricalDataClient (SDK) initialised")
             return _options_client
         except Exception as exc:
             log.error(f"alpaca_options: client init failed — {type(exc).__name__}: {exc}")
+            return None
+
+
+def _get_raw_client():
+    """
+    Return a lazily-created OptionHistoricalDataClient with raw_data=True.
+
+    raw_data=True causes get_option_chain() to return plain dicts instead of
+    SDK model objects, which exposes dailyBar.v (real traded volume) and
+    prevDailyBar.v (prior day volume) — neither accessible via SDK objects.
+    Used exclusively by get_all_chains().
+    """
+    global _raw_client
+    if _raw_client is not None:
+        return _raw_client
+    with _client_lock:
+        if _raw_client is not None:
+            return _raw_client
+        api_key = CONFIG.get("alpaca_api_key", "")
+        secret_key = CONFIG.get("alpaca_secret_key", "")
+        if not api_key or not secret_key:
+            log.debug("alpaca_options: ALPACA_API_KEY / ALPACA_SECRET_KEY not set (raw client)")
+            return None
+        try:
+            from alpaca.data.historical.option import OptionHistoricalDataClient
+        except ImportError as exc:
+            log.error(f"alpaca_options: alpaca-py import failed ({exc})")
+            return None
+        try:
+            _raw_client = OptionHistoricalDataClient(api_key, secret_key, raw_data=True)
+            log.info("alpaca_options: OptionHistoricalDataClient (raw) initialised")
+            return _raw_client
+        except Exception as exc:
+            log.error(f"alpaca_options: raw client init failed — {type(exc).__name__}: {exc}")
             return None
 
 
@@ -104,18 +153,30 @@ def build_option_symbol(symbol: str, expiry_ibkr: str, right: str, strike: float
 
 def _snapshots_to_df(snapshots: dict, opt_type: str) -> pd.DataFrame:
     """
-    Convert an Alpaca OptionSnapshot dict → canonical chain DataFrame.
+    Convert raw Alpaca option chain dict → canonical chain DataFrame.
     opt_type: 'C' (calls) or 'P' (puts).
 
-    Output columns match the yfinance option_chain schema so that
-    existing _select_strike() / _analyse_symbol() logic works unchanged:
+    Input `snapshots` is a raw dict {occ_symbol: raw_dict} from raw_data=True call.
+    Each raw_dict has: dailyBar, greeks, impliedVolatility, latestQuote,
+    latestTrade, minuteBar, and optionally prevDailyBar.
+
+    Volume provenance (audit 2026-05-22 — these mappings are verified real data):
+        volume       = dailyBar.v   — real contracts traded today
+        trade_count  = dailyBar.n   — real trade count today
+        prev_volume  = prevDailyBar.v — prior day volume (0 if prevDailyBar absent)
+        quote_size   = latestQuote.bs + latestQuote.as — bid+ask SIZE, quote
+                       liquidity only, NOT traded volume (stored in separate column)
+        openInterest = None — not available from Alpaca API
+
+    Output columns:
         strike, bid, ask, mid, spread_pct,
-        volume, openInterest, impliedVolatility,
-        delta, gamma, theta, vega,
-        option_symbol (OCC — used by build/lookup callers)
+        volume, volume_source, trade_count, prev_volume, prev_volume_source,
+        quote_size, openInterest,
+        impliedVolatility, delta, gamma, theta, vega,
+        option_symbol
     """
     rows = []
-    for sym, snap in snapshots.items():
+    for sym, raw_dict in snapshots.items():
         parsed = _parse_option_symbol(sym)
         if parsed is None:
             continue
@@ -124,36 +185,43 @@ def _snapshots_to_df(snapshots: dict, opt_type: str) -> pd.DataFrame:
             continue
 
         # ── Quote ──────────────────────────────────────────────────
-        bid = ask = 0.0
-        if snap.latest_quote is not None:
-            bid = float(snap.latest_quote.bid_price or 0)
-            ask = float(snap.latest_quote.ask_price or 0)
+        latest_quote = raw_dict.get("latestQuote") or {}
+        bid = float(latest_quote.get("bp") or 0)
+        ask = float(latest_quote.get("ap") or 0)
         mid = (bid + ask) / 2 if bid > 0 and ask > 0 else 0.0
         spread_pct = (ask - bid) / mid if mid > 0 else 1.0
 
-        # ── Volume ─────────────────────────────────────────────────
-        # Alpaca options snapshot doesn't expose daily volume.
-        # Use bid_size + ask_size as a liquidity proxy — small quoted
-        # sizes indicate nobody is trading this strike; large sizes
-        # indicate active market-maker interest.
-        volume = 0
-        if snap.latest_quote is not None:
-            volume = int((snap.latest_quote.bid_size or 0) + (snap.latest_quote.ask_size or 0))
+        # ── Quote size (bid+ask size — liquidity indicator, NOT traded volume) ──
+        # IMPORTANT: bid_size + ask_size is market-maker quote depth, not contracts
+        # traded. It must never be used as a proxy for volume or OI.
+        bs = int(latest_quote.get("bs") or 0)
+        as_ = int(latest_quote.get("as") or 0)
+        quote_size = bs + as_
 
-        # ── OI and IV ──────────────────────────────────────────────
-        # Alpaca snapshot also doesn't expose open interest — use the
-        # same quoted-size proxy scaled up (OI is always >> single-day size).
-        # The spread filter is the primary liquidity gate for Alpaca chains.
-        oi = volume * 5
-        iv = float(snap.implied_volatility or 0) if snap.implied_volatility else 0.0
+        # ── Real traded volume from dailyBar ───────────────────────
+        daily_bar = raw_dict.get("dailyBar") or {}
+        real_volume = int(daily_bar.get("v", 0) or 0)   # contracts traded today (REAL)
+        trade_count = int(daily_bar.get("n", 0) or 0)   # trade executions today (REAL)
+
+        # ── Prior day volume from prevDailyBar ─────────────────────
+        # prevDailyBar is absent on ~20% of contracts — use 0 when missing.
+        # This is genuinely unavailable data, NOT a proxy.
+        prev_bar = raw_dict.get("prevDailyBar") or {}
+        prev_volume = int(prev_bar.get("v", 0) or 0)
+
+        # ── Open interest ──────────────────────────────────────────
+        # Not available from Alpaca — must be None. Never fabricate.
+        open_interest = None
+
+        # ── Implied volatility ─────────────────────────────────────
+        iv = float(raw_dict.get("impliedVolatility") or 0)
 
         # ── Greeks ─────────────────────────────────────────────────
-        delta = gamma = theta = vega = None
-        if snap.greeks is not None:
-            delta = snap.greeks.delta
-            gamma = snap.greeks.gamma
-            theta = snap.greeks.theta
-            vega = snap.greeks.vega
+        greeks = raw_dict.get("greeks") or {}
+        delta = greeks.get("delta")
+        gamma = greeks.get("gamma")
+        theta = greeks.get("theta")
+        vega = greeks.get("vega")
 
         rows.append(
             {
@@ -162,8 +230,13 @@ def _snapshots_to_df(snapshots: dict, opt_type: str) -> pd.DataFrame:
                 "ask": ask,
                 "mid": mid,
                 "spread_pct": spread_pct,
-                "volume": volume,
-                "openInterest": oi,
+                "volume": real_volume,
+                "volume_source": "alpaca_rest_dailyBar",
+                "trade_count": trade_count,
+                "prev_volume": prev_volume,
+                "prev_volume_source": "alpaca_rest_prevDailyBar",
+                "quote_size": quote_size,   # quote liquidity only — NOT traded volume
+                "openInterest": open_interest,
                 "impliedVolatility": iv,
                 "delta": delta,
                 "gamma": gamma,
@@ -187,14 +260,22 @@ def get_all_chains(symbol: str, min_dte: int, max_dte: int) -> list[dict]:
     """
     Fetch options chains for all expiries in [min_dte, max_dte] window.
 
+    Uses raw_data=True client so that dailyBar.v (real traded volume) and
+    prevDailyBar.v (prior day volume) are accessible. The SDK client does not
+    expose these fields.
+
     Returns a list sorted by DTE ascending, each entry:
         {"calls": DataFrame, "puts": DataFrame,
          "expiry_str": "YYYY-MM-DD", "dte": int}
 
     Returns [] if Alpaca is unavailable, keys missing, or chain is empty.
     """
-    client = _get_client()
+    client = _get_raw_client()
     if client is None:
+        return []
+
+    if _OptionChainRequest is None:
+        log.warning(f"alpaca_options.get_all_chains {symbol}: alpaca-py not installed")
         return []
 
     today = date.today()
@@ -202,13 +283,12 @@ def get_all_chains(symbol: str, min_dte: int, max_dte: int) -> list[dict]:
     date_max = today + timedelta(days=max_dte)
 
     try:
-        from alpaca.data.requests import OptionChainRequest
-
-        request = OptionChainRequest(
+        request = _OptionChainRequest(
             underlying_symbol=symbol,
             expiration_date_gte=date_min,
             expiration_date_lte=date_max,
         )
+        # raw_data=True: returns dict of {occ_symbol: raw_dict} not SDK objects
         snapshots = client.get_option_chain(request)
         if not snapshots:
             log.warning(
@@ -220,9 +300,9 @@ def get_all_chains(symbol: str, min_dte: int, max_dte: int) -> list[dict]:
         log.warning(f"alpaca_options.get_all_chains {symbol}: API call failed — {exc}")
         return []
 
-    # Group snapshots by expiry date
+    # Group raw dicts by expiry date
     expiry_groups: dict[str, dict] = {}
-    for sym, snap in snapshots.items():
+    for sym, raw_dict in snapshots.items():
         parsed = _parse_option_symbol(sym)
         if parsed is None:
             continue
@@ -230,7 +310,7 @@ def get_all_chains(symbol: str, min_dte: int, max_dte: int) -> list[dict]:
         exp_str = exp_date.strftime("%Y-%m-%d")
         if exp_str not in expiry_groups:
             expiry_groups[exp_str] = {}
-        expiry_groups[exp_str][sym] = snap
+        expiry_groups[exp_str][sym] = raw_dict
 
     results = []
     for exp_str, exp_snaps in expiry_groups.items():

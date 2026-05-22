@@ -93,6 +93,11 @@ _config_mod.CONFIG = {
     "trade_log": "/tmp/trades_test.json",
     "order_log": "/tmp/orders_test.json",
     "positions_file": "/tmp/positions_test.json",
+    # Required by bot_state.py on import
+    "agents_required_to_agree": 2,
+    "min_score_to_trade": 14,
+    "alpaca_api_key": "",
+    "alpaca_secret_key": "",
 }
 sys.modules.setdefault("config", _config_mod)
 
@@ -106,6 +111,7 @@ def _sig(
     options_score=22,
     unusual_calls=True,
     unusual_puts=False,
+    provider_status="PARTIAL_FLOW",
 ):
     return {
         "symbol": symbol,
@@ -113,6 +119,7 @@ def _sig(
         "options_score": options_score,
         "unusual_calls": unusual_calls,
         "unusual_puts": unusual_puts,
+        "provider_status": provider_status,
         "cp_ratio": 2.5,
         "iv_rank": 20.0,
         "dte": 21,
@@ -170,13 +177,22 @@ class TestGateRejections:
     def _run(self, signals, *, market_open=True, trades=None, locked=None,
              recently_closed=False, open_order=False):
         """Run execute_options_entries with common patches."""
+        from expression_router import ExpressionRoute
         trades = trades if trades is not None else _empty_trades
         lock = locked if locked is not None else _lock
+        # Route to OPTION by default so gate-rejection tests that reach the router
+        # still exercise the correct downstream gates (cooldown, open_order, etc.)
+        _option_route = ExpressionRoute(
+            route="OPTION", reason="test: forced OPTION route",
+            common_expression_score=22, option_expression_score=37,
+            option_gates_pass=True, common_gates_pass=True, skip_reason=None,
+        )
         with patch("options_entries.is_options_market_open", return_value=market_open), \
              patch("options_entries._is_recently_closed", return_value=recently_closed), \
              patch("options_entries.has_open_order_for", return_value=open_order), \
              patch("options_entries.active_trades", trades), \
              patch("options_entries._trades_lock", lock), \
+             patch("options_entries.route_expression", return_value=_option_route), \
              patch("options_entries.find_best_contract", return_value=None), \
              patch("options_entries.execute_buy_option") as mock_exec:
             import options_entries
@@ -264,11 +280,18 @@ class TestGateRejections:
         mock_exec.assert_not_called()
 
     def test_no_contract_found_skips(self):
+        from expression_router import ExpressionRoute
+        _option_route = ExpressionRoute(
+            route="OPTION", reason="test: forced OPTION route",
+            common_expression_score=22, option_expression_score=37,
+            option_gates_pass=True, common_gates_pass=True, skip_reason=None,
+        )
         with patch("options_entries.is_options_market_open", return_value=True), \
              patch("options_entries._is_recently_closed", return_value=False), \
              patch("options_entries.has_open_order_for", return_value=False), \
              patch("options_entries.active_trades", _empty_trades), \
              patch("options_entries._trades_lock", _lock), \
+             patch("options_entries.route_expression", return_value=_option_route), \
              patch("options_entries.find_best_contract", return_value=None), \
              patch("options_entries.execute_buy_option") as mock_exec:
             import options_entries
@@ -284,16 +307,27 @@ class TestGateRejections:
 class TestHappyPath:
 
     def _run_happy(self, signals, *, contract_factory=None):
+        from expression_router import ExpressionRoute
+
         def _get_contract(symbol, direction, **kwargs):
             right = "C" if direction == "LONG" else "P"
             return _contract(symbol=symbol, right=right)
         cf = contract_factory or _get_contract
+
+        # route_expression returns OPTION — happy path tests verify entry mechanics,
+        # not the router logic (which has its own test suite in test_expression_router.py)
+        _option_route = ExpressionRoute(
+            route="OPTION", reason="test: forced OPTION route",
+            common_expression_score=22, option_expression_score=37,
+            option_gates_pass=True, common_gates_pass=True, skip_reason=None,
+        )
 
         with patch("options_entries.is_options_market_open", return_value=True), \
              patch("options_entries._is_recently_closed", return_value=False), \
              patch("options_entries.has_open_order_for", return_value=False), \
              patch("options_entries.active_trades", _empty_trades), \
              patch("options_entries._trades_lock", _lock), \
+             patch("options_entries.route_expression", return_value=_option_route), \
              patch("options_entries.find_best_contract", side_effect=cf) as mock_fbc, \
              patch("options_entries.execute_buy_option", return_value=True) as mock_exec:
             import options_entries
@@ -329,11 +363,18 @@ class TestHappyPath:
 
     def test_execute_buy_option_not_called_on_false_return(self):
         """execute_buy_option returns False → symbol not in fired set."""
+        from expression_router import ExpressionRoute
+        _option_route = ExpressionRoute(
+            route="OPTION", reason="test: forced OPTION route",
+            common_expression_score=22, option_expression_score=37,
+            option_gates_pass=True, common_gates_pass=True, skip_reason=None,
+        )
         with patch("options_entries.is_options_market_open", return_value=True), \
              patch("options_entries._is_recently_closed", return_value=False), \
              patch("options_entries.has_open_order_for", return_value=False), \
              patch("options_entries.active_trades", _empty_trades), \
              patch("options_entries._trades_lock", _lock), \
+             patch("options_entries.route_expression", return_value=_option_route), \
              patch("options_entries.find_best_contract", return_value=_contract()), \
              patch("options_entries.execute_buy_option", return_value=False):
             import options_entries
@@ -347,6 +388,14 @@ class TestHappyPath:
 
 class TestStockPositionPolicy:
 
+    def _option_route(self):
+        from expression_router import ExpressionRoute
+        return ExpressionRoute(
+            route="OPTION", reason="test: forced OPTION route",
+            common_expression_score=22, option_expression_score=37,
+            option_gates_pass=True, common_gates_pass=True, skip_reason=None,
+        )
+
     def test_existing_stock_position_does_not_block_options_entry(self):
         """Policy rule 1: existing stock position + new options entry = ALLOW."""
         trades = {
@@ -357,6 +406,7 @@ class TestStockPositionPolicy:
              patch("options_entries.has_open_order_for", return_value=False), \
              patch("options_entries.active_trades", trades), \
              patch("options_entries._trades_lock", _lock), \
+             patch("options_entries.route_expression", return_value=self._option_route()), \
              patch("options_entries.find_best_contract", return_value=_contract(symbol="AAPL")), \
              patch("options_entries.execute_buy_option", return_value=True) as mock_exec:
             import options_entries
@@ -377,6 +427,7 @@ class TestStockPositionPolicy:
              patch("options_entries.has_open_order_for", return_value=False), \
              patch("options_entries.active_trades", trades), \
              patch("options_entries._trades_lock", _lock), \
+             patch("options_entries.route_expression", return_value=self._option_route()), \
              patch("options_entries.find_best_contract", return_value=_contract(symbol="AAPL")), \
              patch("options_entries.execute_buy_option") as mock_exec:
             import options_entries
@@ -396,6 +447,7 @@ class TestStockPositionPolicy:
              patch("options_entries.has_open_order_for", return_value=False), \
              patch("options_entries.active_trades", trades), \
              patch("options_entries._trades_lock", _lock), \
+             patch("options_entries.route_expression", return_value=self._option_route()), \
              patch("options_entries.find_best_contract", return_value=_contract(symbol="AAPL")), \
              patch("options_entries.execute_buy_option", return_value=True) as mock_exec:
             import options_entries
@@ -416,19 +468,33 @@ class TestStockPositionPolicy:
 class TestPerCycleCap:
 
     def _run_capped(self, signals, max_entries=2):
+        from expression_router import ExpressionRoute
+
         def _get_contract(symbol, direction, **kwargs):
             right = "C" if direction == "LONG" else "P"
             return _contract(symbol=symbol, right=right)
 
-        with patch.dict("config.CONFIG", {"options_scan_max_entries_per_cycle": max_entries}), \
+        _option_route = ExpressionRoute(
+            route="OPTION", reason="test: forced OPTION route",
+            common_expression_score=22, option_expression_score=37,
+            option_gates_pass=True, common_gates_pass=True, skip_reason=None,
+        )
+
+        import options_entries
+        # Patch both config.CONFIG and options_entries.CONFIG directly — the latter
+        # may be bound to a stub dict from an earlier test's sys.modules setup,
+        # so patching only config.CONFIG is insufficient when they diverge.
+        _cfg_override = {"options_scan_max_entries_per_cycle": max_entries}
+        with patch.dict("config.CONFIG", _cfg_override), \
+             patch.dict(options_entries.CONFIG, _cfg_override), \
              patch("options_entries.is_options_market_open", return_value=True), \
              patch("options_entries._is_recently_closed", return_value=False), \
              patch("options_entries.has_open_order_for", return_value=False), \
              patch("options_entries.active_trades", _empty_trades), \
              patch("options_entries._trades_lock", _lock), \
+             patch("options_entries.route_expression", return_value=_option_route), \
              patch("options_entries.find_best_contract", side_effect=_get_contract), \
              patch("options_entries.execute_buy_option", return_value=True) as mock_exec:
-            import options_entries
             result = options_entries.execute_options_entries(
                 _IB, signals, 100_000, _REGIME_NORMAL
             )
@@ -466,11 +532,18 @@ class TestScoreAndConviction:
         (30, 100,                1.00),   # maximum score
     ])
     def test_score_scaling_and_conviction(self, raw_score, expected_scaled, expected_conviction):
+        from expression_router import ExpressionRoute
+        _option_route = ExpressionRoute(
+            route="OPTION", reason="test: forced OPTION route",
+            common_expression_score=raw_score, option_expression_score=raw_score + 15,
+            option_gates_pass=True, common_gates_pass=True, skip_reason=None,
+        )
         with patch("options_entries.is_options_market_open", return_value=True), \
              patch("options_entries._is_recently_closed", return_value=False), \
              patch("options_entries.has_open_order_for", return_value=False), \
              patch("options_entries.active_trades", _empty_trades), \
              patch("options_entries._trades_lock", _lock), \
+             patch("options_entries.route_expression", return_value=_option_route), \
              patch("options_entries.find_best_contract", return_value=_contract()), \
              patch("options_entries.execute_buy_option", return_value=True) as mock_exec:
             import options_entries

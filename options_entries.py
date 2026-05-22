@@ -33,7 +33,9 @@ import logging
 
 from bot_state import clog
 from config import CONFIG
+from expression_router import route_expression
 from options import find_best_contract
+from options_provider import MIN_CONTRACT_VOLUME
 from orders_contracts import is_options_market_open
 from orders_guards import has_open_order_for
 from orders_options import execute_buy_option
@@ -80,9 +82,14 @@ def execute_options_entries(
 
     fired: set[str] = set()
     skips: dict[str, int] = {
-        "non_directional": 0,
-        "low_score": 0,
-        "no_unusual_vol": 0,
+        "advisory_only_signal": 0,
+        "non_directional_signal": 0,
+        "missing_approved_options_flow_provider": 0,
+        "missing_real_flow_metrics": 0,
+        "no_unusual_volume_expansion": 0,
+        "directional_skew_failed": 0,
+        "below_option_expression_score": 0,
+        "common_better_expression": 0,
         "cooldown": 0,
         "open_order": 0,
         "existing_options_position": 0,
@@ -103,23 +110,66 @@ def execute_options_entries(
         signal: str = sig.get("signal", "")
         options_score: int = sig.get("options_score", 0)
 
+        # Advisory-only signals: never executed deterministically
+        if signal in {"EARNINGS_PLAY", "MIXED_FLOW"}:
+            log.debug("options_entries: %s signal=%s is advisory-only — skip", symbol, signal)
+            skips["advisory_only_signal"] += 1
+            sig["entry_skip_reason"] = "advisory_only_signal"
+            continue
+
         if signal not in _DIRECTIONAL_SIGNALS:
-            skips["non_directional"] += 1
+            log.debug("options_entries: %s signal=%s not directional — skip", symbol, signal)
+            skips["non_directional_signal"] += 1
+            sig["entry_skip_reason"] = "non_directional_signal"
             continue
 
         if options_score < min_score:
             log.debug("options_entries: %s score=%d < min=%d — skip", symbol, options_score, min_score)
-            skips["low_score"] += 1
+            skips["below_option_expression_score"] += 1
+            sig["entry_skip_reason"] = "below_option_expression_score"
+            continue
+
+        # Provider gate: no approved flow provider → block options entry
+        provider_status = sig.get("provider_status")
+        if provider_status in (None, "NULL", "NOT_USABLE_FOR_OPTIONS"):
+            log.info(
+                "options_entries: %s no approved flow provider (status=%s) — skip",
+                symbol, provider_status,
+            )
+            skips["missing_approved_options_flow_provider"] += 1
+            sig["entry_skip_reason"] = "missing_approved_options_flow_provider"
+            clog("ANALYSIS", f"Options {symbol}: no approved flow provider — skip")
             continue
 
         # Unusual volume must be confirmed for the asserted direction
         if signal == "CALL_BUYER" and not sig.get("unusual_calls"):
             log.info("options_entries: %s CALL_BUYER but unusual_calls=False — skip", symbol)
-            skips["no_unusual_vol"] += 1
+            skips["no_unusual_volume_expansion"] += 1
+            sig["entry_skip_reason"] = "no_unusual_volume_expansion"
             continue
         if signal == "PUT_BUYER" and not sig.get("unusual_puts"):
             log.info("options_entries: %s PUT_BUYER but unusual_puts=False — skip", symbol)
-            skips["no_unusual_vol"] += 1
+            skips["no_unusual_volume_expansion"] += 1
+            sig["entry_skip_reason"] = "no_unusual_volume_expansion"
+            continue
+
+        # Expression router: decide OPTION vs COMMON vs NO_TRADE
+        # flow_data is not re-fetched here — pass None and rely on signal fields
+        expr = route_expression(sig, flow_data=None, regime=regime, portfolio_state=None)
+        sig["expression_route"] = expr.route
+        sig["expression_reason"] = expr.reason
+        if expr.route == "COMMON":
+            log.info(
+                "options_entries: %s routed to COMMON expression — skip options entry (%s)",
+                symbol, expr.reason,
+            )
+            skips["common_better_expression"] += 1
+            sig["entry_skip_reason"] = "common_better_expression"
+            continue
+        if expr.route == "NO_TRADE":
+            log.info("options_entries: %s NO_TRADE from expression router — skip", symbol)
+            skips["below_option_expression_score"] += 1
+            sig["entry_skip_reason"] = "below_option_expression_score"
             continue
 
         if _is_recently_closed(symbol):
