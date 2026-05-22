@@ -372,6 +372,71 @@ canvas{display:block;width:100% !important}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
+/* ── MOBILE RESPONSIVE (≤ 768px) ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  body{overflow-y:auto;overflow-x:hidden;height:auto;min-height:100vh}
+
+  /* Header */
+  .hdr{height:auto;flex-wrap:wrap;padding:8px 12px;gap:6px}
+  .logo-name{display:none}
+  .hdr-right{flex-wrap:wrap;gap:4px}
+  .pill{font-size:9px}
+
+  /* Stats — 3 cols */
+  .stats{grid-template-columns:repeat(3,1fr);height:auto;overflow:visible}
+  .stats2{grid-template-columns:repeat(3,1fr);height:auto;overflow:visible}
+  .stat{padding:6px 8px}
+  .sv{font-size:14px}
+
+  /* Tab bar — remove fade mask so nothing is hidden */
+  .tabs{-webkit-mask-image:none;mask-image:none}
+
+  /* Decision bar */
+  .decision-bar{height:auto;flex-wrap:wrap}
+  .decision-bar-actions{flex-wrap:wrap}
+
+  /* Views — let body scroll; override JS-set inline heights */
+  .view,#view-portfolio,.risk-view,
+  .growth-view,.catalyst-view,.news-view{height:auto !important;overflow:visible !important;display:none}
+  .view.active{display:flex;flex-direction:column;overflow-y:auto !important;min-height:60vh}
+  .growth-view.active,.risk-view.active{display:flex;overflow-y:auto !important;min-height:60vh}
+  .catalyst-view.active,.news-view.active{display:flex;flex-direction:column;overflow-y:auto !important;min-height:60vh}
+  #view-portfolio.active{display:block;overflow-y:auto !important;min-height:60vh}
+
+  /* Live grid — stack 3 columns vertically */
+  .live-grid{grid-template-columns:1fr;height:auto;overflow:visible}
+  .col{border-right:none;border-bottom:1px solid var(--border);overflow:visible}
+  .col-body{overflow-y:visible;max-height:none}
+
+  /* Trade history table — horizontal scroll */
+  .hist-view{height:auto}
+  .hist-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .th,.tr{min-width:660px}
+
+  /* News */
+  .news-view{height:auto}
+  .news-grid{grid-template-columns:1fr}
+  .news-card-hero{flex-direction:column}
+  .news-card-hero .news-card-img{width:100%}
+  .news-drawer{width:100%;right:-100%}
+  .news-drawer.open{right:0}
+
+  /* Catalyst */
+  .cat-grid{grid-template-columns:1fr}
+
+  /* Growth/Analytics metric grid — 2 cols */
+  .metric-grid{grid-template-columns:repeat(2,1fr)}
+
+  /* Risk */
+  .risk-grid{grid-template-columns:1fr}
+
+  /* Position modal */
+  .pos-modal{width:95vw}
+
+  /* Voice button */
+  #voice-btn{bottom:16px;right:16px}
+}
+
 /* Position Detail Modal */
 .pos-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .pos-modal-overlay.active{display:flex}
@@ -3829,6 +3894,7 @@ function renderDecisionBar(convo, lastScan, executed, skipReasons) {
 
 // ── Decision bar height sync ───────────────────────────────
 function _syncViewHeights() {
+  if (window.innerWidth <= 768) return;
   const bar = document.querySelector('.decision-bar');
   if (!bar) return;
   const h = bar.offsetHeight;
