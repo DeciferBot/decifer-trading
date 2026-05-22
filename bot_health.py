@@ -579,8 +579,10 @@ def _trading_verdict(stages: list[dict]) -> dict:
         return {"verdict": "DEGRADED", "reason": f"Stale pipeline data: {', '.join(stale)}"}
 
     warned = [s["name"] for s in stages if s.get("status") == "warn"]
-    if warned:
+    if len(warned) > 1:
         return {"verdict": "WARN", "reason": f"Warnings in: {', '.join(warned)}"}
+    if len(warned) == 1:
+        return {"verdict": "TRADING", "reason": "All critical systems healthy", "note": f"1 advisory: {warned[0]}"}
 
     return {"verdict": "TRADING", "reason": "All pipeline stages healthy"}
 

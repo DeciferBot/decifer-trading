@@ -2867,12 +2867,14 @@ function loadHealth() {
       const vi = vv === 'TRADING' ? '●' : (vv === 'WARN' || vv === 'DEGRADED') ? '▲' : '✗';
       verdictEl.style.borderColor = vc;
       verdictEl.style.background = `${vc}11`;
+      const noteHtml = v.note ? `<div style="font-size:9px;color:var(--orange);margin-top:3px;letter-spacing:.3px">▲ ${esc(v.note)}</div>` : '';
       verdictEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px">
           <span style="color:${vc};font-size:18px;line-height:1">${vi}</span>
           <div>
             <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:${vc}">${vv}</div>
             <div style="font-size:10px;color:var(--muted2);margin-top:2px">${v.reason || ''}</div>
+            ${noteHtml}
           </div>
         </div>`;
     }
