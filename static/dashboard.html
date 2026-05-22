@@ -387,7 +387,8 @@ canvas{display:block;width:100% !important}
 
 /* ── MOBILE RESPONSIVE (≤ 768px) ─────────────────────────────────────────── */
 @media (max-width: 768px) {
-  body{overflow-y:auto;overflow-x:hidden;height:auto;min-height:100vh}
+  html{overflow-x:hidden;max-width:100vw}
+  body{overflow-y:auto;overflow-x:hidden;height:auto;min-height:100vh;max-width:100vw}
 
   /* Header */
   .hdr{height:auto;flex-wrap:wrap;padding:8px 12px;gap:6px}
@@ -398,8 +399,11 @@ canvas{display:block;width:100% !important}
   /* Stats — 3 cols */
   .stats{grid-template-columns:repeat(3,1fr);height:auto;overflow:visible}
   .stats2{grid-template-columns:repeat(3,1fr);height:auto;overflow:visible}
-  .stat{padding:6px 8px}
-  .sv{font-size:14px}
+  .stat{padding:3px 2px}
+  .sv{font-size:9px}
+  .stats2 .sv{font-size:9px}
+  .sl{font-size:7px;letter-spacing:.3px}
+  .ss{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   /* Tab bar — remove fade mask so nothing is hidden */
   .tabs{-webkit-mask-image:none;mask-image:none}
@@ -411,15 +415,15 @@ canvas{display:block;width:100% !important}
   /* Views — let body scroll; override JS-set inline heights */
   .view,#view-portfolio,.risk-view,
   .growth-view,.catalyst-view,.news-view{height:auto !important;overflow:visible !important;display:none}
-  .view.active{display:flex;flex-direction:column;overflow-y:auto !important;min-height:60vh}
-  .growth-view.active,.risk-view.active{display:flex;overflow-y:auto !important;min-height:60vh}
-  .catalyst-view.active,.news-view.active{display:flex;flex-direction:column;overflow-y:auto !important;min-height:60vh}
-  #view-portfolio.active{display:block;overflow-y:auto !important;min-height:60vh}
+  .view.active{display:flex;flex-direction:column;overflow-y:auto !important;overflow-x:hidden !important;max-width:100vw;min-height:60vh}
+  .growth-view.active,.risk-view.active{display:flex;overflow-y:auto !important;overflow-x:hidden !important;max-width:100vw;min-height:60vh}
+  .catalyst-view.active,.news-view.active{display:flex;flex-direction:column;overflow-y:auto !important;overflow-x:hidden !important;max-width:100vw;min-height:60vh}
+  #view-portfolio.active{display:block;overflow-y:auto !important;overflow-x:hidden !important;max-width:100vw;min-height:60vh}
 
   /* Live grid — stack 3 columns vertically */
-  .live-grid{grid-template-columns:1fr;height:auto;overflow:visible}
-  .col{border-right:none;border-bottom:1px solid var(--border);overflow:visible}
-  .col-body{overflow-y:visible;max-height:none}
+  .live-grid{grid-template-columns:1fr;height:auto;overflow:hidden;min-width:0}
+  .col{border-right:none;border-bottom:1px solid var(--border);overflow-x:clip;min-width:0}
+  .col-body{overflow-y:visible;max-height:none;min-width:0}
 
   /* Trade history table — horizontal scroll */
   .hist-view{height:auto}
@@ -446,8 +450,8 @@ canvas{display:block;width:100% !important}
   /* Position modal */
   .pos-modal{width:95vw}
 
-  /* Voice button */
-  #voice-btn{bottom:16px;right:16px}
+  /* Voice button — move up so it doesn't cover content */
+  #voice-btn{bottom:90px;right:16px;width:44px;height:44px;font-size:18px}
 
   /* Mobile tab nav — hamburger bar + drawer */
   .tabs{display:none}
@@ -483,8 +487,19 @@ canvas{display:block;width:100% !important}
   .decision-pill{flex-shrink:1}
 
   /* ── LIVE VIEW — cap stacked column heights so they don't run 20+ screens ── */
-  .col-body{max-height:55vh;overflow-y:auto !important}
+  .col-body{max-height:55vh;overflow-y:auto !important;overflow-x:hidden !important;min-width:0}
   .ai-box{max-height:120px}
+
+  /* ── OVERFLOW CONTAINMENT ── */
+  .rm{word-break:break-word;overflow-wrap:anywhere}
+  .lm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .log-row{min-width:0;overflow:hidden}
+  .pos-meta{flex-wrap:wrap;gap:2px 8px}
+  .regime-wrap{min-width:0}
+  .regime-box{min-width:0}
+
+  /* ── CONTROLS — bottom padding so FORCE SCAN isn't under the voice FAB ── */
+  #view-live .col:first-child .col-body{padding-bottom:72px}
 
   /* ── ORDERS TABLE — wider min-width to match 11-col header ── */
   #view-orders .th,#view-orders .tr{min-width:764px}
