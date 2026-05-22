@@ -81,7 +81,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 #view-portfolio > *{flex-shrink:0}
 
 /* ── VIEW 1: LIVE ── */
-.live-grid{display:grid;grid-template-columns:210px 1fr 360px;width:100%;height:100%;overflow:hidden}
+.live-grid{display:grid;grid-template-columns:1fr 360px;width:100%;height:100%;overflow:hidden}
 .col{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
 .col:last-child{border-right:none}
 .col-title{padding:7px 12px;font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;display:flex;justify-content:space-between}
@@ -500,8 +500,8 @@ canvas{display:block;width:100% !important}
   .regime-wrap{min-width:0}
   .regime-box{min-width:0}
 
-  /* ── CONTROLS — bottom padding so FORCE SCAN isn't under the voice FAB ── */
-  #view-live .col:first-child .col-body{padding-bottom:72px}
+  /* ── LIVE LEFT COL — bottom padding so content isn't under voice FAB ── */
+  #view-live .col:first-child{overflow-y:auto}
 
   /* ── ORDERS TABLE — wider min-width to match 11-col header ── */
   #view-orders .th,#view-orders .tr{min-width:764px}
@@ -639,6 +639,7 @@ canvas{display:block;width:100% !important}
 <!-- TABS -->
 <div class="tabs">
   <div class="tab active" onclick="switchTab('live',this)">Live</div>
+  <div class="tab" onclick="switchTab('log',this)">Log</div>
   <div class="tab" onclick="switchTab('agents',this)">Apex</div>
   <div class="tab" onclick="switchTab('news',this)">News</div>
   <div class="tab" onclick="switchTab('catalyst',this)">Catalyst</div>
@@ -669,6 +670,7 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="tabs-drawer-grid">
     <div class="tabs-drawer-item active" id="dm-live"      onclick="mobileNav('live')">Live</div>
+    <div class="tabs-drawer-item"        id="dm-log"       onclick="mobileNav('log')">Log</div>
     <div class="tabs-drawer-item"        id="dm-agents"    onclick="mobileNav('agents')">Apex</div>
     <div class="tabs-drawer-item"        id="dm-news"      onclick="mobileNav('news')">News</div>
     <div class="tabs-drawer-item"        id="dm-catalyst"  onclick="mobileNav('catalyst')">Catalyst</div>
@@ -690,60 +692,47 @@ canvas{display:block;width:100% !important}
 <div class="view active" id="view-live">
   <div class="live-grid">
 
-    <!-- LEFT: Controls -->
-    <div class="col">
-      <div class="col-title">Controls</div>
-      <div class="col-body">
-        <div class="regime-wrap">
-          <div class="regime-box unknown" id="regime-box">
-            <div class="rl" id="regime-label">READING TAPE...</div>
-            <div class="rm" id="regime-meta">SPY: — | QQQ: — | VIX: —</div>
+    <!-- LEFT: Market Map + Apex Synthesis -->
+    <div class="col" style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto">
+
+      <!-- MARKET MAP (Morning Brief) -->
+      <div style="flex-shrink:0">
+        <div class="col-title" style="position:sticky;top:0;z-index:1;background:var(--bg)">
+          <span>Market Map</span>
+          <span id="overnight-meta" style="color:var(--muted2);font-size:9px"></span>
+        </div>
+        <!-- Market tone + regime -->
+        <div id="on-tone-row" style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px">
+          <span style="color:var(--muted2);font-size:10px">Loading…</span>
+        </div>
+        <!-- Sector ETFs -->
+        <div id="on-sector-row" style="padding:6px 12px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px"></div>
+        <!-- Movers + Calendar side-by-side -->
+        <div id="on-movers-grid" style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
+          <div style="border-right:1px solid var(--border);padding:8px 12px">
+            <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">PRE-MARKET MOVERS</div>
+            <div id="on-movers"></div>
+          </div>
+          <div style="padding:8px 12px">
+            <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">UPCOMING EVENTS</div>
+            <div id="on-calendar"></div>
           </div>
         </div>
-        <div class="session-row">
-          <span id="session-name">—</span>
-          <span id="session-time">—</span>
+        <!-- Yesterday -->
+        <div id="on-perf-section" style="padding:8px 12px;border-bottom:1px solid var(--border)">
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">YESTERDAY</div>
+          <div id="on-perf"></div>
         </div>
-        <button class="kill-btn" onclick="killSwitch()">🚨 KILL SWITCH</button>
-        <button class="pause-btn" id="pause-btn" onclick="togglePause()">⏸ PAUSE BOT</button>
-      <button class="pause-btn" style="border-color:#00C853;color:#00C853;background:rgba(0,200,83,.08)" onclick="restartBot()">🔄 RESTART BOT</button>
-      <button class="pause-btn" style="border-color:#FF6B00;color:#FF6B00;background:rgba(255,107,0,.08)" onclick="forceScan()">⚡ FORCE SCAN</button>
-        <div id="apex-synth-panel" style="padding:8px 10px;border-top:1px solid var(--border);margin-top:4px">
-          <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Apex Synthesizer</div>
-          <div style="font-size:11px;color:var(--muted2)">Min score: <span style="color:var(--orange);font-weight:700" id="agents-req">—</span></div>
-          <div style="font-size:11px;color:var(--muted2);margin-top:3px">Engine: <span style="color:var(--green);font-weight:700" id="last-agree">Apex</span></div>
-        </div>
-        <div style="padding:8px 10px;border-top:1px solid var(--border)">
-          <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Daily Risk Budget</div>
-          <div class="rm-bar-bg"><div class="rm-bar" id="risk-bar" style="width:0%;background:var(--green)"></div></div>
-          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-top:3px">
-            <span id="risk-used">$0 used</span><span id="risk-left">$0 left</span>
-          </div>
-        </div>
-        <div style="padding:8px 10px;border-top:1px solid var(--border)">
-          <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Directional Skew</div>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-            <div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;position:relative;border:1px solid var(--border2)">
-              <div style="position:absolute;left:50%;width:1px;height:100%;background:var(--muted)"></div>
-              <div id="skew-bar" style="position:absolute;top:0;height:100%;background:var(--orange);border-radius:4px;transition:all .3s;left:50%;width:0%"></div>
-            </div>
-            <span id="skew-val" style="font-size:12px;font-weight:700;color:var(--orange);min-width:40px;text-align:right">0.0</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)">
-            <span>SHORT</span>
-            <span id="skew-detail">—</span>
-            <span>LONG</span>
-          </div>
-          <div id="skew-alert" style="font-size:9px;color:var(--red);margin-top:3px;display:none"></div>
+        <!-- News -->
+        <div style="padding:8px 12px;border-bottom:1px solid var(--border)">
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px" id="on-news-label">NEWS</div>
+          <div id="on-news"></div>
+          <div id="on-bias" style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap"></div>
         </div>
       </div>
-    </div>
 
-    <!-- CENTRE: Last Decision (top) + Activity Log (bottom) -->
-    <div class="col" style="border-right:1px solid var(--border);display:flex;flex-direction:column">
-
-      <!-- APEX SYNTHESIS VIEW — always visible -->
-      <div class="trade-card-panel" id="opus-view-panel">
+      <!-- APEX SYNTHESIS VIEW -->
+      <div class="trade-card-panel" id="opus-view-panel" style="flex-shrink:0">
         <div class="col-title" style="flex-shrink:0">
           <span>Apex Synthesis View</span>
           <span id="opus-view-ts" style="color:var(--muted2);font-size:9px">—</span>
@@ -758,13 +747,6 @@ canvas{display:block;width:100% !important}
         <div class="scan-bg"><div class="scan-fill" id="scan-fill" style="width:0%"></div></div>
         <div class="scan-meta"><span id="scan-status">Waiting for first scan...</span><span id="scan-eta">—</span></div>
       </div>
-
-      <!-- ACTIVITY LOG — at the bottom, fills remaining space -->
-      <div class="col-title" style="flex-shrink:0">
-        <span>Activity Log</span>
-        <span id="log-count" style="color:var(--muted2)">0 events</span>
-      </div>
-      <div class="col-body" id="log-area" style="flex:1;min-height:0;overflow-y:auto"></div>
 
     </div>
 
@@ -781,50 +763,15 @@ canvas{display:block;width:100% !important}
     </div>
 
   </div>
+</div>
 
-  <!-- Morning Brief (compact, below live grid) -->
-  <div style="padding:12px 16px;border-top:1px solid var(--border)">
-    <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
-      <!-- Header -->
-      <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--orange)">MORNING BRIEF</span>
-        <span id="overnight-meta" style="font-size:9px;color:var(--muted2)"></span>
-      </div>
-
-      <!-- Market tone row -->
-      <div id="on-tone-row" style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px">
-        <span style="color:var(--muted2);font-size:10px">Loading…</span>
-      </div>
-
-      <!-- Sector row -->
-      <div id="on-sector-row" style="padding:6px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px"></div>
-
-      <!-- Two-column: movers | calendar+earnings -->
-      <div id="on-movers-grid" style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
-        <div style="border-right:1px solid var(--border);padding:10px 14px">
-          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">PRE-MARKET MOVERS</div>
-          <div id="on-movers"></div>
-        </div>
-        <div style="padding:10px 14px">
-          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">UPCOMING EVENTS</div>
-          <div id="on-calendar"></div>
-        </div>
-      </div>
-
-      <!-- Yesterday performance -->
-      <div id="on-perf-section" style="padding:10px 16px;border-bottom:1px solid var(--border)">
-        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">YESTERDAY</div>
-        <div id="on-perf"></div>
-      </div>
-
-      <!-- News + bias -->
-      <div style="padding:10px 16px">
-        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px" id="on-news-label">NEWS</div>
-        <div id="on-news"></div>
-        <div id="on-bias" style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap"></div>
-      </div>
-    </div>
+<!-- VIEW 1B: LOG (Activity Log — moved out of LIVE) -->
+<div class="view" id="view-log" style="flex-direction:column">
+  <div class="col-title" style="flex-shrink:0">
+    <span>Activity Log</span>
+    <span id="log-count" style="color:var(--muted2)">0 events</span>
   </div>
+  <div class="col-body" id="log-area" style="flex:1;min-height:0;overflow-y:auto;padding:0"></div>
 </div>
 
 <!-- VIEW 1B: ORDERS -->
@@ -1477,6 +1424,36 @@ canvas{display:block;width:100% !important}
 
 <!-- VIEW: HEALTH ──────────────────────────────────────────────────────────── -->
 <div class="view" id="view-health" style="flex-direction:column;padding:16px 20px;gap:0;overflow-y:auto">
+
+  <!-- Bot Controls (moved from LIVE tab) -->
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;flex:1">
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;min-width:160px">
+        <div class="regime-box unknown" id="regime-box" style="flex:1;padding:5px 8px;min-width:0">
+          <div class="rl" id="regime-label" style="font-size:11px">READING TAPE...</div>
+          <div class="rm" id="regime-meta" style="font-size:9px">SPY: — | QQQ: — | VIX: —</div>
+        </div>
+        <div style="font-size:9px;color:var(--muted2);white-space:nowrap">
+          <span id="session-name">—</span> <span id="session-time" style="color:var(--muted)"></span>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="kill-btn" onclick="killSwitch()" style="margin:0;width:auto;padding:6px 14px;font-size:10px">🚨 Kill</button>
+        <button class="pause-btn" id="pause-btn" onclick="togglePause()" style="margin:0;width:auto;padding:6px 14px;font-size:10px">⏸ Pause</button>
+        <button class="pause-btn" onclick="restartBot()" style="margin:0;width:auto;padding:6px 14px;font-size:10px;border-color:#00C853;color:#00C853;background:rgba(0,200,83,.08)">🔄 Restart</button>
+        <button class="pause-btn" onclick="forceScan()" style="margin:0;width:auto;padding:6px 14px;font-size:10px;border-color:#FF6B00;color:#FF6B00;background:rgba(255,107,0,.08)">⚡ Scan</button>
+      </div>
+    </div>
+    <div id="apex-synth-panel" style="display:flex;gap:14px;align-items:center;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;font-size:10px;color:var(--muted2)">
+      <span>Min score: <span style="color:var(--orange);font-weight:700" id="agents-req">—</span></span>
+      <span>Engine: <span style="color:var(--green);font-weight:700" id="last-agree">Apex</span></span>
+      <span>Risk: <span id="risk-used" style="color:var(--muted2)">—</span> used / <span id="risk-left" style="color:var(--muted2)">—</span> left</span>
+      <span>Skew: <span id="skew-val" style="color:var(--orange);font-weight:700">0.0</span> <span id="skew-detail" style="color:var(--muted)"></span></span>
+      <div id="skew-bar" style="display:none"></div>
+      <div id="skew-alert" style="display:none"></div>
+      <div class="rm-bar-bg" style="display:none"><div class="rm-bar" id="risk-bar"></div></div>
+    </div>
+  </div>
 
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -2508,7 +2485,7 @@ function toggleTheme() {
   } catch(e) {}
 })();
 
-const _TAB_LABELS = {live:'Live',orders:'Orders',history:'Trades',growth:'Growth',agents:'Apex',risk:'Risk',news:'News',catalyst:'Catalyst',portfolio:'Portfolio',alpha:'Decay',analytics:'Analytics',settings:'Settings',health:'Health'};
+const _TAB_LABELS = {live:'Live',log:'Log',orders:'Orders',history:'Trades',growth:'Growth',agents:'Apex',risk:'Risk',news:'News',catalyst:'Catalyst',portfolio:'Portfolio',alpha:'Decay',analytics:'Analytics',settings:'Settings',health:'Health'};
 
 function toggleTabsDrawer() {
   document.getElementById('tabs-drawer').classList.toggle('open');
