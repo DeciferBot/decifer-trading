@@ -5787,16 +5787,26 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
         wake.stop();
         const greeting = 'Hello my master. I am Jarvis, your loyal assistant.';
         showToast('Jarvis', greeting);
+
+        // Chrome bug: SpeechSynthesisUtterance.onend sometimes never fires.
+        // Use a one-shot guard with a 5s safety timeout so startQuery always runs.
+        let queryStarted = false;
+        const launchQuery = () => {
+          if (queryStarted) return;
+          queryStarted = true;
+          setTimeout(startQuery, 300);
+        };
+
         if (window.speechSynthesis) {
           const utt = new SpeechSynthesisUtterance(greeting);
           utt.rate = 0.95;
           utt.pitch = 0.85;
-          // Start listening only after greeting finishes — mic must not open while
-          // TTS is speaking or it picks up Jarvis's own voice and hangs.
-          utt.onend = () => setTimeout(startQuery, 300);
+          utt.onend  = launchQuery;
+          utt.onerror = launchQuery;
           window.speechSynthesis.speak(utt);
+          setTimeout(launchQuery, 5000); // fallback if onend never fires
         } else {
-          // No TTS — fall through to wake.onend → startQuery as before
+          launchQuery();
         }
         return;
       }
