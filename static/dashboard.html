@@ -710,13 +710,8 @@ canvas{display:block;width:100% !important}
     </div>
   </div>
   <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Apex Portfolio Review</div>
-      <div style="font-size:10px;color:var(--muted2)" id="pm-review-ts">—</div>
-    </div>
-    <div id="pm-decisions-list">
-      <div class="empty">Apex portfolio review decisions appear here after the next scan cycle.</div>
-    </div>
+    <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:6px">Portfolio Management</div>
+    <div style="font-size:10px;color:var(--muted2)">PM decisions have moved to the <span onclick="document.querySelector('.tab[onclick*=\'pm\']').click()" style="color:var(--orange);cursor:pointer;text-decoration:underline">Portfolio Mgmt</span> tab.</div>
   </div>
 </div>
 
@@ -4252,8 +4247,6 @@ async function poll() {
         if (scanTimeEl) scanTimeEl.textContent = 'Last scan: ' + (latest.time || d.last_scan || '—');
       }
     }
-    renderPmDecisions(d.pm_decisions);
-
     // News view
     if (d.news_data) renderNews(d.news_data);
 
@@ -5366,38 +5359,6 @@ function renderAgentConvoFull(convo, lastScan) {
   if (window._apexConvoIdx < 0) {
     _renderApexConvoEntry(convo[0]);
   }
-}
-
-function renderPmDecisions(pm) {
-  const el   = document.getElementById('pm-decisions-list');
-  const tsEl = document.getElementById('pm-review-ts');
-  if (!el) return;
-
-  if (!pm || !pm.actions || !pm.actions.length) {
-    el.innerHTML = '<div class="empty">Apex portfolio review decisions appear here after the next scan cycle.</div>';
-    if (tsEl) tsEl.textContent = '—';
-    return;
-  }
-
-  if (tsEl) tsEl.textContent = (pm.trigger ? pm.trigger + '  ·  ' : '') + (pm.ts || '—');
-
-  const ACTION_COLOR = { ADD: 'var(--green)', EXIT: 'var(--red)', TRIM: 'var(--orange)', HOLD: 'var(--muted2)' };
-  const ACTION_BG    = { ADD: 'rgba(0,200,83,.10)', EXIT: 'rgba(255,82,82,.10)', TRIM: 'rgba(255,107,0,.10)', HOLD: 'rgba(100,100,100,.08)' };
-
-  el.innerHTML = pm.actions.map(a => {
-    const act    = (a.action || 'HOLD').toUpperCase();
-    const color  = ACTION_COLOR[act] || 'var(--muted2)';
-    const bg     = ACTION_BG[act]    || 'rgba(100,100,100,.08)';
-    const reason = a.reasoning || a.reason || '';
-    const trimPct = a.trim_pct ? `  ${a.trim_pct}%` : '';
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;margin-bottom:6px;border-radius:4px;background:${bg};border:1px solid ${color}33">
-      <div style="min-width:80px;display:flex;align-items:center;gap:6px;flex-shrink:0">
-        <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:${color}">${esc(act)}${esc(trimPct)}</span>
-        <span style="font-size:12px;font-weight:700;color:var(--text)">${esc(a.symbol || '')}</span>
-      </div>
-      ${reason ? `<div style="font-size:10px;color:var(--muted2);line-height:1.5">${esc(reason)}</div>` : ''}
-    </div>`;
-  }).join('');
 }
 
 // ── Capital Management ────────────────────────────────────

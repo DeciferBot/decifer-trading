@@ -1432,7 +1432,8 @@ def run_scan():
         pass
 
     dash["recent_orders"] = []
-    dash["trades"] = []
+    # dash["trades"] intentionally NOT reset here — accumulates all orders placed
+    # during the session so Trade Actions in the dashboard stays populated.
     dash["_scan_start"] = datetime.now(_ET).isoformat()
 
     clog("SCAN", f"Scan #{bot_state.scan_count} started | Session: {dash['session']}")
