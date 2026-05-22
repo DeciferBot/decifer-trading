@@ -1021,17 +1021,17 @@ CONFIG = {
     # but no execute_sell is called and no positions are touched.
     "ENABLE_PM_ENGINE":             False,
     # Maximum PM-initiated execution actions per calendar day (UTC).
-    "PM_MAX_ACTIONS_PER_DAY":       3,
+    "PM_MAX_ACTIONS_PER_DAY":       5,
     # Maximum PROPOSED action notional as a fraction of NLV.
     # Applies to the action size (e.g. trim amount), NOT the full position notional.
     # A 5% NLV position can still provide a 1% NLV trim.
-    "PM_MAX_ACTION_NLV_PCT":        0.02,
+    "PM_MAX_ACTION_NLV_PCT":        0.20,
     # Minimum useful action notional in dollars (below this, not worth the friction).
     "PM_MIN_ACTION_NOTIONAL":       500.0,
     # Churn penalty applied to action scores for positions held < this many hours.
     "PM_MIN_HOLD_HOURS":            4.0,
     # Hard cooldown — execution blocked within this many hours of entry.
-    "PM_COOLDOWN_HOURS":            2.0,
+    "PM_COOLDOWN_HOURS":            0.25,   # 15 minutes
     # Maximum bid-ask spread for execution (fraction, e.g. 0.01 = 1%).
     "PM_MAX_SPREAD_PCT":            0.01,
     # Account values max age before rail 3 fires (seconds).
