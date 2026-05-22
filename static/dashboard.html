@@ -408,9 +408,11 @@ canvas{display:block;width:100% !important}
   /* Tab bar — remove fade mask so nothing is hidden */
   .tabs{-webkit-mask-image:none;mask-image:none}
 
-  /* Decision bar */
-  .decision-bar{height:auto;flex-wrap:wrap}
-  .decision-bar-actions{flex-wrap:wrap}
+  /* Decision bar — hidden on mobile */
+  .decision-bar{display:none}
+
+  /* Apex Synthesizer panel — hidden on mobile (min score lives in Settings) */
+  #apex-synth-panel{display:none}
 
   /* Views — let body scroll; override JS-set inline heights */
   .view,#view-portfolio,.risk-view,
@@ -709,7 +711,7 @@ canvas{display:block;width:100% !important}
         <button class="pause-btn" id="pause-btn" onclick="togglePause()">⏸ PAUSE BOT</button>
       <button class="pause-btn" style="border-color:#00C853;color:#00C853;background:rgba(0,200,83,.08)" onclick="restartBot()">🔄 RESTART BOT</button>
       <button class="pause-btn" style="border-color:#FF6B00;color:#FF6B00;background:rgba(255,107,0,.08)" onclick="forceScan()">⚡ FORCE SCAN</button>
-        <div style="padding:8px 10px;border-top:1px solid var(--border);margin-top:4px">
+        <div id="apex-synth-panel" style="padding:8px 10px;border-top:1px solid var(--border);margin-top:4px">
           <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Apex Synthesizer</div>
           <div style="font-size:11px;color:var(--muted2)">Min score: <span style="color:var(--orange);font-weight:700" id="agents-req">—</span></div>
           <div style="font-size:11px;color:var(--muted2);margin-top:3px">Engine: <span style="color:var(--green);font-weight:700" id="last-agree">Apex</span></div>
