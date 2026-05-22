@@ -1051,3 +1051,61 @@ def test_decision_log_contains_enriched_fields(tmp_path, monkeypatch):
     # score_source and data_quality must be set
     assert position_records[0]["score_source"] in ("CYCLE_CANDIDATES", "PM_SCORE_CACHE", "ENTRY_SCORE_FALLBACK")
     assert position_records[0]["data_quality"] in ("OK", "DEGRADED_SCORE")
+
+
+def test_live_engine_never_shows_hypothetical(tmp_path, monkeypatch):
+    """
+    When ENABLE_PM_ENGINE=True, HOLD must log 'HOLDING' and DO_NOTHING must
+    log 'MONITORING'.  Neither must ever appear as 'HYPOTHETICAL'.
+
+    Root cause guarded: the engine was using 'HYPOTHETICAL' for any action that
+    does not submit a broker order (HOLD, DO_NOTHING), regardless of whether the
+    flag was on.  When the engine is live, these are real advisory observations —
+    calling them 'HYPOTHETICAL' is misleading and caused user confusion on the
+    dashboard.
+    """
+    import pm_engine
+
+    monkeypatch.setattr(pm_engine, "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    sys.modules["config"].CONFIG = {
+        **sys.modules["config"].CONFIG,
+        "ENABLE_PM_ENGINE": True,
+        "PM_COOLDOWN_HOURS": 0.0,
+        "PM_MIN_ACTION_NOTIONAL": 0.0,
+    }
+    sys.modules["bot_state"].account_values = {"NetLiquidation": "100000"}
+    sys.modules["bot_state"].account_values_updated_at = __import__("time").time()
+
+    # INTACT thesis, no oversizing, no decay → should produce HOLD or DO_NOTHING
+    snapshot = {
+        "AAPL": _pos("AAPL", qty=10, entry=100.0, current=101.0,
+                     pnl=100.0, entry_score=45.0, open_hours_ago=5.0),
+    }
+    pm_engine.evaluate(trigger="scan_cycle", active_trades_snapshot=snapshot)
+
+    log_file = tmp_path / "decisions.jsonl"
+    assert log_file.exists()
+    records = [json.loads(l) for l in log_file.read_text().strip().splitlines() if l]
+    position_records = [r for r in records if r.get("action_type")]
+    assert position_records, "Expected at least one position record"
+
+    # No record may carry HYPOTHETICAL when the engine flag is ON
+    hypo_records = [r for r in position_records if r.get("final_status") == "HYPOTHETICAL"]
+    assert not hypo_records, (
+        f"flag=True must never produce HYPOTHETICAL records; found: {hypo_records}"
+    )
+
+    # The HOLD/DO_NOTHING record must be HOLDING or MONITORING
+    non_exec = [r for r in position_records
+                if r["action_type"] in ("HOLD", "DO_NOTHING")]
+    assert non_exec, (
+        f"Expected a HOLD or DO_NOTHING action for a healthy, small INTACT position. "
+        f"Got: {[r['action_type'] for r in position_records]}"
+    )
+    for r in non_exec:
+        assert r["final_status"] in ("HOLDING", "MONITORING"), (
+            f"HOLD/DO_NOTHING with flag=True must show 'HOLDING' or 'MONITORING', "
+            f"not '{r['final_status']}'"
+        )
