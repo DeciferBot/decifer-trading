@@ -535,6 +535,12 @@ canvas{display:block;width:100% !important}
 
   /* ── CATALYST TAB ── */
   .cat-card{padding:8px 10px}
+
+  /* ── STATS2 — shrink labels so they don't wrap ── */
+  .stats2 .sl{font-size:7.5px;letter-spacing:.3px}
+
+  /* ── FOOTER — single line on mobile ── */
+  #site-footer{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9px;padding:10px 12px}
 }
 
 /* Position Detail Modal */
@@ -5932,7 +5938,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
 </div>
 
 <!-- FOOTER -->
-<div style="text-align:center;padding:18px 0 12px;font-size:11px;color:var(--muted2);border-top:1px solid var(--border);margin-top:32px;">
+<div id="site-footer" style="text-align:center;padding:18px 0 12px;font-size:11px;color:var(--muted2);border-top:1px solid var(--border);margin-top:32px;">
   <span style="color:var(--orange);font-weight:700;">DECIFER __DECIFER_VERSION__</span> &nbsp;|&nbsp; Invented &amp; built by <span style="color:#fff;font-weight:700;">AMIT CHOPRA</span>
 </div>
 
