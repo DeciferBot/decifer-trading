@@ -1,48 +1,72 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { TrendingUp, TrendingDown, Minus, CircleDot, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, CircleDot, ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type BotState, type Regime } from "@/lib/api";
-import { fmtMoney, fmtPct, pnlColor, translateSession, translateRegime, translateVix } from "@/lib/translate";
+import {
+  fmtMoney, fmtPct, pnlColor,
+  translateSession, translateRegime, translateVix,
+  translateTheme, translateThemeState,
+} from "@/lib/translate";
 import type { Tab } from "@/components/BottomNav";
 
+interface Theme {
+  theme_id: string;
+  state: string;
+  confidence: number;
+  direction: string;
+}
+interface IntelligenceResponse { themes?: Theme[] }
 interface Props { onTabChange: (t: Tab) => void }
 
-function pnlFromPositions(positions: BotState["positions"]) {
-  return (positions ?? []).reduce((sum, p) => {
-    const diff = (p.current ?? 0) - (p.entry ?? 0);
-    const dir  = p.direction === "SHORT" ? -1 : 1;
-    return sum + dir * diff * Math.abs(p.qty ?? 0);
-  }, 0);
+function IndexPill({ name, chg }: { name: string; chg?: number }) {
+  const v = chg ?? 0;
+  const pos = v >= 0;
+  return (
+    <div className={`flex flex-col items-center justify-center px-2 py-2.5 rounded-xl border ${
+      pos ? "bg-emerald-500/8 border-emerald-500/15" : "bg-rose-500/8 border-rose-500/15"
+    }`}>
+      <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider">{name}</span>
+      <span className={`text-sm font-bold mt-0.5 ${pos ? "text-emerald-400" : "text-rose-400"}`}>
+        {pos ? "+" : ""}{v.toFixed(2)}%
+      </span>
+    </div>
+  );
 }
 
 export default function TodayView({ onTabChange }: Props) {
-  const [state, setState] = useState<BotState | null>(null);
+  const [state, setState]   = useState<BotState | null>(null);
+  const [intel, setIntel]   = useState<IntelligenceResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]   = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const d = await api.get<BotState>("/api/state");
-      setState(d);
+      const [s, i] = await Promise.all([
+        api.get<BotState>("/api/state"),
+        api.get<IntelligenceResponse>("/api/intelligence").catch(() => ({})),
+      ]);
+      setState(s);
+      setIntel(i as IntelligenceResponse);
       setError(null);
-    } catch (e) {
+    } catch {
       setError("Can't reach the bot right now.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(); const t = setInterval(load, 12_000); return () => clearInterval(t); }, [load]);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 12_000);
+    return () => clearInterval(t);
+  }, [load]);
 
-  if (loading) return <TodaySkeleton />;
+  if (loading) return <HomeSkeleton />;
 
   if (error || !state) return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-3 p-6">
-      <div className="h-12 w-12 rounded-full bg-rose-500/15 flex items-center justify-center">
-        <Minus size={20} className="text-rose-400" />
-      </div>
       <p className="text-slate-400 text-center text-sm">{error ?? "No data"}</p>
       <button
         onClick={() => { setLoading(true); load(); }}
@@ -53,28 +77,40 @@ export default function TodayView({ onTabChange }: Props) {
     </div>
   );
 
-  const positions = state.positions ?? [];
-  const openPnl = pnlFromPositions(positions);
-  const dayPnl = state.daily_pnl ?? 0;
-  const totalPnl = state.performance?.total_pnl ?? 0;
-  const portfolioValue = state.portfolio_value ?? 0;
-  const dayPct = portfolioValue > 0 ? (dayPnl / portfolioValue) * 100 : 0;
-  const regime = state.regime as Regime | undefined;
-  const vixValue = regime?.vix ?? 0;
+  const regime    = state.regime as Regime | undefined;
+  const vixValue  = regime?.vix ?? 0;
+  const vix       = translateVix(vixValue);
+  const prose     = regime?.tape_context?.prose ?? null;
   const regimeName = regime?.regime ?? "UNKNOWN";
-  const vix = translateVix(vixValue);
-  const sessionLabel = translateSession(state.session ?? "");
+  const sessionChar = regime?.session_character ?? "";
   const isRunning = !state.paused && state.session !== "CLOSED" && state.session !== "WEEKEND";
 
-  // Best and worst open positions
-  const withPnl = positions.map(p => {
-    const diff = (p.current ?? 0) - (p.entry ?? 0);
-    const pnlAmt = (p.direction === "SHORT" ? -diff : diff) * Math.abs(p.qty ?? 0);
-    const pct = p.entry ? (diff / p.entry) * 100 * (p.direction === "SHORT" ? -1 : 1) : 0;
-    return { ...p, pnlAmt, pct };
-  });
-  const best  = withPnl.sort((a, b) => b.pct - a.pct)[0];
-  const worst = withPnl.sort((a, b) => a.pct - b.pct)[0];
+  // Sentiment signal: what should the reader feel?
+  const sessionMood: Record<string, { label: string; color: string }> = {
+    FEAR_ELEVATED:  { label: "Caution — elevated fear in the market", color: "text-amber-400"   },
+    GREED_ELEVATED: { label: "Markets showing signs of greed",        color: "text-emerald-400" },
+    RISK_OFF:       { label: "Investors are moving to safety",        color: "text-rose-400"    },
+    RISK_ON:        { label: "Risk appetite is on — growth in favour", color: "text-emerald-400" },
+  };
+  const mood = sessionMood[sessionChar] ?? null;
+
+  // Big card colour from regime + VIX
+  const isPanic = regimeName === "PANIC" || vixValue >= 30;
+  const isBull  = (regimeName.includes("BULL") || regimeName.includes("TRENDING_UP")) && vixValue < 22;
+  const sentimentBg   = isPanic ? "bg-rose-500/10 border-rose-500/25"
+    : isBull             ? "bg-emerald-500/10 border-emerald-500/25"
+    :                      "bg-amber-500/10 border-amber-500/25";
+  const sentimentText = isPanic ? "text-rose-400" : isBull ? "text-emerald-400" : "text-amber-300";
+
+  // Active themes only — cap at 3 on home
+  const activeThemes = (intel?.themes ?? [])
+    .filter(t => t.state === "activated" || t.state === "strengthening")
+    .slice(0, 3);
+
+  const positions = state.positions ?? [];
+  const dayPnl    = state.daily_pnl ?? 0;
+  const portValue = state.portfolio_value ?? 0;
+  const dayPct    = portValue > 0 ? (dayPnl / portValue) * 100 : 0;
 
   return (
     <div className="px-5 pt-6 pb-4 space-y-4">
@@ -82,91 +118,124 @@ export default function TodayView({ onTabChange }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold text-slate-500 tracking-widest uppercase">{sessionLabel}</p>
-          <h1 className="text-lg font-bold text-white mt-0.5">Your Portfolio</h1>
+          <p className="text-xs font-semibold text-slate-500 tracking-widest uppercase">
+            {translateSession(state.session ?? "")}
+          </p>
+          <h1 className="text-xl font-bold text-white mt-0.5">Market Snapshot</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full ${isRunning ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-500/15 text-slate-400"}`}>
-            <CircleDot size={9} className={isRunning ? "text-emerald-400" : "text-slate-500"} />
-            {isRunning ? "Bot running" : state.paused ? "Paused" : "Market closed"}
-          </span>
-        </div>
+        <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full ${
+          isRunning ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-700/60 text-slate-400"
+        }`}>
+          <CircleDot size={9} />
+          {isRunning ? "Bot running" : state.paused ? "Paused" : "Closed"}
+        </span>
       </div>
 
-      {/* Hero: Portfolio Value */}
-      <div className="rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #101e38 0%, #0f1a2e 100%)", border: "1px solid #1e3050" }}>
-        <p className="text-slate-400 text-sm mb-1">Total value</p>
-        <p className="text-4xl font-bold text-white tracking-tight">{fmtMoney(portfolioValue)}</p>
-        <div className="flex items-center gap-3 mt-3">
-          <div className={`flex items-center gap-1.5 text-base font-semibold ${pnlColor(dayPnl)}`}>
-            {dayPnl >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-            {dayPnl >= 0 ? "+" : ""}{fmtMoney(dayPnl)} ({fmtPct(dayPct)}) today
+      {/* Market mood — big, plain English */}
+      <div className={`rounded-2xl border p-4 ${sentimentBg}`}>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <p className={`text-2xl font-bold leading-tight ${sentimentText}`}>
+            {translateRegime(regimeName)}
+          </p>
+          <div className="text-right shrink-0">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider">Fear index</p>
+            <p className={`text-2xl font-bold ${vix.color}`}>{vixValue.toFixed(0)}</p>
+            <p className={`text-[10px] font-semibold ${vix.color}`}>{vix.label}</p>
           </div>
         </div>
-        <div className="mt-2 text-sm text-slate-500">
-          All time: <span className={`font-semibold ${pnlColor(totalPnl)}`}>{totalPnl >= 0 ? "+" : ""}{fmtMoney(totalPnl, true)}</span>
-        </div>
+        {mood && (
+          <p className={`text-sm font-semibold mb-2 ${mood.color}`}>{mood.label}</p>
+        )}
+        {prose && (
+          <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{prose}</p>
+        )}
       </div>
 
-      {/* Open P&L snapshot */}
-      {positions.length > 0 && (
+      {/* Index moves — just % change, no price */}
+      <div className="grid grid-cols-3 gap-2">
+        <IndexPill name="S&P 500" chg={regime?.spy_chg_1d} />
+        <IndexPill name="Nasdaq"  chg={regime?.qqq_chg_1d} />
+        <IndexPill name="Sm-Cap"  chg={regime?.iwm_chg_1d} />
+      </div>
+
+      {/* What's working */}
+      {activeThemes.length > 0 && (
         <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-slate-300">Open positions</p>
-            <button onClick={() => onTabChange("holdings")} className="flex items-center gap-1 text-xs font-semibold text-blue-400">
-              {positions.length} open <ChevronRight size={13} />
-            </button>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+            What&apos;s working today
+          </p>
+          <div className="space-y-2.5">
+            {activeThemes.map(t => {
+              const status = translateThemeState(t.state);
+              return (
+                <div key={t.theme_id} className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-white">{translateTheme(t.theme_id)}</p>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${status.color}`}>
+                    {status.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-          <div className={`text-2xl font-bold ${pnlColor(openPnl)}`}>
-            {openPnl >= 0 ? "+" : ""}{fmtMoney(openPnl)}
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">Unrealised gain / loss</p>
-
-          {/* Best / Worst */}
-          {best && worst && best.symbol !== worst.symbol && (
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/15 p-2.5">
-                <p className="text-[10px] text-emerald-500/70 font-semibold uppercase tracking-wider mb-1">Best today</p>
-                <p className="text-sm font-bold text-white">{best.symbol}</p>
-                <p className="text-sm font-semibold text-emerald-400">{fmtPct(best.pct)}</p>
-              </div>
-              <div className="rounded-xl bg-rose-500/8 border border-rose-500/15 p-2.5">
-                <p className="text-[10px] text-rose-500/70 font-semibold uppercase tracking-wider mb-1">Under pressure</p>
-                <p className="text-sm font-bold text-white">{worst.symbol}</p>
-                <p className="text-sm font-semibold text-rose-400">{fmtPct(worst.pct)}</p>
-              </div>
-            </div>
-          )}
+          <button
+            onClick={() => onTabChange("apex")}
+            className="flex items-center gap-1 text-xs text-blue-400 font-semibold mt-3 active:opacity-70"
+          >
+            See Apex intelligence <ArrowRight size={11} />
+          </button>
         </div>
       )}
 
-      {/* Market mood */}
+      {/* Portfolio strip */}
       <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] p-4">
-        <p className="text-sm font-semibold text-slate-300 mb-3">Market mood</p>
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <p className="text-base font-bold text-white">{translateRegime(regimeName)}</p>
-            <p className={`text-sm font-medium mt-0.5 ${vix.color}`}>{vix.label}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-slate-500 mb-0.5">Your portfolio</p>
+            <p className="text-2xl font-bold text-white">{fmtMoney(portValue)}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-slate-500">Fear index</p>
-            <p className={`text-xl font-bold ${vix.color}`}>{vixValue.toFixed(1)}</p>
+            <p className="text-xs text-slate-500 mb-0.5">Today</p>
+            <p className={`text-2xl font-bold ${pnlColor(dayPnl)}`}>
+              {fmtPct(dayPct)}
+            </p>
+            <p className={`text-xs mt-0.5 ${pnlColor(dayPnl)}`}>
+              {dayPnl >= 0 ? "+" : ""}{fmtMoney(dayPnl)}
+            </p>
           </div>
         </div>
+        {positions.length > 0 && (
+          <button
+            onClick={() => onTabChange("holdings")}
+            className="flex items-center gap-1 text-xs text-blue-400 font-semibold mt-3 active:opacity-70"
+          >
+            {positions.length} open position{positions.length !== 1 ? "s" : ""} <ArrowRight size={11} />
+          </button>
+        )}
       </div>
 
-      {/* Latest bot decision */}
+      {/* Bot's last move — 1 line */}
       {state.last_decision && (
         <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] p-4">
-          <p className="text-sm font-semibold text-slate-300 mb-2">Latest bot decision</p>
-          <p className="text-white font-semibold">
-            {state.last_decision.direction === "SHORT" ? "Shorting" : "Bought"} {state.last_decision.symbol}
-            {state.last_decision.score != null && (
-              <span className="ml-2 text-xs font-normal text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded-full">{state.last_decision.score} pts</span>
-            )}
+          <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-2">
+            Bot&apos;s last move
           </p>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-base font-bold text-white">{state.last_decision.symbol}</span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+              state.last_decision.direction === "SHORT"
+                ? "text-rose-400 bg-rose-400/10"
+                : "text-emerald-400 bg-emerald-400/10"
+            }`}>
+              {state.last_decision.direction === "SHORT" ? "Short ↓" : "Bought ↑"}
+            </span>
+            {state.last_decision.score != null && (
+              <span className="text-xs text-slate-500">{state.last_decision.score} pts</span>
+            )}
+          </div>
           {state.last_decision.thesis && (
-            <p className="text-sm text-slate-400 mt-1.5 leading-relaxed line-clamp-3">{state.last_decision.thesis}</p>
+            <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
+              {state.last_decision.thesis}
+            </p>
           )}
         </div>
       )}
@@ -175,15 +244,18 @@ export default function TodayView({ onTabChange }: Props) {
   );
 }
 
-function TodaySkeleton() {
+function HomeSkeleton() {
   return (
     <div className="px-5 pt-6 space-y-4">
       <div className="flex justify-between items-start">
         <Skeleton className="h-10 w-36 bg-[#161e2e]" />
-        <Skeleton className="h-7 w-28 rounded-full bg-[#161e2e]" />
+        <Skeleton className="h-7 w-24 rounded-full bg-[#161e2e]" />
       </div>
-      <Skeleton className="h-36 w-full rounded-2xl bg-[#161e2e]" />
-      <Skeleton className="h-36 w-full rounded-2xl bg-[#161e2e]" />
+      <Skeleton className="h-40 w-full rounded-2xl bg-[#161e2e]" />
+      <div className="grid grid-cols-3 gap-2">
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl bg-[#161e2e]" />)}
+      </div>
+      <Skeleton className="h-28 w-full rounded-2xl bg-[#161e2e]" />
       <Skeleton className="h-24 w-full rounded-2xl bg-[#161e2e]" />
     </div>
   );
