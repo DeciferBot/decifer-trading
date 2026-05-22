@@ -5734,11 +5734,22 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
     })
     .then(r => r.json())
     .then(d => {
-      showToast(question, d.answer || d.error || 'No response.');
+      const answer = d.answer || d.error || 'No response.';
+      showToast(question, answer);
       btn.classList.remove('waiting');
       btn.title = 'Ask Decifer a question';
-      busy = false;
-      restartWake();
+      if (window.speechSynthesis) {
+        const utt = new SpeechSynthesisUtterance(answer);
+        utt.rate = 0.92;
+        utt.pitch = 0.85;
+        utt.onend = () => { busy = false; restartWake(); };
+        utt.onerror = () => { busy = false; restartWake(); };
+        window.speechSynthesis.speak(utt);
+        setTimeout(() => { busy = false; restartWake(); }, 15000); // safety fallback
+      } else {
+        busy = false;
+        restartWake();
+      }
     })
     .catch(() => {
       showToast(question, 'Request failed.');
