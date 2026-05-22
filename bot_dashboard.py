@@ -833,12 +833,16 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
-            _bot = sys.modules.get("bot")
-            html = (_bot.DASHBOARD_HTML if _bot else "") or ""
+            try:
+                from pathlib import Path
+                html = (Path(__file__).parent / "static" / "dashboard.html").read_text()
+            except Exception:
+                _bot = sys.modules.get("bot")
+                html = (_bot.DASHBOARD_HTML if _bot else "") or ""
             try:
                 import importlib.util
-                from pathlib import Path
-                _vpath = Path(__file__).parent / "version.py"
+                from pathlib import Path as _Path
+                _vpath = _Path(__file__).parent / "version.py"
                 _spec = importlib.util.spec_from_file_location("_ver", _vpath)
                 _mod = importlib.util.module_from_spec(_spec)
                 _spec.loader.exec_module(_mod)
@@ -851,7 +855,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/state":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             # Include current settings so dashboard form can show live values
             state = dict(dash)
@@ -1039,7 +1042,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/ic_weights":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 import json as _json
@@ -1083,7 +1085,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/analytics":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 from analytics import get_analytics
@@ -1095,7 +1096,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path.startswith("/api/analytics/explain"):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 from urllib.parse import parse_qs, urlparse
@@ -1110,7 +1110,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/alpha_decay":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 from alpha_decay import get_alpha_decay_stats
@@ -1124,7 +1123,6 @@ class DashHandler(BaseHTTPRequestHandler):
             # Multi-account aggregated position view
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 from portfolio import get_aggregate_summary
@@ -1146,7 +1144,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/thesis-performance":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 from pattern_library import get_thesis_performance
@@ -1266,7 +1263,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/news":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 payload = _get_news_payload()
@@ -1277,7 +1273,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/catalyst":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 payload = _get_catalyst_payload()
@@ -1288,7 +1283,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/alpha-gate":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 from phase_gate import get_status
@@ -1302,7 +1296,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/sectors":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 from alpha_vantage_client import get_sector_performance
@@ -1347,7 +1340,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/dimensions":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             payload = {
                 "dimensions": [
@@ -1378,7 +1370,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/overnight-notes":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 import time as _t
@@ -1404,7 +1395,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/prices":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 import time as _t
@@ -1419,7 +1409,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/health":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 from bot_health import build_health_report
@@ -1434,7 +1423,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/intelligence":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 import time as _t
@@ -1494,7 +1482,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/pm":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 _pm_path = os.path.join(
@@ -1530,7 +1517,6 @@ class DashHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/pm_outcomes":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
                 import pm_outcome_tracker as _pot
@@ -1548,7 +1534,6 @@ class DashHandler(BaseHTTPRequestHandler):
             # Retired — rotation_live_v1 migrated to Portfolio Management Engine.
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(json.dumps({"retired": True, "use": "/api/pm"}).encode())
         else:
@@ -1566,7 +1551,6 @@ class DashHandler(BaseHTTPRequestHandler):
         if self._is_remote_request():
             self.send_response(403)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(json.dumps({"error": "write operations not available remotely"}).encode())
             return
@@ -1582,7 +1566,6 @@ class DashHandler(BaseHTTPRequestHandler):
                 _on_disconnected()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(json.dumps({"ok": True, "msg": "Reconnect attempt triggered"}).encode())
         elif self.path == "/api/kill":
@@ -1880,6 +1863,18 @@ class DashHandler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def end_headers(self):
+        """Inject CORS headers on every response so the mobile PWA can call the API."""
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        """Handle CORS preflight requests."""
+        self.send_response(204)
+        self.end_headers()
 
     def log_message(self, *args):
         pass  # Suppress default HTTP logs
