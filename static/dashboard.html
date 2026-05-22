@@ -3700,6 +3700,7 @@ function renderTradeActions(trades) {
   }
   const ACTION_COLOR = { BUY: 'var(--green)', SHORT: 'var(--red)', SELL: 'var(--orange)' };
   const ACTION_BG    = { BUY: 'rgba(0,200,83,.12)', SHORT: 'rgba(255,82,82,.12)', SELL: 'rgba(255,107,0,.12)' };
+  const ACTION_LABEL = { BUY: 'Bought', SHORT: 'Shorted', SELL: 'Sold' };
   // Deduplicate by side+symbol (most-recent first — trades is already newest-first)
   const seen = new Set();
   const unique = trades.filter(t => {
@@ -3708,16 +3709,27 @@ function renderTradeActions(trades) {
     seen.add(key);
     return true;
   });
-  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 0">' +
+  el.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">' +
     unique.map(t => {
       const action = (t.side || '').toUpperCase().split(' ')[0];
       const color  = ACTION_COLOR[action] || 'var(--muted2)';
       const bg     = ACTION_BG[action]    || 'rgba(80,80,80,.1)';
-      const price  = t.price ? ` @ $${parseFloat(t.price).toFixed(2)}` : '';
-      return `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;border:1px solid ${color};background:${bg}" title="${esc(t.time || '')}${price}">
-        <span style="font-size:10px;font-weight:700;color:${color};letter-spacing:1px">${esc(action)}</span>
-        <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(t.symbol || '')}</span>
-        ${price ? `<span style="font-size:9px;color:var(--muted2)">${esc(price)}</span>` : ''}
+      const label  = ACTION_LABEL[action] || action;
+      const price  = t.price && parseFloat(t.price) > 0 ? ` @ $${parseFloat(t.price).toFixed(2)}` : '';
+      const time   = t.time ? `<span style="font-size:9px;color:var(--muted2);margin-left:auto">${esc(t.time)}</span>` : '';
+      const pnl    = (t.pnl !== undefined && t.pnl !== null)
+        ? `<span style="font-size:10px;font-weight:600;color:${t.pnl >= 0 ? 'var(--green)' : 'var(--red)'};margin-left:6px">${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(0)}</span>`
+        : '';
+      const reason = t.reason ? `<div style="font-size:10px;color:var(--muted2);margin-top:4px;line-height:1.4">${esc(t.reason)}</div>` : '';
+      return `<div style="padding:8px 12px;border-radius:5px;border:1px solid ${color};background:${bg}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;font-weight:700;color:${color};letter-spacing:1px;white-space:nowrap">${esc(label)}</span>
+          <span style="font-size:14px;font-weight:700;color:var(--text)">${esc(t.symbol || '')}</span>
+          ${price ? `<span style="font-size:10px;color:var(--muted2)">${esc(price)}</span>` : ''}
+          ${pnl}
+          ${time}
+        </div>
+        ${reason}
       </div>`;
     }).join('') +
   '</div>';

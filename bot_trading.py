@@ -3237,6 +3237,28 @@ def run_scan():
                 "ts": now_str,
             }
 
+        # Record executed BUY/SHORT entries in dash["trades"] for Trade Actions panel.
+        # Rationale comes from the Apex decision (plain English); executed flag from dispatch.
+        _reason_map = {
+            e.get("symbol"): e.get("rationale") or e.get("reasoning") or ""
+            for e in (_apex_decision.get("new_entries") or [])
+            if e.get("symbol")
+        }
+        for _dr_e in (_cut_report.get("new_entries") or []):
+            if not _dr_e.get("executed"):
+                continue
+            _e_sym = _dr_e.get("symbol")
+            _e_dir = (_dr_e.get("direction") or "LONG").upper()
+            dash["trades"].insert(0, {
+                "side": "BUY" if _e_dir == "LONG" else "SHORT",
+                "symbol": _e_sym,
+                "price": str(round(float(_dr_e.get("price") or 0), 2)),
+                "time": datetime.now(_ET).strftime("%H:%M:%S"),
+                "reason": _reason_map.get(_e_sym) or "",
+                "trade_type": _dr_e.get("trade_type") or "",
+                "conviction": _dr_e.get("conviction") or "",
+            })
+
     except Exception as _cut_err:
         log.error("APEX_LIVE SCAN_CYCLE failed — %s", _cut_err)
     dash["scanning"] = False
