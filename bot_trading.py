@@ -2547,6 +2547,20 @@ def run_scan():
     open_pos = get_open_positions()  # refresh after any PM exits
     dash["positions"] = open_pos
 
+    # ── PM Engine: deterministic scan-cycle evaluation (runs after Track B) ──
+    # Evaluates each held position against thesis state and scoring rules.
+    # Runs in HYPOTHETICAL mode until ENABLE_PM_ENGINE=True.
+    try:
+        import pm_engine as _pm_mod
+        from orders_state import active_trades as _pm_trades
+        _pm_mod.evaluate(
+            trigger="scan_cycle",
+            active_trades_snapshot=dict(_pm_trades),
+            candidates=list(pipeline.all_scored or []),
+        )
+    except Exception as _pm_scan_err:
+        log.debug("pm_engine scan_cycle error: %s", _pm_scan_err)
+
     # CP-4: PM exits change daily P&L but strategy_mode was frozen before PM ran.
     # Recompute pnl + strategy_mode so agents size new trades against the actual
     # post-PM portfolio state (e.g. a large exit tipping NORMAL → DEFENSIVE).

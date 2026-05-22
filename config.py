@@ -1015,24 +1015,43 @@ CONFIG = {
     #   PRU older than this is treated as stale and rescue is blocked.
     "nexus_pru_max_age_days": 2,
 
-    # ── ROTATION LIVE V1 CANARY ───────────────────────────────────────────────
+    # ── PORTFOLIO MANAGEMENT ENGINE ───────────────────────────────────────────
     # Kill switch — defaults OFF. Activate only after all tests pass and Amit approves.
-    # When OFF the module runs in HYPOTHETICAL mode: gates are evaluated and logged
+    # When OFF the engine runs in HYPOTHETICAL mode: decisions are scored and logged
     # but no execute_sell is called and no positions are touched.
-    "ENABLE_ROTATION_LIVE_V1":         False,
-    # Maximum rotation events per calendar day (UTC). Hard ceiling regardless of
-    # how many strong candidates are blocked.
-    "ROTATION_LIVE_MAX_PER_DAY":       999,  # effectively unlimited
-    # Maximum positions exited per rotation event.
-    "ROTATION_LIVE_MAX_EXITS":         1,
-    # Minimum score the blocked candidate must have to trigger evaluation.
-    "ROTATION_LIVE_MIN_BLOCKED_SCORE": 35,
-    # Minimum gap (blocked_score − book_avg) to trigger evaluation.
-    "ROTATION_LIVE_MIN_GAP_VS_BOOK":   0,   # candidate only needs to beat book avg
-    # Maximum score an exit candidate may have (weak position threshold).
-    "ROTATION_LIVE_EXIT_SCORE_MAX":    50,
-    # Maximum notional of the exit candidate expressed as a fraction of NLV.
-    "ROTATION_LIVE_MAX_NLV_PCT":       0.02,
+    "ENABLE_PM_ENGINE":             False,
+    # Maximum PM-initiated execution actions per calendar day (UTC).
+    "PM_MAX_ACTIONS_PER_DAY":       3,
+    # Maximum PROPOSED action notional as a fraction of NLV.
+    # Applies to the action size (e.g. trim amount), NOT the full position notional.
+    # A 5% NLV position can still provide a 1% NLV trim.
+    "PM_MAX_ACTION_NLV_PCT":        0.02,
+    # Minimum useful action notional in dollars (below this, not worth the friction).
+    "PM_MIN_ACTION_NOTIONAL":       500.0,
+    # Churn penalty applied to action scores for positions held < this many hours.
+    "PM_MIN_HOLD_HOURS":            4.0,
+    # Hard cooldown — execution blocked within this many hours of entry.
+    "PM_COOLDOWN_HOURS":            2.0,
+    # Maximum bid-ask spread for execution (fraction, e.g. 0.01 = 1%).
+    "PM_MAX_SPREAD_PCT":            0.01,
+    # Account values max age before rail 3 fires (seconds).
+    "PM_ACCOUNT_MAX_AGE_S":         300.0,
+    # Quote max age before rail 4 fires (seconds).
+    "PM_QUOTE_MAX_AGE_S":           30.0,
+    # Candidate score must exceed held position score by this much to trigger ROTATE.
+    "PM_MIN_ROTATE_ADVANTAGE":      10,
+    # Position > this fraction of NLV is considered oversized (TRIM candidate).
+    "PM_OVERSIZE_THRESHOLD":        0.06,
+    # Default trim fraction (sell this fraction of position on TRIM action).
+    "PM_DEFAULT_TRIM_PCT":          0.33,
+    # Target position size as fraction of NLV (used for ADD/DCA sizing).
+    "PM_TARGET_POSITION_PCT":       0.04,
+    # Estimated round-trip transaction cost (fraction, 0.001 = 0.1%).
+    "PM_TRANSACTION_COST_PCT":      0.001,
+    # Thesis classification thresholds.
+    "PM_THESIS_DECAY_DELTA":        -10,
+    "PM_THESIS_BROKEN_DELTA":       -15,
+    "PM_THESIS_BROKEN_LOSS_PCT":    -0.08,
 }
 
 

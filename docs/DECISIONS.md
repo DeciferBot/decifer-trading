@@ -6,6 +6,63 @@
 
 ---
 
+## 2026-05-22 — Migration: rotation_live_v1 → Portfolio Management Engine
+
+**Decision**: Retire the G1-G9 rotation waterfall entirely and replace it with a deterministic Portfolio Management Engine (`pm_engine.py`, `pm_thesis.py`, `pm_rails.py`).
+
+**Root cause of old system failure**: `rotation_live_v1` never fired because it framed the entire PM problem as "exit one weak position to fund one blocked buy." This is too narrow. The correct framing is: continuously evaluate each held position across multiple possible actions using thesis state, scoring, and safety rails.
+
+**Critical G7 fix**: Old G7 blocked any action on a position whose full notional exceeded 2% NLV. New Rail 7 checks the *proposed action notional* (e.g. a trim amount), not the full position. A 5% NLV position can provide a 1% trim without being blocked.
+
+**What was built**:
+- `pm_thesis.py` (~130 lines): PMPosition dataclass, ThesisStatus enum (STRENGTHENING/INTACT/PLAYED_OUT/DECAYING/BROKEN/UNKNOWN), `build_position()`, `_classify()`. Single responsibility: position enrichment.
+- `pm_rails.py` (~120 lines): 10 safety rails applied *after* action selection. DO_NOTHING bypasses all rails. Rail 7 checks proposed_notional, not market_value.
+- `pm_engine.py` (~250 lines): Public `evaluate()` entry point, ActionType enum (HOLD/ADD/DCA/TRIM/FULL_EXIT/ROTATE/DO_NOTHING), PMAction dataclass, action generation, action scoring with churn penalty and cost hurdle, execute_sell/qty_override for TRIM, decision log at `data/pm_engine/decisions.jsonl`.
+- `pm_observability.py`: Migrated from `rotation_observability.py`. Writes to `data/pm_engine/margin_blocks.jsonl` and `data/pm_engine/position_snapshots.jsonl`.
+- `tests/test_pm_engine.py`: 17 tests — all 11 spec acceptance tests + 5 safety rail unit tests + import guard test.
+- `config.py`: `ROTATION_LIVE_*` constants replaced with `PM_ENGINE_*` constants.
+- `orders_core.py`: `_rlv1_info` / `rotation_live_v1` call site replaced with `_pm_info` / `pm_engine`. Both LONG and SHORT paths migrated from `rotation_observability` to `pm_observability`.
+- `bot_trading.py`: Scan cycle call to `pm_engine.evaluate(trigger="scan_cycle", ...)` added after Track B and position refresh.
+- `bot_dashboard.py`: `/api/pm` endpoint added. `/api/rotation` tombstoned (returns `{"retired": true}`).
+- `static/dashboard.html`: "Rotation" tab renamed "Portfolio Mgmt". View, JS function, API call, table schema all updated.
+
+**What was archived** (not deleted — historical reference):
+- `rotation_live_v1.py`, `rotation_observability.py` → `archive/`
+- `tests/test_rotation_live_v1.py`, `test_rotation_paper_validation.py`, `test_rotation_shadow_report.py`, `test_rotation_observability.py` → `archive/tests/`
+- `scripts/rotation_paper_validation.py`, `scripts/rotation_shadow_report.py` → `archive/scripts/`
+
+**Call sites**: `pm_engine` is triggered from two places:
+1. `orders_core.execute_buy()` on `margin_gross_cap_block` (reactive — same deadlock-safe pattern as old _rlv1 call)
+2. `bot_trading.py` scan cycle after Track B + position refresh (proactive)
+
+**Feature flag**: `ENABLE_PM_ENGINE=False` — runs in HYPOTHETICAL mode until Amit activates it.
+
+## 2026-05-22 — PME Post-Migration Validation Audit
+
+**Trigger**: Full audit of the PME migration after retirement of rotation_live_v1.
+
+**Bugs found and fixed**:
+
+1. **`feature_flag_off` was a safety rail (wrong layer)** — Rail 1 of `pm_rails.py` blocked all actions with `safety_blocked=True, reason="feature_flag_off"` when the feature flag was off. This caused the next-best fallback loop in `evaluate()` to cascade to `DO_NOTHING` for every position in HYPOTHETICAL mode, making the decision log useless. Root cause: the feature flag is an activation gate, not a market-condition safety check.
+   - **Fix**: Removed rail 1 from `pm_rails.py` entirely. The flag check lives only in `_execute()`. Rails now check market conditions only (9 rails, down from 10). The fallback loop in `evaluate()` only runs when `ENABLE_PM_ENGINE=True`. In HYPOTHETICAL mode, the top-scoring action is logged as HYPOTHETICAL regardless of market conditions — stale quote etc. still show as SAFETY_BLOCKED correctly.
+
+2. **`_log()` final_status misclassification** — When flag was off and rail 1 fired, every decision logged as SAFETY_BLOCKED. After removing rail 1, `_log()` simplifies cleanly: SAFETY_BLOCKED = real rail fired, HYPOTHETICAL = flag off or action needs no execution (HOLD/DO_NOTHING), EXECUTED = flag on + rails passed + execution action.
+
+3. **PLAYED_OUT thesis did not generate TRIM** — Spec says `PLAYED_OUT → FULL_EXIT, TRIM`. Code only generated TRIM for DECAYING or oversized. HOLD was generated for PLAYED_OUT, which then outscored FULL_EXIT (20 vs 5-8) causing the engine to recommend HOLD on a thesis that has run its course.
+   - **Fix**: `TRIM` generation condition expanded to include `ThesisStatus.PLAYED_OUT`. `HOLD` generation explicitly excludes `PLAYED_OUT` (alongside `BROKEN`). After fix: AMZN (PLAYED_OUT, 60h, score stable) correctly generates FULL_EXIT + TRIM, and FULL_EXIT is selected.
+
+**Design decisions locked by audit**:
+
+4. **FULL_EXIT on large positions blocked by rail 6 (notional cap)** — A BROKEN thesis position at 5% NLV proposes FULL_EXIT with `proposed_notional = market_value = $45,500 > 2% NLV cap ($20k)`. Rail 6 blocks it; in live mode the fallback selects TRIM. This is intentional: even for broken positions, the 2% NLV cap applies to force gradual exits. Rationale: a sudden full exit on a large position is a large market impact. Trim down over successive cycles. This is NOT changed.
+
+5. **archive/ is namespace-importable if sys.path is manipulated** — Python 3 treats directories as namespace packages. `sys.path.insert(0, 'archive'); import rotation_live_v1` works. The production runtime never adds `archive/` to sys.path, so this is low risk. The import guard test (`test_rotation_live_v1_not_imported_by_live_runtime`) remains the primary enforcement mechanism.
+
+**Tests added**: `test_hypothetical_status_when_flag_off`, `test_do_nothing_rationale_includes_thesis_context` — bringing PM engine test count to 19.
+
+**Final rail count**: 9 (was 10 — rail 1 `feature_flag_off` removed).
+
+---
+
 ## 2026-05-21 — ML Sprint 3.7: Candidate Source Accuracy + Canary Baseline + Old 50-Trade Gate Retired
 
 **Decision**: Move `write_observations()` to `bot_trading.py` after handoff enrichment so `candidate_source` is accurate. Expose `rank_map`, `ranking_total`, `vix` on `SignalPipelineResult`. Update `SCHEMA_VERSION` to `sprint37_v1`. Add `--since-scan-id` baseline to canary mode. Explicitly retire the legacy 50-trade ML activation gate.

@@ -464,7 +464,7 @@ canvas{display:block;width:100% !important}
   <div class="tab-sep"></div>
   <div class="tab" onclick="switchTab('settings',this)">Settings</div>
   <div class="tab" onclick="switchTab('health',this)">Health</div>
-  <div class="tab" onclick="switchTab('rotation',this)">Rotation</div>
+  <div class="tab" onclick="switchTab('pm',this)">Portfolio Mgmt</div>
 </div>
 
 <!-- VIEW 1: LIVE -->
@@ -1232,23 +1232,23 @@ canvas{display:block;width:100% !important}
 </div>
 <!-- END VIEW: HEALTH ───────────────────────────────────────────────────────── -->
 
-<!-- VIEW: ROTATION ──────────────────────────────────────────────────────────── -->
-<div class="view" id="view-rotation" style="flex-direction:column;padding:16px 20px;gap:0;overflow-y:auto">
+<!-- VIEW: PORTFOLIO MANAGEMENT ──────────────────────────────────────────────── -->
+<div class="view" id="view-pm" style="flex-direction:column;padding:16px 20px;gap:0;overflow-y:auto">
 
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-    <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase">Rotation Live V1</div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase">Portfolio Management Engine</div>
     <div style="display:flex;align-items:center;gap:10px">
-      <span id="rot-ts" style="font-size:10px;color:var(--muted2)">—</span>
-      <button onclick="loadRotation()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
+      <span id="pm-ts" style="font-size:10px;color:var(--muted2)">—</span>
+      <button onclick="loadPortfolioMgmt()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
     </div>
   </div>
 
   <!-- Config pills -->
-  <div id="rot-config" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>
+  <div id="pm-config" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>
 
   <!-- Summary banner -->
-  <div id="rot-summary" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
+  <div id="pm-summary" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
     Loading…
   </div>
 
@@ -1259,22 +1259,22 @@ canvas{display:block;width:100% !important}
       <thead>
         <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:9px;letter-spacing:.5px;text-transform:uppercase">
           <th style="text-align:left;padding:4px 8px;white-space:nowrap">Time</th>
-          <th style="text-align:left;padding:4px 8px">Blocked</th>
+          <th style="text-align:left;padding:4px 8px">Symbol</th>
+          <th style="text-align:left;padding:4px 8px">Action</th>
+          <th style="text-align:right;padding:4px 8px">Proposed $</th>
           <th style="text-align:right;padding:4px 8px">Score</th>
-          <th style="text-align:left;padding:4px 8px">Failed Gate</th>
-          <th style="text-align:left;padding:4px 8px;white-space:nowrap">Reason</th>
-          <th style="text-align:left;padding:4px 8px">Exit Sym</th>
-          <th style="text-align:right;padding:4px 8px">Exit Score</th>
+          <th style="text-align:left;padding:4px 8px">Thesis</th>
+          <th style="text-align:left;padding:4px 8px;min-width:200px">Rationale</th>
           <th style="text-align:left;padding:4px 8px">Status</th>
         </tr>
       </thead>
-      <tbody id="rot-tbody"></tbody>
+      <tbody id="pm-tbody"></tbody>
     </table>
   </div>
-  <div id="rot-empty" style="display:none;color:var(--muted2);font-size:11px;padding:16px 0">No rotation decisions logged yet.</div>
+  <div id="pm-empty" style="display:none;color:var(--muted2);font-size:11px;padding:16px 0">No portfolio management decisions logged yet.</div>
 
 </div>
-<!-- END VIEW: ROTATION ─────────────────────────────────────────────────────── -->
+<!-- END VIEW: PORTFOLIO MANAGEMENT ──────────────────────────────────────────── -->
 
 <script>
 // ── State ──────────────────────────────────────────────────
@@ -2331,8 +2331,8 @@ function switchTab(id, el) {
     _stopHealthRefresh();
   }
 
-  // Rotation tab: load on open
-  if (id === 'rotation') loadRotation();
+  // Portfolio Management tab: load on open
+  if (id === 'pm') loadPortfolioMgmt();
 }
 
 // ── Health tab ─────────────────────────────────────────────
@@ -2353,43 +2353,43 @@ function _toggleHealthStage(headerEl, stageName) {
   if (open) _openHealthStages.delete(stageName); else _openHealthStages.add(stageName);
 }
 
-// ── Rotation tab ───────────────────────────────────────────
-function loadRotation() {
-  fetch('/api/rotation').then(r => r.json()).then(d => {
-    const ts = document.getElementById('rot-ts');
+// ── Portfolio Management tab ────────────────────────────────
+function loadPortfolioMgmt() {
+  fetch('/api/pm').then(r => r.json()).then(d => {
+    const ts = document.getElementById('pm-ts');
     if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString();
 
     // Config pills
     const cfg = d.config || {};
-    const cfgEl = document.getElementById('rot-config');
+    const cfgEl = document.getElementById('pm-config');
     if (cfgEl) {
       const onColor = cfg.enabled ? 'var(--green)' : 'var(--red)';
       cfgEl.innerHTML = [
-        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:${onColor}">● ${cfg.enabled ? 'LIVE' : 'DISABLED'}</span>`,
-        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Min blocked score: <span style="color:var(--text)">${cfg.min_blocked_score ?? '—'}</span></span>`,
-        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Exit score max: <span style="color:var(--text)">${cfg.exit_score_max ?? '—'}</span></span>`,
-        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Min gap: <span style="color:var(--text)">${cfg.min_gap ?? '—'}</span></span>`,
-        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Max/day: <span style="color:var(--text)">${cfg.max_per_day ?? '—'}</span></span>`,
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:${onColor}">● ${cfg.enabled ? 'LIVE' : 'HYPOTHETICAL'}</span>`,
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Max/day: <span style="color:var(--text)">${cfg.max_actions_per_day ?? '—'}</span></span>`,
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Max action NLV: <span style="color:var(--text)">${cfg.max_action_nlv_pct != null ? (cfg.max_action_nlv_pct * 100).toFixed(0) + '%' : '—'}</span></span>`,
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Min hold: <span style="color:var(--text)">${cfg.min_hold_hours != null ? cfg.min_hold_hours + 'h' : '—'}</span></span>`,
+        `<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;color:var(--muted2)">Oversize: <span style="color:var(--text)">${cfg.oversize_threshold != null ? (cfg.oversize_threshold * 100).toFixed(0) + '%' : '—'}</span></span>`,
       ].join('');
     }
 
     // Summary banner
     const decisions = d.decisions || [];
     const total = d.total || 0;
-    const exits = decisions.filter(r => r.final_status === 'EXIT_OK_AWAITING_NEXT_SCAN').length;
-    const failed = decisions.filter(r => r.final_status === 'EXIT_FAILED').length;
-    const blocked = decisions.filter(r => r.final_status === 'GATE_BLOCKED').length;
-    const sumEl = document.getElementById('rot-summary');
+    const executed = decisions.filter(r => r.final_status === 'EXECUTED').length;
+    const safetyBlocked = decisions.filter(r => r.final_status === 'SAFETY_BLOCKED').length;
+    const hypo = decisions.filter(r => r.final_status === 'HYPOTHETICAL').length;
+    const sumEl = document.getElementById('pm-summary');
     if (sumEl) {
       sumEl.innerHTML = `<span style="color:var(--text);font-weight:700">${total}</span> total decisions — ` +
-        `<span style="color:var(--green)">${exits} executed</span> · ` +
-        `<span style="color:var(--muted2)">${blocked} gate-blocked</span>` +
-        (failed ? ` · <span style="color:var(--red)">${failed} failed</span>` : '');
+        `<span style="color:var(--green)">${executed} executed</span> · ` +
+        `<span style="color:var(--orange)">${hypo} hypothetical</span>` +
+        (safetyBlocked ? ` · <span style="color:var(--muted2)">${safetyBlocked} safety-blocked</span>` : '');
     }
 
     // Table
-    const tbody = document.getElementById('rot-tbody');
-    const empty = document.getElementById('rot-empty');
+    const tbody = document.getElementById('pm-tbody');
+    const empty = document.getElementById('pm-empty');
     if (!tbody) return;
     if (!decisions.length) {
       tbody.innerHTML = '';
@@ -2398,40 +2398,41 @@ function loadRotation() {
     }
     if (empty) empty.style.display = 'none';
 
-    const _statusColor = s => {
-      if (s === 'EXIT_OK_AWAITING_NEXT_SCAN') return 'var(--green)';
-      if (s === 'EXIT_FAILED') return 'var(--red)';
+    const _pmStatusColor = s => {
+      if (s === 'EXECUTED') return 'var(--green)';
+      if (s === 'SAFETY_BLOCKED') return 'var(--red)';
       if (s === 'HYPOTHETICAL') return 'var(--orange)';
       return 'var(--muted2)';
     };
-    const _statusLabel = s => {
-      if (s === 'EXIT_OK_AWAITING_NEXT_SCAN') return 'EXIT OK';
-      if (s === 'EXIT_FAILED') return 'FAILED';
-      if (s === 'GATE_BLOCKED') return 'BLOCKED';
-      if (s === 'HYPOTHETICAL') return 'HYPOTHETICAL';
-      return s || '—';
+    const _actionColor = a => {
+      if (a === 'FULL_EXIT' || a === 'ROTATE') return 'var(--red)';
+      if (a === 'TRIM') return 'var(--orange)';
+      if (a === 'ADD' || a === 'DCA') return 'var(--green)';
+      if (a === 'HOLD') return 'var(--text)';
+      return 'var(--muted2)';
     };
+    const _thesisShort = s => (s || '').replace('THESIS_', '');
 
     tbody.innerHTML = decisions.map(r => {
       let t = '—';
       try { t = new Date(r.ts).toLocaleTimeString(); } catch(e) {}
-      const gatesPassed = (r.gates_passed || []).join(' ');
-      const failedGate = r.failed_gate ? `${r.failed_gate}` : '—';
-      const reason = (r.failed_reason || '').substring(0, 40) + ((r.failed_reason || '').length > 40 ? '…' : '');
+      const notional = r.proposed_notional != null ? '$' + r.proposed_notional.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—';
+      const rationale = (r.rationale || '').substring(0, 55) + ((r.rationale || '').length > 55 ? '…' : '');
+      const statusLabel = r.safety_blocked ? ('BLOCKED: ' + (r.safety_block_reason || '')).substring(0, 30) : (r.final_status || '—');
       return `<tr style="border-bottom:1px solid var(--border)">
         <td style="padding:5px 8px;color:var(--muted2);white-space:nowrap">${t}</td>
-        <td style="padding:5px 8px;color:var(--text);font-weight:600">${r.blocked_symbol || '—'}</td>
-        <td style="padding:5px 8px;text-align:right;color:var(--orange)">${r.blocked_score ?? '—'}</td>
-        <td style="padding:5px 8px;color:var(--muted2)">${failedGate}${gatesPassed ? ' <span style="color:var(--muted)">✓'+gatesPassed+'</span>' : ''}</td>
-        <td style="padding:5px 8px;color:var(--muted2);font-size:10px">${reason || '—'}</td>
-        <td style="padding:5px 8px;color:var(--text)">${r.exit_symbol || '—'}</td>
-        <td style="padding:5px 8px;text-align:right;color:var(--muted2)">${r.exit_score != null ? r.exit_score : '—'}</td>
-        <td style="padding:5px 8px;color:${_statusColor(r.final_status)};font-weight:600">${_statusLabel(r.final_status)}</td>
+        <td style="padding:5px 8px;color:var(--text);font-weight:600">${r.symbol || '—'}</td>
+        <td style="padding:5px 8px;color:${_actionColor(r.action_type)};font-weight:600">${r.action_type || '—'}</td>
+        <td style="padding:5px 8px;text-align:right;color:var(--muted2)">${notional}</td>
+        <td style="padding:5px 8px;text-align:right;color:var(--orange)">${r.action_score != null ? r.action_score.toFixed(1) : '—'}</td>
+        <td style="padding:5px 8px;color:var(--muted2);font-size:10px">${_thesisShort(r.thesis_status)}</td>
+        <td style="padding:5px 8px;color:var(--muted2);font-size:10px">${rationale || '—'}</td>
+        <td style="padding:5px 8px;color:${_pmStatusColor(r.final_status)};font-weight:600;font-size:10px">${statusLabel}</td>
       </tr>`;
     }).join('');
   }).catch(e => {
-    const sumEl = document.getElementById('rot-summary');
-    if (sumEl) sumEl.textContent = 'Error loading rotation data: ' + e;
+    const sumEl = document.getElementById('pm-summary');
+    if (sumEl) sumEl.textContent = 'Error loading portfolio management data: ' + e;
   });
 }
 

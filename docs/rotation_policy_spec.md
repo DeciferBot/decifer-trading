@@ -1,10 +1,15 @@
 # Rotation Policy Specification
 
-**Status:** Active shadow testing. No implementation authorised.
+> **MIGRATED 2026-05-22** — `rotation_live_v1.py` and the G1-G9 gate waterfall have been
+> retired. The Portfolio Management Engine (`pm_engine.py`, `pm_thesis.py`, `pm_rails.py`)
+> replaces this system entirely. Decision log: `data/pm_engine/decisions.jsonl`.
+> This document is preserved for historical reference only.
+
+**Status:** RETIRED — superseded by Portfolio Management Engine
 **Created:** 2026-05-12
-**Last updated:** 2026-05-13
+**Last updated:** 2026-05-22
 **Author:** Cowork (Claude)
-**Approved by:** Pending Amit review
+**Approved by:** Amit (migration approved 2026-05-22)
 
 **Shadow testing progress:** 4 sessions observed. ROTATION_SHADOW_CONFIRMED in 3 of 4.
 **Paper validation framework:** Live as of 2026-05-13 (`scripts/rotation_paper_validation.py`).

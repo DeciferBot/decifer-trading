@@ -1472,43 +1472,49 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("[dashboard][/api/intelligence] error: %s", exc)
                 payload = {"available": False, "error": str(exc), "ts": ""}
             self.wfile.write(json.dumps(payload, default=str).encode())
-        elif self.path == "/api/rotation":
+        elif self.path == "/api/pm":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
-                _rot_path = os.path.join(
+                _pm_path = os.path.join(
                     os.path.dirname(os.path.abspath(__file__)),
-                    "data", "rotation_live_v1", "decisions.jsonl",
+                    "data", "pm_engine", "decisions.jsonl",
                 )
-                _rot_records: list = []
-                if os.path.exists(_rot_path):
-                    with open(_rot_path, encoding="utf-8") as _rf:
-                        for _line in _rf:
+                _pm_records: list = []
+                if os.path.exists(_pm_path):
+                    with open(_pm_path, encoding="utf-8") as _pmf:
+                        for _line in _pmf:
                             _line = _line.strip()
                             if _line:
                                 try:
-                                    _rot_records.append(json.loads(_line))
+                                    _pm_records.append(json.loads(_line))
                                 except Exception:
                                     pass
-                # Return last 100 records, newest first
                 payload = {
-                    "decisions": list(reversed(_rot_records[-100:])),
-                    "total": len(_rot_records),
+                    "decisions": list(reversed(_pm_records[-100:])),
+                    "total": len(_pm_records),
                     "config": {
-                        "enabled": bool(CONFIG.get("ENABLE_ROTATION_LIVE_V1", False)),
-                        "min_blocked_score": int(CONFIG.get("ROTATION_LIVE_MIN_BLOCKED_SCORE", 35)),
-                        "max_per_day": int(CONFIG.get("ROTATION_LIVE_MAX_PER_DAY", 1)),
-                        "exit_score_max": int(CONFIG.get("ROTATION_LIVE_EXIT_SCORE_MAX", 35)),
-                        "min_gap": float(CONFIG.get("ROTATION_LIVE_MIN_GAP_VS_BOOK", 15)),
-                        "max_nlv_pct": float(CONFIG.get("ROTATION_LIVE_MAX_NLV_PCT", 0.02)),
+                        "enabled":             bool(CONFIG.get("ENABLE_PM_ENGINE", False)),
+                        "max_actions_per_day": int(CONFIG.get("PM_MAX_ACTIONS_PER_DAY", 3)),
+                        "max_action_nlv_pct":  float(CONFIG.get("PM_MAX_ACTION_NLV_PCT", 0.02)),
+                        "min_hold_hours":      float(CONFIG.get("PM_MIN_HOLD_HOURS", 4.0)),
+                        "cooldown_hours":      float(CONFIG.get("PM_COOLDOWN_HOURS", 2.0)),
+                        "oversize_threshold":  float(CONFIG.get("PM_OVERSIZE_THRESHOLD", 0.06)),
                     },
                 }
             except Exception as exc:
-                log.warning("[dashboard][/api/rotation] error: %s", exc)
+                log.warning("[dashboard][/api/pm] error: %s", exc)
                 payload = {"decisions": [], "total": 0, "error": str(exc)}
             self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/rotation":
+            # Retired — rotation_live_v1 migrated to Portfolio Management Engine.
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"retired": True, "use": "/api/pm"}).encode())
         else:
             self.send_response(404)
             self.end_headers()

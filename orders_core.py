@@ -325,10 +325,10 @@ def execute_buy(
     # ── Guard: per-symbol lock closes TOCTOU gap between check and submission ──
     sym_lock = _get_symbol_lock(symbol)
     with sym_lock:
-        # _rlv1_info is populated when a margin_gross_cap_block fires so that
-        # rotation_live_v1.evaluate() can be called after _trades_lock is released
+        # _pm_info is populated when a margin_gross_cap_block fires so that
+        # pm_engine.evaluate() can be called after _trades_lock is released
         # (calling execute_sell inside _trades_lock would deadlock).
-        _rlv1_info: dict | None = None
+        _pm_info: dict | None = None
 
         # ── Guard: check active_trades under lock (prop-003/014) ──────────
         with _trades_lock:
@@ -385,8 +385,8 @@ def execute_buy(
                     "max_single_pct":          CONFIG.get("max_single_position", 0.10),
                 }
                 try:
-                    import rotation_observability as _ro
-                    _ro.write_margin_block(
+                    import pm_observability as _pmo
+                    _pmo.write_margin_block(
                         symbol=symbol,
                         candidate_score=score,
                         direction="LONG",
@@ -405,17 +405,17 @@ def execute_buy(
                 if exp_code == "margin_gross_cap_block":
                     # Cannot call execute_sell here — _trades_lock is held and
                     # execute_sell also acquires _trades_lock → deadlock.
-                    # Capture state; evaluate() is called after _trades_lock releases.
-                    _rlv1_info = {
-                        "blocked_symbol":         symbol,
-                        "blocked_score":          score,
-                        "portfolio_value":        portfolio_value,
+                    # Capture state; pm_engine.evaluate() is called after _trades_lock releases.
+                    _pm_info = {
+                        "trigger":                "margin_cap_block",
+                        "candidate_symbol":       symbol,
+                        "candidate_score":        score,
                         "active_trades_snapshot": dict(active_trades),
                     }
                 else:
                     return False
 
-            if _rlv1_info is None:
+            if _pm_info is None:
                 # ── FIX #2: Sector concentration check ────────────────────
                 sec_ok, sec_reason = check_sector_concentration(
                     symbol, list(active_trades.values()), portfolio_value, regime.get("regime", "NORMAL")
@@ -430,14 +430,14 @@ def execute_buy(
                 # and exit early. Replaced with the full entry after order placement.
                 active_trades[symbol] = {"status": "RESERVED", "symbol": symbol}
 
-        # ── Rotation Live V1: evaluate() outside _trades_lock (deadlock-safe) ──
+        # ── PM Engine: evaluate() outside _trades_lock (deadlock-safe) ──────
         # execute_sell acquires _trades_lock — must only be called after it is released.
-        if _rlv1_info is not None:
+        if _pm_info is not None:
             try:
-                import rotation_live_v1 as _rlv1_mod
-                _rlv1_mod.evaluate(**_rlv1_info)
-            except Exception as _rlv1_err:
-                log.debug("rotation_live_v1 evaluate error: %s", _rlv1_err)
+                import pm_engine as _pm_mod
+                _pm_mod.evaluate(**_pm_info)
+            except Exception as _pm_err:
+                log.debug("pm_engine evaluate error: %s", _pm_err)
             return False
 
         # ── Duplicate open-order guard (prop-duplicate) ────────────────
@@ -1482,7 +1482,7 @@ def execute_short(
                     "max_single_pct":          CONFIG.get("max_single_position", 0.10),
                 }
                 try:
-                    import rotation_observability as _ro
+                    import pm_observability as _ro
                     _ro.write_margin_block(
                         symbol=symbol,
                         candidate_score=score,
