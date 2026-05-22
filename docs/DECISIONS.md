@@ -6,6 +6,43 @@
 
 ---
 
+## 2026-05-23 — Options pipeline rewrite: real volume, provider contract, expression router
+
+**Root cause of 15-day non-execution**: `alpaca_options.py` used `bid_size + ask_size` (quote size) as a traded volume proxy and multiplied by 5 to fabricate open interest. This locked the unusual-volume ratio at exactly 0.200 for every symbol (below the 0.250 threshold), guaranteeing every options entry was blocked.
+
+**FMP provider audit**: All FMP options endpoints (`/v3/option-chain/`, `/v4/options/`, `/v3/historical/options/`) returned 404 or 403 on the current API key. FMP is classified `NOT_USABLE_FOR_OPTIONS` in code. No FMP code exists in the options runtime path.
+
+**Alpaca data contract**: The Python SDK `OptionHistoricalDataClient` objects do NOT expose `dailyBar`. Using `raw_data=True` returns raw dicts where `dailyBar.v` = real traded contracts today, `dailyBar.n` = real trade count, `prevDailyBar.v` = prior day volume. Open interest is not available from Alpaca at all — it is always `None`. Never fabricated.
+
+**Provider decision tree** (locked):
+1. FMP → skip (`NOT_USABLE_FOR_OPTIONS`)
+2. Alpaca `raw_data=True` → `PARTIAL_FLOW` (real volume, no OI)
+3. None → null provider (no entry)
+
+**Unusual flow definition**:
+- `OI_RATIO` path (when OI available): `volume / OI ≥ 0.25` — NOT currently available
+- `VOLUME_EXPANSION` path (Alpaca PARTIAL_FLOW): `today_vol / max(prev_vol, 50) ≥ 1.75`
+
+**Expression router decision** (locked):
+- Common stock is the default expression
+- Options require ALL of: directional signal (CALL_BUYER or PUT_BUYER) + confirmed unusual flow + approved provider + option score beats common score by ≥ 10 points
+- If common gates pass but option gates don't: route COMMON (execute stock trade)
+- If neither: route NO_TRADE
+
+**What was removed** (fabricated data — banned):
+- `oi = volume * 5` (synthetic OI — mathematically locked ratio at 0.200)
+- `volume = bid_size + ask_size` (quote size used as traded volume)
+- All yfinance calls from options files (`_get_nearest_expiry`, `_get_earnings_days`, max pain calc)
+- `cp_ratio`, `call_oi`, `put_oi`, `max_pain` fields from scanner signal (all required fabricated data)
+
+**New modules**:
+- `options_provider.py`: single-responsibility flow data fetcher. Public API: `get_options_flow_data(symbol, min_dte, max_dte) → OptionsFlowData | None`. All fields carry explicit provenance (source labels).
+- `expression_router.py`: COMMON/OPTION/NO_TRADE routing. `route_expression(signal, flow_data, regime, portfolio_state) → ExpressionRoute`.
+
+**Test coverage**: 31 new tests (11 provider, 7 flow, 13 router). Full suite passes with pre-existing 17 failures unchanged.
+
+---
+
 ## 2026-05-22 — Migration: rotation_live_v1 → Portfolio Management Engine
 
 **Decision**: Retire the G1-G9 rotation waterfall entirely and replace it with a deterministic Portfolio Management Engine (`pm_engine.py`, `pm_thesis.py`, `pm_rails.py`).
