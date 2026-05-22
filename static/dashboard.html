@@ -5791,7 +5791,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
           const utt = new SpeechSynthesisUtterance(greeting);
           utt.rate = 0.95;
           utt.pitch = 0.85;
+          // Start listening only after greeting finishes — mic must not open while
+          // TTS is speaking or it picks up Jarvis's own voice and hangs.
+          utt.onend = () => setTimeout(startQuery, 300);
           window.speechSynthesis.speak(utt);
+        } else {
+          // No TTS — fall through to wake.onend → startQuery as before
         }
         return;
       }
@@ -5801,8 +5806,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
   wake.onend = () => {
     if (wakeTriggered) {
       wakeTriggered = false;
-      // Small pause so the mic fully resets before query starts
-      setTimeout(startQuery, 300);
+      // utt.onend handles startQuery when TTS is available; only fall back here
+      // if speechSynthesis is absent (utt.onend was never wired up).
+      if (!window.speechSynthesis) setTimeout(startQuery, 300);
     } else if (!busy) {
       // Restart background listener (Chrome stops continuous after ~60s silence)
       setTimeout(() => { try { wake.start(); } catch(e) {} }, 500);
