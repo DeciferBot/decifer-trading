@@ -21,6 +21,7 @@ log = logging.getLogger("decifer.voice")
 
 _VOICE_RATE = 180
 _VOICE_NAME = "Daniel"
+_VOICE_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "voice_log.jsonl")
 
 # Single-worker speech queue — serializes all TTS calls so alerts never overlap.
 # Max 8 items: if the queue is full, new alerts are silently dropped to avoid
@@ -193,9 +194,6 @@ def _generate_natural(event: str, fallback: str, **ctx) -> str:
         return fallback
 
 
-_VOICE_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "voice_log.jsonl")
-
-
 def speak_natural(event: str, fallback: str = "", **ctx) -> None:
     """
     Generate a friendly spoken alert via Claude Haiku, then speak it.
@@ -341,11 +339,7 @@ def _log_voice_audit(action: str, symbol: str | None, voice_text: str, result: s
 
 
 def write_voice_memo(text: str) -> None:
-    """Append a timestamped voice memo to data/voice_memos.md.
-
-    The file is auto-created on first write. Opus reads it at the start of
-    each scan cycle via agents.py (voice_block injection).
-    """
+    """Append a timestamped voice memo to data/voice_memos.md (operator log)."""
     import os
     from datetime import datetime
     from zoneinfo import ZoneInfo
