@@ -5667,18 +5667,13 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
   const qEl   = document.getElementById('voice-q');
   const aEl   = document.getElementById('voice-a');
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
     btn.title = 'Voice not supported in this browser (use Chrome)';
     btn.style.opacity = '0.35';
     btn.onclick = () => alert('Voice requires Chrome or Safari.');
     return;
   }
-
-  const rec = new SpeechRecognition();
-  rec.lang = 'en-US';
-  rec.interimResults = false;
-  rec.maxAlternatives = 1;
 
   let busy = false;
 
@@ -5690,13 +5685,25 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
     toast._timer = setTimeout(() => toast.classList.remove('show'), 12000);
   }
 
-  btn.addEventListener('click', () => {
+  function restartWake() {
+    if (!busy) setTimeout(() => { try { wake.start(); } catch(e) {} }, 600);
+  }
+
+  // -- Query recognizer (one-shot, activated by button or wake word) ----------
+  const rec = new SR();
+  rec.lang = 'en-US';
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+
+  function startQuery() {
     if (busy) return;
-    rec.start();
-  });
+    busy = true;
+    try { rec.start(); } catch(e) { busy = false; }
+  }
+
+  btn.addEventListener('click', startQuery);
 
   rec.onstart = () => {
-    busy = true;
     btn.classList.add('listening');
     btn.title = 'Listening…';
     showToast('Listening…', '');
@@ -5704,11 +5711,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
 
   rec.onresult = (e) => {
     const question = e.results[0][0].transcript;
+    // Don't send bare wake-word utterances as questions
+    if (/^(hello|hey|hi)\s+jarvis\.?$/i.test(question.trim())) return;
     btn.classList.remove('listening');
     btn.classList.add('waiting');
     btn.title = 'Thinking…';
     showToast(question, 'Thinking…');
-
     fetch('/api/ask', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -5716,17 +5724,18 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
     })
     .then(r => r.json())
     .then(d => {
-      const answer = d.answer || d.error || 'No response.';
-      showToast(question, answer);
+      showToast(question, d.answer || d.error || 'No response.');
       btn.classList.remove('waiting');
       btn.title = 'Ask Decifer a question';
       busy = false;
+      restartWake();
     })
-    .catch(err => {
+    .catch(() => {
       showToast(question, 'Request failed.');
       btn.classList.remove('waiting');
       btn.title = 'Ask Decifer a question';
       busy = false;
+      restartWake();
     });
   };
 
@@ -5735,14 +5744,61 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
     btn.title = 'Ask Decifer a question';
     if (e.error !== 'no-speech') showToast('', 'Could not hear you. Try again.');
     busy = false;
+    restartWake();
   };
 
   rec.onend = () => {
-    if (btn.classList.contains('listening')) {
-      btn.classList.remove('listening');
+    btn.classList.remove('listening');
+    // Clear busy if no fetch is still in flight (waiting class not set)
+    if (!btn.classList.contains('waiting')) {
       busy = false;
+      restartWake();
     }
   };
+
+  // -- Wake word recognizer (continuous background listener) ------------------
+  // Say "Hello Jarvis" or "Hey Jarvis" to activate hands-free listening
+  const wake = new SR();
+  wake.lang = 'en-US';
+  wake.continuous = true;
+  wake.interimResults = true;
+  wake.maxAlternatives = 1;
+
+  let wakeTriggered = false;
+
+  wake.onresult = (e) => {
+    if (busy || wakeTriggered) return;
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript.toLowerCase().trim();
+      if (/\b(hello|hey|hi)\s+jarvis\b/.test(t)) {
+        wakeTriggered = true;
+        wake.stop();
+        showToast('Hey! 👋', 'Ask me anything…');
+        return;
+      }
+    }
+  };
+
+  wake.onend = () => {
+    if (wakeTriggered) {
+      wakeTriggered = false;
+      // Small pause so the mic fully resets before query starts
+      setTimeout(startQuery, 300);
+    } else if (!busy) {
+      // Restart background listener (Chrome stops continuous after ~60s silence)
+      setTimeout(() => { try { wake.start(); } catch(e) {} }, 500);
+    }
+  };
+
+  wake.onerror = (e) => {
+    wakeTriggered = false;
+    if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      setTimeout(() => { try { wake.start(); } catch(ex) {} }, 2000);
+    }
+  };
+
+  // Start background wake word listener automatically on page load
+  try { wake.start(); } catch(e) {}
 })();
 </script>
 </body>

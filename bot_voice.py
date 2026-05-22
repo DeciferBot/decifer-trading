@@ -15,6 +15,8 @@ import subprocess
 import threading
 from datetime import datetime, timezone
 
+from config import CONFIG
+
 log = logging.getLogger("decifer.voice")
 
 _VOICE_RATE = 180
@@ -111,8 +113,7 @@ def _generate_natural(event: str, fallback: str, **ctx) -> str:
         import anthropic as _anthropic
         client = _anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
 
-        _prompts = {
-            "entry": (
+        _prompts = {            "entry": (
                 "The bot just entered a {direction} trade on {symbol}. "
                 "Agent reasoning: {reason}. "
                 "News context: {news}. "
