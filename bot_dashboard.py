@@ -954,31 +954,90 @@ class DashHandler(BaseHTTPRequestHandler):
                 }
             except Exception:
                 state["skew"] = None
-            # Last decision — for trade card on home page
+            # Last decision + decision history — derived from trade_events.jsonl ORDER_INTENT.
+            # _write_last_decision() was a dead function post-Apex 3.0; ORDER_INTENT is
+            # the authoritative write-ahead record for every executed entry.
             try:
                 import os as _os
+                from datetime import datetime as _dte, timezone as _dtz
 
-                _ld_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "data", "last_decision.json")
-                if _os.path.exists(_ld_path):
-                    with open(_ld_path) as _ldf:
-                        state["last_decision"] = json.load(_ldf)
-                else:
-                    state["last_decision"] = None
+                _te_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "data", "trade_events.jsonl")
+                _intents: list[dict] = []
+                if _os.path.exists(_te_path):
+                    with open(_te_path) as _tef:
+                        for _tel in _tef:
+                            _tel = _tel.strip()
+                            if not _tel:
+                                continue
+                            try:
+                                _tev = json.loads(_tel)
+                                if _tev.get("event") == "ORDER_INTENT":
+                                    _intents.append(_tev)
+                            except Exception:
+                                pass
+                # Map ORDER_INTENT → trade card schema (newest first)
+                def _intent_to_card(ev: dict) -> dict:
+                    _ts = ev.get("ts", "")
+                    try:
+                        _dt = _dte.fromisoformat(_ts.replace("Z", "+00:00"))
+                        _ts_fmt = _dt.astimezone().strftime("%Y-%m-%dT%H:%M:%S")
+                    except Exception:
+                        _ts_fmt = _ts
+                    return {
+                        "symbol": ev.get("symbol", ""),
+                        "direction": ev.get("direction", "LONG"),
+                        "trade_type": ev.get("trade_type", ""),
+                        "conviction": ev.get("conviction"),
+                        "score": ev.get("score"),
+                        "price": ev.get("intended_price", 0),
+                        "stop_loss": ev.get("sl", 0),
+                        "take_profit": ev.get("tp", 0),
+                        "thesis": ev.get("reasoning") or ev.get("entry_thesis") or "",
+                        "edge_why_now": ev.get("entry_thesis", ""),
+                        "risk": "",
+                        "price_targets": {},
+                        "timestamp": _ts_fmt,
+                        "signal_scores": ev.get("signal_scores", {}),
+                    }
+                _cards = [_intent_to_card(e) for e in reversed(_intents)]
+                state["last_decision"] = _cards[0] if _cards else None
+                state["decision_history"] = _cards[:50]
             except Exception:
                 state["last_decision"] = None
-            # Decision history — last 50 entries for trade card navigation
-            try:
-                _hist_path = _os.path.join(
-                    _os.path.dirname(_os.path.abspath(__file__)), "data", "decision_history.jsonl"
-                )
-                if _os.path.exists(_hist_path):
-                    with open(_hist_path) as _hf:
-                        _lines = [l.strip() for l in _hf if l.strip()]
-                        state["decision_history"] = [json.loads(l) for l in _lines[-50:]]
-                else:
-                    state["decision_history"] = []
-            except Exception:
                 state["decision_history"] = []
+            # Session trades — reconstruct today's ORDER_INTENT entries from trade_events.jsonl.
+            # Supplements dash["trades"] (in-memory, resets on bot restart) so the panel
+            # stays populated across restarts. Uses UTC date of most recent entry as the
+            # session date (avoids server timezone vs UTC timestamp mismatch).
+            try:
+                _session_trades: list[dict] = []
+                if _intents:
+                    # Most recent intent's UTC date is the session date
+                    _latest_ts = _intents[-1].get("ts", "")
+                    _session_date = _latest_ts[:10]  # "YYYY-MM-DD" in UTC
+                    for _si in reversed(_intents):  # newest first
+                        _si_ts = _si.get("ts", "")
+                        if not _si_ts.startswith(_session_date):
+                            continue
+                        try:
+                            _si_dt = _dte.fromisoformat(_si_ts.replace("Z", "+00:00"))
+                            _si_time = _si_dt.astimezone().strftime("%H:%M:%S")
+                        except Exception:
+                            _si_time = _si_ts[11:19]
+                        _si_dir = (_si.get("direction") or "LONG").upper()
+                        _session_trades.append({
+                            "side": "BUY" if _si_dir == "LONG" else "SHORT",
+                            "symbol": _si.get("symbol", ""),
+                            "price": str(round(float(_si.get("intended_price") or 0), 2)),
+                            "time": _si_time,
+                            "reason": _si.get("reasoning") or "",
+                            "trade_type": _si.get("trade_type") or "",
+                            "conviction": _si.get("conviction"),
+                        })
+                if _session_trades:
+                    state["trades"] = _session_trades
+            except Exception:
+                pass  # fall back to in-memory dash["trades"]
             # Apex conversation history — last 30 scan cycles for Apex tab browsing
             try:
                 _alog_path = _os.path.join(
