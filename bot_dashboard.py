@@ -1541,7 +1541,21 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def _is_remote_request(self) -> bool:
+        """True when the request arrived via Cloudflare Tunnel (not localhost)."""
+        return bool(
+            self.headers.get("CF-Connecting-IP")
+            or self.headers.get("X-Forwarded-For")
+        )
+
     def do_POST(self):
+        if self._is_remote_request():
+            self.send_response(403)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "write operations not available remotely"}).encode())
+            return
         ib = bot_state.ib
         if self.path == "/api/reconnect":
             import bot_state as _bs
