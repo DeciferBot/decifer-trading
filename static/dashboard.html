@@ -45,10 +45,11 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .co{color:var(--orange)}.cg{color:var(--green)}.cr{color:var(--red)}.cw{color:#fff}
 
 /* TABS */
-.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);height:34px}
-.tab{padding:0 18px;font-size:11px;cursor:pointer;color:var(--muted2);border-bottom:2px solid transparent;transition:.15s;display:flex;align-items:center;font-family:'JetBrains Mono',monospace}
-.tab:hover{color:var(--text)}
-.tab.active{color:var(--orange);border-bottom-color:var(--orange)}
+.tabs{display:flex;align-items:center;background:var(--bg);border-bottom:1px solid var(--border);height:40px;overflow-x:auto;scrollbar-width:none;padding:0 10px;gap:2px;-webkit-mask-image:linear-gradient(to right,black 90%,transparent 100%);mask-image:linear-gradient(to right,black 90%,transparent 100%)}
+.tabs::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:5px;padding:5px 13px;font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;color:var(--muted);border-radius:5px;white-space:nowrap;transition:color .12s,background .12s,border-color .12s;font-family:'JetBrains Mono',monospace;border:1px solid transparent;flex-shrink:0}
+.tab:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.tab.active{color:var(--orange);background:rgba(255,107,0,.1);border-color:rgba(255,107,0,.25)}
 
 /* DECISION BAR */
 .decision-bar{display:flex;align-items:center;gap:6px 12px;padding:5px 16px;min-height:32px;height:auto;border-bottom:1px solid var(--border);background:var(--bg2);overflow:visible;flex-shrink:0;flex-wrap:wrap}
@@ -435,20 +436,20 @@ canvas{display:block;width:100% !important}
 
 <!-- TABS -->
 <div class="tabs">
-  <div class="tab active" onclick="switchTab('live',this)">⚡ Live</div>
-  <div class="tab" onclick="switchTab('orders',this)">📝 Orders</div>
-  <div class="tab" onclick="switchTab('history',this)">📋 Closed Trades</div>
-  <div class="tab" onclick="switchTab('growth',this)">📈 Account Growth</div>
-  <div class="tab" onclick="switchTab('agents',this)">🧠 Apex</div>
-  <div class="tab" onclick="switchTab('risk',this)">🛡 Risk</div>
-  <div class="tab" onclick="switchTab('news',this)">📰 News</div>
-  <div class="tab" onclick="switchTab('catalyst',this)">⚡ Catalyst</div>
-  <div class="tab" onclick="switchTab('portfolio',this)">🏦 Portfolio</div>
-  <div class="tab" onclick="switchTab('alpha',this)">📉 Alpha Decay</div>
-  <div class="tab" onclick="switchTab('analytics',this)">📊 Analytics</div>
-  <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
-  <div class="tab" onclick="switchTab('health',this)">🏥 Health</div>
-  <div class="tab" onclick="switchTab('rotation',this)">🔄 Rotation</div>
+  <div class="tab active" onclick="switchTab('live',this)">Live</div>
+  <div class="tab" onclick="switchTab('orders',this)">Orders</div>
+  <div class="tab" onclick="switchTab('history',this)">Trades</div>
+  <div class="tab" onclick="switchTab('growth',this)">Growth</div>
+  <div class="tab" onclick="switchTab('agents',this)">Apex</div>
+  <div class="tab" onclick="switchTab('risk',this)">Risk</div>
+  <div class="tab" onclick="switchTab('news',this)">News</div>
+  <div class="tab" onclick="switchTab('catalyst',this)">Catalyst</div>
+  <div class="tab" onclick="switchTab('portfolio',this)">Portfolio</div>
+  <div class="tab" onclick="switchTab('alpha',this)">Decay</div>
+  <div class="tab" onclick="switchTab('analytics',this)">Analytics</div>
+  <div class="tab" onclick="switchTab('settings',this)">Settings</div>
+  <div class="tab" onclick="switchTab('health',this)">Health</div>
+  <div class="tab" onclick="switchTab('rotation',this)">Rotation</div>
 </div>
 
 <!-- VIEW 1: LIVE -->
