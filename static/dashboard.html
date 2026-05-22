@@ -534,9 +534,8 @@ canvas{display:block;width:100% !important}
   #an-cum-wrap{height:130px !important}
   #an-dd-wrap{height:110px !important}
 
-  /* ── HEALTH & PM TABS ── */
+  /* ── HEALTH TAB ── */
   #view-health{padding:10px 12px !important}
-  #view-pm{padding:10px 12px !important}
 
   /* ── NEWS TAB ── */
   .news-hero-bg{height:150px}
@@ -1592,7 +1591,6 @@ async function loadPortfolio() {
 
     if (!positions.length) {
       tableEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted2)">No open positions across all accounts.</div>';
-      loadOvernightNotes();
       return;
     }
 
@@ -1632,8 +1630,6 @@ async function loadPortfolio() {
     tableEl.innerHTML = `<div style="padding:20px;color:var(--red)">⚠ Could not load portfolio data: ${esc(err.message)}</div>`;
   }
 
-  // Load overnight research in parallel
-  loadOvernightNotes();
 }
 
 async function loadOvernightNotes() {
@@ -4899,6 +4895,7 @@ setInterval(async () => {
 setInterval(fetchPrices, 1000);  // live price updates between full polls
 setInterval(loadNews, 90_000);   // auto-refresh news every 90 s
 loadNews();                       // load immediately on page open
+loadOvernightNotes();             // morning brief lives on Live tab, load at startup
 setInterval(() => {               // auto-refresh Catalyst 4× per trading day (~97 min)
   const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const day = et.getDay(), mins = et.getHours() * 60 + et.getMinutes();
