@@ -372,25 +372,28 @@ def _log(
 ) -> None:
     from config import CONFIG
     flag_on = bool(CONFIG.get("ENABLE_PM_ENGINE", False))
-    # Four mutually exclusive final_status values:
+    # Six mutually exclusive final_status values:
     #   SAFETY_BLOCKED  — a market-condition rail fired (stale quote, bad spread,
     #                     excessive notional, cooldown…). Logged regardless of flag.
-    #   EXECUTED        — flag on + rails pass + broker call was made
-    #                     (TRIM, FULL_EXIT, ROTATE only).
-    #   RECOMMENDATION  — flag on + rails pass + action is advisory only, no broker
-    #                     call (ADD, DCA defer to Apex on next scan cycle).
-    #   HYPOTHETICAL    — flag off, or action type never submits an order
-    #                     (HOLD, DO_NOTHING always hypothetical regardless of flag).
+    #   EXECUTED        — flag on + rails pass + broker call made (TRIM/FULL_EXIT/ROTATE).
+    #   RECOMMENDATION  — flag on + rails pass + advisory only (ADD/DCA — Apex decides entry).
+    #   HOLDING         — flag on + engine reviewed + decided to hold the position.
+    #   MONITORING      — flag on + engine scanned + no actionable condition triggered.
+    #   HYPOTHETICAL    — flag OFF only (engine not yet activated); never shown when live.
     _EXEC_TYPES     = frozenset({ActionType.TRIM, ActionType.FULL_EXIT, ActionType.ROTATE})
     _ADVISORY_TYPES = frozenset({ActionType.ADD, ActionType.DCA})
     if action.safety_blocked:
         final_status = "SAFETY_BLOCKED"
-    elif flag_on and action.action_type in _EXEC_TYPES:
-        final_status = "EXECUTED"
-    elif flag_on and action.action_type in _ADVISORY_TYPES:
-        final_status = "RECOMMENDATION"
-    else:
+    elif not flag_on:
         final_status = "HYPOTHETICAL"
+    elif action.action_type in _EXEC_TYPES:
+        final_status = "EXECUTED"
+    elif action.action_type in _ADVISORY_TYPES:
+        final_status = "RECOMMENDATION"
+    elif action.action_type == ActionType.HOLD:
+        final_status = "HOLDING"
+    else:
+        final_status = "MONITORING"   # DO_NOTHING
 
     score_source = pos.score_source if pos else "UNKNOWN"
     data_quality = "DEGRADED_SCORE" if score_source == "ENTRY_SCORE_FALLBACK" else "OK"

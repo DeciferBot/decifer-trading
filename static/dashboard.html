@@ -2376,15 +2376,24 @@ function loadPortfolioMgmt() {
     // Summary banner
     const decisions = d.decisions || [];
     const total = d.total || 0;
-    const executed = decisions.filter(r => r.final_status === 'EXECUTED').length;
+    const executed   = decisions.filter(r => r.final_status === 'EXECUTED').length;
     const safetyBlocked = decisions.filter(r => r.final_status === 'SAFETY_BLOCKED').length;
-    const hypo = decisions.filter(r => r.final_status === 'HYPOTHETICAL').length;
+    const recommended = decisions.filter(r => r.final_status === 'RECOMMENDATION').length;
+    const holding    = decisions.filter(r => r.final_status === 'HOLDING').length;
+    const monitoring = decisions.filter(r => r.final_status === 'MONITORING').length;
+    const hypo       = decisions.filter(r => r.final_status === 'HYPOTHETICAL').length;
     const sumEl = document.getElementById('pm-summary');
     if (sumEl) {
-      sumEl.innerHTML = `<span style="color:var(--text);font-weight:700">${total}</span> total decisions — ` +
-        `<span style="color:var(--green)">${executed} executed</span> · ` +
-        `<span style="color:var(--orange)">${hypo} hypothetical</span>` +
-        (safetyBlocked ? ` · <span style="color:var(--muted2)">${safetyBlocked} safety-blocked</span>` : '');
+      const parts = [
+        `<span style="color:var(--text);font-weight:700">${total}</span> total decisions`,
+      ];
+      if (executed)     parts.push(`<span style="color:var(--green)">${executed} executed</span>`);
+      if (recommended)  parts.push(`<span style="color:var(--green)">${recommended} recommended</span>`);
+      if (safetyBlocked) parts.push(`<span style="color:var(--red)">${safetyBlocked} safety-blocked</span>`);
+      if (holding)      parts.push(`<span style="color:var(--text)">${holding} holding</span>`);
+      if (monitoring)   parts.push(`<span style="color:var(--muted2)">${monitoring} monitoring</span>`);
+      if (hypo)         parts.push(`<span style="color:var(--orange)">${hypo} hypothetical</span>`);
+      sumEl.innerHTML = parts.join(' · ');
     }
 
     // Table
@@ -2399,9 +2408,12 @@ function loadPortfolioMgmt() {
     if (empty) empty.style.display = 'none';
 
     const _pmStatusColor = s => {
-      if (s === 'EXECUTED') return 'var(--green)';
+      if (s === 'EXECUTED')       return 'var(--green)';
+      if (s === 'RECOMMENDATION') return 'var(--green)';
       if (s === 'SAFETY_BLOCKED') return 'var(--red)';
-      if (s === 'HYPOTHETICAL') return 'var(--orange)';
+      if (s === 'HOLDING')        return 'var(--text)';
+      if (s === 'MONITORING')     return 'var(--muted2)';
+      if (s === 'HYPOTHETICAL')   return 'var(--orange)';  // engine inactive
       return 'var(--muted2)';
     };
     const _actionColor = a => {
@@ -5773,7 +5785,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
       if (/\b(hello|hey|hi)\s+jarvis\b/.test(t)) {
         wakeTriggered = true;
         wake.stop();
-        showToast('Hey! 👋', 'Ask me anything…');
+        const greeting = 'Hello my master. I am Jarvis, your loyal assistant.';
+        showToast('Jarvis', greeting);
+        if (window.speechSynthesis) {
+          const utt = new SpeechSynthesisUtterance(greeting);
+          utt.rate = 0.95;
+          utt.pitch = 0.85;
+          window.speechSynthesis.speak(utt);
+        }
         return;
       }
     }
