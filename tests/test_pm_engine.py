@@ -85,6 +85,11 @@ def _mock_runtime_imports(monkeypatch):
     oc.execute_sell = MagicMock(return_value=True)
     monkeypatch.setitem(sys.modules, "orders_core", oc)
 
+    # orders_state — holds the live active_trades dict; TRIM reads qty from here
+    os_mod = types.ModuleType("orders_state")
+    os_mod.active_trades = {}
+    monkeypatch.setitem(sys.modules, "orders_state", os_mod)
+
     # config
     cfg_mod = types.ModuleType("config")
     cfg_mod.CONFIG = {
@@ -1109,3 +1114,51 @@ def test_live_engine_never_shows_hypothetical(tmp_path, monkeypatch):
             f"HOLD/DO_NOTHING with flag=True must show 'HOLDING' or 'MONITORING', "
             f"not '{r['final_status']}'"
         )
+
+
+# ── Regression: TRIM reads qty from orders_state, not bot_state ───────────────
+
+def test_trim_execution_reads_qty_from_orders_state():
+    """
+    Regression for bug where pm_engine._execute (TRIM path) imported bot_state
+    and read bot_state.active_trades — a module attribute that does not exist.
+    Every TRIM attempt raised AttributeError, leaving the action SAFETY_BLOCKED
+    with reason 'execute_sell_raised: module bot_state has no attribute active_trades'.
+
+    After fix: pm_engine reads orders_state.active_trades for qty.
+    The test deliberately leaves bot_state.active_trades EMPTY so the fix is the
+    only way to get the correct qty. If the fix regresses, qty_override will be
+    max(1, round(0 * 0.33)) = 1, and the assertion fails.
+    """
+    import pm_engine
+    from pm_engine import ActionType, PMAction
+
+    # Real position in orders_state (100 shares) — bot_state.active_trades stays empty
+    sys.modules["orders_state"].active_trades = {"TSLA": {"qty": 90, "symbol": "TSLA"}}
+    # Ensure bot_state.active_trades is empty so it cannot contribute the correct qty
+    sys.modules["bot_state"].active_trades = {}
+
+    cfg = {**sys.modules["config"].CONFIG, "PM_DEFAULT_TRIM_PCT": 0.33}
+    action = PMAction(
+        action_type=ActionType.TRIM,
+        symbol="TSLA",
+        proposed_notional=500.0,
+        action_score=30.0,
+        rationale="trim regression test",
+        trigger="scan_cycle",
+        holding_period_hours=10.0,
+    )
+
+    pm_engine._execute(action, 100_000.0, cfg)
+
+    expected_qty = max(1, round(90 * 0.33))  # 30
+    sys.modules["orders_core"].execute_sell.assert_called_once_with(
+        sys.modules["bot_state"].ib,
+        "TSLA",
+        reason="trim regression test",
+        qty_override=expected_qty,
+    )
+    assert not action.safety_blocked, (
+        f"TRIM must not be safety-blocked after fix. "
+        f"Reason: {action.safety_block_reason}"
+    )

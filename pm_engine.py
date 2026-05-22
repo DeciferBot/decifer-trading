@@ -319,8 +319,8 @@ def _execute(action: PMAction, nlv: float, cfg: dict) -> None:
 
     elif action.action_type == ActionType.TRIM:
         try:
-            import bot_state as _bs
-            pos = _bs.active_trades.get(action.symbol, {})
+            import orders_state as _os
+            pos = _os.active_trades.get(action.symbol, {})
             qty = int(pos.get("qty", 0))
             trim_qty = max(1, round(qty * float(cfg.get("PM_DEFAULT_TRIM_PCT", 0.33))))
             ok = orders_core.execute_sell(
