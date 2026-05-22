@@ -74,17 +74,34 @@ def evaluate(
     """
     Evaluate every held position and generate PM action recommendations.
     Logs one decision record per position. Executes if flag ON and rails pass.
+
+    Skips (with a single PM_SKIPPED record) when account values are not fresh —
+    prevents polluted decision records from running before IBKR has delivered
+    the real NLV.
     """
     from config import CONFIG
-    from pm_thesis import build_position, PMPosition
+    from pm_thesis import build_position
 
+    # ── NLV freshness gate ────────────────────────────────────────────────────
+    # Require that bot_state.account_values_updated_at is set (not None) AND
+    # that the NLV value is positive.  If account values have never been written
+    # (startup race, IBKR not yet connected) we must not proceed — there is no
+    # safe fallback NLV value.
     nlv = _get_nlv()
-    if nlv is None or nlv <= 0:
-        log.debug("pm_engine.evaluate: NLV unavailable — skipping")
+    if not _nlv_is_ready(nlv, CONFIG):
+        _log_skipped(trigger, "account_not_ready")
+        log.debug("pm_engine.evaluate: NLV not ready — skipped")
         return
 
-    candidate_scores = _extract_candidate_scores(candidates or [])
-    best_candidate   = _best_candidate(candidates or [], candidate_symbol, candidate_score)
+    candidates_list = candidates or []
+    candidate_scores = _extract_candidate_scores(candidates_list)
+    best_candidate   = _best_candidate(candidates_list, candidate_symbol, candidate_score)
+
+    # Persist fresh scores into the PM score cache so future evaluations
+    # with an empty candidate list can fall back to the last known score.
+    if candidate_scores:
+        import pm_score_resolver
+        pm_score_resolver.update_cache(candidate_scores)
 
     positions = []
     for sym, pos in active_trades_snapshot.items():
@@ -96,6 +113,13 @@ def evaluate(
     if not positions:
         log.debug("pm_engine.evaluate: no evaluable positions")
         return
+
+    candidate_count = len(candidates_list)
+    candidate_source_summary = (
+        f"cycle_{candidate_count}"
+        if candidate_count > 0
+        else "cycle_0_cache_used"
+    )
 
     for pos in positions:
         actions = _generate_actions(pos, best_candidate, trigger, CONFIG)
@@ -119,7 +143,11 @@ def evaluate(
                     break
 
         _execute(selected, nlv, CONFIG)
-        _log(selected, trigger, nlv, candidate_symbol, candidate_score)
+        _log(
+            selected, trigger, nlv, pos,
+            candidate_count, candidate_source_summary,
+            candidate_symbol, candidate_score,
+        )
 
 
 # ── Action generation ─────────────────────────────────────────────────────────
@@ -333,43 +361,73 @@ def _execute(action: PMAction, nlv: float, cfg: dict) -> None:
 # ── Decision log ──────────────────────────────────────────────────────────────
 
 def _log(
-    action: PMAction,
-    trigger: str,
-    nlv: float,
-    candidate_symbol: str | None,
-    candidate_score: int | None,
+    action:                  "PMAction",
+    trigger:                 str,
+    nlv:                     float,
+    pos:                     "PMPosition | None",
+    candidate_count:         int,
+    candidate_source_summary: str,
+    candidate_symbol:        str | None,
+    candidate_score:         int | None,
 ) -> None:
     from config import CONFIG
     flag_on = bool(CONFIG.get("ENABLE_PM_ENGINE", False))
-    # SAFETY_BLOCKED: a real market-condition rail fired (stale quote, bad spread,
-    #                 excessive notional, cooldown, etc.) — logged regardless of flag.
-    # EXECUTED:       flag on + rails passed + action requires order submission.
-    # HYPOTHETICAL:   flag off (engine not yet activated) or action needs no execution
-    #                 (HOLD, DO_NOTHING always hypothetical regardless of flag state).
-    final_status = (
-        "SAFETY_BLOCKED" if action.safety_blocked
-        else ("EXECUTED" if flag_on
-              and action.action_type not in (ActionType.HOLD, ActionType.DO_NOTHING)
-              else "HYPOTHETICAL")
+    # Four mutually exclusive final_status values:
+    #   SAFETY_BLOCKED  — a market-condition rail fired (stale quote, bad spread,
+    #                     excessive notional, cooldown…). Logged regardless of flag.
+    #   EXECUTED        — flag on + rails pass + broker call was made
+    #                     (TRIM, FULL_EXIT, ROTATE only).
+    #   RECOMMENDATION  — flag on + rails pass + action is advisory only, no broker
+    #                     call (ADD, DCA defer to Apex on next scan cycle).
+    #   HYPOTHETICAL    — flag off, or action type never submits an order
+    #                     (HOLD, DO_NOTHING always hypothetical regardless of flag).
+    _EXEC_TYPES     = frozenset({ActionType.TRIM, ActionType.FULL_EXIT, ActionType.ROTATE})
+    _ADVISORY_TYPES = frozenset({ActionType.ADD, ActionType.DCA})
+    if action.safety_blocked:
+        final_status = "SAFETY_BLOCKED"
+    elif flag_on and action.action_type in _EXEC_TYPES:
+        final_status = "EXECUTED"
+    elif flag_on and action.action_type in _ADVISORY_TYPES:
+        final_status = "RECOMMENDATION"
+    else:
+        final_status = "HYPOTHETICAL"
+
+    score_source = pos.score_source if pos else "UNKNOWN"
+    data_quality = "DEGRADED_SCORE" if score_source == "ENTRY_SCORE_FALLBACK" else "OK"
+    action_pct_nlv = (
+        round(action.proposed_notional / nlv, 4)
+        if action.proposed_notional and nlv
+        else None
     )
+
     record = {
-        "ts":                   datetime.datetime.now(UTC).isoformat(),
-        "trigger":              trigger,
-        "symbol":               action.symbol,
-        "action_type":          action.action_type.value,
-        "proposed_notional":    round(action.proposed_notional, 2) if action.proposed_notional else None,
-        "action_score":         round(action.action_score, 2),
-        "rationale":            action.rationale,
-        "thesis_status":        action.thesis_status,
-        "score_delta":          round(action.score_delta, 2),
-        "unrealised_pnl_pct":   round(action.unrealised_pnl_pct, 4),
-        "holding_period_hours": round(action.holding_period_hours, 2),
-        "nlv":                  round(nlv, 2) if nlv else None,
-        "safety_blocked":       action.safety_blocked,
-        "safety_block_reason":  action.safety_block_reason,
-        "candidate_symbol":     candidate_symbol,
-        "candidate_score":      candidate_score,
-        "final_status":         final_status,
+        "ts":                       datetime.datetime.now(UTC).isoformat(),
+        "trigger":                  trigger,
+        "symbol":                   action.symbol,
+        "action_type":              action.action_type.value,
+        "proposed_notional":        round(action.proposed_notional, 2) if action.proposed_notional else None,
+        "action_score":             round(action.action_score, 2),
+        "rationale":                action.rationale,
+        "thesis_status":            action.thesis_status,
+        "score_delta":              round(action.score_delta, 2),
+        "unrealised_pnl_pct":       round(action.unrealised_pnl_pct, 4),
+        "holding_period_hours":     round(action.holding_period_hours, 2),
+        "nlv":                      round(nlv, 2) if nlv else None,
+        "safety_blocked":           action.safety_blocked,
+        "safety_block_reason":      action.safety_block_reason,
+        "candidate_symbol":         candidate_symbol,
+        "candidate_score":          candidate_score,
+        "final_status":             final_status,
+        # ── enriched fields ───────────────────────────────────────────────────
+        "entry_price":              round(pos.entry_price, 4) if pos else None,
+        "current_price":            round(pos.current_price, 4) if pos else None,
+        "position_pct_nlv":         round(pos.position_pct_nlv, 4) if pos else None,
+        "action_pct_nlv":           action_pct_nlv,
+        "score_source":             score_source,
+        "data_quality":             data_quality,
+        "market_regime":            _get_regime(),
+        "candidate_count":          candidate_count,
+        "candidate_source_summary": candidate_source_summary,
     }
     try:
         _DECISIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -377,6 +435,22 @@ def _log(
             fh.write(json.dumps(record) + "\n")
     except Exception as exc:
         log.debug("pm_engine log write failed: %s", exc)
+
+
+def _log_skipped(trigger: str, reason: str) -> None:
+    """Write a single PM_SKIPPED record — no decision, no position evaluated."""
+    record = {
+        "ts":      datetime.datetime.now(UTC).isoformat(),
+        "trigger": trigger,
+        "event":   "PM_SKIPPED",
+        "reason":  reason,
+    }
+    try:
+        _DECISIONS_DIR.mkdir(parents=True, exist_ok=True)
+        with _DECISIONS_FILE.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record) + "\n")
+    except Exception as exc:
+        log.debug("pm_engine skip log write failed: %s", exc)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -388,6 +462,40 @@ def _get_nlv() -> float | None:
         return float(val) if val is not None else None
     except Exception:
         return None
+
+
+def _nlv_is_ready(nlv: float | None, cfg: dict) -> bool:
+    """
+    True iff NLV is positive AND account values have been written at least once
+    by the IBKR callback (account_values_updated_at is not None).
+
+    This guards against two failure modes:
+      1. Startup race: pm_engine fires before IBKR delivers the first account
+         value event — account_values_updated_at is None.
+      2. Stale account: pm_rails.py (rail 2) will later block individual actions,
+         but we also refuse to write any decision record at all when stale.
+    """
+    if nlv is None or nlv <= 0:
+        return False
+    try:
+        import time
+        import bot_state
+        updated_at = bot_state.account_values_updated_at
+        if updated_at is None:
+            return False
+        max_age = float(cfg.get("PM_ACCOUNT_MAX_AGE_S", 300.0))
+        return (time.time() - updated_at) <= max_age
+    except Exception:
+        return False
+
+
+def _get_regime() -> str:
+    """Best-effort read of the current market regime from bot_state.dash."""
+    try:
+        import bot_state
+        return bot_state.dash.get("regime", {}).get("regime", "UNKNOWN")
+    except Exception:
+        return "UNKNOWN"
 
 
 def _extract_candidate_scores(candidates: list[dict]) -> dict[str, float]:
@@ -438,6 +546,15 @@ def _trim_rationale(pos: "PMPosition", trim_pct: float) -> str:
 
 
 def _do_nothing(pos: "PMPosition") -> PMAction:
+    # Distinguish true no-action (full scoring data) from degraded-data no-action
+    # (score_delta is 0 because current score is unavailable, not because thesis
+    # is stable). This makes the rationale auditable without joining other data.
+    if pos.score_source == "ENTRY_SCORE_FALLBACK":
+        score_note = " [DEGRADED: score source is entry fallback — score_delta unreliable]"
+    elif pos.score_source == "PM_SCORE_CACHE":
+        score_note = " [score from PM cache, not current cycle]"
+    else:
+        score_note = ""
     return PMAction(
         action_type=ActionType.DO_NOTHING,
         symbol=pos.symbol,
@@ -447,7 +564,7 @@ def _do_nothing(pos: "PMPosition") -> PMAction:
             f"Thesis {pos.thesis_status.value}. "
             f"Score delta {pos.score_delta:+.0f}. "
             f"PnL {pos.unrealised_pnl_pct:+.1%}. "
-            "No actionable signal."
+            f"No actionable signal.{score_note}"
         ),
         trigger="",
         holding_period_hours=pos.holding_period_hours,

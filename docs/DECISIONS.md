@@ -63,6 +63,45 @@
 
 ---
 
+## 2026-05-22 — PME Score Wiring Fix + Decision Log Enrichment
+
+**Trigger**: Post-activation audit found all 103 post-restart records are `DO_NOTHING HYPOTHETICAL` with `score_delta=0`. Root cause: `build_position()` was defaulting `current_score = candidate_scores.get(symbol, entry_score)` — if `candidate_scores` is empty (no scan output available at evaluate() time), every position gets `score_delta=0` and classifies as `THESIS_INTACT`.
+
+Additionally, found that `test_hypothetical_mode_no_execute_sell` was writing AAPL/NLV=100k records to the production `data/pm_engine/decisions.jsonl` because it never redirected the log file path. This was the root cause of the "NLV=100k pollution" in the live log.
+
+**Bug 1 — Score resolver missing**: All current-score lookups went directly to the passed `candidate_scores` dict. No fallback to a persistent cache of last-known scores. When `pipeline.all_scored` is empty, every position gets `score_delta=0` even if a prior scan cycle had a valid score for that symbol.
+- **Fix**: New `pm_score_resolver.py` — 3-tier score resolution (CYCLE_CANDIDATES → PM_SCORE_CACHE → ENTRY_SCORE_FALLBACK). Cache is in-memory + persistent (`data/pm_engine/score_cache.json`). `evaluate()` calls `pm_score_resolver.update_cache()` whenever candidate_scores is non-empty. `build_position()` calls `pm_score_resolver.resolve()` instead of the dict lookup.
+
+**Bug 2 — Silent INTACT classification on stale data**: When score_source == ENTRY_SCORE_FALLBACK, `score_delta` is always 0 and thesis classification is always INTACT (since no condition fires on delta=0). This is misleading — INTACT implies the thesis is actively confirmed; ENTRY_SCORE_FALLBACK means we simply don't know.
+- **Fix**: Added `INTACT_DEGRADED = "THESIS_INTACT_DEGRADED"` to `ThesisStatus`. `build_position()` demotes INTACT → INTACT_DEGRADED when `score_source == "ENTRY_SCORE_FALLBACK"`. INTACT_DEGRADED generates HOLD (safe conservative action) but NOT DCA or ADD (conviction cannot be confirmed on degraded data).
+
+**Bug 3 — NLV startup race not guarded**: `evaluate()` skipped on `nlv is None` but not on `account_values_updated_at is None` (IBKR not yet connected). A valid-looking NLV of unknown provenance could slip through.
+- **Fix**: Added `_nlv_is_ready(nlv, cfg)` guard in `evaluate()`. Requires both `nlv > 0` AND `account_values_updated_at is not None` AND freshness within `PM_ACCOUNT_MAX_AGE_S`. If not ready, writes a single `PM_SKIPPED` record (event, not position) and returns. No position decision records are written until IBKR confirms account values.
+
+**Bug 4 — Test file pollution**: `test_hypothetical_mode_no_execute_sell` wrote to the real `data/pm_engine/decisions.jsonl` because it never monkeypatched `_DECISIONS_FILE`. This produced AAPL/NLV=100k records in the production log, misidentified as a live NLV bug.
+- **Fix**: Added `tmp_path` and `monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", ...)` to the test.
+
+**ADD/DCA = RECOMMENDATION (not EXECUTED)**: Locked design decision. ADD and DCA are advisory actions — no broker call is made. `_log()` now uses four statuses: EXECUTED (TRIM/FULL_EXIT/ROTATE), RECOMMENDATION (ADD/DCA), SAFETY_BLOCKED (rail fired), HYPOTHETICAL (flag off or HOLD/DO_NOTHING). See prior audit entry for reasoning.
+
+**Decision log enriched**: Each record now includes:
+- `score_source` — CYCLE_CANDIDATES | PM_SCORE_CACHE | ENTRY_SCORE_FALLBACK
+- `data_quality` — OK | DEGRADED_SCORE
+- `entry_price`, `current_price` — for breakeven and drift analysis
+- `position_pct_nlv` — for sizing correlation with outcome
+- `action_pct_nlv` — proposed_notional / nlv for relative action sizing
+- `market_regime` — from bot_state.dash["regime"]["regime"]
+- `candidate_count` — how many candidates were in the current cycle
+- `candidate_source_summary` — "cycle_N" or "cycle_0_cache_used"
+
+**DO_NOTHING now self-describing**: Rationale includes `[DEGRADED: score source is entry fallback — score_delta unreliable]` tag when score_source == ENTRY_SCORE_FALLBACK, and `[score from PM cache, not current cycle]` when using PM_SCORE_CACHE.
+
+**Files created**: `pm_score_resolver.py`.
+**Files modified**: `pm_thesis.py`, `pm_engine.py`, `tests/test_pm_engine.py`.
+**Tests added**: 8 new tests — bringing PM engine test count to 27.
+**Tests fixed**: `test_hypothetical_mode_no_execute_sell` — now properly isolated (no production file writes).
+
+---
+
 ## 2026-05-21 — ML Sprint 3.7: Candidate Source Accuracy + Canary Baseline + Old 50-Trade Gate Retired
 
 **Decision**: Move `write_observations()` to `bot_trading.py` after handoff enrichment so `candidate_source` is accurate. Expose `rank_map`, `ranking_total`, `vix` on `SignalPipelineResult`. Update `SCHEMA_VERSION` to `sprint37_v1`. Add `--since-scan-id` baseline to canary mode. Explicitly retire the legacy 50-trade ML activation gate.

@@ -65,6 +65,7 @@ def _mock_runtime_imports(monkeypatch):
     bs.account_values = {"NetLiquidation": "100000"}
     bs.account_values_updated_at = __import__("time").time()
     bs.active_trades = {}
+    bs.dash = {"regime": {"regime": "BULL_TRENDING"}}
     monkeypatch.setitem(sys.modules, "bot_state", bs)
 
     # alpaca_stream — fresh quote, zero spread
@@ -106,6 +107,24 @@ def _mock_runtime_imports(monkeypatch):
         "PM_THESIS_BROKEN_LOSS_PCT": -0.08,
     }
     monkeypatch.setitem(sys.modules, "config", cfg_mod)
+
+    # pm_score_resolver — deterministic stub so tests don't touch the real
+    # score cache on disk.  The stub mimics the real resolver logic but with
+    # an empty in-memory cache (no PM_SCORE_CACHE hits unless a test explicitly
+    # sets up the mock to return one).
+    psr = types.ModuleType("pm_score_resolver")
+
+    def _resolve(symbol, entry_score, candidate_scores):
+        if symbol in candidate_scores:
+            return float(candidate_scores[symbol]), "CYCLE_CANDIDATES"
+        return float(entry_score) if entry_score else 0.0, "ENTRY_SCORE_FALLBACK"
+
+    def _update_cache(scores, source="scan_cycle"):
+        pass  # no-op in tests
+
+    psr.resolve = _resolve
+    psr.update_cache = _update_cache
+    monkeypatch.setitem(sys.modules, "pm_score_resolver", psr)
 
     # Reload pm modules to pick up fresh stubs
     for mod_name in ("pm_thesis", "pm_rails", "pm_engine"):
@@ -570,9 +589,13 @@ def test_decision_logged_for_every_position(tmp_path, monkeypatch):
     assert "MSFT" in logged_symbols
 
 
-def test_hypothetical_mode_no_execute_sell(monkeypatch):
+def test_hypothetical_mode_no_execute_sell(tmp_path, monkeypatch):
     """When ENABLE_PM_ENGINE=False, execute_sell is never called."""
     import pm_engine
+
+    # Redirect decisions file so this test never writes to the production log.
+    monkeypatch.setattr(pm_engine, "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
 
     sys.modules["config"].CONFIG = {
         **sys.modules["config"].CONFIG,
@@ -667,3 +690,364 @@ def test_do_nothing_rationale_includes_thesis_context():
         f"DO_NOTHING rationale must include score delta. Got: {action.rationale}"
     assert "%" in action.rationale, \
         f"DO_NOTHING rationale must include PnL percentage. Got: {action.rationale}"
+
+
+def test_dca_add_show_recommendation_not_executed(tmp_path, monkeypatch):
+    """
+    When ENABLE_PM_ENGINE=True and DCA or ADD passes all safety rails,
+    the decision log must record final_status='RECOMMENDATION', never 'EXECUTED'.
+
+    Root cause guarded: _log() previously marked ADD/DCA as 'EXECUTED' because
+    they are not in the (HOLD, DO_NOTHING) exclusion set — but _execute() has
+    no broker call for ADD or DCA (entry is deferred to Apex on the next scan).
+    A misleading 'EXECUTED' status would make the log look like trades happened
+    when they did not.
+    """
+    import pm_engine
+
+    monkeypatch.setattr(pm_engine, "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    sys.modules["config"].CONFIG = {
+        **sys.modules["config"].CONFIG,
+        "ENABLE_PM_ENGINE": True,
+        "PM_COOLDOWN_HOURS": 0.0,
+        "PM_MAX_ACTION_NLV_PCT": 1.0,  # allow any notional so rail 6 doesn't block
+        "PM_MAX_ACTIONS_PER_DAY": 100,
+        "PM_MIN_ACTION_NOTIONAL": 0.0,
+        "PM_MIN_HOLD_HOURS": 0.0,
+    }
+    nlv = 1_000_000.0
+    sys.modules["bot_state"].account_values = {"NetLiquidation": str(nlv)}
+    sys.modules["bot_state"].account_values_updated_at = __import__("time").time()
+
+    # INTACT thesis, shallow loss ~4% → DCA generated, score=25 > HOLD score=20.
+    # Deliberately avoid the >5% deep-loss path (-15 penalty) which would drop
+    # DCA below HOLD. entry=150, current=144 → pnl=-600, pnl_pct=-4% exactly.
+    #
+    # Pass a candidates list so the resolver returns CYCLE_CANDIDATES for AAPL,
+    # which gives THESIS_INTACT (not INTACT_DEGRADED). DCA only fires when
+    # thesis is INTACT or STRENGTHENING — not on INTACT_DEGRADED (stale data).
+    snapshot = {
+        "AAPL": _pos(
+            "AAPL",
+            qty=100,
+            entry=150.0,
+            current=144.0,  # exactly 4% loss: pnl_pct = -600/15000 = -0.04
+            pnl=-600.0,
+            entry_score=40.0,
+            open_hours_ago=8.0,
+        ),
+    }
+    candidates = [{"symbol": "AAPL", "score": 40.0}]  # real score → CYCLE_CANDIDATES → INTACT
+    pm_engine.evaluate(
+        trigger="scan_cycle",
+        active_trades_snapshot=snapshot,
+        candidates=candidates,
+    )
+
+    log_file = tmp_path / "decisions.jsonl"
+    assert log_file.exists(), "Decision log was not written"
+    records = [json.loads(l) for l in log_file.read_text().strip().splitlines() if l]
+    assert records, "No decision records found"
+
+    # At least one DCA record must exist
+    dca_records = [r for r in records if r["action_type"] == "DCA"]
+    assert dca_records, (
+        f"Expected a DCA record but got action types: "
+        f"{[r['action_type'] for r in records]}"
+    )
+    for r in dca_records:
+        assert r["final_status"] == "RECOMMENDATION", (
+            f"DCA with flag ON and rails passing must be 'RECOMMENDATION', "
+            f"not '{r['final_status']}'. DCA is advisory-only — no broker call is made. "
+            f"Record: {r}"
+        )
+    # Confirm execute_sell was NOT called (DCA has no broker call)
+    sys.modules["orders_core"].execute_sell.assert_not_called()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Score wiring and data quality tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_cycle_score_used_when_available(tmp_path, monkeypatch):
+    """
+    Test 1: When the current scan cycle provides a score for a held symbol,
+    pm_engine uses that score (CYCLE_CANDIDATES), not the entry score.
+    """
+    import pm_engine
+    import pm_score_resolver as _psr
+
+    monkeypatch.setattr(pm_engine, "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    # Override the fixture stub with a real resolver that returns CYCLE_CANDIDATES
+    def _resolve(symbol, entry_score, candidate_scores):
+        if symbol in candidate_scores:
+            return float(candidate_scores[symbol]), "CYCLE_CANDIDATES"
+        return float(entry_score) if entry_score else 0.0, "ENTRY_SCORE_FALLBACK"
+
+    real_psr = types.ModuleType("pm_score_resolver")
+    real_psr.resolve = _resolve
+    real_psr.update_cache = lambda *a, **kw: None
+    monkeypatch.setitem(sys.modules, "pm_score_resolver", real_psr)
+
+    # Force pm_thesis to reload with the updated resolver stub
+    importlib.reload(sys.modules["pm_thesis"])
+    importlib.reload(sys.modules["pm_engine"])
+    monkeypatch.setattr(sys.modules["pm_engine"], "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(sys.modules["pm_engine"], "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    sys.modules["bot_state"].account_values = {"NetLiquidation": "100000"}
+    sys.modules["bot_state"].account_values_updated_at = __import__("time").time()
+
+    snapshot = {"AAPL": _pos("AAPL", entry_score=30.0, open_hours_ago=5.0)}
+    # Pass AAPL with a higher current score — cycle should use 45, not entry 30
+    candidates = [{"symbol": "AAPL", "score": 45.0}]
+
+    pm_engine.evaluate(trigger="scan_cycle", active_trades_snapshot=snapshot, candidates=candidates)
+
+    records = [json.loads(l) for l in (tmp_path / "decisions.jsonl").read_text().splitlines() if l]
+    assert records, "No decision records written"
+    r = records[0]
+    assert r["score_source"] == "CYCLE_CANDIDATES", (
+        f"Expected score_source=CYCLE_CANDIDATES but got {r['score_source']}"
+    )
+    assert r["data_quality"] == "OK", (
+        f"CYCLE_CANDIDATES score must have data_quality=OK, got {r['data_quality']}"
+    )
+
+
+def test_cache_score_used_when_cycle_empty(tmp_path, monkeypatch):
+    """
+    Test 2: When the current cycle has no score for a symbol but the PM score
+    cache has a previous entry, the engine uses PM_SCORE_CACHE.
+    """
+    import pm_engine
+
+    monkeypatch.setattr(pm_engine, "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    # Override resolver stub to simulate a cache hit for AAPL
+    def _resolve_with_cache(symbol, entry_score, candidate_scores):
+        if symbol in candidate_scores:
+            return float(candidate_scores[symbol]), "CYCLE_CANDIDATES"
+        if symbol == "AAPL":
+            return 50.0, "PM_SCORE_CACHE"   # simulated cache hit
+        return float(entry_score) if entry_score else 0.0, "ENTRY_SCORE_FALLBACK"
+
+    psr_stub = types.ModuleType("pm_score_resolver")
+    psr_stub.resolve = _resolve_with_cache
+    psr_stub.update_cache = lambda *a, **kw: None
+    monkeypatch.setitem(sys.modules, "pm_score_resolver", psr_stub)
+
+    importlib.reload(sys.modules["pm_thesis"])
+    importlib.reload(sys.modules["pm_engine"])
+    monkeypatch.setattr(sys.modules["pm_engine"], "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(sys.modules["pm_engine"], "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    sys.modules["bot_state"].account_values = {"NetLiquidation": "100000"}
+    sys.modules["bot_state"].account_values_updated_at = __import__("time").time()
+
+    snapshot = {"AAPL": _pos("AAPL", entry_score=30.0, open_hours_ago=5.0)}
+    pm_engine.evaluate(trigger="scan_cycle", active_trades_snapshot=snapshot, candidates=[])
+
+    records = [json.loads(l) for l in (tmp_path / "decisions.jsonl").read_text().splitlines() if l]
+    assert records
+    r = records[0]
+    assert r["score_source"] == "PM_SCORE_CACHE", (
+        f"Expected PM_SCORE_CACHE but got {r['score_source']}"
+    )
+    assert r["data_quality"] == "OK", (
+        "PM_SCORE_CACHE is an informed score and should have data_quality=OK"
+    )
+
+
+def test_entry_fallback_produces_degraded_score(tmp_path, monkeypatch):
+    """
+    Test 3 + 4: When all current score sources are missing, PME falls back to
+    entry_score and logs score_source=ENTRY_SCORE_FALLBACK and
+    data_quality=DEGRADED_SCORE.
+
+    Root cause guarded: missing current score must NEVER silently produce a
+    normal THESIS_INTACT record.  The thesis must be THESIS_INTACT_DEGRADED
+    so degraded-data positions are distinguishable in the decision log.
+    """
+    import pm_engine
+
+    monkeypatch.setattr(pm_engine, "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    sys.modules["bot_state"].account_values = {"NetLiquidation": "100000"}
+    sys.modules["bot_state"].account_values_updated_at = __import__("time").time()
+
+    snapshot = {"AAPL": _pos("AAPL", entry_score=40.0, open_hours_ago=5.0)}
+    # Pass zero candidates → resolver stub returns ENTRY_SCORE_FALLBACK
+    pm_engine.evaluate(trigger="scan_cycle", active_trades_snapshot=snapshot, candidates=[])
+
+    records = [json.loads(l) for l in (tmp_path / "decisions.jsonl").read_text().splitlines() if l]
+    assert records
+
+    r = records[0]
+    assert r["score_source"] == "ENTRY_SCORE_FALLBACK", (
+        f"No candidate scores → expected ENTRY_SCORE_FALLBACK, got {r['score_source']}"
+    )
+    assert r["data_quality"] == "DEGRADED_SCORE", (
+        f"ENTRY_SCORE_FALLBACK must set data_quality=DEGRADED_SCORE, got {r['data_quality']}"
+    )
+    # INTACT_DEGRADED not INTACT — degraded-data positions are distinguishable
+    assert r["thesis_status"] == "THESIS_INTACT_DEGRADED", (
+        f"Missing current score must produce THESIS_INTACT_DEGRADED, "
+        f"not {r['thesis_status']!r}. "
+        "This prevents silent THESIS_INTACT classification on stale data."
+    )
+
+
+def test_nlv_startup_race_skips_evaluation(tmp_path, monkeypatch):
+    """
+    Test 5 + 6: When account_values_updated_at is None (IBKR not yet connected,
+    startup race), PME must not write any position decision records.
+    It should write a single PM_SKIPPED event and return.
+    """
+    import pm_engine
+
+    monkeypatch.setattr(pm_engine, "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    # Simulate startup state: NLV present but timestamp not set
+    sys.modules["bot_state"].account_values = {"NetLiquidation": "100000"}
+    sys.modules["bot_state"].account_values_updated_at = None   # IBKR not connected yet
+
+    snapshot = {"AAPL": _pos("AAPL", open_hours_ago=5.0)}
+    pm_engine.evaluate(trigger="scan_cycle", active_trades_snapshot=snapshot)
+
+    log_file = tmp_path / "decisions.jsonl"
+    assert log_file.exists(), "SKIPPED event should have been written"
+
+    records = [json.loads(l) for l in log_file.read_text().strip().splitlines() if l]
+    position_records = [r for r in records if r.get("action_type")]
+    assert not position_records, (
+        f"No position decision records should be written when account_values_updated_at "
+        f"is None, but got: {position_records}"
+    )
+    skipped = [r for r in records if r.get("event") == "PM_SKIPPED"]
+    assert skipped, "Expected at least one PM_SKIPPED event record"
+    assert skipped[0]["reason"] == "account_not_ready"
+
+
+def test_stale_account_skips_evaluation(tmp_path, monkeypatch):
+    """
+    Test 6 (continued): When account values are stale (older than
+    PM_ACCOUNT_MAX_AGE_S), PME skips the entire evaluation — no position
+    records are written.
+    """
+    import pm_engine, time
+
+    monkeypatch.setattr(pm_engine, "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    sys.modules["config"].CONFIG = {
+        **sys.modules["config"].CONFIG,
+        "PM_ACCOUNT_MAX_AGE_S": 5.0,   # 5-second freshness window
+    }
+    sys.modules["bot_state"].account_values = {"NetLiquidation": "100000"}
+    sys.modules["bot_state"].account_values_updated_at = time.time() - 60  # 60s ago = stale
+
+    snapshot = {"AAPL": _pos("AAPL", open_hours_ago=5.0)}
+    pm_engine.evaluate(trigger="scan_cycle", active_trades_snapshot=snapshot)
+
+    records = [json.loads(l) for l in (tmp_path / "decisions.jsonl").read_text().strip().splitlines() if l]
+    position_records = [r for r in records if r.get("action_type")]
+    assert not position_records, (
+        f"Stale account must not produce position decision records, got: {position_records}"
+    )
+    skipped = [r for r in records if r.get("event") == "PM_SKIPPED"]
+    assert skipped, "Expected a PM_SKIPPED event for stale account"
+
+
+def test_do_nothing_rationale_includes_degraded_flag(tmp_path, monkeypatch):
+    """
+    Test 7: When DO_NOTHING is selected for a position with ENTRY_SCORE_FALLBACK,
+    the rationale must say '[DEGRADED: ...]' so the log is self-explanatory.
+    When score source is CYCLE_CANDIDATES, the DEGRADED note must NOT appear.
+    """
+    from pm_engine import _do_nothing
+    from pm_thesis import PMPosition, ThesisStatus
+
+    # Build a PMPosition that simulates the entry fallback case
+    pos_fallback = PMPosition(
+        symbol="AAPL", market_value=5000.0, position_pct_nlv=0.05,
+        unrealised_pnl_pct=0.01, holding_period_hours=8.0,
+        entry_score=40.0, current_score=40.0, score_delta=0.0,
+        thesis_status=ThesisStatus.INTACT_DEGRADED,
+        spread_pct=0.001, quote_age_s=5.0, qty=50.0,
+        entry_price=100.0, current_price=100.0,
+        score_source="ENTRY_SCORE_FALLBACK",
+    )
+    action_fallback = _do_nothing(pos_fallback)
+    assert "[DEGRADED" in action_fallback.rationale, (
+        f"DO_NOTHING rationale must flag DEGRADED score source. Got: {action_fallback.rationale}"
+    )
+
+    # Build a PMPosition with a real cycle score — no DEGRADED flag
+    pos_live = PMPosition(
+        symbol="MSFT", market_value=5000.0, position_pct_nlv=0.05,
+        unrealised_pnl_pct=0.01, holding_period_hours=8.0,
+        entry_score=40.0, current_score=43.0, score_delta=3.0,
+        thesis_status=ThesisStatus.INTACT,
+        spread_pct=0.001, quote_age_s=5.0, qty=50.0,
+        entry_price=100.0, current_price=103.0,
+        score_source="CYCLE_CANDIDATES",
+    )
+    action_live = _do_nothing(pos_live)
+    assert "[DEGRADED" not in action_live.rationale, (
+        f"DO_NOTHING rationale must NOT include DEGRADED tag for CYCLE_CANDIDATES. "
+        f"Got: {action_live.rationale}"
+    )
+
+
+def test_decision_log_contains_enriched_fields(tmp_path, monkeypatch):
+    """
+    Test 8: Decision log records must include score_source, data_quality,
+    entry_price, current_price, position_pct_nlv, action_pct_nlv, and
+    market_regime fields.
+    """
+    import pm_engine
+
+    monkeypatch.setattr(pm_engine, "_DECISIONS_DIR", tmp_path)
+    monkeypatch.setattr(pm_engine, "_DECISIONS_FILE", tmp_path / "decisions.jsonl")
+
+    sys.modules["config"].CONFIG = {
+        **sys.modules["config"].CONFIG,
+        "ENABLE_PM_ENGINE": True,
+    }
+    sys.modules["bot_state"].account_values = {"NetLiquidation": "100000"}
+    sys.modules["bot_state"].account_values_updated_at = __import__("time").time()
+    # Confirm dash is accessible for regime read
+    sys.modules["bot_state"].dash = {"regime": {"regime": "CHOPPY"}}
+
+    snapshot = {"AAPL": _pos("AAPL", qty=100, entry=100.0, current=105.0, open_hours_ago=5.0)}
+    pm_engine.evaluate(trigger="scan_cycle", active_trades_snapshot=snapshot)
+
+    log_file = tmp_path / "decisions.jsonl"
+    assert log_file.exists()
+    records = [json.loads(l) for l in log_file.read_text().strip().splitlines() if l]
+    position_records = [r for r in records if r.get("action_type")]
+    assert position_records, "Expected at least one position record"
+
+    required_fields = {
+        "score_source", "data_quality", "entry_price", "current_price",
+        "position_pct_nlv", "market_regime", "candidate_count",
+        "candidate_source_summary",
+    }
+    for r in position_records:
+        missing = required_fields - set(r.keys())
+        assert not missing, (
+            f"Decision record missing enriched fields: {missing}\nRecord: {r}"
+        )
+    # market_regime should be the value from bot_state.dash
+    assert position_records[0]["market_regime"] == "CHOPPY"
+    # score_source and data_quality must be set
+    assert position_records[0]["score_source"] in ("CYCLE_CANDIDATES", "PM_SCORE_CACHE", "ENTRY_SCORE_FALLBACK")
+    assert position_records[0]["data_quality"] in ("OK", "DEGRADED_SCORE")

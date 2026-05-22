@@ -17,12 +17,13 @@ UTC = datetime.timezone.utc
 
 
 class ThesisStatus(str, Enum):
-    STRENGTHENING = "THESIS_STRENGTHENING"
-    INTACT        = "THESIS_INTACT"
-    PLAYED_OUT    = "THESIS_PLAYED_OUT"
-    DECAYING      = "THESIS_DECAYING"
-    BROKEN        = "THESIS_BROKEN"
-    UNKNOWN       = "THESIS_UNKNOWN"
+    STRENGTHENING   = "THESIS_STRENGTHENING"
+    INTACT          = "THESIS_INTACT"
+    INTACT_DEGRADED = "THESIS_INTACT_DEGRADED"   # intact but score_delta unreliable
+    PLAYED_OUT      = "THESIS_PLAYED_OUT"
+    DECAYING        = "THESIS_DECAYING"
+    BROKEN          = "THESIS_BROKEN"
+    UNKNOWN         = "THESIS_UNKNOWN"
 
 
 @dataclass
@@ -41,6 +42,7 @@ class PMPosition:
     qty:                  float
     entry_price:          float
     current_price:        float
+    score_source:         str   = "ENTRY_SCORE_FALLBACK"
 
 
 def build_position(
@@ -66,9 +68,13 @@ def build_position(
     pnl_pct      = pnl_dollar / cost_basis if cost_basis > 0 else 0.0
     pos_pct_nlv  = market_value / nlv if nlv > 0 else 0.0
 
-    entry_score   = _f(pos.get("entry_score") or pos.get("score")) or 0.0
-    current_score = candidate_scores.get(symbol, entry_score)
-    score_delta   = current_score - entry_score
+    entry_score = _f(pos.get("entry_score") or pos.get("score")) or 0.0
+
+    import pm_score_resolver
+    current_score, score_source = pm_score_resolver.resolve(
+        symbol, entry_score, candidate_scores
+    )
+    score_delta = current_score - entry_score
 
     spread, age = _quote_info(symbol)
 
@@ -78,6 +84,13 @@ def build_position(
         pnl_pct=pnl_pct,
         holding_hours=_holding_hours(pos.get("open_time")),
     )
+
+    # When score_delta is unreliable (entry fallback), the INTACT classification
+    # is meaningless — score_delta is always 0. Demote to INTACT_DEGRADED so
+    # downstream logic and the decision log can distinguish real INTACT from
+    # "we just don't know."
+    if score_source == "ENTRY_SCORE_FALLBACK" and thesis == ThesisStatus.INTACT:
+        thesis = ThesisStatus.INTACT_DEGRADED
 
     return PMPosition(
         symbol=symbol,
@@ -94,6 +107,7 @@ def build_position(
         qty=qty,
         entry_price=entry,
         current_price=current,
+        score_source=score_source,
     )
 
 
