@@ -15,7 +15,7 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
 import bot_state
 import ibkr_reconciler
@@ -1166,22 +1166,34 @@ class DashHandler(BaseHTTPRequestHandler):
 
             qs = _parse_qs(_urlparse(self.path).query)
             img_url = _unquote((qs.get("url") or [""])[0])
+            ref_url = _unquote((qs.get("ref") or [""])[0])
             if not img_url or not img_url.startswith("http"):
                 self.send_response(400)
                 self.end_headers()
                 return
             try:
+                # Use the article page URL as Referer when available — CDNs validate that
+                # images are loaded from the article page domain, not the CDN's own domain.
+                # Fall back to the image CDN's origin for logo/direct-CDN URLs with no article.
+                _parsed_img = _urlparse(img_url)
+                if ref_url and ref_url.startswith("http"):
+                    _referer = ref_url
+                else:
+                    _referer = f"{_parsed_img.scheme}://{_parsed_img.netloc}/"
                 r = _req.get(
                     img_url,
                     timeout=5,
                     allow_redirects=True,
                     headers={
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                         "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+                        "Referer": _referer,
+                        "Accept-Language": "en-US,en;q=0.9",
                     },
                 )
                 ct = r.headers.get("content-type", "image/jpeg")
-                if r.status_code == 200 and "image" in ct:
+                # Accept image/* and octet-stream (some CDNs use generic binary CT for images)
+                if r.status_code == 200 and ("image" in ct or "octet-stream" in ct):
                     self.send_response(200)
                     self.send_header("Content-Type", ct)
                     self.send_header("Cache-Control", "public, max-age=3600")
@@ -1888,7 +1900,7 @@ def _pnl_refresh_loop():
 
 
 def start_dashboard():
-    server = HTTPServer(("127.0.0.1", CONFIG["dashboard_port"]), DashHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", CONFIG["dashboard_port"]), DashHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     threading.Thread(target=_pnl_refresh_loop, daemon=True, name="pnl-refresh").start()
     clog("INFO", f"Dashboard live → http://localhost:{CONFIG['dashboard_port']}")

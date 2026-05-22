@@ -640,21 +640,20 @@ canvas{display:block;width:100% !important}
 <!-- TABS -->
 <div class="tabs">
   <div class="tab active" onclick="switchTab('live',this)">Live</div>
-  <div class="tab" onclick="switchTab('orders',this)">Orders</div>
-  <div class="tab" onclick="switchTab('history',this)">Trades</div>
-  <div class="tab-sep"></div>
-  <div class="tab" onclick="switchTab('growth',this)">Growth</div>
   <div class="tab" onclick="switchTab('agents',this)">Apex</div>
-  <div class="tab" onclick="switchTab('risk',this)">Risk</div>
   <div class="tab" onclick="switchTab('news',this)">News</div>
   <div class="tab" onclick="switchTab('catalyst',this)">Catalyst</div>
   <div class="tab" onclick="switchTab('portfolio',this)">Portfolio</div>
+  <div class="tab-sep"></div>
+  <div class="tab" onclick="switchTab('risk',this)">Risk</div>
+  <div class="tab" onclick="switchTab('growth',this)">Growth</div>
+  <div class="tab" onclick="switchTab('orders',this)">Orders</div>
+  <div class="tab" onclick="switchTab('history',this)">Trades</div>
   <div class="tab" onclick="switchTab('alpha',this)">Decay</div>
   <div class="tab" onclick="switchTab('analytics',this)">Analytics</div>
+  <div class="tab" onclick="switchTab('health',this)">Health</div>
   <div class="tab-sep"></div>
   <div class="tab" id="tab-settings" onclick="switchTab('settings',this)">Settings</div>
-  <div class="tab" onclick="switchTab('health',this)">Health</div>
-  <div class="tab" onclick="switchTab('pm',this)">Portfolio Mgmt</div>
 </div>
 
 <!-- MOBILE NAV: hamburger bar + full-screen drawer -->
@@ -671,21 +670,20 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="tabs-drawer-grid">
     <div class="tabs-drawer-item active" id="dm-live"      onclick="mobileNav('live')">Live</div>
-    <div class="tabs-drawer-item"        id="dm-orders"    onclick="mobileNav('orders')">Orders</div>
-    <div class="tabs-drawer-item"        id="dm-history"   onclick="mobileNav('history')">Trades</div>
-    <div class="tabs-drawer-sep"></div>
-    <div class="tabs-drawer-item"        id="dm-growth"    onclick="mobileNav('growth')">Growth</div>
     <div class="tabs-drawer-item"        id="dm-agents"    onclick="mobileNav('agents')">Apex</div>
-    <div class="tabs-drawer-item"        id="dm-risk"      onclick="mobileNav('risk')">Risk</div>
     <div class="tabs-drawer-item"        id="dm-news"      onclick="mobileNav('news')">News</div>
     <div class="tabs-drawer-item"        id="dm-catalyst"  onclick="mobileNav('catalyst')">Catalyst</div>
     <div class="tabs-drawer-item"        id="dm-portfolio" onclick="mobileNav('portfolio')">Portfolio</div>
+    <div class="tabs-drawer-sep"></div>
+    <div class="tabs-drawer-item"        id="dm-risk"      onclick="mobileNav('risk')">Risk</div>
+    <div class="tabs-drawer-item"        id="dm-growth"    onclick="mobileNav('growth')">Growth</div>
+    <div class="tabs-drawer-item"        id="dm-orders"    onclick="mobileNav('orders')">Orders</div>
+    <div class="tabs-drawer-item"        id="dm-history"   onclick="mobileNav('history')">Trades</div>
     <div class="tabs-drawer-item"        id="dm-alpha"     onclick="mobileNav('alpha')">Decay</div>
     <div class="tabs-drawer-item"        id="dm-analytics" onclick="mobileNav('analytics')">Analytics</div>
+    <div class="tabs-drawer-item"        id="dm-health"    onclick="mobileNav('health')">Health</div>
     <div class="tabs-drawer-sep"></div>
     <div class="tabs-drawer-item"        id="dm-settings"  onclick="mobileNav('settings')">Settings</div>
-    <div class="tabs-drawer-item"        id="dm-health"    onclick="mobileNav('health')">Health</div>
-    <div class="tabs-drawer-item"        id="dm-pm"        onclick="mobileNav('pm')">PM</div>
   </div>
 </div>
 
@@ -783,6 +781,50 @@ canvas{display:block;width:100% !important}
       </div>
     </div>
 
+  </div>
+
+  <!-- Morning Brief (compact, below live grid) -->
+  <div style="padding:12px 16px;border-top:1px solid var(--border)">
+    <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
+      <!-- Header -->
+      <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--orange)">MORNING BRIEF</span>
+        <span id="overnight-meta" style="font-size:9px;color:var(--muted2)"></span>
+      </div>
+
+      <!-- Market tone row -->
+      <div id="on-tone-row" style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px">
+        <span style="color:var(--muted2);font-size:10px">Loading…</span>
+      </div>
+
+      <!-- Sector row -->
+      <div id="on-sector-row" style="padding:6px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px"></div>
+
+      <!-- Two-column: movers | calendar+earnings -->
+      <div id="on-movers-grid" style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
+        <div style="border-right:1px solid var(--border);padding:10px 14px">
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">PRE-MARKET MOVERS</div>
+          <div id="on-movers"></div>
+        </div>
+        <div style="padding:10px 14px">
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">UPCOMING EVENTS</div>
+          <div id="on-calendar"></div>
+        </div>
+      </div>
+
+      <!-- Yesterday performance -->
+      <div id="on-perf-section" style="padding:10px 16px;border-bottom:1px solid var(--border)">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">YESTERDAY</div>
+        <div id="on-perf"></div>
+      </div>
+
+      <!-- News + bias -->
+      <div style="padding:10px 16px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px" id="on-news-label">NEWS</div>
+        <div id="on-news"></div>
+        <div id="on-bias" style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -932,8 +974,22 @@ canvas{display:block;width:100% !important}
     </div>
   </div>
   <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
-    <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:6px">Portfolio Management</div>
-    <div style="font-size:10px;color:var(--muted2)">PM decisions have moved to the <span onclick="document.querySelector('.tab[onclick*=\'pm\']').click()" style="color:var(--orange);cursor:pointer;text-decoration:underline">Portfolio Mgmt</span> tab.</div>
+    <!-- Last Decision -->
+    <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
+      <div class="col-title" style="flex-shrink:0">
+        <span>Last Decision</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span id="trade-card-age" style="color:var(--muted2);font-size:9px"></span>
+          <button id="tc-copy-btn" onclick="copyDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0;letter-spacing:1px" title="Copy to clipboard">Copy</button>
+          <button id="tc-prev-btn" onclick="prevDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Previous decision">&#8592;</button>
+          <span id="tc-nav-pos" style="color:var(--muted2);font-size:9px"></span>
+          <button id="tc-next-btn" onclick="nextDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Next decision">&#8594;</button>
+        </span>
+      </div>
+      <div class="trade-card-body" id="trade-card-body" style="max-height:none">
+        <div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1049,65 +1105,6 @@ canvas{display:block;width:100% !important}
 <!-- VIEW 7: PORTFOLIO (multi-account aggregation) -->
 <div class="view" id="view-portfolio" style="flex-direction:column;padding:16px;gap:14px">
 
-  <!-- Morning Brief (structured overnight research) -->
-  <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
-    <!-- Header -->
-    <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--orange)">MORNING BRIEF</span>
-      <span id="overnight-meta" style="font-size:9px;color:var(--muted2)"></span>
-    </div>
-
-    <!-- Market tone row -->
-    <div id="on-tone-row" style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px">
-      <span style="color:var(--muted2);font-size:10px">Loading…</span>
-    </div>
-
-    <!-- Sector row -->
-    <div id="on-sector-row" style="padding:6px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px"></div>
-
-    <!-- Two-column: movers | calendar+earnings -->
-    <div id="on-movers-grid" style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
-      <div style="border-right:1px solid var(--border);padding:10px 14px">
-        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">PRE-MARKET MOVERS</div>
-        <div id="on-movers"></div>
-      </div>
-      <div style="padding:10px 14px">
-        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">UPCOMING EVENTS</div>
-        <div id="on-calendar"></div>
-      </div>
-    </div>
-
-    <!-- Yesterday performance -->
-    <div id="on-perf-section" style="padding:10px 16px;border-bottom:1px solid var(--border)">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">YESTERDAY</div>
-      <div id="on-perf"></div>
-    </div>
-
-    <!-- News + bias -->
-    <div style="padding:10px 16px">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px" id="on-news-label">NEWS</div>
-      <div id="on-news"></div>
-      <div id="on-bias" style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap"></div>
-    </div>
-  </div>
-
-  <!-- Last Decision (full card with navigation) -->
-  <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
-    <div class="col-title" style="flex-shrink:0">
-      <span>Last Decision</span>
-      <span style="display:flex;align-items:center;gap:6px">
-        <span id="trade-card-age" style="color:var(--muted2);font-size:9px"></span>
-        <button id="tc-copy-btn" onclick="copyDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0;letter-spacing:1px" title="Copy to clipboard">Copy</button>
-        <button id="tc-prev-btn" onclick="prevDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Previous decision">&#8592;</button>
-        <span id="tc-nav-pos" style="color:var(--muted2);font-size:9px"></span>
-        <button id="tc-next-btn" onclick="nextDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Next decision">&#8594;</button>
-      </span>
-    </div>
-    <div class="trade-card-body" id="trade-card-body" style="max-height:none">
-      <div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>
-    </div>
-  </div>
-
   <!-- Summary KPI strip -->
   <div id="pf-kpi-strip" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">
     <div class="setting-card" style="padding:10px 14px;margin:0">
@@ -1136,7 +1133,7 @@ canvas{display:block;width:100% !important}
     </div>
   </div>
 
-  <!-- Exposure bar -->
+  <!-- Exposure bars -->
   <div class="setting-card" style="margin:0;padding:12px 16px">
     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-bottom:6px">
       <span>LONG EXPOSURE</span><span id="pf-long-pct">0%</span>
@@ -1152,15 +1149,74 @@ canvas{display:block;width:100% !important}
     </div>
   </div>
 
-  <!-- Position table -->
+  <!-- Open Positions table -->
   <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
     <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);display:flex;justify-content:space-between">
-      <span>AGGREGATED POSITIONS</span>
+      <span>OPEN POSITIONS</span>
       <span id="pf-count" style="color:var(--orange)">0 positions</span>
     </div>
     <div id="pf-table">
-      <div class="empty" style="padding:20px;text-align:center;color:var(--muted2)">Click the Portfolio tab to load aggregated positions.</div>
+      <div class="empty" style="padding:20px;text-align:center;color:var(--muted2)">Click the Portfolio tab to load positions.</div>
     </div>
+  </div>
+
+  <!-- PM Engine section -->
+  <div style="margin-top:4px">
+
+    <!-- Config pills -->
+    <div id="pm-config" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>
+
+    <!-- Summary banner -->
+    <div id="pm-summary" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
+      Loading…
+    </div>
+
+    <!-- Outcome tracking panel -->
+    <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Action outcome tracking</div>
+    <div id="pm-outcomes-banner" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
+      Loading outcomes…
+    </div>
+    <div id="pm-outcomes-table-wrap" style="margin-bottom:14px;display:none;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:'JetBrains Mono',monospace">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:9px;letter-spacing:.5px;text-transform:uppercase">
+            <th style="text-align:left;padding:3px 8px;white-space:nowrap">Resolved</th>
+            <th style="text-align:left;padding:3px 8px">Symbol</th>
+            <th style="text-align:left;padding:3px 8px">Action</th>
+            <th style="text-align:left;padding:3px 8px">Window</th>
+            <th style="text-align:right;padding:3px 8px">Return</th>
+            <th style="text-align:left;padding:3px 8px">Quality</th>
+            <th style="text-align:left;padding:3px 8px">Label</th>
+            <th style="text-align:left;padding:3px 8px">Thesis</th>
+            <th style="text-align:right;padding:3px 8px">Δscore</th>
+          </tr>
+        </thead>
+        <tbody id="pm-outcomes-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Decisions table -->
+    <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Recent decisions (newest first)</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:'JetBrains Mono',monospace">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:9px;letter-spacing:.5px;text-transform:uppercase">
+            <th style="text-align:left;padding:4px 8px;white-space:nowrap">Time</th>
+            <th style="text-align:left;padding:4px 8px">Symbol</th>
+            <th style="text-align:left;padding:4px 8px">Action</th>
+            <th style="text-align:right;padding:4px 8px">Proposed $</th>
+            <th style="text-align:right;padding:4px 8px">Score</th>
+            <th style="text-align:left;padding:4px 8px">Thesis</th>
+            <th style="text-align:left;padding:4px 8px;min-width:200px">Rationale</th>
+            <th style="text-align:left;padding:4px 8px">Status</th>
+          </tr>
+        </thead>
+        <tbody id="pm-tbody"></tbody>
+      </table>
+    </div>
+    <div id="pm-empty" style="display:none;color:var(--muted2);font-size:11px;padding:16px 0">No portfolio management decisions logged yet.</div>
+    <div id="pm-ts" style="font-size:9px;color:var(--muted2);margin-top:8px"></div>
+
   </div>
 
 </div>
@@ -1449,73 +1505,6 @@ canvas{display:block;width:100% !important}
 </div>
 <!-- END VIEW: HEALTH ───────────────────────────────────────────────────────── -->
 
-<!-- VIEW: PORTFOLIO MANAGEMENT ──────────────────────────────────────────────── -->
-<div class="view" id="view-pm" style="flex-direction:column;padding:16px 20px;gap:0;overflow-y:auto">
-
-  <!-- Header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-    <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase">Portfolio Management Engine</div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <span id="pm-ts" style="font-size:10px;color:var(--muted2)">—</span>
-      <button onclick="loadPortfolioMgmt()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
-    </div>
-  </div>
-
-  <!-- Config pills -->
-  <div id="pm-config" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>
-
-  <!-- Summary banner -->
-  <div id="pm-summary" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
-    Loading…
-  </div>
-
-  <!-- Outcome tracking panel -->
-  <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Action outcome tracking</div>
-  <div id="pm-outcomes-banner" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
-    Loading outcomes…
-  </div>
-  <div id="pm-outcomes-table-wrap" style="margin-bottom:14px;display:none;overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:'JetBrains Mono',monospace">
-      <thead>
-        <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:9px;letter-spacing:.5px;text-transform:uppercase">
-          <th style="text-align:left;padding:3px 8px;white-space:nowrap">Resolved</th>
-          <th style="text-align:left;padding:3px 8px">Symbol</th>
-          <th style="text-align:left;padding:3px 8px">Action</th>
-          <th style="text-align:left;padding:3px 8px">Window</th>
-          <th style="text-align:right;padding:3px 8px">Return</th>
-          <th style="text-align:left;padding:3px 8px">Quality</th>
-          <th style="text-align:left;padding:3px 8px">Label</th>
-          <th style="text-align:left;padding:3px 8px">Thesis</th>
-          <th style="text-align:right;padding:3px 8px">Δscore</th>
-        </tr>
-      </thead>
-      <tbody id="pm-outcomes-tbody"></tbody>
-    </table>
-  </div>
-
-  <!-- Decisions table -->
-  <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Recent decisions (newest first)</div>
-  <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:'JetBrains Mono',monospace">
-      <thead>
-        <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:9px;letter-spacing:.5px;text-transform:uppercase">
-          <th style="text-align:left;padding:4px 8px;white-space:nowrap">Time</th>
-          <th style="text-align:left;padding:4px 8px">Symbol</th>
-          <th style="text-align:left;padding:4px 8px">Action</th>
-          <th style="text-align:right;padding:4px 8px">Proposed $</th>
-          <th style="text-align:right;padding:4px 8px">Score</th>
-          <th style="text-align:left;padding:4px 8px">Thesis</th>
-          <th style="text-align:left;padding:4px 8px;min-width:200px">Rationale</th>
-          <th style="text-align:left;padding:4px 8px">Status</th>
-        </tr>
-      </thead>
-      <tbody id="pm-tbody"></tbody>
-    </table>
-  </div>
-  <div id="pm-empty" style="display:none;color:var(--muted2);font-size:11px;padding:16px 0">No portfolio management decisions logged yet.</div>
-
-</div>
-<!-- END VIEW: PORTFOLIO MANAGEMENT ──────────────────────────────────────────── -->
 
 <script>
 // ── Remote mode (tunnel / non-localhost access) ────────────
@@ -2523,7 +2512,7 @@ function toggleTheme() {
   } catch(e) {}
 })();
 
-const _TAB_LABELS = {live:'Live',orders:'Orders',history:'Trades',growth:'Growth',agents:'Apex',risk:'Risk',news:'News',catalyst:'Catalyst',portfolio:'Portfolio',alpha:'Decay',analytics:'Analytics',settings:'Settings',health:'Health',pm:'PM'};
+const _TAB_LABELS = {live:'Live',orders:'Orders',history:'Trades',growth:'Growth',agents:'Apex',risk:'Risk',news:'News',catalyst:'Catalyst',portfolio:'Portfolio',alpha:'Decay',analytics:'Analytics',settings:'Settings',health:'Health'};
 
 function toggleTabsDrawer() {
   document.getElementById('tabs-drawer').classList.toggle('open');
@@ -2548,7 +2537,7 @@ function switchTab(id, el) {
   if (dm) dm.classList.add('active');
 
   // Load portfolio aggregation when switching to that tab
-  if (id === 'portfolio') loadPortfolio();
+  if (id === 'portfolio') { loadPortfolio(); loadPortfolioMgmt(); }
 
   // Load news when switching to news tab
   if (id === 'news') loadNews();
@@ -2598,8 +2587,6 @@ function switchTab(id, el) {
     _stopHealthRefresh();
   }
 
-  // Portfolio Management tab: load on open
-  if (id === 'pm') loadPortfolioMgmt();
 }
 
 // ── Health tab ─────────────────────────────────────────────
@@ -4951,8 +4938,10 @@ function _imgPh(sym, sentiment) {
 function _imgHtml(item, cls='news-card-img') {
   const ph = `<div class="news-card-img-ph" style="${_imgPh(item.symbol||'?', item.sentiment)}">${esc(item.symbol||'?')}</div>`;
   if (!item.image_url) return `<div class="${cls}">${ph}</div>`;
-  // Route through local proxy to avoid hotlink blocks and CORS issues
-  const src = '/api/img-proxy?url=' + encodeURIComponent(item.image_url);
+  // Route through local proxy to avoid hotlink blocks and CORS issues.
+  // Pass the article URL as `ref` so the proxy can send the correct Referer header —
+  // CDNs check Referer against the article page domain, not the CDN's own domain.
+  const src = '/api/img-proxy?url=' + encodeURIComponent(item.image_url) + (item.url ? '&ref=' + encodeURIComponent(item.url) : '');
   return `<div class="${cls}"><img src="${src}" alt="" loading="lazy" onerror="this.style.display='none';this.nextSibling.style.display='flex'">${ph}</div>`;
 }
 
@@ -5605,9 +5594,9 @@ function renderTradeCard(ld) {
       ${alloc ? `<span class="tc-alloc"> | ${alloc}</span>` : ''}
       <span class="${dirCls}"> | ${dir}</span>
     </div>
-    ${thesis ? `<div class="tc-row"><span class="tc-label">Thesis: </span><span class="tc-val">${thesis}</span></div>` : ''}
-    ${edge   ? `<div class="tc-row"><span class="tc-label">Edge (why now): </span><span class="tc-val">${edge}</span></div>` : ''}
-    ${risk   ? `<div class="tc-row"><span class="tc-label">Risk: </span><span class="tc-val">${risk}</span></div>` : ''}
+    ${thesis ? `<div class="tc-row"><span class="tc-label">Why we entered: </span><span class="tc-val">${thesis}</span></div>` : ''}
+    ${edge   ? `<div class="tc-row"><span class="tc-label">What triggered it: </span><span class="tc-val">${edge}</span></div>` : ''}
+    ${risk   ? `<div class="tc-row"><span class="tc-label">What could go wrong: </span><span class="tc-val">${risk}</span></div>` : ''}
     ${retHtml ? `<div class="tc-returns"><span class="tc-label" style="margin-right:4px">Expected Returns:</span>${retHtml}</div>` : ''}
     <div class="tc-footer">${agents}${agents && ts ? '  ·  ' : ''}${ts}</div>`;
 }
