@@ -62,6 +62,8 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .tab:hover{color:var(--text);background:var(--orange_dim)}
 .tab.active{color:var(--orange);background:var(--orange_dim);box-shadow:inset 0 2px 0 var(--orange)}
 .tab-sep{width:1px;height:18px;background:var(--border2);margin:0 6px;flex-shrink:0;opacity:.6}
+.tabs-mobile{display:none}
+.tabs-drawer{display:none}
 
 /* DECISION BAR */
 .decision-bar{display:flex;align-items:center;gap:6px 12px;padding:5px 16px;min-height:32px;height:auto;border-bottom:1px solid var(--border);background:var(--bg2);overflow:visible;flex-shrink:0;flex-wrap:wrap}
@@ -106,6 +108,17 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .kill-btn:hover{background:rgba(255,23,68,.25)}
 .pause-btn{margin:0 10px 8px;padding:7px;background:var(--orange_dim);border:1px solid var(--orange);border-radius:5px;color:var(--orange);font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;width:calc(100% - 20px);transition:.15s}
 .pause-btn:hover{background:rgba(255,107,0,.18)}
+
+/* Remote read-only mode (Cloudflare Tunnel) — hide all write controls */
+body.remote-mode .kill-btn,
+body.remote-mode .pause-btn,
+body.remote-mode #tws-reconnect-btn,
+body.remote-mode #voice-btn,
+body.remote-mode #voice-toast,
+body.remote-mode #tab-settings,
+body.remote-mode #dm-settings{display:none!important}
+#remote-badge{display:none;position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(0,200,83,.12);border:1px solid var(--green);border-radius:4px;padding:4px 12px;font-size:10px;color:var(--green);font-family:'JetBrains Mono',monospace;letter-spacing:1px;z-index:10000;pointer-events:none}
+body.remote-mode #remote-badge{display:block}
 
 /* Scan progress */
 .scan-wrap{padding:7px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -435,6 +448,93 @@ canvas{display:block;width:100% !important}
 
   /* Voice button */
   #voice-btn{bottom:16px;right:16px}
+
+  /* Mobile tab nav — hamburger bar + drawer */
+  .tabs{display:none}
+  .tabs-mobile{display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-bottom:1px solid var(--border);height:44px;padding:0 14px;flex-shrink:0}
+  .tabs-mobile-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);font-family:'JetBrains Mono',monospace}
+  .tabs-hamburger{display:flex;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;padding:10px 6px;border-radius:4px}
+  .tabs-hamburger span{display:block;width:22px;height:2px;background:var(--text);border-radius:1px}
+  .tabs-drawer{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:2000;display:none;flex-direction:column;backdrop-filter:blur(6px)}
+  .tabs-drawer.open{display:flex}
+  .tabs-drawer-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .tabs-drawer-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);font-family:'JetBrains Mono',monospace}
+  .tabs-drawer-close{font-size:24px;color:var(--muted2);cursor:pointer;line-height:1;padding:2px 6px}
+  .tabs-drawer-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:16px;overflow-y:auto}
+  .tabs-drawer-item{display:flex;align-items:center;justify-content:center;padding:14px 8px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted2);background:var(--bg2);border-radius:7px;border:1px solid var(--border);cursor:pointer;font-family:'JetBrains Mono',monospace;text-align:center;min-height:48px}
+  .tabs-drawer-item.active{color:var(--orange);background:var(--orange_dim);border-color:var(--orange)}
+  .tabs-drawer-sep{grid-column:1/-1;height:1px;background:var(--border);margin:4px 0}
+
+  /* ── TOUCH TARGETS — 36px minimum for all buttons ── */
+  button{min-height:36px}
+  .f-btn,.tf-btn{padding:6px 12px;font-size:11px;min-height:36px}
+  .kill-btn{padding:12px;font-size:12px}
+  .pause-btn{padding:10px}
+
+  /* ── FONT REDUCTIONS ── */
+  .metric-val{font-size:16px}
+  .cat-score{font-size:14px}
+  .cat-ticker{font-size:12px}
+  .news-hero-hl{font-size:13px}
+  .news-card-hero .news-card-hl{font-size:13px}
+
+  /* ── DECISION BAR — allow pills to wrap ── */
+  .decision-bar-actions{flex-wrap:wrap;gap:4px}
+  .decision-pill{flex-shrink:1}
+
+  /* ── LIVE VIEW — cap stacked column heights so they don't run 20+ screens ── */
+  .col-body{max-height:55vh;overflow-y:auto !important}
+  .ai-box{max-height:120px}
+
+  /* ── ORDERS TABLE — wider min-width to match 11-col header ── */
+  #view-orders .th,#view-orders .tr{min-width:764px}
+
+  /* ── IC BARS (Decay tab) — compress fixed cols ── */
+  #ic-bars{grid-template-columns:65px 1fr 38px 38px !important}
+
+  /* ── KPI STRIPS — reduce columns ── */
+  #ad-kpi-row{grid-template-columns:repeat(2,1fr) !important}
+  #pf-kpi-strip{grid-template-columns:repeat(3,1fr) !important}
+
+  /* ── PORTFOLIO TAB ── */
+  #view-portfolio{padding:10px !important;gap:10px !important}
+  #on-movers-grid{grid-template-columns:1fr !important}
+  #on-movers-grid>div:first-child{border-right:none !important;border-bottom:1px solid var(--border)}
+
+  /* ── APEX TAB — Intelligence 2-col → 1-col ── */
+  #intel-2col-grid{grid-template-columns:1fr !important}
+
+  /* ── ANALYTICS TAB ── */
+  #view-analytics{padding:10px !important}
+  .analytics-flex-row{flex-direction:column}
+  .analytics-flex-row .card{min-width:0 !important;max-width:100% !important}
+  #view-analytics .card[style*="max-width"]{max-width:100% !important}
+  #ad-segment-table{overflow-x:auto}
+  #ad-segment-table>div:first-child{min-width:480px}
+
+  /* ── CANVAS HEIGHTS — reduce for narrow screens ── */
+  #alpha-decay-wrap{height:160px !important}
+  #an-cum-wrap{height:130px !important}
+  #an-dd-wrap{height:110px !important}
+
+  /* ── HEALTH & PM TABS ── */
+  #view-health{padding:10px 12px !important}
+  #view-pm{padding:10px 12px !important}
+
+  /* ── NEWS TAB ── */
+  .news-hero-bg{height:150px}
+  .news-hdr{gap:6px;padding:6px 10px}
+
+  /* ── SETTINGS TAB ── */
+  .setting-input{max-width:140px}
+  .fav-input{max-width:140px}
+  .setting-row{flex-wrap:wrap;gap:4px}
+
+  /* ── GROWTH TAB ── */
+  .growth-view{padding:10px;gap:10px}
+
+  /* ── CATALYST TAB ── */
+  .cat-card{padding:8px 10px}
 }
 
 /* Position Detail Modal */
@@ -459,6 +559,8 @@ canvas{display:block;width:100% !important}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
+
+<div id="remote-badge">👁 READ ONLY</div>
 
 <!-- TWS DISCONNECTED BANNER -->
 <div id="tws-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#1a0a00;border-bottom:2px solid var(--orange);padding:10px 20px;display:none;align-items:center;gap:12px">
@@ -527,9 +629,41 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('alpha',this)">Decay</div>
   <div class="tab" onclick="switchTab('analytics',this)">Analytics</div>
   <div class="tab-sep"></div>
-  <div class="tab" onclick="switchTab('settings',this)">Settings</div>
+  <div class="tab" id="tab-settings" onclick="switchTab('settings',this)">Settings</div>
   <div class="tab" onclick="switchTab('health',this)">Health</div>
   <div class="tab" onclick="switchTab('pm',this)">Portfolio Mgmt</div>
+</div>
+
+<!-- MOBILE NAV: hamburger bar + full-screen drawer -->
+<div class="tabs-mobile">
+  <span class="tabs-mobile-label" id="tabs-mobile-label">Live</span>
+  <div class="tabs-hamburger" onclick="toggleTabsDrawer()">
+    <span></span><span></span><span></span>
+  </div>
+</div>
+<div class="tabs-drawer" id="tabs-drawer">
+  <div class="tabs-drawer-hdr">
+    <span class="tabs-drawer-title">Navigation</span>
+    <span class="tabs-drawer-close" onclick="toggleTabsDrawer()">&#x2715;</span>
+  </div>
+  <div class="tabs-drawer-grid">
+    <div class="tabs-drawer-item active" id="dm-live"      onclick="mobileNav('live')">Live</div>
+    <div class="tabs-drawer-item"        id="dm-orders"    onclick="mobileNav('orders')">Orders</div>
+    <div class="tabs-drawer-item"        id="dm-history"   onclick="mobileNav('history')">Trades</div>
+    <div class="tabs-drawer-sep"></div>
+    <div class="tabs-drawer-item"        id="dm-growth"    onclick="mobileNav('growth')">Growth</div>
+    <div class="tabs-drawer-item"        id="dm-agents"    onclick="mobileNav('agents')">Apex</div>
+    <div class="tabs-drawer-item"        id="dm-risk"      onclick="mobileNav('risk')">Risk</div>
+    <div class="tabs-drawer-item"        id="dm-news"      onclick="mobileNav('news')">News</div>
+    <div class="tabs-drawer-item"        id="dm-catalyst"  onclick="mobileNav('catalyst')">Catalyst</div>
+    <div class="tabs-drawer-item"        id="dm-portfolio" onclick="mobileNav('portfolio')">Portfolio</div>
+    <div class="tabs-drawer-item"        id="dm-alpha"     onclick="mobileNav('alpha')">Decay</div>
+    <div class="tabs-drawer-item"        id="dm-analytics" onclick="mobileNav('analytics')">Analytics</div>
+    <div class="tabs-drawer-sep"></div>
+    <div class="tabs-drawer-item"        id="dm-settings"  onclick="mobileNav('settings')">Settings</div>
+    <div class="tabs-drawer-item"        id="dm-health"    onclick="mobileNav('health')">Health</div>
+    <div class="tabs-drawer-item"        id="dm-pm"        onclick="mobileNav('pm')">PM</div>
+  </div>
 </div>
 
 <!-- VIEW 1: LIVE -->
@@ -721,7 +855,7 @@ canvas{display:block;width:100% !important}
         <button onclick="loadIntelligence()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:9px;padding:2px 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div id="intel-2col-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:10px">
         <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">MARKET MAP</div>
         <div id="intel-drivers">
@@ -909,7 +1043,7 @@ canvas{display:block;width:100% !important}
     <div id="on-sector-row" style="padding:6px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px"></div>
 
     <!-- Two-column: movers | calendar+earnings -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
+    <div id="on-movers-grid" style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
       <div style="border-right:1px solid var(--border);padding:10px 14px">
         <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">PRE-MARKET MOVERS</div>
         <div id="on-movers"></div>
@@ -952,7 +1086,7 @@ canvas{display:block;width:100% !important}
   </div>
 
   <!-- Summary KPI strip -->
-  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">
+  <div id="pf-kpi-strip" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">
     <div class="setting-card" style="padding:10px 14px;margin:0">
       <div class="sl">Gross Exposure</div>
       <div class="sv co" id="pf-gross">—</div>
@@ -1149,7 +1283,7 @@ canvas{display:block;width:100% !important}
       Median direction-adjusted return (%) for closed trades at T+N bars after entry — cohort analysis
       (only trades with data at every horizon; n shows cohort/total). Positive = favourable for trade direction.
     </div>
-    <div style="position:relative;height:220px"><canvas id="alpha-decay-chart"></canvas></div>
+    <div id="alpha-decay-wrap" style="position:relative;height:220px"><canvas id="alpha-decay-chart"></canvas></div>
   </div>
 
   <!-- Per-segment breakdown table -->
@@ -1201,13 +1335,13 @@ canvas{display:block;width:100% !important}
   <!-- Cumulative Returns Chart -->
   <div class="card">
     <div class="card-title">Cumulative Returns (%)</div>
-    <div style="position:relative;height:180px"><canvas id="an-cum-chart"></canvas></div>
+    <div id="an-cum-wrap" style="position:relative;height:180px"><canvas id="an-cum-chart"></canvas></div>
   </div>
 
   <!-- Drawdown Chart -->
   <div class="card">
     <div class="card-title">Drawdown (%)</div>
-    <div style="position:relative;height:150px"><canvas id="an-dd-chart"></canvas></div>
+    <div id="an-dd-wrap" style="position:relative;height:150px"><canvas id="an-dd-chart"></canvas></div>
   </div>
 
   <!-- Monthly Returns Heatmap -->
@@ -1217,7 +1351,7 @@ canvas{display:block;width:100% !important}
   </div>
 
   <!-- Direction + Regime + Instrument breakdowns -->
-  <div style="display:flex;gap:14px;flex-wrap:wrap">
+  <div class="analytics-flex-row" style="display:flex;gap:14px;flex-wrap:wrap">
 
     <!-- By Direction -->
     <div class="card" style="flex:1;min-width:240px">
@@ -1240,7 +1374,7 @@ canvas{display:block;width:100% !important}
   </div>
 
   <!-- Top Symbols -->
-  <div style="display:flex;gap:14px;flex-wrap:wrap">
+  <div class="analytics-flex-row" style="display:flex;gap:14px;flex-wrap:wrap">
     <div class="card" style="flex:1;min-width:240px">
       <div class="card-title">Top Winners (by symbol)</div>
       <div id="an-winners" style="font-size:11px"></div>
@@ -2358,11 +2492,29 @@ function toggleTheme() {
   } catch(e) {}
 })();
 
+const _TAB_LABELS = {live:'Live',orders:'Orders',history:'Trades',growth:'Growth',agents:'Apex',risk:'Risk',news:'News',catalyst:'Catalyst',portfolio:'Portfolio',alpha:'Decay',analytics:'Analytics',settings:'Settings',health:'Health',pm:'PM'};
+
+function toggleTabsDrawer() {
+  document.getElementById('tabs-drawer').classList.toggle('open');
+}
+
+function mobileNav(id) {
+  document.getElementById('tabs-drawer').classList.remove('open');
+  const tabEl = document.querySelector(`.tab[onclick*="'${id}'"]`);
+  if (tabEl) tabEl.click();
+}
+
 function switchTab(id, el) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('view-' + id).classList.add('active');
   el.classList.add('active');
+  // Sync mobile nav
+  const ml = document.getElementById('tabs-mobile-label');
+  if (ml) ml.textContent = _TAB_LABELS[id] || id;
+  document.querySelectorAll('.tabs-drawer-item').forEach(t => t.classList.remove('active'));
+  const dm = document.getElementById('dm-' + id);
+  if (dm) dm.classList.add('active');
 
   // Load portfolio aggregation when switching to that tab
   if (id === 'portfolio') loadPortfolio();

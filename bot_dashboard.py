@@ -845,6 +845,8 @@ class DashHandler(BaseHTTPRequestHandler):
                 html = html.replace("__DECIFER_VERSION__", _mod.__version__)
             except Exception:
                 html = html.replace("__DECIFER_VERSION__", "?")
+            if self._is_remote_request():
+                html = html.replace("<body>", '<body class="remote-mode">', 1)
             self.wfile.write(html.encode())
         elif self.path == "/api/state":
             self.send_response(200)
