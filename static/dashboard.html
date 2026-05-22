@@ -1247,6 +1247,30 @@ canvas{display:block;width:100% !important}
     Loading…
   </div>
 
+  <!-- Outcome tracking panel -->
+  <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Action outcome tracking</div>
+  <div id="pm-outcomes-banner" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
+    Loading outcomes…
+  </div>
+  <div id="pm-outcomes-table-wrap" style="margin-bottom:14px;display:none;overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:'JetBrains Mono',monospace">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:9px;letter-spacing:.5px;text-transform:uppercase">
+          <th style="text-align:left;padding:3px 8px;white-space:nowrap">Resolved</th>
+          <th style="text-align:left;padding:3px 8px">Symbol</th>
+          <th style="text-align:left;padding:3px 8px">Action</th>
+          <th style="text-align:left;padding:3px 8px">Window</th>
+          <th style="text-align:right;padding:3px 8px">Return</th>
+          <th style="text-align:left;padding:3px 8px">Quality</th>
+          <th style="text-align:left;padding:3px 8px">Label</th>
+          <th style="text-align:left;padding:3px 8px">Thesis</th>
+          <th style="text-align:right;padding:3px 8px">Δscore</th>
+        </tr>
+      </thead>
+      <tbody id="pm-outcomes-tbody"></tbody>
+    </table>
+  </div>
+
   <!-- Decisions table -->
   <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Recent decisions (newest first)</div>
   <div style="overflow-x:auto">
@@ -2440,6 +2464,85 @@ function loadPortfolioMgmt() {
   }).catch(e => {
     const sumEl = document.getElementById('pm-summary');
     if (sumEl) sumEl.textContent = 'Error loading portfolio management data: ' + e;
+  });
+  // Load outcome tracking in parallel
+  loadPMOutcomes();
+}
+
+function loadPMOutcomes() {
+  fetch('/api/pm_outcomes').then(r => r.json()).then(d => {
+    const banner = document.getElementById('pm-outcomes-banner');
+    const tableWrap = document.getElementById('pm-outcomes-table-wrap');
+    const tbody = document.getElementById('pm-outcomes-tbody');
+    if (!banner) return;
+
+    const total = d.total || 0;
+    const qc = d.quality_counts || {};
+    const good = qc['GOOD'] || 0;
+    const bad  = qc['BAD']  || 0;
+    const neut = qc['NEUTRAL'] || 0;
+
+    if (total === 0) {
+      banner.innerHTML = '<span style="color:var(--muted2)">No resolved outcomes yet — windows resolve as time elapses.</span>';
+      if (tableWrap) tableWrap.style.display = 'none';
+      return;
+    }
+
+    // Summary line
+    const byAction = d.by_action || {};
+    const actionParts = Object.entries(byAction).map(([at, counts]) => {
+      const g = counts['GOOD'] || 0;
+      const b = counts['BAD'] || 0;
+      const n = counts['NEUTRAL'] || 0;
+      const tot = g + b + n;
+      const pct = tot > 0 ? Math.round(g / tot * 100) : 0;
+      const col = pct >= 60 ? 'var(--green)' : pct <= 35 ? 'var(--red)' : 'var(--orange)';
+      return `<span style="color:var(--muted2)">${at}:</span> <span style="color:${col}">${pct}% good</span> (${tot})`;
+    });
+    banner.innerHTML = [
+      `<span style="color:var(--text);font-weight:700">${total}</span> resolved`,
+      `<span style="color:var(--green)">${good} good</span>`,
+      `<span style="color:var(--red)">${bad} bad</span>`,
+      `<span style="color:var(--muted2)">${neut} neutral</span>`,
+      actionParts.length ? ' · ' + actionParts.join(' · ') : '',
+    ].join(' · ');
+
+    // Recent outcomes table
+    const recent = d.recent || [];
+    if (!tbody || !recent.length) return;
+    if (tableWrap) tableWrap.style.display = 'block';
+
+    const _qColor = q => q === 'GOOD' ? 'var(--green)' : q === 'BAD' ? 'var(--red)' : 'var(--muted2)';
+    const _retColor = r => r > 0.005 ? 'var(--green)' : r < -0.005 ? 'var(--red)' : 'var(--muted2)';
+    const _thShort = s => (s || '').replace('THESIS_', '');
+    const _actionColor = a => {
+      if (a === 'FULL_EXIT' || a === 'ROTATE') return 'var(--red)';
+      if (a === 'TRIM') return 'var(--orange)';
+      if (a === 'ADD' || a === 'DCA') return 'var(--green)';
+      return 'var(--muted2)';
+    };
+
+    tbody.innerHTML = recent.map(r => {
+      let ts = '—';
+      try { ts = new Date(r.ts_resolved).toLocaleTimeString(); } catch(e) {}
+      const ret = r.symbol_return_pct != null
+        ? (r.symbol_return_pct >= 0 ? '+' : '') + (r.symbol_return_pct * 100).toFixed(2) + '%'
+        : '—';
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:3px 8px;color:var(--muted2);white-space:nowrap">${ts}</td>
+        <td style="padding:3px 8px;color:var(--text);font-weight:600">${r.symbol || '—'}</td>
+        <td style="padding:3px 8px;color:${_actionColor(r.action_type)}">${r.action_type || '—'}</td>
+        <td style="padding:3px 8px;color:var(--muted2)">${r.window || '—'}</td>
+        <td style="padding:3px 8px;text-align:right;color:${_retColor(r.symbol_return_pct)}">${ret}</td>
+        <td style="padding:3px 8px;color:${_qColor(r.outcome_quality)};font-weight:700">${r.outcome_quality || '—'}</td>
+        <td style="padding:3px 8px;color:var(--muted2);font-size:9px">${r.outcome_label || '—'}</td>
+        <td style="padding:3px 8px;color:var(--muted2);font-size:9px">${_thShort(r.thesis_status)}</td>
+        <td style="padding:3px 8px;text-align:right;color:var(--orange)">${r.score_delta != null ? (r.score_delta >= 0 ? '+' : '') + r.score_delta : '—'}</td>
+      </tr>`;
+    }).join('');
+  }).catch(() => {
+    const banner = document.getElementById('pm-outcomes-banner');
+    if (banner) banner.textContent = 'Outcomes unavailable.';
   });
 }
 
@@ -5671,6 +5774,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
   function startQuery() {
     if (busy) return;
     busy = true;
+    try { wake.stop(); } catch(e) {}   // explicit stop before rec.start()
     try { rec.start(); } catch(e) { busy = false; }
   }
 
@@ -5699,18 +5803,11 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
       showToast(question, answer);
       btn.classList.remove('waiting');
       btn.title = 'Ask Decifer a question';
-      if (window.speechSynthesis) {
-        const utt = new SpeechSynthesisUtterance(answer);
-        utt.rate = 0.92;
-        utt.pitch = 0.85;
-        utt.onend = () => { busy = false; restartWake(); };
-        utt.onerror = () => { busy = false; restartWake(); };
-        window.speechSynthesis.speak(utt);
-        setTimeout(() => { busy = false; restartWake(); }, 15000); // safety fallback
-      } else {
-        busy = false;
-        restartWake();
-      }
+      // Backend speaks via macOS `say -v Daniel`; estimate duration so the mic
+      // doesn't reopen while Daniel is mid-sentence.
+      const wordsPerSec = 3.0; // say -r 180 ≈ 3 words/sec
+      const waitMs = Math.min(Math.max((answer.trim().split(/\s+/).length / wordsPerSec) * 1000, 2000), 12000);
+      setTimeout(() => { busy = false; restartWake(); }, waitMs);
     })
     .catch(() => {
       showToast(question, 'Request failed.');

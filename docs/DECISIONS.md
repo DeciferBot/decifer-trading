@@ -700,3 +700,31 @@ After one live scan cycle writes observations, run `scripts/ml_observation_healt
 6. **Structured telemetry**: Each scan logs `requested=N successful=M failed=K fetch_mode=batched|bounded_parallel|fallback elapsed_ms=T`.
 
 **What was NOT changed:** Signal scoring logic, trading thresholds, risk gates, execution pipeline, IC weights, Apex call count.
+
+---
+
+### PME Outcome Tracking — Sprint (2026-05-22)
+
+**Decision (2026-05-22, Amit):**
+
+Add outcome tracking for Portfolio Management Engine decisions without altering PME execution behaviour or thresholds.
+
+**Why:**
+PME is live and executing FULL_EXIT actions. Without outcome measurement, there is no way to know whether exits avoided loss, cut winners early, or whether HOLD decisions were justified by subsequent price action. Training data quality depends on knowing whether PME added alpha.
+
+**What was built:**
+- `pm_outcome_tracker.py` — links each PME decision to future market price outcomes across 6 time windows (30 min, 1 h, EOD, 1 d, 3 d, 5 d).
+- `data/pm_engine/outcomes.jsonl` — append-only outcome log; one record per (decision, window) pair.
+- `/api/pm_outcomes` endpoint in `bot_dashboard.py` — returns `get_summary()` payload.
+- Outcomes panel in the Portfolio Mgmt dashboard tab — summary banner + recent outcomes table.
+- `resolve_pending()` wired into `bot_trading.py` scan cycle (non-blocking, max 20 Alpaca fetches per cycle).
+- 35 tests in `tests/test_pm_outcome_tracker.py`.
+
+**Outcome classification thresholds (for evaluation only — do NOT conflate with PME execution thresholds):**
+- `> +2%` return after exit → BAD (`cut_winner_early`)
+- `< −2%` return after exit → GOOD (`caught_decline`)
+- Within ±2% → NEUTRAL
+- HOLD: opposite sign convention — price rising is GOOD (`justified_hold`), falling is BAD (`held_too_long`)
+- SAFETY_BLOCKED exits: price falling → BAD (`rail_too_strict`), rising → GOOD (`rail_correct`)
+
+**What was NOT changed:** PME thresholds, execution logic, signal weights, Apex prompts, safety rails, or any trading behaviour.

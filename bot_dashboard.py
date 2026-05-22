@@ -822,6 +822,11 @@ def _todays_closed_trades_from_events() -> list:
     return results
 
 
+# Cooldown for /api/ask — prevents accidental repeated wake-word submissions
+_ask_last_ts: float = 0.0
+_ASK_COOLDOWN_SECS: float = 1.5
+
+
 class DashHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/":
@@ -1508,6 +1513,23 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("[dashboard][/api/pm] error: %s", exc)
                 payload = {"decisions": [], "total": 0, "error": str(exc)}
             self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/pm_outcomes":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                import pm_outcome_tracker as _pot
+                _pot_path = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "data", "pm_engine", "outcomes.jsonl",
+                )
+                import pathlib as _pl
+                payload = _pot.get_summary(_pl.Path(_pot_path))
+            except Exception as exc:
+                log.warning("[dashboard][/api/pm_outcomes] error: %s", exc)
+                payload = {"total": 0, "by_action": {}, "quality_counts": {}, "recent": [], "error": str(exc)}
+            self.wfile.write(json.dumps(payload, default=str).encode())
         elif self.path == "/api/rotation":
             # Retired — rotation_live_v1 migrated to Portfolio Management Engine.
             self.send_response(200)
@@ -1772,6 +1794,9 @@ class DashHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": True, "effective_capital": get_effective_capital()}).encode())
         elif self.path == "/api/ask":
+            global _ask_last_ts
+            import time as _time
+
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length)) if length else {}
             question = (body.get("question") or "").strip()
@@ -1780,22 +1805,19 @@ class DashHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"ok": False, "error": "No question provided"}).encode())
+            elif _time.monotonic() - _ask_last_ts < _ASK_COOLDOWN_SECS:
+                self.send_response(429)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "error": "cooldown"}).encode())
             else:
+                _ask_last_ts = _time.monotonic()
                 try:
-                    from bot_voice import (
-                        answer_voice_query,
-                        classify_voice_intent,
-                        handle_voice_command,
-                        speak,
-                    )
+                    from voice_agent import answer_voice_question
+                    from bot_voice import speak
 
-                    intent = classify_voice_intent(question)
-                    if intent["intent"] == "QA":
-                        # answer_voice_query already calls speak() internally
-                        answer = answer_voice_query(question, dash)
-                    else:
-                        answer = handle_voice_command(intent, dash)
-                        speak(answer)
+                    answer = answer_voice_question(question, dash)
+                    speak(answer)
 
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
@@ -1803,7 +1825,6 @@ class DashHandler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({
                         "ok": True,
                         "answer": answer,
-                        "intent": intent["intent"],
                     }).encode())
                 except Exception as e:
                     self.send_response(500)

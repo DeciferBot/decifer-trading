@@ -2562,6 +2562,15 @@ def run_scan():
     except Exception as _pm_scan_err:
         log.debug("pm_engine scan_cycle error: %s", _pm_scan_err)
 
+    # ── PM Outcome Tracker: resolve pending price windows (non-blocking) ─────────
+    try:
+        import pm_outcome_tracker as _pot
+        _pot_written = _pot.resolve_pending()
+        if _pot_written:
+            log.debug("pm_outcome_tracker: %d new outcome records", _pot_written)
+    except Exception as _pot_err:
+        log.debug("pm_outcome_tracker resolve error: %s", _pot_err)
+
     # CP-4: PM exits change daily P&L but strategy_mode was frozen before PM ran.
     # Recompute pnl + strategy_mode so agents size new trades against the actual
     # post-PM portfolio state (e.g. a large exit tipping NORMAL → DEFENSIVE).
