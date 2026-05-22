@@ -1888,7 +1888,7 @@ def _pnl_refresh_loop():
 
 
 def start_dashboard():
-    server = HTTPServer(("", CONFIG["dashboard_port"]), DashHandler)
+    server = HTTPServer(("127.0.0.1", CONFIG["dashboard_port"]), DashHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     threading.Thread(target=_pnl_refresh_loop, daemon=True, name="pnl-refresh").start()
     clog("INFO", f"Dashboard live → http://localhost:{CONFIG['dashboard_port']}")
