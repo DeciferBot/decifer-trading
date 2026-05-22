@@ -5688,6 +5688,17 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
   }
 
   let busy = false;
+  let fromWakeWord = false;
+
+  // Unlock speechSynthesis on first user gesture — Chrome blocks TTS without it.
+  let ttsUnlocked = false;
+  document.addEventListener('click', () => {
+    if (ttsUnlocked) return;
+    ttsUnlocked = true;
+    const silent = new SpeechSynthesisUtterance('');
+    silent.volume = 0;
+    window.speechSynthesis && window.speechSynthesis.speak(silent);
+  }, { once: true });
 
   function showToast(q, a) {
     qEl.textContent = q ? '\u201C' + q + '\u201D' : '';
@@ -5718,7 +5729,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
   rec.onstart = () => {
     btn.classList.add('listening');
     btn.title = 'Listening…';
-    showToast('Listening…', '');
+    // Don't overwrite the greeting toast when triggered by wake word.
+    if (!fromWakeWord) showToast('Listening…', '');
+    fromWakeWord = false;
   };
 
   rec.onresult = (e) => {
@@ -5794,6 +5807,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
         const launchQuery = () => {
           if (queryStarted) return;
           queryStarted = true;
+          fromWakeWord = true;  // suppress "Listening…" toast — greeting is already shown
           setTimeout(startQuery, 300);
         };
 
