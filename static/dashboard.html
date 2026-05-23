@@ -673,7 +673,7 @@ canvas{display:block;width:100% !important}
   <div class="stat"><div class="sl">Day P&amp;L</div><div class="sv" id="s-pnl">—</div><div class="ss" id="s-pnlp">—</div></div>
   <div class="stat"><div class="sl">Session</div><div class="sv co" id="s-session">—</div><div class="ss" id="s-next">—</div></div>
   <div class="stat"><div class="sl">Scans Run</div><div class="sv co" id="s-scans">0</div><div class="ss" id="s-last">Never</div></div>
-  <div class="stat"><div class="sl">Open Positions</div><div class="sv co" id="s-pos">0</div><div class="ss">bot-managed</div></div>
+  <div class="stat"><div class="sl">Open Positions</div><div class="sv co" id="s-pos">0</div><div class="ss">active positions</div></div>
   <div class="stat"><div class="sl">Trades</div><div class="sv co"><span id="s-trades">0</span></div><div class="ss" id="s-wr">—</div></div>
 </div>
 
@@ -792,7 +792,7 @@ canvas{display:block;width:100% !important}
           <span id="opus-view-ts" style="color:var(--muted2);font-size:9px">—</span>
         </div>
         <div id="opus-view-body" style="padding:8px 12px">
-          <div style="color:var(--muted2);font-size:11px">Waiting for Apex to synthesize…</div>
+          <div style="color:var(--muted2);font-size:11px">Apex will summarise the next completed scan.</div>
         </div>
       </div>
 
@@ -803,7 +803,7 @@ canvas{display:block;width:100% !important}
           <span id="apex-entries-count" style="font-size:10px;color:var(--muted2)"></span>
         </div>
         <div id="apex-entries-body" style="padding:8px 12px">
-          <div style="color:var(--muted2);font-size:11px">Waiting for Apex…</div>
+          <div style="color:var(--muted2);font-size:11px">Apex will show new entries after the first scan.</div>
         </div>
       </div>
 
@@ -942,7 +942,7 @@ canvas{display:block;width:100% !important}
       </div>
     </div>
     <div id="agents-convo-full">
-      <div style="color:var(--muted2);font-size:11px">Apex synthesis appears after the first scan.</div>
+      <div style="color:var(--muted2);font-size:11px">Apex will summarise the next completed scan. Run a scan to populate this view.</div>
     </div>
   </div>
 
@@ -959,7 +959,7 @@ canvas{display:block;width:100% !important}
   <div id="atab-panel-story" class="atab-panel atab-show">
     <div class="atab-scroll" style="padding:16px;display:flex;flex-direction:column;gap:14px">
       <div id="intel-market-story" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px">
-        <div style="font-size:10px;color:var(--muted2)">Click ↻ Refresh to load market intelligence.</div>
+        <div style="font-size:10px;color:var(--muted2)">Press ↻ Refresh to load today's market intelligence.</div>
       </div>
     </div>
   </div>
@@ -969,7 +969,7 @@ canvas{display:block;width:100% !important}
     <div class="atab-scroll" style="padding:16px;display:flex;flex-direction:column;gap:12px">
       <div style="font-size:10px;color:var(--muted2)">Active and dormant market forces. Click any card to expand details.</div>
       <div id="intel-forces-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
-        <div style="font-size:10px;color:var(--muted2)">Load intelligence data first (↻ Refresh).</div>
+        <div style="font-size:10px;color:var(--muted2)">Press ↻ Refresh above to load market intelligence.</div>
       </div>
     </div>
     <!-- Hidden legacy IDs used by existing JS -->
@@ -983,7 +983,7 @@ canvas{display:block;width:100% !important}
   <div id="atab-panel-themes" class="atab-panel">
     <div class="atab-scroll" style="padding:16px;display:flex;flex-direction:column;gap:14px">
       <div id="intel-theme-map">
-        <div style="font-size:10px;color:var(--muted2)">Load intelligence data first (↻ Refresh).</div>
+        <div style="font-size:10px;color:var(--muted2)">Press ↻ Refresh above to load market intelligence.</div>
       </div>
     </div>
     <!-- Hidden legacy ID -->
@@ -1010,7 +1010,7 @@ canvas{display:block;width:100% !important}
       <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden">
         <div class="col-title">Market Forces</div>
         <div id="vt-forces" style="overflow-y:auto;flex:1;padding:6px">
-          <div style="font-size:10px;color:var(--muted2);padding:8px">Load intelligence data first.</div>
+          <div style="font-size:10px;color:var(--muted2);padding:8px">Press ↻ Refresh above to load market intelligence.</div>
         </div>
       </div>
       <!-- Column 2: Themes for selected force -->
@@ -1118,7 +1118,7 @@ canvas{display:block;width:100% !important}
     <button id="cat-refresh-btn" onclick="loadCatalyst()" style="background:none;border:1px solid var(--border);color:var(--muted2);padding:3px 10px;border-radius:3px;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer">⟳ Refresh</button>
   </div>
   <div class="cat-body">
-    <div id="cat-feed"><div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Loading catalyst data…</div></div>
+    <div id="cat-feed"><div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Loading catalyst screening data…</div></div>
   </div>
 </div>
 <!-- Catalyst detail drawer -->
@@ -1201,8 +1201,8 @@ canvas{display:block;width:100% !important}
     <div id="news-feed">
       <div class="empty" style="padding:40px 0;text-align:center">
         <div style="font-size:28px;opacity:.3;margin-bottom:12px">📰</div>
-        <div style="font-size:12px;color:var(--muted2);margin-bottom:14px">No stories loaded yet</div>
-        <button class="news-fetch-btn" onclick="loadNews()">Fetch News Now</button>
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:14px">No news stories loaded yet. Press Fetch News to begin.</div>
+        <button class="news-fetch-btn" onclick="loadNews()">Fetch News</button>
       </div>
     </div>
   </div>
@@ -1288,7 +1288,7 @@ canvas{display:block;width:100% !important}
       <span id="pf-count" style="color:var(--orange)">0 positions</span>
     </div>
     <div id="pf-table">
-      <div class="empty" style="padding:20px;text-align:center;color:var(--muted2)">Click the Portfolio tab to load positions.</div>
+      <div class="empty" style="padding:20px;text-align:center;color:var(--muted2)">No open positions.</div>
     </div>
   </div>
 
@@ -1300,13 +1300,13 @@ canvas{display:block;width:100% !important}
 
     <!-- Summary banner -->
     <div id="pm-summary" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
-      Loading…
+      Loading portfolio management status…
     </div>
 
     <!-- Outcome tracking panel -->
     <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Action outcome tracking</div>
     <div id="pm-outcomes-banner" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
-      Loading outcomes…
+      Loading action outcome tracking…
     </div>
     <div id="pm-outcomes-table-wrap" style="margin-bottom:14px;display:none;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:'JetBrains Mono',monospace">
@@ -1357,6 +1357,7 @@ canvas{display:block;width:100% !important}
 <div class="view settings-view" id="view-settings">
   <div class="setting-card">
     <div class="setting-title">&lt;&gt; Bot Control</div>
+    <p style="font-size:11px;color:var(--muted2);margin-bottom:10px">Apply Settings writes changes to config and takes effect on the next scan cycle. Restart Bot briefly halts and re-initialises the trading engine — open positions are not affected.</p>
     <div class="setting-row"><span class="setting-label">Active Account</span><span class="setting-val" id="cfg-account">—</span></div>
     <div class="setting-row"><span class="setting-label">Bot Status</span><span class="setting-val" id="cfg-status">—</span></div>
     <div style="display:flex;gap:8px;padding-top:10px">
@@ -1366,6 +1367,7 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="setting-card">
     <div class="setting-title">Risk Parameters</div>
+    <p style="font-size:11px;color:var(--muted2);margin-bottom:10px">These control position sizing and safety gates. The daily loss limit halts all new entries when breached. The cash reserve floor prevents over-deployment. Changes take effect after Apply Settings.</p>
     <div class="setting-row"><span class="setting-label">Risk per trade (%)</span><input class="setting-input" id="cfg-risk-pct" type="number" step="0.5" min="0.5" max="10"></div>
     <div class="setting-row"><span class="setting-label">Daily loss limit (%)</span><input class="setting-input" id="cfg-daily-limit" type="number" step="0.5" min="1" max="15"></div>
     <div class="setting-row"><span class="setting-label">Max positions</span><input class="setting-input" id="cfg-max-pos" type="number" step="1" min="1" max="30"></div>
@@ -1374,6 +1376,7 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="setting-card">
     <div class="setting-title">Scoring &amp; Apex</div>
+    <p style="font-size:11px;color:var(--muted2);margin-bottom:10px">Min score controls the entry threshold — candidates below this score are not passed to Apex for consideration. Raising it reduces trade frequency; lowering it increases it. High conviction score determines full position sizing.</p>
     <div class="setting-row"><span class="setting-label">Min score to trade</span><input class="setting-input" id="cfg-min-score" type="number" step="1" min="10" max="100"></div>
     <div class="setting-row"><span class="setting-label">High conviction score</span><input class="setting-input" id="cfg-high-score" type="number" step="1" min="20" max="100"></div>
   </div>
@@ -1389,6 +1392,7 @@ canvas{display:block;width:100% !important}
 
   <div class="setting-card">
     <div class="setting-title">📡 News Sentinel</div>
+    <p style="font-size:11px;color:var(--muted2);margin-bottom:10px">The Sentinel monitors news feeds for high-conviction breaking stories and can interrupt the normal scan cycle to submit a trade. When enabled, it runs in the background and bypasses the standard scan interval. Position size is scaled by the multiplier below.</p>
     <div class="setting-row"><span class="setting-label">Sentinel enabled</span>
       <select id="cfg-sentinel-enabled" class="setting-input" style="width:70px"><option value="true">On</option><option value="false">Off</option></select>
     </div>
@@ -1510,8 +1514,8 @@ canvas{display:block;width:100% !important}
 
   <!-- Data quality note -->
   <div style="font-size:10px;color:var(--muted);padding:4px 2px">
-    ⚠ Forward returns fetched via market data provider (Alpaca → FMP → fallback chain). Chart uses cohort trades (those with data at every horizon) so all horizons reflect the same set of trades. Recent trades excluded until T+10 data is available.
-    Signal half-life analysis requires ≥20 agent-scored trades for statistical significance.
+    ⚠ Forward returns fetched via market data providers (Alpaca → FMP → secondary sources). Chart uses cohort trades (those with data at every horizon) so all horizons reflect the same set of trades. Recent trades excluded until T+10 data is available.
+    Signal half-life analysis requires ≥20 scored trades for statistical significance.
   </div>
 
 </div>
@@ -1522,13 +1526,13 @@ canvas{display:block;width:100% !important}
   <!-- LLM Interpretation Panel -->
   <div class="card" id="an-explain-card" style="border-left:3px solid var(--orange)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div class="card-title" style="margin:0">Plain-English Read <span style="font-size:9px;color:var(--muted2);letter-spacing:1px;margin-left:6px">CLAUDE SONNET</span></div>
+      <div class="card-title" style="margin:0">Signal Interpretation</div>
       <button id="an-explain-refresh" onclick="loadAnalyticsExplain(true)"
               style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace">
         ↻ REGENERATE
       </button>
     </div>
-    <div id="an-explain-body" style="font-size:12px;color:var(--muted2)">Loading interpretation…</div>
+    <div id="an-explain-body" style="font-size:12px;color:var(--muted2)">Loading AI interpretation…</div>
   </div>
 
   <!-- Metric cards row 1: Core ratios -->
@@ -1616,7 +1620,7 @@ canvas{display:block;width:100% !important}
     <div style="display:flex;flex-wrap:wrap;gap:6px;flex:1">
       <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;min-width:160px">
         <div class="regime-box unknown" id="regime-box" style="flex:1;padding:5px 8px;min-width:0">
-          <div class="rl" id="regime-label" style="font-size:11px">READING TAPE...</div>
+          <div class="rl" id="regime-label" style="font-size:11px">READING MARKET...</div>
           <div class="rm" id="regime-meta" style="font-size:9px">SPY: — | QQQ: — | VIX: —</div>
         </div>
         <div style="font-size:9px;color:var(--muted2);white-space:nowrap">
@@ -6325,7 +6329,7 @@ async function loadCatalyst() {
   if (!feed) return;
   const btn = document.getElementById('cat-refresh-btn');
   if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
-  feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Loading…</div>';
+  feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Loading catalyst data…</div>';
   try {
     const r = await fetch('/api/catalyst');
     const j = await r.json();
@@ -6343,7 +6347,7 @@ async function loadCatalyst() {
     if (dateEl) dateEl.textContent = dateStr ? 'Screened: ' + dateStr : 'Not yet screened';
 
     if (!candidates.length && !edgar.length) {
-      feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">No catalyst data yet.<br><span style="font-size:10px">Run: python -m signals.catalyst_screen -v</span></div>';
+      feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">No catalyst data yet.<br><span style="font-size:10px">Catalyst screening runs automatically with each scan cycle.</span></div>';
       if (btn) { btn.textContent = '⟳ Refresh'; btn.disabled = false; }
       return;
     }
@@ -6642,7 +6646,7 @@ function renderOpusView(d) {
   const latest = hist.length ? hist[hist.length - 1] : null;
 
   if (!latest) {
-    el.innerHTML = '<div style="color:var(--muted2);font-size:11px">Waiting for Apex to synthesize…</div>';
+    el.innerHTML = '<div style="color:var(--muted2);font-size:11px">Apex will summarise the next completed scan.</div>';
     return;
   }
 
