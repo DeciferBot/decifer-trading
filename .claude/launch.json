@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "homepage-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3001,
+      "cwd": "homepage"
+    },
+    {
+      "name": "dashboard-preview",
+      "runtimeExecutable": "python3.11",
+      "runtimeArgs": ["-m", "http.server", "8899"],
+      "port": 8899
+    },
+    {
+      "name": "mobile-preview",
+      "runtimeExecutable": "python3.11",
+      "runtimeArgs": ["-m", "http.server", "8901", "--directory", "static"],
+      "port": 8901
+    }
+  ]
+}
