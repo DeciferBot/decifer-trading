@@ -66,13 +66,6 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .tabs-drawer{display:none}
 
 /* DECISION BAR */
-.decision-bar{display:flex;align-items:center;gap:6px 12px;padding:5px 16px;min-height:32px;height:auto;border-bottom:1px solid var(--border);background:var(--bg2);overflow:visible;flex-shrink:0;flex-wrap:wrap}
-.decision-bar-label{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;white-space:nowrap;flex-shrink:0}
-.decision-bar-actions{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;flex:1;min-width:0}
-.decision-bar-time{font-size:9px;color:var(--muted2);white-space:nowrap;flex-shrink:0}
-.decision-pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:3px;border:1px solid;white-space:nowrap;flex-shrink:0}
-.decision-pill-action{font-size:9px;font-weight:700;letter-spacing:1px}
-.decision-pill-ticker{font-size:11px;font-weight:700;color:var(--text)}
 
 /* VIEWS */
 .view{display:none;height:calc(100vh - 46px - 66px - 58px - 32px - 34px);overflow:hidden}
@@ -408,9 +401,6 @@ canvas{display:block;width:100% !important}
   /* Tab bar — remove fade mask so nothing is hidden */
   .tabs{-webkit-mask-image:none;mask-image:none}
 
-  /* Decision bar — hidden on mobile */
-  .decision-bar{display:none}
-
   /* Apex Synthesizer panel — hidden on mobile (min score lives in Settings) */
   #apex-synth-panel{display:none}
 
@@ -483,10 +473,6 @@ canvas{display:block;width:100% !important}
   .cat-ticker{font-size:12px}
   .news-hero-hl{font-size:13px}
   .news-card-hero .news-card-hl{font-size:13px}
-
-  /* ── DECISION BAR — allow pills to wrap ── */
-  .decision-bar-actions{flex-wrap:wrap;gap:4px}
-  .decision-pill{flex-shrink:1}
 
   /* ── LIVE VIEW — cap stacked column heights so they don't run 20+ screens ── */
   .col-body{max-height:55vh;overflow-y:auto !important;overflow-x:hidden !important;min-width:0}
@@ -628,14 +614,6 @@ canvas{display:block;width:100% !important}
 </div>
 
 <!-- DECISION BAR -->
-<div class="decision-bar">
-  <div class="decision-bar-label" id="decision-bar-label">Last Decision</div>
-  <div class="decision-bar-actions" id="decision-bar-actions">
-    <span style="color:var(--muted2);font-size:11px">Awaiting first scan…</span>
-  </div>
-  <div class="decision-bar-time" id="decision-bar-time">—</div>
-</div>
-
 <!-- TABS -->
 <div class="tabs">
   <div class="tab active" onclick="switchTab('live',this)">Live</div>
@@ -3968,109 +3946,6 @@ function renderTradeActions(trades) {
   '</div>';
 }
 
-// ── Decision Bar (always-visible top strip) ─────────────────
-function renderDecisionBar(convo, lastScan, executed, skipReasons) {
-  const actionsEl = document.getElementById('decision-bar-actions');
-  const timeEl    = document.getElementById('decision-bar-time');
-  const labelEl   = document.getElementById('decision-bar-label');
-  if (!actionsEl) return;
-
-  const finalEntry = convo.find(m => m.agent === 'Apex Synthesizer') || convo[convo.length - 1];
-  if (!finalEntry) return;
-
-  const lines = (finalEntry.output || '').split('\n').map(l => l.trim()).filter(Boolean);
-
-  if (!lines.length || lines[0] === 'No trades this cycle.') {
-    actionsEl.innerHTML = '<span style="color:var(--muted2);font-size:11px">No trades this cycle.</span>';
-    if (labelEl) { labelEl.textContent = 'Last Decision'; labelEl.style.color = ''; labelEl.title = ''; }
-    if (timeEl) timeEl.textContent = finalEntry.time || lastScan || '—';
-    return;
-  }
-
-  // Build skip-reason lookup: symbol → reason (most recent entry wins)
-  const skipMap = {};
-  (skipReasons || []).forEach(sr => {
-    if (sr.symbol && sr.reason && !skipMap[sr.symbol]) skipMap[sr.symbol] = sr.reason;
-  });
-
-  // Update label to reflect whether the suggestion was actually executed
-  if (labelEl) {
-    if (executed === false) {
-      labelEl.textContent = 'Suggested — Not Taken';
-      labelEl.style.color = 'var(--orange)';
-    } else if (executed === true) {
-      labelEl.textContent = 'Last Executed';
-      labelEl.style.color = 'var(--green)';
-      labelEl.title = '';
-    } else {
-      labelEl.textContent = 'Last Decision';
-      labelEl.style.color = '';
-      labelEl.title = '';
-    }
-  }
-
-  const ACTION_COLOR = { BUY: 'var(--green)', SELL: 'var(--red)', HOLD: 'var(--orange)' };
-  const ACTION_BG    = { BUY: 'rgba(0,200,83,.15)', SELL: 'rgba(255,82,82,.15)', HOLD: 'rgba(255,107,0,.15)' };
-  const pillOpacity  = executed === false ? '0.45' : '1';
-
-  // Build pills — pill shows only the action + ticker symbol; description goes to timeEl
-  let firstLineDesc = '';
-  const pills = lines.map((line, i) => {
-    const parts  = line.split(/\s+/);
-    const action = (parts[0] || '').toUpperCase();
-    const sym    = (parts[1] || '').replace(/[^A-Za-z]/g, '').toUpperCase();
-    // Description: everything after the symbol, strip leading dash/em-dash
-    const desc   = parts.slice(2).join(' ').replace(/^[-\u2013\u2014]\s*/, '');
-    if (i === 0 && desc) firstLineDesc = desc;
-    const color  = ACTION_COLOR[action] || 'var(--muted2)';
-    const bg     = ACTION_BG[action]    || 'rgba(80,80,80,.1)';
-    const reason = skipMap[sym] || '';
-    const tip    = reason || desc;
-    return `<div class="decision-pill" style="border-color:${color};background:${bg};opacity:${pillOpacity};cursor:${tip?'help':'default'}" title="${esc(tip)}">
-      <span class="decision-pill-action" style="color:${color}">${esc(action)}</span>
-      <span class="decision-pill-ticker">${esc(sym)}</span>
-    </div>`;
-  }).join('');
-
-  // Show description / skip reason / timestamp below the pills (full-width second row)
-  if (timeEl) {
-    let subText = '';
-    let subColor = 'var(--muted2)';
-    if (executed === false) {
-      // prefer skip-map reason, fall back to inline description
-      for (const line of lines) {
-        const sym = (line.split(/\s+/)[1] || '').replace(/[^A-Za-z]/g, '').toUpperCase();
-        if (skipMap[sym]) { subText = skipMap[sym]; break; }
-      }
-      if (!subText) subText = firstLineDesc;
-      subColor = 'var(--orange)';
-    } else {
-      subText = firstLineDesc;
-    }
-    if (subText) {
-      timeEl.style.cssText = 'width:100%;font-size:9px;padding-top:3px;word-break:break-word;white-space:normal';
-      timeEl.innerHTML = `<span style="color:${subColor};font-style:italic">${esc(subText)}</span>`;
-    } else {
-      timeEl.style.cssText = '';
-      timeEl.textContent = finalEntry.time || lastScan || '—';
-    }
-  }
-
-  actionsEl.innerHTML = pills;
-  _syncViewHeights();
-}
-
-// ── Decision bar height sync ───────────────────────────────
-function _syncViewHeights() {
-  if (window.innerWidth <= 768) return;
-  const bar = document.querySelector('.decision-bar');
-  if (!bar) return;
-  const h = bar.offsetHeight;
-  const withStats2 = `calc(100vh - ${46 + 66 + 58 + h + 34}px)`;
-  const noStats2   = `calc(100vh - ${46 + 66 + h + 34}px)`;
-  document.querySelectorAll('.view, #view-portfolio, .risk-view').forEach(v => { v.style.height = withStats2; });
-  document.querySelectorAll('.growth-view, .catalyst-view, .news-view').forEach(v => { v.style.height = noStats2; });
-}
 
 // ── Chart instances ────────────────────────────────────────
 let equityChart = null;
@@ -4563,11 +4438,6 @@ async function poll() {
     // Growth view
     if (d.performance) renderGrowth(d.performance, d.equity_history);
 
-    // Agents view — conversation + executed trade actions
-    if (d.agent_conversation && d.agent_conversation.length) {
-      window._totalAgents = d.agent_conversation.length;
-      renderDecisionBar(d.agent_conversation, d.last_scan, d.last_decision_executed, d.last_skip_reasons);
-    }
     // Trade Actions: show only orders actually submitted this session (not recommendations)
     renderTradeActions(d.trades);
 
@@ -4887,8 +4757,7 @@ async function twsReconnect() {
 
 let _pollInFlight = false;
 let _lastLogCount = 0;
-poll().then(_syncViewHeights);
-window.addEventListener('resize', _syncViewHeights);
+poll();
 setInterval(async () => {
   if (_pollInFlight) return;
   _pollInFlight = true;
