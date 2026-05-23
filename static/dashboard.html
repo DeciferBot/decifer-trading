@@ -187,12 +187,27 @@ body.remote-mode #remote-badge{display:block}
 canvas{display:block;width:100% !important}
 
 /* ── VIEW 4: AGENTS ── */
-.agents-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px}
+.agents-view{flex-direction:column;overflow:hidden;padding:0;gap:0}
 .agent-card{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:6px;padding:12px}
 .agent-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .agent-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--orange)}
 .agent-accuracy{font-size:11px;font-weight:700}
 .agent-last{font-size:11px;color:var(--muted2);line-height:1.6;max-height:80px;overflow-y:auto;white-space:pre-wrap}
+/* ── Apex sub-tabs ── */
+.atab{padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;color:var(--muted2);background:transparent;border:none;border-bottom:2px solid transparent;white-space:nowrap;font-family:'JetBrains Mono',monospace;transition:color .15s,border-color .15s;flex-shrink:0}
+.atab:hover{color:var(--text)}
+.atab.atab-act{color:var(--orange);border-bottom-color:var(--orange)}
+.atab-panel{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.atab-panel.atab-show{display:flex}
+.atab-scroll{flex:1;overflow-y:auto;min-height:0}
+.fc{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;cursor:pointer;transition:border-color .15s,background .15s}
+.fc:hover{background:rgba(255,255,255,0.025)}
+.fc.fc-on{border-color:rgba(0,200,83,0.4)}
+.fc.fc-block{border-color:rgba(255,145,0,0.35)}
+.fc.fc-off{opacity:0.5}
+.vt-item{padding:7px 10px;border-radius:5px;cursor:pointer;font-size:11px;transition:background .12s}
+.vt-item:hover{background:rgba(255,255,255,0.04)}
+.vt-item.vt-sel{background:var(--orange_dim)}
 
 /* ── VIEW 5: RISK ── */
 .risk-view{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:14px;gap:12px;height:calc(100vh - 46px - 66px - 58px - 32px - 34px)}
@@ -848,79 +863,121 @@ canvas{display:block;width:100% !important}
 </div>
 
 <!-- VIEW 4: AGENTS / APEX -->
-<div class="view agents-view" id="view-agents" style="flex-direction:column;padding:14px 16px;gap:14px;overflow-y:auto">
+<div class="view agents-view" id="view-agents">
 
-  <!-- ZONE 1: Apex Synthesis -->
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0">
-    <div class="col-title" style="background:var(--bg2)">
-      <span>Apex Synthesis</span>
-      <span style="display:flex;align-items:center;gap:10px">
+  <!-- ── Apex Synthesis strip (always visible) ── -->
+  <div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px;flex-shrink:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono',monospace">Apex Live Conversation</span>
         <div style="display:none;align-items:center;gap:4px" id="agents-nav">
-          <button onclick="apexConvoNav(-1)" style="font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--border);background:var(--card);color:var(--muted2);cursor:pointer">&#8592;</button>
+          <button onclick="apexConvoNav(-1)" style="font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer">&#8592;</button>
           <span id="agents-nav-counter" style="font-size:9px;color:var(--muted2);min-width:40px;text-align:center">—</span>
-          <button onclick="apexConvoNav(1)" style="font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--border);background:var(--card);color:var(--muted2);cursor:pointer">&#8594;</button>
+          <button onclick="apexConvoNav(1)" style="font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer">&#8594;</button>
         </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
         <span id="agents-scan-time" style="font-size:9px;color:var(--muted2)">Last scan: —</span>
-        <button onclick="loadIntelligence()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:9px;padding:2px 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
-      </span>
+        <span id="intel-ts" style="font-size:9px;color:var(--muted2)"></span>
+        <button onclick="loadIntelligence()" style="background:transparent;border:1px solid var(--border);color:var(--muted2);font-size:9px;padding:2px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻ Refresh</button>
+      </div>
     </div>
-    <div id="agents-convo-full" style="padding:14px 16px">
+    <div id="agents-convo-full">
       <div style="color:var(--muted2);font-size:11px">Apex synthesis appears after the first scan.</div>
     </div>
   </div>
 
-  <!-- Market Story -->
-  <div id="intel-market-story" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:12px 14px;flex-shrink:0">
-    <div style="font-size:10px;color:var(--muted2)">Loading market story…</div>
+  <!-- ── Sub-tab nav ── -->
+  <div style="display:flex;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none">
+    <button onclick="apexSubTab('story')"    id="atab-story"    class="atab atab-act">Market Story</button>
+    <button onclick="apexSubTab('forces')"   id="atab-forces"   class="atab">Market Forces</button>
+    <button onclick="apexSubTab('themes')"   id="atab-themes-tab" class="atab">Theme Map</button>
+    <button onclick="apexSubTab('universe')" id="atab-universe" class="atab">Intelligence Universe</button>
+    <button onclick="apexSubTab('tree')"     id="atab-tree"     class="atab">Visual Tree</button>
   </div>
 
-  <!-- Active driver buttons — floated above 2-column grid -->
-  <div id="intel-active-drivers" style="display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0;min-height:0"></div>
-
-  <!-- ZONE 2: Market Map + Active Themes -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0">
-
-    <!-- What's Driving the Market -->
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column">
-      <div class="col-title" style="background:var(--bg2)">What's Driving the Market</div>
-      <div id="intel-drivers" style="padding:10px 14px;overflow-y:auto;flex:1;max-height:260px">
-        <div style="font-size:10px;color:var(--muted2)">Loading…</div>
+  <!-- ── MARKET STORY panel ── -->
+  <div id="atab-panel-story" class="atab-panel atab-show">
+    <div class="atab-scroll" style="padding:16px;display:flex;flex-direction:column;gap:14px">
+      <div id="intel-market-story" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <div style="font-size:10px;color:var(--muted2)">Click ↻ Refresh to load market intelligence.</div>
       </div>
     </div>
+  </div>
 
-    <!-- Active Themes -->
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column">
-      <div class="col-title" style="background:var(--bg2)">Active Themes</div>
-      <div id="intel-themes" style="padding:10px 14px;overflow-y:auto;flex:1;max-height:260px">
-        <div style="font-size:10px;color:var(--muted2)">Loading…</div>
+  <!-- ── MARKET FORCES panel ── -->
+  <div id="atab-panel-forces" class="atab-panel">
+    <div class="atab-scroll" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:10px;color:var(--muted2)">Active and dormant market forces. Click any card to expand details.</div>
+      <div id="intel-forces-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+        <div style="font-size:10px;color:var(--muted2)">Load intelligence data first (↻ Refresh).</div>
       </div>
     </div>
-
-  </div>
-
-  <!-- ZONE 3: Intelligence Universe (full, paginated) -->
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0">
-    <div class="col-title" style="background:var(--bg2)">
-      <span>Intelligence Universe</span>
-      <span style="display:flex;align-items:center;gap:10px">
-        <span id="intel-cand-count" style="font-size:10px;color:var(--muted2)">—</span>
-        <span id="intel-ts" style="font-size:9px;color:var(--muted2)"></span>
-      </span>
-    </div>
-    <div id="intel-candidates" style="padding:0 14px"></div>
-    <div id="intel-cand-pagination" style="display:flex;align-items:center;justify-content:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border)">
-      <button onclick="_intelPage(-1)" id="intel-page-prev" style="background:var(--card);border:1px solid var(--border);color:var(--muted2);font-size:11px;padding:3px 12px;border-radius:3px;cursor:pointer">← Prev</button>
-      <span id="intel-page-label" style="font-size:10px;color:var(--muted2)">—</span>
-      <button onclick="_intelPage(1)" id="intel-page-next" style="background:var(--card);border:1px solid var(--border);color:var(--muted2);font-size:11px;padding:3px 12px;border-radius:3px;cursor:pointer">Next →</button>
+    <!-- Hidden legacy IDs used by existing JS -->
+    <div style="display:none">
+      <div id="intel-active-drivers"></div>
+      <div id="intel-drivers"></div>
     </div>
   </div>
 
-  <!-- Hidden: IDs required by JS -->
+  <!-- ── THEME MAP panel ── -->
+  <div id="atab-panel-themes" class="atab-panel">
+    <div class="atab-scroll" style="padding:16px;display:flex;flex-direction:column;gap:14px">
+      <div id="intel-theme-map">
+        <div style="font-size:10px;color:var(--muted2)">Load intelligence data first (↻ Refresh).</div>
+      </div>
+    </div>
+    <!-- Hidden legacy ID -->
+    <div style="display:none"><div id="intel-themes"></div></div>
+  </div>
+
+  <!-- ── INTELLIGENCE UNIVERSE panel ── -->
+  <div id="atab-panel-universe" class="atab-panel">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <span id="intel-cand-count" style="font-size:11px;font-weight:700;color:var(--text)">—</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="_intelPage(-1)" id="intel-page-prev" style="background:transparent;border:1px solid var(--border);color:var(--muted2);font-size:10px;padding:3px 10px;border-radius:3px;cursor:pointer">← Prev</button>
+        <span id="intel-page-label" style="font-size:10px;color:var(--muted2)">—</span>
+        <button onclick="_intelPage(1)" id="intel-page-next" style="background:transparent;border:1px solid var(--border);color:var(--muted2);font-size:10px;padding:3px 10px;border-radius:3px;cursor:pointer">Next →</button>
+      </div>
+    </div>
+    <div id="intel-candidates" style="flex:1;overflow-y:auto;min-height:0"></div>
+  </div>
+
+  <!-- ── VISUAL TREE panel ── -->
+  <div id="atab-panel-tree" class="atab-panel">
+    <div style="display:grid;grid-template-columns:220px 240px 1fr;height:100%;overflow:hidden;flex:1;min-height:0">
+      <!-- Column 1: Market Forces -->
+      <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden">
+        <div class="col-title">Market Forces</div>
+        <div id="vt-forces" style="overflow-y:auto;flex:1;padding:6px">
+          <div style="font-size:10px;color:var(--muted2);padding:8px">Load intelligence data first.</div>
+        </div>
+      </div>
+      <!-- Column 2: Themes for selected force -->
+      <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden">
+        <div class="col-title">Themes</div>
+        <div id="vt-themes" style="overflow-y:auto;flex:1;padding:6px">
+          <div style="font-size:10px;color:var(--muted2);padding:8px">Select a market force.</div>
+        </div>
+      </div>
+      <!-- Column 3: Symbols + detail -->
+      <div style="display:flex;flex-direction:column;overflow:hidden">
+        <div class="col-title" id="vt-detail-title">Symbols</div>
+        <div id="vt-detail" style="overflow-y:auto;flex:1;padding:12px 14px">
+          <div style="font-size:10px;color:var(--muted2)">Select a theme.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden: legacy IDs required by existing JS -->
   <div style="display:none">
     <div id="intel-universe"></div>
     <div id="intel-2col-grid"></div>
     <div id="intel-context-section"></div>
     <div id="intel-cand-toggle"></div>
+    <div id="intel-cand-pagination"></div>
   </div>
 
 </div>
@@ -1342,7 +1399,7 @@ canvas{display:block;width:100% !important}
 
   <!-- Data quality note -->
   <div style="font-size:10px;color:var(--muted);padding:4px 2px">
-    ⚠ Forward returns fetched via yfinance. Chart uses cohort trades (those with data at every horizon) so all horizons reflect the same set of trades. Recent trades excluded until T+10 data is available.
+    ⚠ Forward returns fetched via market data provider (Alpaca → FMP → fallback chain). Chart uses cohort trades (those with data at every horizon) so all horizons reflect the same set of trades. Recent trades excluded until T+10 data is available.
     Signal half-life analysis requires ≥20 agent-scored trades for statistical significance.
   </div>
 
@@ -3429,28 +3486,456 @@ function _buildIntelMarketStory(drivers, themes) {
   else
     tradeMode = 'Selective. Favour confirmed setups with IC-weighted scoring above threshold.';
 
-  return { headline, bullets, focusThemes, tradeMode, sentiment,
-           driverCount: drivers.length, activeThemeCount: activeTailwinds.length };
+  // What next?
+  let whatNext;
+  if (isRiskOff) whatNext = 'Defensive posture until volatility subsides. Watch for VIX reversal or positive macro catalyst before re-engaging risk.';
+  else if (drivers.includes('ai_capex_growth') || drivers.includes('ai_compute_demand'))
+    whatNext = 'Monitor hyperscaler earnings guidance for capex confirmation. Semiconductor supply/demand data is the next key read.';
+  else if (drivers.includes('yields_falling'))
+    whatNext = 'Rate sensitivity plays should benefit as long as the declining yield trend holds. Watch Fed commentary.';
+  else if (drivers.includes('small_cap_risk_on'))
+    whatNext = 'Breadth expansion typically continues in early-cycle recovery. Monitor IWM/SPY spread for regime continuation.';
+  else whatNext = 'Selective setup quality matters most in neutral regimes. Focus on IC-weighted scores above threshold.';
+
+  // What breaks the view?
+  const breakers = [];
+  if (!isRiskOff) {
+    if (drivers.includes('ai_capex_growth') || drivers.includes('ai_compute_demand'))
+      breakers.push('Hyperscaler capex guidance miss or AI spending freeze');
+    if (drivers.includes('yields_falling'))
+      breakers.push('Surprise inflation spike reversing the yield decline');
+    if (drivers.includes('small_cap_risk_on'))
+      breakers.push('IWM rolling over below SPY; credit spreads widening');
+    if (drivers.includes('geopolitical_risk_rising'))
+      breakers.push('Rapid diplomatic resolution removing the defence premium');
+    if (!breakers.length)
+      breakers.push('Unexpected policy shift or macro shock reversing current regime');
+  } else {
+    breakers.push('VIX normalisation or positive macro surprise breaking the risk-off pattern');
+  }
+
+  return { headline, bullets, focusThemes, tradeMode, sentiment, whatNext,
+           breakers, driverCount: drivers.length, activeThemeCount: activeTailwinds.length,
+           headwindCount: activeHeadwinds.length };
 }
 
 function _renderMarketStory(drivers, themes) {
   const storyEl = document.getElementById('intel-market-story');
   if (!storyEl) return;
-  const story = _buildIntelMarketStory(drivers, themes);
-  const col = story.sentiment === 'risk-on' ? 'var(--green)' : story.sentiment === 'risk-off' ? 'var(--red)' : 'var(--orange)';
-  const tag = story.sentiment === 'risk-on' ? 'RISK-ON' : story.sentiment === 'risk-off' ? 'RISK-OFF' : 'NEUTRAL';
+  const s   = _buildIntelMarketStory(drivers, themes);
+  const col = s.sentiment === 'risk-on' ? 'var(--green)' : s.sentiment === 'risk-off' ? 'var(--red)' : 'var(--orange)';
+  const tag = s.sentiment === 'risk-on' ? 'RISK-ON' : s.sentiment === 'risk-off' ? 'RISK-OFF' : 'NEUTRAL';
   storyEl.style.borderColor = col + '55';
+
+  const block = (label, content, accent) =>
+    `<div style="padding:12px 14px;background:rgba(0,0,0,0.18);border-radius:5px;border-left:2px solid ${accent||'rgba(255,255,255,0.12)'}">
+       <div style="font-size:8px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;font-family:'JetBrains Mono',monospace">${label}</div>
+       <div style="font-size:11px;color:var(--text);line-height:1.5">${content}</div>
+     </div>`;
+
+  const bulletList = s.bullets.length
+    ? `<ul style="margin:0;padding-left:16px">${s.bullets.map(b=>`<li style="font-size:10px;color:var(--muted2);padding:2px 0;line-height:1.45">${esc(b)}</li>`).join('')}</ul>`
+    : '';
+
   storyEl.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <span style="font-size:8px;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace;padding:1px 7px;border-radius:3px;background:${col}1a;border:1px solid ${col}55;color:${col}">${tag}</span>
-      <span style="font-size:9px;color:var(--muted2)">${story.driverCount} active force${story.driverCount!==1?'s':''} · ${story.activeThemeCount} tailwind theme${story.activeThemeCount!==1?'s':''}</span>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:8px;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace;padding:2px 8px;border-radius:3px;background:${col}1a;border:1px solid ${col}55;color:${col}">${tag}</span>
+      <span style="font-size:9px;color:var(--muted2)">${s.driverCount} active force${s.driverCount!==1?'s':''}</span>
+      <span style="font-size:9px;color:var(--muted)">·</span>
+      <span style="font-size:9px;color:var(--muted2)">${s.activeThemeCount} tailwind${s.activeThemeCount!==1?'s':''}</span>
+      ${s.headwindCount ? `<span style="font-size:9px;color:var(--muted)">·</span><span style="font-size:9px;color:#f77">${s.headwindCount} headwind${s.headwindCount!==1?'s':''}</span>` : ''}
     </div>
-    <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.45;margin-bottom:${story.bullets.length?'8px':'0'}">${esc(story.headline)}</div>
-    ${story.bullets.length ? `<ul style="margin:0 0 10px;padding-left:16px">${story.bullets.map(b=>`<li style="font-size:10px;color:var(--muted2);padding:1px 0;line-height:1.4">${esc(b)}</li>`).join('')}</ul>` : ''}
+    <div style="font-size:15px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:${bulletList?'10px':'12px'};font-family:'Syne',sans-serif">${esc(s.headline)}</div>
+    ${bulletList ? `<div style="margin-bottom:14px">${bulletList}</div>` : ''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      ${block('What is the market doing?', esc(s.headline), col + '40')}
+      ${block('Why is it happening?', s.bullets.length ? esc(s.bullets[0]) : 'Active market forces confirmed via sensor data.', 'rgba(255,255,255,0.1)')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      ${block('What should traders expect next?', esc(s.whatNext), 'rgba(255,255,255,0.1)')}
+      ${s.focusThemes.length ? block('Where should attention go?', esc(s.focusThemes.join(' · ')), 'rgba(0,200,100,0.25)') : block('Where should attention go?', 'No high-conviction themes active yet.', 'rgba(255,255,255,0.1)')}
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      ${story.focusThemes.length ? `<div><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Where to focus</div><div style="font-size:10px;color:var(--text)">${esc(story.focusThemes.join(', '))}</div></div>` : '<div></div>'}
-      <div><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Trade mode</div><div style="font-size:10px;color:var(--text)">${esc(story.tradeMode)}</div></div>
+      ${block('What could break the view?', s.breakers.map(b=>`• ${b}`).join('<br>'), 'rgba(200,50,50,0.25)')}
+      ${block('Preferred trade mode', esc(s.tradeMode), col + '40')}
     </div>`;
+}
+
+// ── Apex sub-tab switching ────────────────────────────────────────────────────
+function apexSubTab(id) {
+  const tabs = ['story','forces','themes','universe','tree'];
+  tabs.forEach(t => {
+    const btn   = document.getElementById('atab-' + (t==='themes' ? 'themes-tab' : t));
+    const panel = document.getElementById('atab-panel-' + t);
+    const on = t === id;
+    if (btn)   btn.classList.toggle('atab-act', on);
+    if (panel) panel.classList.toggle('atab-show', on);
+  });
+}
+
+// ── Market force detail definitions ──────────────────────────────────────────
+const _FORCE_DETAIL = {
+  ai_capex_growth: {
+    meaning: 'Major cloud providers are expanding capital expenditure on AI compute, data centres, and networking. Revenue flows to semiconductor and infrastructure suppliers.',
+    whatToWatch: 'Hyperscaler capex guidance, semiconductor order backlog, SMH performance vs SPY.',
+    invalidation: 'Hyperscaler capex guidance misses; AI hype reversal; macro budget freeze.',
+    themes: ['semiconductors','data_centre_power','ai_compute_infrastructure','memory_storage'],
+  },
+  ai_compute_demand: {
+    meaning: 'Demand for AI processing (GPUs, custom ASICs, high-bandwidth memory) outpaces available supply, driving pricing power for compute suppliers.',
+    whatToWatch: 'NVDA/AMD earnings guidance, data centre lease announcements, SMH vol.',
+    invalidation: 'Supply normalisation; GPU ASP deflation; model training spend slowdown.',
+    themes: ['semiconductors','memory_storage','ai_compute_infrastructure'],
+  },
+  geopolitical_risk_rising: {
+    meaning: 'Elevated geopolitical tension is driving defence sector outperformance as governments accelerate procurement programs.',
+    whatToWatch: 'ITA ETF vs SPY spread, government contract announcements, threat-level indicators.',
+    invalidation: 'Ceasefire or diplomatic resolution; defence budget sequestration.',
+    themes: ['defence_aerospace'],
+  },
+  small_cap_risk_on: {
+    meaning: 'Investors rotating into smaller, higher-beta names — signals broad-based risk appetite beyond mega-caps, often a bull market breadth expansion.',
+    whatToWatch: 'IWM vs SPY relative strength, Russell 2000 breadth, regional bank performance.',
+    invalidation: 'IWM underperforms SPY by >3%; credit spreads widen; Fed turns hawkish.',
+    themes: ['small_cap_basket','regional_banks'],
+  },
+  yields_falling: {
+    meaning: 'Treasury yields are declining, reducing the discount rate on future earnings — a direct tailwind for growth stocks, REITs, and long-duration assets.',
+    whatToWatch: 'IEF price action, 10Y yield level, Fed fund futures, TIPS breakevens.',
+    invalidation: 'Sticky inflation data; hawkish Fed commentary; supply-driven yield spike.',
+    themes: ['software_cloud','reits','biotech','mega_cap_platforms'],
+  },
+  yields_rising: {
+    meaning: 'Rising Treasury yields are compressing growth multiples and pressuring rate-sensitive sectors. Headwind for equities at long duration.',
+    whatToWatch: 'IEF price decline, 2Y/10Y spread, TIPS breakeven inflation.',
+    invalidation: 'Weaker jobs data; inflation declining; Fed easing signals.',
+    themes: ['reits_falling_yield'],
+    isHeadwind: true,
+  },
+  credit_stress_easing: {
+    meaning: 'Investment-grade and high-yield credit spreads are tightening — lower default risk, better corporate funding, supportive of risk assets.',
+    whatToWatch: 'HYG/LQD spread, CDX IG index, bank lending standards.',
+    invalidation: 'Spreads widen >50bp; bank stress event; earnings wave disappointments.',
+    themes: ['regional_banks','small_cap_basket'],
+  },
+  credit_stress_rising: {
+    meaning: 'Corporate credit spreads are widening, signalling rising default risk and reduced risk appetite in funding markets. Headwind for equities.',
+    whatToWatch: 'HYG price decline, HYG/LQD ratio, bank sector underperformance.',
+    invalidation: 'Spreads tighten; Fed provides liquidity backstop; earnings stabilise.',
+    themes: [],
+    isHeadwind: true,
+  },
+  risk_on_rotation: {
+    meaning: 'Broad capital rotation into higher-beta equities and cyclicals — classic risk-on environment with improving breadth and declining defensive demand.',
+    whatToWatch: 'SPY advancing, VIX declining, XLY vs XLP ratio.',
+    invalidation: 'VIX spike; macro shock; geopolitical event; policy reversal.',
+    themes: ['consumer_discretionary','travel_leisure','small_cap_basket'],
+  },
+  risk_off_rotation: {
+    meaning: 'Capital is flowing out of equities into safe havens — bonds, gold, and defensive sectors. Adverse environment for directional long exposure.',
+    whatToWatch: 'UVXY bid, SPY declining, gold outperforming, defensive sector leadership.',
+    invalidation: 'VIX normalises; positive macro surprise; policy pivot signal.',
+    themes: ['defensive_healthcare','gold_precious_metals'],
+    isHeadwind: true,
+  },
+  gold_safe_haven_bid: {
+    meaning: 'Gold is outperforming, reflecting demand for protection against inflation, currency risk, or broad market uncertainty.',
+    whatToWatch: 'GLD price vs SPY, real rates, DXY strength, central bank buying.',
+    invalidation: 'Real rates rise sharply; USD strengthens significantly; risk-on normalises.',
+    themes: ['gold_precious_metals'],
+  },
+  oil_supply_shock: {
+    meaning: 'Oil prices are surging on supply disruption — geopolitical shock, OPEC+ cuts, or pipeline disruption — creating an inflationary headwind.',
+    whatToWatch: 'USO price vs 60-day average, OPEC meeting outcomes, inventory data.',
+    invalidation: 'OPEC production increase; demand destruction; diplomatic resolution.',
+    themes: ['energy_transition'],
+    isHeadwind: true,
+  },
+};
+
+// ── Market Forces cards renderer ──────────────────────────────────────────────
+function _renderMarketForcesCards(drivers, evidence, blocked, themes, candidates) {
+  const el = document.getElementById('intel-forces-cards');
+  if (!el) return;
+
+  const allIds = Object.keys(_DRIVER_LABELS);
+  el.innerHTML = allIds.map(id => {
+    const label     = _DRIVER_LABELS[id] || _toTitleCase(id);
+    const detail    = _FORCE_DETAIL[id] || {};
+    const isActive  = drivers.includes(id);
+    const isBlocked = blocked.includes(id);
+    const evText    = evidence[id + '_reason'] || '';
+
+    const activatedThemes = (themes||[]).filter(t => (t.active_drivers||[]).includes(id));
+    const themeChips = activatedThemes.slice(0,4).map(t =>
+      `<span style="font-size:8px;padding:1px 7px;border-radius:9px;background:rgba(0,200,100,0.1);border:1px solid rgba(0,200,100,0.28);color:var(--green)">${esc(_themeLabel(t.theme_id||''))}</span>`
+    ).join('');
+
+    const forceCands = (candidates||[]).filter(c => c.driver === id);
+
+    let badge, col, cls;
+    if (isActive)       { badge='ACTIVE';  col='var(--green)';  cls='fc fc-on'; }
+    else if (isBlocked) { badge='BLOCKED'; col='var(--orange)'; cls='fc fc-block'; }
+    else                { badge='DORMANT'; col='var(--muted)';  cls='fc fc-off'; }
+
+    const cardId = 'fc-' + id.replace(/_/g,'-');
+    return `<div class="${cls}" id="${cardId}" onclick="_toggleForceCard('${id}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700;color:var(--text);font-family:'Syne',sans-serif;line-height:1.2">${esc(label)}</div>
+        <span style="font-size:7px;padding:2px 7px;border-radius:3px;background:${col}1a;border:1px solid ${col}55;color:${col};font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;flex-shrink:0;margin-top:2px">${badge}</span>
+      </div>
+      <div style="font-size:10px;color:var(--muted2);line-height:1.5;margin-bottom:8px">${esc(detail.meaning||'No description available.')}</div>
+      ${evText
+        ? `<div style="font-size:9px;color:${isActive?'var(--green)':'var(--muted2)'};background:${isActive?'rgba(0,200,100,0.06)':'rgba(255,255,255,0.03)'};border-radius:4px;padding:6px 8px;margin-bottom:8px;line-height:1.45"><span style="opacity:0.7">${isActive?'● Confirmed:':'○ Not triggered:'}</span> ${esc(evText)}</div>`
+        : ''}
+      ${themeChips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">${themeChips}</div>` : ''}
+      <div id="${cardId}-exp" style="display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;display:none">
+        ${detail.whatToWatch ? `<div style="margin-bottom:8px"><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px">What to watch</div><div style="font-size:10px;color:var(--muted2);line-height:1.4">${esc(detail.whatToWatch)}</div></div>` : ''}
+        ${detail.invalidation ? `<div style="margin-bottom:8px"><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Invalidation triggers</div><div style="font-size:10px;color:var(--muted2);line-height:1.4">${esc(detail.invalidation)}</div></div>` : ''}
+        ${forceCands.length ? `<div><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Symbols in this force (${forceCands.length})</div><div style="display:flex;flex-wrap:wrap;gap:4px">${forceCands.slice(0,10).map(c=>`<span style="font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--text)">${esc(c.symbol)}</span>`).join('')}${forceCands.length>10?`<span style="font-size:9px;color:var(--muted2)">+${forceCands.length-10}</span>`:''}</div></div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _toggleForceCard(id) {
+  const exp = document.getElementById('fc-' + id.replace(/_/g,'-') + '-exp');
+  if (!exp) return;
+  exp.style.display = exp.style.display === 'none' ? 'block' : 'none';
+}
+
+function _toTitleCase(s) {
+  return s.replace(/_/g,' ').replace(/\b[a-z]/g, c => c.toUpperCase());
+}
+
+// ── Theme Map renderer ────────────────────────────────────────────────────────
+function _renderThemeMapCards(themes, candidates) {
+  const el = document.getElementById('intel-theme-map');
+  if (!el) return;
+  if (!themes || !themes.length) {
+    el.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No theme data available.</div>';
+    return;
+  }
+
+  const isActive  = t => { const s=(t.state||'').toLowerCase(); return s==='activated'||s==='active'||s==='strengthening'; };
+  const isDormish = t => { const s=(t.state||'').toLowerCase(); return s==='dormant'||s==='invalidated'; };
+
+  const tailwinds = themes.filter(t => isActive(t)  && (t.direction||'').toLowerCase()!=='headwind');
+  const headwinds = themes.filter(t => isActive(t)  && (t.direction||'').toLowerCase()==='headwind');
+  const watching  = themes.filter(t => !isActive(t) && !isDormish(t));
+  const dormant   = themes.filter(t => isDormish(t));
+
+  const section = (title, color, items, dim) => {
+    if (!items.length) return '';
+    return `<div style="margin-bottom:20px">
+      <div style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:${color};margin-bottom:8px;font-family:'JetBrains Mono',monospace;font-weight:700;padding-bottom:4px;border-bottom:1px solid ${color}22">${esc(title)} <span style="opacity:0.6">(${items.length})</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
+        ${items.map(t => _buildThemeCard(t, candidates, dim)).join('')}
+      </div>
+    </div>`;
+  };
+
+  el.innerHTML = section('Active Tailwinds', 'var(--green)', tailwinds, false) +
+                 section('Active Headwinds', '#f77', headwinds, false) +
+                 section('Watching / Cooling', 'var(--orange)', watching, false) +
+                 section('Dormant', 'var(--muted)', dormant, true);
+}
+
+function _buildThemeCard(t, candidates, dim) {
+  const name  = _themeLabel(t.theme_id || t.name || '?');
+  const conf  = t.confidence != null ? Math.round((t.confidence||0)*100) : null;
+  const cands = t.candidate_count != null ? t.candidate_count : null;
+  const state = (t.state||'').toLowerCase();
+  const dir   = (t.direction||'').toLowerCase();
+
+  let sc, sl;
+  if (state==='activated'||state==='active') { sc='var(--green)'; sl='ACTIVE'; }
+  else if (state==='strengthening')          { sc='#4fd';          sl='STRONG'; }
+  else if (state==='watchlist')              { sc='var(--orange)'; sl='WATCH'; }
+  else if (state==='weakening')              { sc='#f77';          sl='WEAK'; }
+  else if (state==='crowded')                { sc='#c80';          sl='CROWDED'; }
+  else if (state==='invalidated')            { sc='#944';          sl='INVALID'; }
+  else                                       { sc='var(--muted)';  sl='DORMANT'; }
+
+  const dirTag   = dir==='headwind' ? '↓ Headwind' : dir==='tailwind' ? '↑ Tailwind' : '';
+  const dirColor = dir==='headwind' ? '#f77' : 'var(--green)';
+
+  const byChips = (t.active_drivers||[]).map(dr =>
+    `<span style="font-size:8px;padding:1px 6px;border-radius:9px;background:rgba(255,255,255,0.06);color:var(--muted2)">${esc(_driverLabel(dr))}</span>`
+  ).join('');
+
+  const riskChips = (t.risk_flags||[]).slice(0,3).map(r =>
+    `<span style="font-size:8px;padding:1px 6px;border-radius:9px;background:rgba(200,50,50,0.1);border:1px solid rgba(200,50,50,0.22);color:#f99">${esc(_riskLabel(r))}</span>`
+  ).join('');
+
+  const symChips = (candidates||[]).filter(c => c.theme === t.theme_id).slice(0,5).map(c =>
+    `<span style="font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--text)">${esc(c.symbol)}</span>`
+  ).join('');
+
+  const confBar = conf != null
+    ? `<div style="height:2px;background:rgba(255,255,255,0.06);border-radius:1px;margin:6px 0;overflow:hidden">
+         <div style="height:100%;width:${conf}%;background:${sc};opacity:0.7;border-radius:1px"></div>
+       </div>` : '';
+
+  return `<div style="background:var(--bg2);border:1px solid ${dim?'rgba(255,255,255,0.05)':sc+'40'};border-radius:6px;padding:12px;${dim?'opacity:0.55':''}">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:4px">
+      <div style="font-size:12px;font-weight:700;color:${dim?'var(--muted2)':'var(--text)'};line-height:1.2">${esc(name)}</div>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        ${dirTag ? `<span style="font-size:8px;color:${dirColor}">${dirTag}</span>` : ''}
+        <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${sc}1a;border:1px solid ${sc}40;color:${sc};font-family:'JetBrains Mono',monospace">${sl}</span>
+      </div>
+    </div>
+    ${confBar}
+    ${cands != null && cands > 0 ? `<div style="font-size:9px;color:var(--muted2);margin-bottom:5px">${cands} candidate${cands!==1?'s':''} in universe</div>` : ''}
+    ${byChips ? `<div style="margin-bottom:5px"><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Activated by</div><div style="display:flex;flex-wrap:wrap;gap:3px">${byChips}</div></div>` : ''}
+    ${symChips ? `<div style="margin-bottom:5px"><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Symbols</div><div style="display:flex;flex-wrap:wrap;gap:3px">${symChips}</div></div>` : ''}
+    ${riskChips ? `<div><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Risks</div><div style="display:flex;flex-wrap:wrap;gap:3px">${riskChips}</div></div>` : ''}
+  </div>`;
+}
+
+// ── Visual Tree ───────────────────────────────────────────────────────────────
+window._vtData = { drivers:[], evidence:{}, blocked:[], themes:[], candidates:[] };
+
+function _initVisualTree(drivers, evidence, blocked, themes, candidates) {
+  window._vtData = { drivers, evidence, blocked, themes, candidates };
+  const el = document.getElementById('vt-forces');
+  if (!el) return;
+
+  const active  = drivers.filter(id => _DRIVER_LABELS[id]);
+  const blkd    = blocked.filter(id => _DRIVER_LABELS[id] && !active.includes(id));
+  const dormant = Object.keys(_DRIVER_LABELS).filter(id => !active.includes(id) && !blkd.includes(id));
+
+  const item = (id, col, dot, dim) =>
+    `<div class="vt-item${dim?' fc-off':''}" id="vtf-${id.replace(/_/g,'-')}" onclick="_vtClickForce('${id}')">
+       <div style="display:flex;align-items:center;gap:7px">
+         <span style="color:${col};font-size:8px;flex-shrink:0">${dot}</span>
+         <span style="font-size:10px;font-weight:600;color:${dim?'var(--muted2)':'var(--text)'};line-height:1.3">${esc(_driverLabel(id))}</span>
+       </div>
+     </div>`;
+
+  el.innerHTML =
+    active.map(id => item(id,'var(--green)','●',false)).join('') +
+    (blkd.length ? `<div style="height:1px;background:rgba(255,255,255,0.05);margin:6px 0"></div>` + blkd.map(id => item(id,'var(--orange)','▲',false)).join('') : '') +
+    (dormant.length ? `<div style="height:1px;background:rgba(255,255,255,0.05);margin:6px 0"></div>` + dormant.map(id => item(id,'var(--muted)','○',true)).join('') : '');
+}
+
+function _vtClickForce(forceId) {
+  const { themes, candidates } = window._vtData;
+  document.querySelectorAll('#vt-forces .vt-item').forEach(e => e.classList.remove('vt-sel'));
+  const sel = document.getElementById('vtf-' + forceId.replace(/_/g,'-'));
+  if (sel) sel.classList.add('vt-sel');
+
+  const themesEl = document.getElementById('vt-themes');
+  const detEl    = document.getElementById('vt-detail');
+  const titEl    = document.getElementById('vt-detail-title');
+  if (detEl)  detEl.innerHTML  = '<div style="font-size:10px;color:var(--muted2)">Select a theme.</div>';
+  if (titEl)  titEl.textContent = 'Symbols';
+
+  const forceThemes = themes.filter(t => (t.active_drivers||[]).includes(forceId));
+  // also include expected themes from FORCE_DETAIL if not in live data
+  const liveIds   = forceThemes.map(t => t.theme_id);
+  const extraIds  = ((_FORCE_DETAIL[forceId]||{}).themes||[]).filter(id => !liveIds.includes(id));
+  const extraItems = extraIds.map(id => ({ theme_id: id, state:'dormant', direction:'', confidence:0, candidate_count:0, active_drivers:[forceId], risk_flags:[] }));
+  const allThemes = forceThemes.concat(extraItems);
+
+  if (!themesEl) return;
+  if (!allThemes.length) {
+    themesEl.innerHTML = '<div style="font-size:10px;color:var(--muted2);padding:8px">No themes linked to this force.</div>';
+    return;
+  }
+  themesEl.innerHTML = allThemes.map(t => {
+    const s    = (t.state||'').toLowerCase();
+    const col  = (s==='activated'||s==='active') ? 'var(--green)' : s==='strengthening' ? '#4fd' : s==='watchlist' ? 'var(--orange)' : 'var(--muted2)';
+    const n    = (candidates||[]).filter(c => c.theme === t.theme_id).length;
+    const tid  = (t.theme_id||'').replace(/_/g,'-');
+    return `<div class="vt-item" id="vtt-${tid}" onclick="_vtClickTheme('${t.theme_id||''}')">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <span style="font-size:10px;font-weight:600;color:var(--text);line-height:1.3">${esc(_themeLabel(t.theme_id||''))}</span>
+        ${n ? `<span style="font-size:8px;color:var(--muted2);flex-shrink:0">${n} sym</span>` : ''}
+      </div>
+      ${t.confidence ? `<div style="height:2px;background:rgba(255,255,255,0.05);border-radius:1px;margin-top:4px;overflow:hidden"><div style="height:100%;width:${Math.round((t.confidence||0)*100)}%;background:${col};opacity:0.65;border-radius:1px"></div></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function _vtClickTheme(themeId) {
+  const { candidates } = window._vtData;
+  document.querySelectorAll('#vt-themes .vt-item').forEach(e => e.classList.remove('vt-sel'));
+  const sel = document.getElementById('vtt-' + themeId.replace(/_/g,'-'));
+  if (sel) sel.classList.add('vt-sel');
+
+  const titEl = document.getElementById('vt-detail-title');
+  const detEl = document.getElementById('vt-detail');
+  if (titEl) titEl.textContent = _themeLabel(themeId) + ' — Symbols';
+  if (!detEl) return;
+
+  const themeCands = (candidates||[]).filter(c => c.theme === themeId);
+  if (!themeCands.length) {
+    detEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No symbols in this theme yet.</div>';
+    return;
+  }
+  detEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">` +
+    themeCands.map(c => {
+      const pct  = Math.round((c.confidence||0)*100);
+      const band = _getUniScoreBand(pct);
+      const sym  = c.symbol || '?';
+      const co   = (_SYMBOL_DICT[sym]||{}).co || '';
+      const role = _ROLE_LABELS[c.role] || { label:c.role||'—', color:'var(--muted2)', bg:'rgba(255,255,255,0.06)' };
+      return `<div onclick="_vtClickSym('${esc(sym)}')" style="padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;cursor:pointer;transition:border-color .12s" onmouseenter="this.style.borderColor='rgba(255,107,0,0.35)'" onmouseleave="this.style.borderColor='var(--border)'">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div>
+            <span style="font-size:14px;font-weight:700;color:var(--orange);font-family:'Syne',sans-serif">${esc(sym)}</span>
+            ${co ? `<span style="font-size:9px;color:var(--muted2);margin-left:6px">${esc(co)}</span>` : ''}
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:16px;font-weight:700;color:${band.color};font-family:'Syne',sans-serif;line-height:1">${pct}</div>
+            <div style="font-size:8px;color:${band.color};opacity:0.75">${esc(band.label)}</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--muted2);line-height:1.4;margin-bottom:4px">${esc(_shortThesis(c))}</div>
+        <span style="font-size:8px;padding:1px 6px;border-radius:9px;background:${role.bg};color:${role.color}">${esc(role.label)}</span>
+      </div>`;
+    }).join('') + `</div>`;
+}
+
+function _vtClickSym(sym) {
+  const c = (window._vtData.candidates||[]).find(x => x.symbol === sym);
+  if (!c) return;
+  const detEl = document.getElementById('vt-detail');
+  const titEl = document.getElementById('vt-detail-title');
+  if (!detEl) return;
+  if (titEl) titEl.textContent = sym + ' — Detail';
+
+  const pct      = Math.round((c.confidence||0)*100);
+  const band     = _getUniScoreBand(pct);
+  const co       = (_SYMBOL_DICT[sym]||{}).co || '';
+  const role     = _ROLE_LABELS[c.role] || { label:c.role||'—', color:'var(--muted2)', bg:'rgba(255,255,255,0.06)' };
+  const route    = (c.route_hint||[])[0]||'';
+  const routeInf = _ROUTE_LABELS[route]||{};
+  const driver   = c.driver ? _driverLabel(c.driver) : '';
+  const ready    = _getReadiness(pct, route);
+  const themeId  = c.theme||'';
+
+  detEl.innerHTML = `
+    <button onclick="_vtClickTheme('${esc(themeId)}')" style="background:transparent;border:1px solid var(--border);color:var(--muted2);font-size:9px;padding:2px 10px;border-radius:3px;cursor:pointer;margin-bottom:12px;font-family:'JetBrains Mono',monospace">← Back to ${esc(_themeLabel(themeId))}</button>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+      <div>
+        <div style="font-size:22px;font-weight:800;color:var(--orange);font-family:'Syne',sans-serif;line-height:1">${esc(sym)}</div>
+        ${co ? `<div style="font-size:10px;color:var(--muted2);margin-top:2px">${esc(co)}</div>` : ''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:28px;font-weight:700;color:${band.color};font-family:'Syne',sans-serif;line-height:1">${pct}</div>
+        <div style="font-size:9px;color:${band.color};opacity:0.75">${esc(band.label)}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">
+      <span style="font-size:8px;padding:2px 8px;border-radius:9px;background:${role.bg};color:${role.color}">${esc(role.label)}</span>
+      ${routeInf.label ? `<span style="font-size:8px;padding:2px 8px;border-radius:9px;background:${routeInf.color}12;color:${routeInf.color}">${esc(routeInf.label)}</span>` : ''}
+      <span style="font-size:8px;padding:2px 8px;border-radius:9px;background:rgba(255,255,255,0.05);color:var(--muted2)">${esc(ready)}</span>
+    </div>
+    ${driver ? `<div style="font-size:9px;color:var(--muted2);margin-bottom:8px">↳ Activated by: <span style="color:var(--green)">${esc(driver)}</span></div>` : ''}
+    <div style="font-size:10px;color:var(--text);line-height:1.55;padding:10px 12px;background:rgba(0,0,0,0.15);border-radius:5px;margin-bottom:12px">${esc(c.reason_to_care||c.reason||'—')}</div>
+    ${_buildUniDetail(c,'vt-'+sym)}`;
 }
 
 function loadIntelligence() {
@@ -3462,6 +3947,7 @@ function loadIntelligence() {
     const drivers = mm.active_drivers || [];
     const ev      = mm.evidence || {};
     const themes  = d.themes || [];
+    const blocked = mm.blocked_conditions || [];
 
     const tsEl = document.getElementById('intel-ts');
     if (tsEl && d.ts) {
@@ -3621,6 +4107,12 @@ function loadIntelligence() {
         uniEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No universe data</div>';
       }
     }
+
+    // ── New tab renderers ────────────────────────────────────────────────────
+    const cands = d.candidates || [];
+    _renderMarketForcesCards(drivers, ev, blocked, themes, cands);
+    _renderThemeMapCards(themes, cands);
+    _initVisualTree(drivers, ev, blocked, themes, cands);
   }).catch(() => {
     const driversEl = document.getElementById('intel-drivers');
     if (driversEl) driversEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">Pipeline not yet run</div>';
