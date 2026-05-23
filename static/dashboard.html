@@ -874,6 +874,9 @@ canvas{display:block;width:100% !important}
     <div style="font-size:10px;color:var(--muted2)">Loading market story…</div>
   </div>
 
+  <!-- Active driver buttons — floated above 2-column grid -->
+  <div id="intel-active-drivers" style="display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0;min-height:0"></div>
+
   <!-- ZONE 2: Market Map + Active Themes -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0">
 
@@ -3469,18 +3472,28 @@ function loadIntelligence() {
     // ── Market Story ──────────────────────────────────────────────────────────
     _renderMarketStory(drivers, themes);
 
-    // ── What's Driving the Market ─────────────────────────────────────────────
+    // ── Active driver buttons (above the 2-column grid) ──────────────────────
+    const activeBarEl = document.getElementById('intel-active-drivers');
+    if (activeBarEl) {
+      activeBarEl.innerHTML = drivers.length
+        ? drivers.map(dr =>
+            `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;background:var(--green)16;border:1px solid var(--green)55;cursor:default">
+               <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)88;flex-shrink:0"></span>
+               <span style="font-size:11px;font-weight:600;color:var(--green);letter-spacing:0.02em">${esc(_driverLabel(dr))}</span>
+             </div>`
+          ).join('')
+        : '';
+    }
+
+    // ── What's Driving the Market — evidence rows only (chips moved above) ────
     const driversEl = document.getElementById('intel-drivers');
     if (driversEl) {
       const blocked = mm.blocked_conditions || [];
       const evKeys  = Object.keys(ev).filter(k => k.endsWith('_reason'));
 
-      if (!drivers.length && !evKeys.length) {
-        driversEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No drivers resolved — run intelligence pipeline first.</div>';
+      if (!evKeys.length) {
+        driversEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No evidence data — run intelligence pipeline first.</div>';
       } else {
-        const activeChips = drivers.map(dr =>
-          `<span style="padding:2px 9px;border-radius:3px;background:var(--green)1a;border:1px solid var(--green)44;font-size:10px;color:var(--green);font-weight:600">${esc(_driverLabel(dr))}</span>`
-        ).join('');
         const blockedLine = blocked.length
           ? `<div style="font-size:9px;color:var(--red);margin-bottom:6px">Blocked: ${blocked.map(_driverLabel).map(esc).join(', ')}</div>` : '';
         const evidenceRows = evKeys.map(k => {
@@ -3490,16 +3503,12 @@ function loadIntelligence() {
                                             .replace(/^risk_on$/, 'risk_on_rotation')
                                             .replace(/^gold$/, 'gold_safe_haven_bid')
                                             .replace(/^credit_easing$/, 'credit_stress_easing');
-          const isActive = drivers.includes(dk) || drivers.some(d => k.startsWith(d.split('_')[0]));
-          const activeMatch = drivers.find(d => k === d + '_reason' || k.replace('_reason','') === d);
-          const confirmed = !!activeMatch;
+          const confirmed = drivers.find(d => k === d + '_reason' || k.replace('_reason','') === d);
           const col = confirmed ? 'var(--green)' : 'var(--muted)';
           const dot = confirmed ? '●' : '○';
           return `<div style="font-size:10px;color:${col};padding:2px 0;line-height:1.5">${dot} ${esc(ev[k])}</div>`;
         }).join('');
-        driversEl.innerHTML =
-          (activeChips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${activeChips}</div>` : '') +
-          blockedLine + evidenceRows;
+        driversEl.innerHTML = blockedLine + evidenceRows;
       }
     }
 
