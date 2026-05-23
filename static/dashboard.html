@@ -6239,6 +6239,86 @@ function _renderMacroStrip(allItems) {
     <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin">${cards}</div>`;
 }
 
+// ── Catalyst helpers ─────────────────────────────────────────
+let _catCandidates = [];
+
+function _catColor(s) { return s >= 7 ? 'var(--red)' : s >= 4 ? 'var(--yellow)' : '#4dabf7'; }
+
+function _catStatus(c) {
+  const o = c.options_anomaly_score||0, e = c.edgar_score||0;
+  const isBull = (c.sentiment_flags||[]).includes('Bullish'), score = c.catalyst_score||0;
+  if (e > 0 && o > 5 && score >= 7) return {label:'Trade Review',       cls:'trade-review',   icon:'◆'};
+  if (e > 0 && score >= 6)           return {label:'Confirmed Catalyst', cls:'confirmed',       icon:'✓'};
+  if (e > 0)                         return {label:'EDGAR Signal',       cls:'edgar-signal',    icon:'⚡'};
+  if (o >= 7 && isBull)              return {label:'Send to Apex',       cls:'send-apex',       icon:'↑'};
+  if (o > 0)                         return {label:'Options Anomaly',    cls:'options-anomaly', icon:'◈'};
+  return                               {label:'Watch Only',              cls:'watch-only',      icon:'○'};
+}
+
+function _catEvidence(c) {
+  const o = c.options_anomaly_score||0, e = c.edgar_score||0, fl = c.sentiment_flags||[];
+  return {
+    optionsFlow:   o >= 7 ? ['Strong','ev-strong'] : o >= 4 ? ['Moderate','ev-moderate'] : o > 0 ? ['Weak','ev-weak'] : ['None','ev-none'],
+    eventEvidence: e > 0  ? ['Confirmed','ev-confirmed'] : ['Missing','ev-missing'],
+    sentiment:     fl.includes('Bullish') ? ['Bullish','ev-bullish'] : fl.includes('Bearish') ? ['Bearish','ev-bearish'] : ['Neutral','ev-neutral'],
+    priceConfirm:  ['Waiting','ev-waiting'],
+  };
+}
+
+function _catEvidenceHtml(c) {
+  const ev = _catEvidence(c);
+  const lbls = {optionsFlow:'Options Flow',eventEvidence:'Event Evidence',sentiment:'Sentiment',priceConfirm:'Price Confirm'};
+  return Object.keys(lbls).map(k => {
+    const [val, cls] = ev[k];
+    return `<div class="cat-evidence-row"><span class="cat-evidence-lbl">${lbls[k]}</span><span class="cat-evidence-val ${cls}">${val}</span></div>`;
+  }).join('');
+}
+
+function _catWhyNow(c) {
+  const opts = (c.options_anomaly_flags||[]).filter(f => f && !f.startsWith('No '));
+  const edgar = c.edgar_events||[], hasEdgar = (c.edgar_score||0) > 0, hasOpts = (c.options_anomaly_score||0) > 0;
+  if (!hasOpts && !hasEdgar)
+    return (c.sentiment_flags||[]).includes('Bullish')
+      ? 'Positive sentiment detected, but no options or SEC filing catalyst confirmed yet.'
+      : 'Fundamental profile meets screening criteria. No anomaly signals active.';
+  const parts = [];
+  if (opts.length) parts.push(opts[0].charAt(0).toUpperCase() + opts[0].slice(1));
+  else if (hasOpts) parts.push('Unusual options activity detected');
+  if (edgar.length) parts.push('SEC ' + edgar[0] + ' filing on record');
+  if (!hasEdgar) parts.push('no confirmed external catalyst found yet');
+  const s = parts.join('; ');
+  return (s.charAt(0).toUpperCase() + s.slice(1) + '.').replace('..','.');
+}
+
+function _catBadgesHtml(c) {
+  let b = '';
+  if (c.sector) b += `<span class="cat-badge sector">${esc(c.sector)}</span>`;
+  (c.options_anomaly_flags||[]).filter(f => f && !f.startsWith('No ')).slice(0,2).forEach(f => {
+    b += `<span class="cat-badge opt">${esc(f.length > 36 ? f.slice(0,36)+'…' : f)}</span>`;
+  });
+  (c.edgar_events||[]).slice(0,1).forEach(ev => {
+    b += `<span class="cat-badge edgar">${esc(ev.length > 36 ? ev.slice(0,36)+'…' : ev)}</span>`;
+  });
+  const sent = (c.sentiment_flags||[]).find(f => ['Bullish','Bearish'].includes(f));
+  if (sent) b += `<span class="cat-badge ${sent==='Bullish'?'senti-bull':'senti-bear'}">Senti: ${sent}</span>`;
+  return b ? `<div class="cat-badges">${b}</div>` : '';
+}
+
+function _catSpotlightCard(c, idx) {
+  const score = c.catalyst_score||0, col = _catColor(score);
+  const cls = score >= 7 ? 'live' : score >= 4 ? 'warm' : 'cool';
+  const pct = Math.min(100, Math.round(score / 10 * 100)), st = _catStatus(c);
+  return `<div class="cat-spotlight-card ${cls}" onclick="openCatalystDetail(${idx})"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div style="min-width:0;flex:1"><div style="margin-bottom:4px"><span class="cat-status-badge ${st.cls}">${st.icon} ${st.label}</span></div><div class="cat-ticker" style="color:${col}">${esc(c.ticker||'?')}</div><div class="cat-name">${esc((c.name||c.ticker||'').slice(0,32))}</div></div><div style="text-align:right;flex-shrink:0"><div class="cat-score-row"><span class="cat-score" style="color:${col}">${score}</span><span class="cat-score-max">/10</span></div></div></div><div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%;background:${col}"></div></div><div class="cat-why-now">${esc(_catWhyNow(c))}</div><div class="cat-evidence-stack">${_catEvidenceHtml(c)}</div>${_catBadgesHtml(c)}</div>`;
+}
+
+function _catCompactCard(c, idx) {
+  const score = c.catalyst_score||0, col = _catColor(score);
+  const cls = score >= 7 ? 'live' : score >= 4 ? 'warm' : 'cool';
+  const pct = Math.min(100, Math.round(score / 10 * 100)), st = _catStatus(c);
+  const hasAnomaly = (c.options_anomaly_score||0) > 0 || (c.edgar_score||0) > 0;
+  return `<div class="cat-card ${cls}" onclick="openCatalystDetail(${idx})"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><div class="cat-ticker" style="color:${col}">${hasAnomaly?'<span class="cat-pulse"></span>':''}${esc(c.ticker||'?')}</div><span class="cat-status-badge ${st.cls}">${st.icon} ${st.label}</span></div><div class="cat-name">${esc((c.name||c.ticker||'').slice(0,36))}</div></div><div style="text-align:right;flex-shrink:0;margin-left:8px"><div class="cat-score-row"><span class="cat-score" style="color:${col}">${score}</span><span class="cat-score-max">/10</span></div><div class="cat-dims"><span class="cat-dim ${(c.options_anomaly_score||0)>0?'active':''}" style="${(c.options_anomaly_score||0)>0?'color:var(--yellow)':''}">O:${c.options_anomaly_score||0}/10</span><span class="cat-dim ${(c.edgar_score||0)>0?'active':''}" style="${(c.edgar_score||0)>0?'color:var(--red)':''}">E:${c.edgar_score||0}/10</span></div></div></div><div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%;background:${col}"></div></div><div class="cat-why-now">${esc(_catWhyNow(c))}</div>${_catBadgesHtml(c)}</div>`;
+}
+
 // ── Catalyst ────────────────────────────────────────────────
 async function loadCatalyst() {
   const feed = document.getElementById('cat-feed');
@@ -6254,10 +6334,11 @@ async function loadCatalyst() {
     const dateStr = j.date_str || '';
     const total = j.total_candidates || 0;
 
-    document.getElementById('cat-count').textContent = total + ' candidates screened';
-    const live = candidates.filter(c => (c.options_anomaly_score||0) > 0 || (c.edgar_score||0) > 0);
-    const liveEl = document.getElementById('cat-live-count');
-    if (liveEl) liveEl.textContent = live.length ? live.length + ' live anomalies' : '';
+    _catCandidates = candidates;
+    const liveAnomalies = candidates.filter(c => (c.options_anomaly_score||0) > 0 || (c.edgar_score||0) > 0);
+    const highInterest  = candidates.filter(c => (c.catalyst_score||0) >= 6);
+    const confirmed     = candidates.filter(c => (c.edgar_score||0) > 0);
+    const tradeReview   = candidates.filter(c => (c.edgar_score||0) > 0 && (c.options_anomaly_score||0) > 5 && (c.catalyst_score||0) >= 7);
     const dateEl = document.getElementById('cat-date');
     if (dateEl) dateEl.textContent = dateStr ? 'Screened: ' + dateStr : 'Not yet screened';
 
@@ -6267,54 +6348,30 @@ async function loadCatalyst() {
       return;
     }
 
-    // Score colour helper
-    function catColor(s) { return s >= 7 ? 'var(--red)' : s >= 4 ? 'var(--yellow)' : '#4dabf7'; }
-    function catClass(s) { return s >= 7 ? 'live' : s >= 4 ? 'warm' : 'cool'; }
+    // Radar strip
+    const radarHtml = `<div class="cat-radar-strip"><div class="cat-radar-step"><div class="cat-radar-step-val" style="color:var(--text)">${total}</div><div class="cat-radar-step-lbl">Scanned</div><div class="cat-radar-arrow">›</div></div><div class="cat-radar-step"><div class="cat-radar-step-val" style="color:var(--yellow)">${liveAnomalies.length}</div><div class="cat-radar-step-lbl">Anomalies</div><div class="cat-radar-arrow">›</div></div><div class="cat-radar-step"><div class="cat-radar-step-val" style="color:var(--orange)">${highInterest.length}</div><div class="cat-radar-step-lbl">High Interest</div><div class="cat-radar-arrow">›</div></div><div class="cat-radar-step"><div class="cat-radar-step-val" style="color:var(--green)">${confirmed.length}</div><div class="cat-radar-step-lbl">Confirmed</div><div class="cat-radar-arrow">›</div></div><div class="cat-radar-step"><div class="cat-radar-step-val" style="color:var(--red)">${tradeReview.length}</div><div class="cat-radar-step-lbl">Trade Review</div></div></div>`;
 
-    // Candidate cards
-    let cardsHtml = '<div class="cat-grid">';
-    for (let i = 0; i < candidates.length; i++) {
-      const c = candidates[i];
-      const score = c.catalyst_score || 0;
-      const col = catColor(score);
-      const cls = catClass(score);
-      const hasAnomaly = (c.options_anomaly_score||0) > 0 || (c.edgar_score||0) > 0;
-      const pct = Math.min(100, Math.round(score / 10 * 100));
+    // Spotlight — top 3 by score
+    const bySc = candidates.slice().sort((a,b) => (b.catalyst_score||0) - (a.catalyst_score||0));
+    const topIdx = bySc.slice(0,3).map(c => candidates.indexOf(c));
+    const spotlightHtml = topIdx.length
+      ? `<div class="cat-section-hdr" style="padding-top:4px"><span class="cat-section-dot" style="background:var(--orange)"></span>Highest Interest <span style="color:var(--border2);font-weight:400">(top ${topIdx.length})</span></div><div class="cat-spotlight-grid">${topIdx.map(i => _catSpotlightCard(candidates[i],i)).join('')}</div>`
+      : '';
 
-      // Badges
-      let badges = '';
-      if (c.sector) badges += `<span class="cat-badge sector">${c.sector}</span>`;
-      (c.options_anomaly_flags||[]).filter(f => f && !f.startsWith('No ')).slice(0,2).forEach(f => {
-        badges += `<span class="cat-badge opt">${f.length > 40 ? f.slice(0,40)+'…' : f}</span>`;
-      });
-      (c.edgar_events||[]).slice(0,2).forEach(e => {
-        badges += `<span class="cat-badge edgar">${e.length > 40 ? e.slice(0,40)+'…' : e}</span>`;
-      });
-      const sentLabel = (c.sentiment_flags||[]).find(f => ['Bullish','Bearish','Neutral'].includes(f));
-      if (sentLabel) badges += `<span class="cat-badge ${sentLabel==='Bullish'?'senti-bull':'senti-bear'}">Senti: ${sentLabel}</span>`;
-
-      cardsHtml += `
-      <div class="cat-card ${cls}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <div class="cat-ticker" style="color:${col}">${hasAnomaly ? '<span class="cat-pulse"></span>' : ''}${c.ticker||'?'}</div>
-            <div class="cat-name" title="${c.name||''}">${(c.name||c.ticker||'').slice(0,38)}</div>
-          </div>
-          <div style="text-align:right">
-            <div class="cat-score-row"><span class="cat-score" style="color:${col}">${score}</span><span class="cat-score-max">/10</span></div>
-            <div class="cat-dims">
-              <span class="cat-dim ${(c.fundamental_score||0)>0?'active':''}">F:${c.fundamental_score||0}/5</span>
-              <span class="cat-dim ${(c.options_anomaly_score||0)>0?'active':''}" style="${(c.options_anomaly_score||0)>0?'color:var(--yellow)':''}">O:${c.options_anomaly_score||0}/10</span>
-              <span class="cat-dim ${(c.edgar_score||0)>0?'active':''}" style="${(c.edgar_score||0)>0?'color:var(--red)':''}">E:${c.edgar_score||0}/10</span>
-              <span class="cat-dim ${(c.sentiment_score||0)>5.5?'active':''}">S:${(c.sentiment_score||0).toFixed ? (c.sentiment_score||0).toFixed(1) : c.sentiment_score||0}/10</span>
-            </div>
-          </div>
-        </div>
-        <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%;background:${col}"></div></div>
-        ${badges ? `<div class="cat-badges">${badges}</div>` : ''}
-      </div>`;
-    }
-    cardsHtml += '</div>';
+    // Remaining candidates grouped into sections
+    const restIdx = bySc.slice(3).map(c => candidates.indexOf(c));
+    const grp = {co:[],ho:[],nc:[],wa:[]};
+    restIdx.forEach(i => {
+      const c = candidates[i], o = c.options_anomaly_score||0, e = c.edgar_score||0;
+      if (e > 0) grp.co.push(_catCompactCard(c,i));
+      else if (o >= 6) grp.ho.push(_catCompactCard(c,i));
+      else if (o > 0) grp.nc.push(_catCompactCard(c,i));
+      else grp.wa.push(_catCompactCard(c,i));
+    });
+    const mkSec = (lbl, dot, cards) => cards.length
+      ? `<div class="cat-section-hdr"><span class="cat-section-dot" style="background:${dot}"></span>${lbl} <span style="color:var(--border2);font-weight:400">(${cards.length})</span></div><div class="cat-grid">${cards.join('')}</div>`
+      : '';
+    const sectionsHtml = mkSec('Confirmed Catalysts','var(--green)',grp.co) + mkSec('Hot Anomalies','var(--yellow)',grp.ho) + mkSec('Needs Price Confirmation','#4dabf7',grp.nc) + mkSec('Watch Only','var(--border2)',grp.wa);
 
     // EDGAR table
     let edgarHtml = '';
@@ -6341,21 +6398,63 @@ async function loadCatalyst() {
       </div>`;
     }
 
-    // Score key legend
-    const legend = `
-    <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 12px;border-radius:5px;background:var(--bg2);border:1px solid var(--border);margin-top:14px;font-size:9px;color:var(--muted2)">
-      <span><span style="color:#4dabf7">●</span> F: fundamental (EV/Rev, cash, growth) · 35%</span>
-      <span><span style="color:var(--yellow)">●</span> O: options anomaly (OTM spike, IV, P/C) · 35%</span>
-      <span><span style="color:var(--red)">●</span> E: EDGAR 13D/13G/Form 4 · 15%</span>
-      <span><span style="color:var(--green)">●</span> S: sentiment (Claude + FinBERT) · 15%</span>
-    </div>`;
-
-    feed.innerHTML = cardsHtml + edgarHtml + legend;
+    feed.innerHTML = radarHtml + spotlightHtml + sectionsHtml + edgarHtml;
     if (btn) { btn.textContent = '✓ Done'; setTimeout(() => { btn.textContent = '⟳ Refresh'; btn.disabled = false; }, 1200); }
   } catch(e) {
-    feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Error loading catalyst data: ' + e.message + '</div>';
+    feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Error loading catalyst data: ' + esc(e.message) + '</div>';
     if (btn) { btn.textContent = '⟳ Refresh'; btn.disabled = false; }
   }
+}
+
+function openCatalystDetail(idx) {
+  const c = _catCandidates[idx];
+  if (!c) return;
+  const st = _catStatus(c), score = c.catalyst_score||0;
+  const o = c.options_anomaly_score||0, e = c.edgar_score||0;
+
+  const missing = [];
+  if (e === 0) missing.push('No SEC filings detected (13D/13G/Form 4)');
+  if (o === 0) missing.push('No unusual options flow detected');
+  if (!(c.sentiment_flags||[]).includes('Bullish')) missing.push('Bullish sentiment not confirmed');
+
+  let inv;
+  if (e > 0 && o > 0) inv = 'EDGAR filing relates to routine disclosure (not activist/acquirer). Options interest fades below anomaly threshold.';
+  else if (e > 0)     inv = 'SEC filing relates to routine disclosure. No price follow-through within the signal window.';
+  else if (o > 0)     inv = 'Options flow normalises; elevated OTM call concentration resolves without price confirmation.';
+  else                inv = 'No confirming catalyst materialises. Fundamental profile deteriorates.';
+
+  const nextMap = {
+    'trade-review':    'Review in Apex for entry setup. Confirm price action and volume before sizing.',
+    'confirmed':       'Monitor for price confirmation. Add to active watchlist if not already present.',
+    'edgar-signal':    'Investigate SEC filing context. Watch for options build-up as a confirming signal.',
+    'send-apex':       'Consider Apex entry setup if price confirms the options thesis.',
+    'options-anomaly': 'Await a confirming catalyst (news, EDGAR filing) before taking exposure. Signal is unconfirmed.',
+    'watch-only':      'Continue monitoring. No action warranted without a stronger anomaly signal.',
+  };
+
+  document.getElementById('cat-detail-ticker').textContent = c.ticker || '?';
+  document.getElementById('cat-detail-name').textContent = c.name || '';
+  const badge = document.getElementById('cat-detail-status-badge');
+  badge.className = 'cat-status-badge ' + st.cls;
+  badge.textContent = st.icon + ' ' + st.label;
+  const scoreEl = document.getElementById('cat-detail-score');
+  scoreEl.textContent = score + '/10';
+  scoreEl.style.color = _catColor(score);
+  document.getElementById('cat-detail-why').textContent = _catWhyNow(c);
+  document.getElementById('cat-detail-evidence').innerHTML = _catEvidenceHtml(c);
+  document.getElementById('cat-detail-missing').textContent = missing.length ? missing.join('. ') + '.' : 'No obvious gaps identified.';
+  document.getElementById('cat-detail-invalidation').textContent = inv;
+  const allFlags = [...(c.options_anomaly_flags||[]).filter(f => f && !f.startsWith('No ')), ...(c.edgar_events||[])];
+  document.getElementById('cat-detail-flags').textContent = allFlags.length ? allFlags.join('; ') : 'None detected.';
+  document.getElementById('cat-detail-next').textContent = nextMap[st.cls] || nextMap['watch-only'];
+
+  document.getElementById('cat-detail-overlay').classList.add('open');
+  document.getElementById('cat-detail-drawer').classList.add('open');
+}
+
+function closeCatalystDetail() {
+  document.getElementById('cat-detail-overlay').classList.remove('open');
+  document.getElementById('cat-detail-drawer').classList.remove('open');
 }
 
 function _updateSectorDropdown() {
