@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Decifer Intelligence</title>
+<style>
+/* ── Reset & base ─────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0d0d14;
+  --surface:#13131f;
+  --surface-2:#1a1a2a;
+  --surface-3:#20203080;
+  --border:rgba(255,255,255,0.07);
+  --border-accent:rgba(255,140,0,0.25);
+  --text:#e8e8f0;
+  --muted:#6b6b84;
+  --accent:#ff8c00;
+  --accent-dim:rgba(255,140,0,0.12);
+  --green:#4ade80;
+  --green-dim:rgba(74,222,128,0.12);
+  --red:#f87171;
+  --red-dim:rgba(248,113,113,0.12);
+  --yellow:#fbbf24;
+  --blue:#60a5fa;
+  --blue-dim:rgba(96,165,250,0.12);
+  --nav-h:68px;
+  --header-h:52px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --radius:12px;
+  --radius-sm:8px;
+}
+html{background:var(--bg)}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Helvetica,Arial,sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  min-height:100dvh;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+#app-header{
+  position:fixed;top:0;left:0;right:0;
+  height:var(--header-h);
+  background:rgba(13,13,20,0.92);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 16px;
+  z-index:200;
+  gap:10px;
+}
+#hdr-wordmark{
+  font-size:13px;font-weight:700;
+  letter-spacing:0.08em;
+  color:var(--accent);
+  text-transform:uppercase;
+  flex-shrink:0;
+}
+#hdr-mood{
+  flex:1;
+  font-size:13px;font-weight:500;
+  color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  text-align:center;
+}
+#hdr-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+#hdr-time{font-size:11px;color:var(--muted)}
+#hdr-refresh-btn{
+  background:none;border:none;color:var(--muted);
+  font-size:16px;cursor:pointer;padding:4px;
+  transition:color 0.15s;
+}
+#hdr-refresh-btn:active{color:var(--accent)}
+#hdr-refresh-btn.spinning{animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Main content area ───────────────────────────────────────────── */
+#app-main{
+  padding-top:var(--header-h);
+  padding-bottom:calc(var(--nav-h) + var(--safe-bottom) + 8px);
+  min-height:100dvh;
+}
+.tab-panel{display:none;padding:12px 16px 8px}
+.tab-panel.active{display:block}
+
+/* ── Bottom nav ──────────────────────────────────────────────────── */
+#bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  height:calc(var(--nav-h) + var(--safe-bottom));
+  padding-bottom:var(--safe-bottom);
+  background:rgba(13,13,20,0.96);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-top:1px solid var(--border);
+  display:flex;
+  z-index:200;
+}
+.nav-btn{
+  flex:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;
+  background:none;border:none;cursor:pointer;
+  color:var(--muted);
+  font-size:10px;font-weight:500;
+  letter-spacing:0.04em;
+  transition:color 0.15s;
+  min-height:44px;
+}
+.nav-btn.active{color:var(--accent)}
+.nav-icon{font-size:20px;line-height:1}
+.nav-label{font-size:10px}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+  margin-bottom:10px;
+}
+.card-sm{padding:12px 14px}
+.section-label{
+  font-size:11px;font-weight:600;
+  letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--muted);
+  margin:16px 0 8px;
+}
+.card-title{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px}
+
+/* ── Mood hero card ──────────────────────────────────────────────── */
+.mood-card{
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:12px;
+  position:relative;
+  overflow:hidden;
+}
+.mood-card::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 70% 20%,rgba(255,140,0,0.06) 0%,transparent 70%);
+  pointer-events:none;
+}
+.mood-card.bull::before{background:radial-gradient(ellipse at 70% 20%,rgba(74,222,128,0.08) 0%,transparent 70%)}
+.mood-card.bear::before{background:radial-gradient(ellipse at 70% 20%,rgba(248,113,113,0.08) 0%,transparent 70%)}
+.mood-card.panic::before{background:radial-gradient(ellipse at 70% 20%,rgba(251,191,36,0.10) 0%,transparent 70%)}
+.mood-label-big{
+  font-size:28px;font-weight:700;
+  letter-spacing:-0.02em;
+  margin-bottom:6px;
+}
+.mood-meta{
+  display:flex;gap:8px;flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.mood-pill{
+  font-size:12px;font-weight:500;
+  background:var(--surface-3);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:3px 10px;
+  color:var(--muted);
+}
+.portfolio-strip{
+  display:flex;align-items:baseline;gap:10px;
+  padding-top:16px;
+  border-top:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.pv-label{font-size:22px;font-weight:600;letter-spacing:-0.01em}
+.pnl-label{font-size:14px;font-weight:500}
+.pnl-label.positive{color:var(--green)}
+.pnl-label.negative{color:var(--red)}
+.pnl-label.flat{color:var(--muted)}
+
+/* ── Chips / horizontal scroll ───────────────────────────────────── */
+.chips-row{
+  display:flex;gap:8px;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  margin:0 -16px;
+  padding:0 16px 6px;
+}
+.chips-row::-webkit-scrollbar{display:none}
+.chip{
+  flex-shrink:0;
+  scroll-snap-align:start;
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:7px 14px;
+  font-size:13px;font-weight:500;
+  color:var(--text);
+  white-space:nowrap;
+}
+.chip-force{border-color:var(--border-accent);background:var(--accent-dim)}
+.chip-headwind{border-color:rgba(248,113,113,0.25);background:var(--red-dim);color:var(--red)}
+.chip-neutral{color:var(--muted)}
+
+/* ── Status row ──────────────────────────────────────────────────── */
+.status-row{
+  display:flex;align-items:center;gap:8px;
+  font-size:14px;font-weight:500;
+  margin-bottom:4px;
+}
+.dot{
+  width:8px;height:8px;
+  border-radius:50%;flex-shrink:0;
+}
+.dot-active{background:var(--green);box-shadow:0 0 0 3px rgba(74,222,128,0.2);animation:pulse 2s ease-in-out infinite}
+.dot-idle{background:var(--muted)}
+.dot-warn{background:var(--yellow)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(74,222,128,0.2)}50%{box-shadow:0 0 0 6px rgba(74,222,128,0.08)}}
+.sub-line{font-size:12px;color:var(--muted)}
+
+/* ── Driver / theme cards ────────────────────────────────────────── */
+.driver-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:14px;
+  margin-bottom:8px;
+}
+.driver-label{font-size:15px;font-weight:600;margin-bottom:4px}
+.driver-evidence{font-size:13px;color:var(--muted);line-height:1.5}
+.direction-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:600;
+  border-radius:4px;padding:2px 7px;
+  text-transform:uppercase;letter-spacing:0.05em;
+}
+.badge-tailwind{background:var(--green-dim);color:var(--green)}
+.badge-headwind{background:var(--red-dim);color:var(--red)}
+.badge-neutral{background:var(--surface-2);color:var(--muted)}
+.badge-active{background:var(--accent-dim);color:var(--accent)}
+.badge-high{background:var(--accent-dim);color:var(--accent)}
+.badge-medium{background:var(--surface-2);color:var(--yellow)}
+.badge-low{background:var(--surface-2);color:var(--muted)}
+
+/* ── Candidate / alpha cards ─────────────────────────────────────── */
+.alpha-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+  margin-bottom:10px;
+}
+.alpha-card-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.alpha-symbol{
+  font-size:18px;font-weight:700;
+  letter-spacing:0.02em;
+}
+.alpha-theme{font-size:12px;color:var(--muted);margin-top:1px}
+.reason-to-care{
+  font-size:14px;line-height:1.55;
+  color:var(--text);
+  margin-bottom:10px;
+}
+.risk-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.risk-chip{
+  font-size:11px;
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:2px 8px;
+  color:var(--muted);
+  text-transform:capitalize;
+}
+.apex-card{
+  border-color:var(--border-accent);
+  background:linear-gradient(135deg,rgba(255,140,0,0.04) 0%,var(--surface) 50%);
+}
+.apex-rationale{font-size:14px;line-height:1.55;margin-bottom:8px}
+.apex-risk{font-size:12px;color:var(--muted);font-style:italic}
+
+/* ── Position cards ──────────────────────────────────────────────── */
+.position-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+  margin-bottom:10px;
+}
+.pos-header{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:12px;
+}
+.pos-symbol{font-size:20px;font-weight:700;letter-spacing:0.02em}
+.pos-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.pos-pnl{
+  text-align:right;
+}
+.pos-pnl-pct{font-size:18px;font-weight:600}
+.pos-pnl-pct.up{color:var(--green)}
+.pos-pnl-pct.down{color:var(--red)}
+.pos-pnl-pct.flat{color:var(--muted)}
+.pos-prices{
+  display:flex;gap:16px;
+  padding:10px 0;
+  border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  margin-bottom:12px;
+}
+.pos-price-item{flex:1}
+.pos-price-label{font-size:11px;color:var(--muted);margin-bottom:2px}
+.pos-price-value{font-size:14px;font-weight:500}
+.pos-thesis{
+  font-size:13px;line-height:1.55;
+  color:var(--muted);
+  margin-bottom:10px;
+}
+.pos-status{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:500;
+}
+.pos-change-hint{
+  font-size:12px;color:var(--muted);margin-top:6px;
+  padding-top:8px;border-top:1px solid var(--border);
+}
+.direction-tag{
+  display:inline-flex;align-items:center;
+  font-size:11px;font-weight:700;
+  letter-spacing:0.05em;
+  padding:3px 8px;border-radius:4px;
+  text-transform:uppercase;
+}
+.dir-long{background:var(--green-dim);color:var(--green)}
+.dir-short{background:var(--red-dim);color:var(--red)}
+
+/* ── Portfolio summary bar ───────────────────────────────────────── */
+.portfolio-bar{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px;
+}
+.pb-value{font-size:22px;font-weight:600;letter-spacing:-0.01em}
+.pb-label{font-size:11px;color:var(--muted);margin-bottom:2px}
+.pb-pnl{text-align:right}
+.pb-pnl-fig{font-size:18px;font-weight:600}
+
+/* ── Ask tab ─────────────────────────────────────────────────────── */
+#tab-ask{
+  display:none;
+  flex-direction:column;
+  height:calc(100dvh - var(--header-h) - var(--nav-h) - var(--safe-bottom));
+  padding:0;
+  overflow:hidden;
+}
+#tab-ask.active{display:flex}
+#ask-scroll{
+  flex:1;overflow-y:auto;
+  padding:12px 16px;
+  -webkit-overflow-scrolling:touch;
+}
+#ask-suggestions{
+  display:flex;gap:8px;
+  flex-wrap:wrap;
+  padding:12px 16px 0;
+}
+.suggest-chip{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:7px 14px;
+  font-size:13px;color:var(--text);
+  cursor:pointer;
+  transition:border-color 0.15s,background 0.15s;
+}
+.suggest-chip:active{background:var(--accent-dim);border-color:var(--border-accent)}
+#ask-input-row{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 16px calc(10px + var(--safe-bottom));
+  background:var(--bg);
+  border-top:1px solid var(--border);
+}
+#ask-input{
+  flex:1;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:22px;
+  padding:10px 16px;
+  color:var(--text);
+  font-size:15px;
+  font-family:inherit;
+  outline:none;
+  transition:border-color 0.15s;
+}
+#ask-input:focus{border-color:rgba(255,140,0,0.4)}
+#ask-input::placeholder{color:var(--muted)}
+#ask-submit{
+  background:var(--accent);
+  border:none;
+  border-radius:50%;
+  width:40px;height:40px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  flex-shrink:0;
+  font-size:18px;
+  transition:opacity 0.15s;
+}
+#ask-submit:active{opacity:0.8}
+#ask-submit:disabled{opacity:0.35;cursor:default}
+.msg{
+  display:flex;
+  margin-bottom:12px;
+}
+.msg-user{justify-content:flex-end}
+.msg-decifer,.msg-thinking{justify-content:flex-start}
+.msg-bubble{
+  max-width:85%;
+  padding:10px 14px;
+  border-radius:16px;
+  font-size:14px;line-height:1.55;
+}
+.msg-user .msg-bubble{
+  background:var(--accent);color:#1a1000;
+  border-bottom-right-radius:4px;
+  font-weight:500;
+}
+.msg-decifer .msg-bubble{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-bottom-left-radius:4px;
+}
+.msg-thinking .msg-bubble{
+  background:var(--surface);
+  border:1px solid var(--border);
+  color:var(--muted);
+  font-style:italic;
+}
+.msg-error .msg-bubble{
+  background:var(--red-dim);
+  border:1px solid rgba(248,113,113,0.25);
+  color:var(--red);
+}
+
+/* ── Skeleton / loading ──────────────────────────────────────────── */
+.skeleton{
+  background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 50%,var(--surface) 75%);
+  background-size:200% 100%;
+  animation:shimmer 1.4s infinite;
+  border-radius:var(--radius-sm);
+  height:16px;
+}
+@keyframes shimmer{to{background-position:-200% 0}}
+.skeleton-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+  margin-bottom:10px;
+}
+.sk-line{height:14px;border-radius:4px;margin-bottom:8px}
+.sk-line.wide{width:75%}
+.sk-line.mid{width:55%}
+.sk-line.narrow{width:35%}
+.sk-block{height:80px;border-radius:var(--radius-sm);margin-bottom:8px}
+
+/* ── Empty states ────────────────────────────────────────────────── */
+.empty-state{
+  text-align:center;
+  padding:40px 20px;
+  color:var(--muted);
+}
+.empty-icon{font-size:36px;margin-bottom:12px}
+.empty-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px}
+.empty-body{font-size:14px;line-height:1.55}
+
+/* ── Error state ─────────────────────────────────────────────────── */
+.data-error{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:20px;
+  text-align:center;
+  color:var(--muted);
+  font-size:13px;
+}
+
+/* ── Dividers ────────────────────────────────────────────────────── */
+.divider{height:1px;background:var(--border);margin:12px 0}
+
+/* ── Misc utils ──────────────────────────────────────────────────── */
+.text-green{color:var(--green)}
+.text-red{color:var(--red)}
+.text-accent{color:var(--accent)}
+.text-muted{color:var(--muted)}
+.fw-6{font-weight:600}
+.mt-4{margin-top:16px}
+.row{display:flex;align-items:center;gap:8px}
+.col{display:flex;flex-direction:column;gap:4px}
+.flex-1{flex:1}
+</style>
+</head>
+<body>
+
+<!-- ── App header ────────────────────────────────────────────────── -->
+<header id="app-header">
+  <span id="hdr-wordmark">Decifer</span>
+  <span id="hdr-mood">—</span>
+  <div id="hdr-actions">
+    <span id="hdr-time"></span>
+    <button id="hdr-refresh-btn" onclick="refreshActive()" title="Refresh">↻</button>
+  </div>
+</header>
+
+<!-- ── Tab content ───────────────────────────────────────────────── -->
+<main id="app-main">
+
+  <!-- NOW -->
+  <section id="tab-now" class="tab-panel active">
+    <div id="now-content"></div>
+  </section>
+
+  <!-- WHY -->
+  <section id="tab-why" class="tab-panel">
+    <div id="why-content"></div>
+  </section>
+
+  <!-- ALPHA -->
+  <section id="tab-alpha" class="tab-panel">
+    <div id="alpha-content"></div>
+  </section>
+
+  <!-- PORTFOLIO -->
+  <section id="tab-portfolio" class="tab-panel">
+    <div id="portfolio-content"></div>
+  </section>
+
+  <!-- ASK -->
+  <section id="tab-ask" class="tab-panel">
+    <div id="ask-suggestions"></div>
+    <div id="ask-scroll" role="log" aria-live="polite"></div>
+    <div id="ask-input-row">
+      <input id="ask-input" type="text" placeholder="Ask anything about the market…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button id="ask-submit" onclick="submitAsk()" aria-label="Send" disabled>↑</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Bottom nav ────────────────────────────────────────────────── -->
+<nav id="bottom-nav" role="navigation" aria-label="Main">
+  <button class="nav-btn active" data-tab="now" onclick="switchTab('now')">
+    <span class="nav-icon">◉</span>
+    <span class="nav-label">Now</span>
+  </button>
+  <button class="nav-btn" data-tab="why" onclick="switchTab('why')">
+    <span class="nav-icon">⦿</span>
+    <span class="nav-label">Why</span>
+  </button>
+  <button class="nav-btn" data-tab="alpha" onclick="switchTab('alpha')">
+    <span class="nav-icon">◈</span>
+    <span class="nav-label">Alpha</span>
+  </button>
+  <button class="nav-btn" data-tab="portfolio" onclick="switchTab('portfolio')">
+    <span class="nav-icon">◧</span>
+    <span class="nav-label">Portfolio</span>
+  </button>
+  <button class="nav-btn" data-tab="ask" onclick="switchTab('ask')">
+    <span class="nav-icon">◎</span>
+    <span class="nav-label">Ask</span>
+  </button>
+</nav>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const API = '/api/mobile';
+let currentTab = 'now';
+const loaded = {};
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmt$(n) {
+  if (n == null || n === 0) return '—';
+  return '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function fmtPct(n) {
+  if (n == null) return '—';
+  const sign = n >= 0 ? '+' : '';
+  return sign + n.toFixed(2) + '%';
+}
+
+function fmtPctShort(n) {
+  if (n == null) return '—';
+  const sign = n >= 0 ? '+' : '';
+  return sign + Math.abs(n).toFixed(1) + '%';
+}
+
+function pnlClass(n) {
+  if (n == null || n === 0) return 'flat';
+  return n > 0 ? 'positive' : 'negative';
+}
+
+function pnlUpDown(dir) { return dir === 'up' ? 'up' : 'down'; }
+
+function relTime(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return `${Math.floor(diff/86400)}d ago`;
+  } catch { return ''; }
+}
+
+async function fetchJSON(path) {
+  try {
+    const r = await fetch(path, {cache:'no-store'});
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+// ── Skeleton helpers ───────────────────────────────────────────────────────────
+function skeleton(n = 3) {
+  let h = '';
+  for (let i = 0; i < n; i++) h += `
+    <div class="skeleton-card">
+      <div class="skeleton sk-line wide"></div>
+      <div class="skeleton sk-line mid"></div>
+      <div class="skeleton sk-block" style="margin-top:12px"></div>
+    </div>`;
+  return h;
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────────
+function switchTab(id) {
+  if (currentTab === id) { refreshActive(); return; }
+  currentTab = id;
+
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  document.querySelector(`[data-tab="${id}"]`).classList.add('active');
+
+  if (!loaded[id]) {
+    loaded[id] = true;
+    loadTab(id);
+  }
+
+  // Ask tab — focus input after brief delay (iOS keyboard timing)
+  if (id === 'ask') setTimeout(() => document.getElementById('ask-input')?.focus(), 120);
+}
+
+function refreshActive() {
+  delete loaded[currentTab];
+  loadTab(currentTab);
+}
+
+async function loadTab(id) {
+  const btn = document.getElementById('hdr-refresh-btn');
+  btn.classList.add('spinning');
+  try {
+    switch (id) {
+      case 'now':       await loadNow(); break;
+      case 'why':       await loadWhy(); break;
+      case 'alpha':     await loadAlpha(); break;
+      case 'portfolio': await loadPortfolio(); break;
+      case 'ask':       initAsk(); break;
+    }
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
+// ── Header mood update ─────────────────────────────────────────────────────────
+function updateHeader(mood, ts) {
+  const el = document.getElementById('hdr-mood');
+  if (mood) el.textContent = mood;
+  const te = document.getElementById('hdr-time');
+  if (ts) te.textContent = relTime(ts);
+}
+
+// ── NOW tab ────────────────────────────────────────────────────────────────────
+async function loadNow() {
+  const el = document.getElementById('now-content');
+  el.innerHTML = skeleton(2);
+
+  const d = await fetchJSON(API + '/now');
+  if (!d || d.error) { el.innerHTML = errorState('Market data is not available right now.'); return; }
+
+  const mood = d.market_mood || {};
+  const toneClass = {bull:'bull', bear:'bear', neutral:'', panic:'panic'}[mood.tone] || '';
+  const pv = d.portfolio_value || 0;
+  const pnl = d.daily_pnl || 0;
+  const pnlDir = pnl >= 0 ? 'positive' : 'negative';
+  const pnlSign = pnl >= 0 ? '+' : '−';
+
+  updateHeader(mood.label || '—', d.ts);
+
+  let forcesHtml = '';
+  if (d.main_forces && d.main_forces.length > 0) {
+    const chips = d.main_forces.map(f =>
+      `<div class="chip chip-force" title="${esc(f.evidence)}">${esc(f.label)}</div>`
+    ).join('');
+    forcesHtml = `
+      <div class="section-label">What's moving</div>
+      <div class="chips-row">${chips}</div>`;
+  } else if (d.blocked_conditions && d.blocked_conditions.length > 0) {
+    const chips = d.blocked_conditions.map(k =>
+      `<div class="chip chip-headwind">⚠ ${esc(k.replace(/_/g,' '))}</div>`
+    ).join('');
+    forcesHtml = `
+      <div class="section-label">Conditions flagged</div>
+      <div class="chips-row">${chips}</div>`;
+  }
+
+  const statusDot = mood.is_open ? 'dot-active' : 'dot-idle';
+  const watchLabel = d.watching_count > 0
+    ? `Watching <strong>${d.watching_count}</strong> symbols`
+    : 'Building universe…';
+  const scanLabel = d.last_scan ? `· Last scan ${esc(d.last_scan)}` : '';
+  const posLabel = d.positions_count > 0
+    ? `<div class="mt-4"><span class="fw-6 text-accent">${d.positions_count}</span> open position${d.positions_count !== 1 ? 's' : ''}</div>`
+    : '';
+
+  el.innerHTML = `
+    <div class="mood-card ${toneClass}">
+      <div class="mood-label-big">${esc(mood.label || '—')}</div>
+      <div class="mood-meta">
+        <span class="mood-pill">${esc(mood.session || '—')}</span>
+        ${mood.vix != null ? `<span class="mood-pill">VIX ${mood.vix}</span>` : ''}
+        ${mood.spy_price ? `<span class="mood-pill">SPY $${mood.spy_price}</span>` : ''}
+      </div>
+      ${pv > 0 ? `
+        <div class="portfolio-strip">
+          <span class="pv-label">${fmt$(pv)}</span>
+          <span class="pnl-label ${pnlDir}">${pnlSign}${fmt$(Math.abs(pnl))} today</span>
+        </div>` : ''}
+    </div>
+
+    ${forcesHtml}
+
+    <div class="section-label">Decifer status</div>
+    <div class="card card-sm">
+      <div class="status-row">
+        <span class="dot ${statusDot}"></span>
+        <span>${esc(d.bot_status || 'Active')}</span>
+      </div>
+      <div class="sub-line" style="margin-top:5px">${watchLabel} ${scanLabel}</div>
+      ${posLabel}
+    </div>
+  `;
+}
+
+// ── WHY tab ────────────────────────────────────────────────────────────────────
+async function loadWhy() {
+  const el = document.getElementById('why-content');
+  el.innerHTML = skeleton(3);
+
+  const d = await fetchJSON(API + '/why');
+  if (!d || d.error) { el.innerHTML = errorState('Market context is not available right now.'); return; }
+
+  // Market read card
+  let readHtml = '';
+  if (d.market_read) {
+    const char = d.session_character ? `<span class="direction-badge badge-active" style="margin-bottom:10px;display:inline-flex">${esc(d.session_character)}</span><br>` : '';
+    readHtml = `
+      <div class="section-label">Market read</div>
+      <div class="card">
+        ${char}
+        <p style="font-size:14px;line-height:1.6;color:var(--text)">${esc(d.market_read)}</p>
+      </div>`;
+  }
+
+  // Macro drivers
+  let driversHtml = '';
+  if (d.macro_drivers && d.macro_drivers.length > 0) {
+    driversHtml = `<div class="section-label">What's driving markets</div>` +
+      d.macro_drivers.map(f => `
+        <div class="driver-card">
+          <div class="driver-label">${esc(f.label)}</div>
+          ${f.evidence ? `<div class="driver-evidence">${esc(f.evidence)}</div>` : ''}
+        </div>`).join('');
+  }
+
+  // Headwinds
+  let headwindHtml = '';
+  if (d.headwinds && d.headwinds.length > 0) {
+    headwindHtml = `<div class="section-label">Conditions to watch</div>` +
+      d.headwinds.map(h => `
+        <div class="driver-card" style="border-color:rgba(248,113,113,0.2)">
+          <div class="driver-label text-red">${esc(h.label)}</div>
+        </div>`).join('');
+  }
+
+  // Active themes
+  let themesHtml = '';
+  if (d.themes_active && d.themes_active.length > 0) {
+    themesHtml = `<div class="section-label">Active themes (${d.themes_active.length})</div>` +
+      d.themes_active.map(t => {
+        const dirClass = t.direction === 'tailwind' ? 'badge-tailwind' : t.direction === 'headwind' ? 'badge-headwind' : 'badge-neutral';
+        const confClass = `badge-${t.confidence >= 0.7 ? 'high' : t.confidence >= 0.4 ? 'medium' : 'low'}`;
+        return `
+          <div class="driver-card">
+            <div class="row" style="margin-bottom:8px">
+              <div class="flex-1 fw-6">${esc(t.name)}</div>
+              <span class="direction-badge ${dirClass}">${esc(t.direction || 'neutral')}</span>
+            </div>
+            ${t.summary ? `<div class="driver-evidence">${esc(t.summary)}</div>` : ''}
+            ${t.candidate_count > 0 ? `<div class="sub-line" style="margin-top:6px">${t.candidate_count} names in scope</div>` : ''}
+          </div>`;
+      }).join('');
+    if (d.dormant_theme_count > 0) {
+      themesHtml += `<div class="sub-line" style="margin-top:4px;padding:0 2px">${d.dormant_theme_count} additional themes dormant or not yet activated.</div>`;
+    }
+  } else {
+    themesHtml = `
+      <div class="section-label">Themes</div>
+      <div class="empty-state">
+        <div class="empty-icon">○</div>
+        <div class="empty-title">No themes active yet</div>
+        <div class="empty-body">The intelligence pipeline hasn't activated any themes for the current session.</div>
+      </div>`;
+  }
+
+  if (!driversHtml && !readHtml && !themesHtml) {
+    el.innerHTML = errorState('No market context available. Intelligence pipeline may not have run yet.');
+    return;
+  }
+
+  el.innerHTML = readHtml + driversHtml + headwindHtml + themesHtml;
+}
+
+// ── ALPHA tab ──────────────────────────────────────────────────────────────────
+async function loadAlpha() {
+  const el = document.getElementById('alpha-content');
+  el.innerHTML = skeleton(3);
+
+  const d = await fetchJSON(API + '/alpha');
+  if (!d || d.error) { el.innerHTML = errorState('Intelligence data is not available right now.'); return; }
+
+  let html = '';
+
+  // Last cycle — Apex entries
+  if (d.apex_last_cycle && d.apex_last_cycle.length > 0) {
+    html += `<div class="section-label">Last cycle — what Decifer decided</div>`;
+    html += d.apex_last_cycle.map(e => {
+      const dirClass = e.direction === 'LONG' ? 'dir-long' : 'dir-short';
+      const dirLabel = e.direction === 'LONG' ? '↑ Long' : '↓ Short';
+      const ttLabel = e.trade_type ? `<span class="mood-pill">${esc(e.trade_type.toLowerCase())}</span>` : '';
+      const convLabel = e.conviction ? `<span class="mood-pill">${esc(e.conviction.toLowerCase())} conviction</span>` : '';
+      return `
+        <div class="alpha-card apex-card">
+          <div class="alpha-card-header">
+            <div>
+              <div class="alpha-symbol">${esc(e.symbol)}</div>
+              <div class="row" style="margin-top:4px;gap:6px">
+                <span class="direction-tag ${dirClass}">${dirLabel}</span>
+                ${ttLabel}${convLabel}
+              </div>
+            </div>
+          </div>
+          ${e.rationale ? `<div class="apex-rationale">${esc(e.rationale)}</div>` : ''}
+          ${e.key_risk ? `<div class="apex-risk">Risk: ${esc(e.key_risk)}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  // Under review — intelligence candidates
+  if (d.under_review && d.under_review.length > 0) {
+    html += `<div class="section-label">Under review (${d.under_review.length})</div>`;
+    html += d.under_review.map(c => {
+      const confClass = `badge-${c.confidence || 'low'}`;
+      const statusClass = c.entry_status === 'In consideration' ? 'badge-active' : 'badge-neutral';
+      const riskChips = (c.risk_flags || []).map(r =>
+        `<span class="risk-chip">${esc(r.replace(/_/g,' '))}</span>`
+      ).join('');
+      return `
+        <div class="alpha-card">
+          <div class="alpha-card-header">
+            <div>
+              <div class="alpha-symbol">${esc(c.symbol)}</div>
+              <div class="alpha-theme">${esc(c.theme)}</div>
+            </div>
+            <div class="col" style="align-items:flex-end;gap:4px">
+              <span class="direction-badge ${statusClass}">${esc(c.entry_status)}</span>
+              <span class="direction-badge ${confClass}">${esc(c.confidence || 'low')}</span>
+            </div>
+          </div>
+          <div class="reason-to-care">${esc(c.reason_to_care)}</div>
+          ${riskChips ? `<div class="risk-chips">${riskChips}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  if (!html) {
+    html = `
+      <div class="empty-state">
+        <div class="empty-icon">◈</div>
+        <div class="empty-title">No opportunities in scope</div>
+        <div class="empty-body">The intelligence pipeline hasn't surfaced any candidates for this session. This usually means the market map hasn't activated any themes yet.</div>
+      </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ── PORTFOLIO tab ──────────────────────────────────────────────────────────────
+async function loadPortfolio() {
+  const el = document.getElementById('portfolio-content');
+  el.innerHTML = skeleton(2);
+
+  const d = await fetchJSON(API + '/portfolio');
+  if (!d || d.error) { el.innerHTML = errorState('Portfolio data is not available right now.'); return; }
+
+  const sum = d.portfolio_summary || {};
+  const pv = sum.portfolio_value || 0;
+  const pnl = sum.daily_pnl || 0;
+  const pnlDir = pnl >= 0 ? 'positive' : 'negative';
+  const pnlSign = pnl >= 0 ? '+' : '−';
+
+  let html = '';
+
+  if (pv > 0) {
+    html += `
+      <div class="portfolio-bar">
+        <div>
+          <div class="pb-label">Portfolio value</div>
+          <div class="pb-value">${fmt$(pv)}</div>
+        </div>
+        <div class="pb-pnl">
+          <div class="pb-label" style="text-align:right">Today</div>
+          <div class="pb-pnl-fig ${pnlDir}">${pnlSign}${fmt$(Math.abs(pnl))}</div>
+        </div>
+      </div>`;
+  }
+
+  const positions = d.positions || [];
+
+  if (positions.length === 0) {
+    html += `
+      <div class="empty-state">
+        <div class="empty-icon">◧</div>
+        <div class="empty-title">No open positions</div>
+        <div class="empty-body">Decifer is not holding any positions right now. Check the Alpha tab to see what's being watched.</div>
+      </div>`;
+  } else {
+    html += `<div class="section-label">Open positions (${positions.length})</div>`;
+    html += positions.map(p => {
+      const pnlPct = p.pnl_pct;
+      const pnlClass = pnlPct == null ? 'flat' : pnlUpDown(p.pnl_direction);
+      const pnlText = pnlPct != null ? fmtPct(pnlPct) : '—';
+      const dirClass = p.direction === 'SHORT' ? 'dir-short' : 'dir-long';
+      const dirLabel = p.direction === 'SHORT' ? '↓ Short' : '↑ Long';
+      const ttLabel = p.trade_type ? `<span class="mood-pill">${esc(p.trade_type.toLowerCase())}</span>` : '';
+      const convLabel = p.conviction ? `<span class="mood-pill">${esc(p.conviction.toLowerCase())}</span>` : '';
+      const thesisText = p.thesis
+        ? `<div class="pos-thesis">${esc(p.thesis)}</div>`
+        : `<div class="pos-thesis text-muted" style="font-style:italic">No thesis recorded for this position.</div>`;
+      const changeHint = p.change_hint ? `<div class="pos-change-hint">${esc(p.change_hint)}</div>` : '';
+
+      return `
+        <div class="position-card">
+          <div class="pos-header">
+            <div>
+              <div class="pos-symbol">${esc(p.symbol)}</div>
+              <div class="row" style="margin-top:4px;gap:6px">
+                <span class="direction-tag ${dirClass}">${dirLabel}</span>
+                ${ttLabel}${convLabel}
+              </div>
+            </div>
+            <div class="pos-pnl">
+              <div class="pos-pnl-pct ${pnlClass}">${pnlText}</div>
+            </div>
+          </div>
+          <div class="pos-prices">
+            <div class="pos-price-item">
+              <div class="pos-price-label">Entry</div>
+              <div class="pos-price-value">${p.entry_price > 0 ? '$' + p.entry_price.toFixed(2) : '—'}</div>
+            </div>
+            <div class="pos-price-item">
+              <div class="pos-price-label">Current</div>
+              <div class="pos-price-value">${p.current_price > 0 ? '$' + p.current_price.toFixed(2) : '—'}</div>
+            </div>
+          </div>
+          ${thesisText}
+          <div class="pos-status">
+            <span class="dot ${p.pm_status && p.pm_status.includes('intact') ? 'dot-active' : p.pm_status && p.pm_status.includes('weakening') ? 'dot-warn' : 'dot-idle'}"></span>
+            <span>${esc(p.pm_status || 'Monitoring')}</span>
+          </div>
+          ${changeHint}
+        </div>`;
+    }).join('');
+  }
+
+  el.innerHTML = html;
+}
+
+// ── ASK tab ────────────────────────────────────────────────────────────────────
+const SUGGEST_QS = [
+  'What is happening in markets right now?',
+  'Why is Decifer not trading?',
+  'What are the biggest risks in the portfolio?',
+  'Which names are closest to entry?',
+  'What changed since yesterday?',
+  'Why was this sector leading today?',
+];
+
+function initAsk() {
+  const sgEl = document.getElementById('ask-suggestions');
+  if (sgEl.innerHTML) return; // already init'd
+  sgEl.innerHTML = SUGGEST_QS.map(q =>
+    `<button class="suggest-chip" onclick="askQuestion(${JSON.stringify(q)})">${esc(q)}</button>`
+  ).join('');
+  document.getElementById('ask-input').addEventListener('input', e => {
+    document.getElementById('ask-submit').disabled = !e.target.value.trim();
+  });
+  document.getElementById('ask-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitAsk(); }
+  });
+}
+
+function askQuestion(q) {
+  document.getElementById('ask-input').value = q;
+  document.getElementById('ask-submit').disabled = false;
+  submitAsk();
+}
+
+let _msgId = 0;
+function addMsg(type, text) {
+  const id = 'msg-' + (++_msgId);
+  const scroll = document.getElementById('ask-scroll');
+  const div = document.createElement('div');
+  div.className = `msg msg-${type}`;
+  div.id = id;
+  div.innerHTML = `<div class="msg-bubble">${esc(text)}</div>`;
+  scroll.appendChild(div);
+  scroll.scrollTop = scroll.scrollHeight;
+  return id;
+}
+
+function removeMsg(id) {
+  document.getElementById(id)?.remove();
+}
+
+async function submitAsk() {
+  const input = document.getElementById('ask-input');
+  const q = (input.value || '').trim();
+  if (!q) return;
+  input.value = '';
+  document.getElementById('ask-submit').disabled = true;
+
+  // Hide suggestions after first question
+  document.getElementById('ask-suggestions').style.display = 'none';
+
+  addMsg('user', q);
+  const thinkId = addMsg('thinking', 'Thinking…');
+
+  try {
+    const r = await fetch('/api/mobile/ask', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({question: q}),
+    });
+    const data = await r.json().catch(() => null);
+    removeMsg(thinkId);
+    if (data?.ok && data.answer) {
+      addMsg('decifer', data.answer);
+    } else {
+      addMsg('error', data?.error || 'Could not get an answer. Please try again.');
+    }
+  } catch {
+    removeMsg(thinkId);
+    addMsg('error', 'Connection error. Please try again.');
+  }
+}
+
+function errorState(msg) {
+  return `<div class="data-error"><p>${esc(msg)}</p></div>`;
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+loaded['now'] = true;
+loadTab('now');
+
+// Auto-refresh Now tab every 90 seconds while it's active
+setInterval(() => {
+  if (currentTab === 'now') {
+    delete loaded['now'];
+    loadTab('now');
+  }
+}, 90000);
+</script>
+</body>
+</html>

@@ -1622,6 +1622,61 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"retired": True, "use": "/api/pm"}).encode())
+        # ── Mobile intelligence companion (read-only) ─────────────────────────
+        elif self.path == "/mobile":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            try:
+                from pathlib import Path
+                html = (Path(__file__).parent / "static" / "mobile.html").read_text()
+            except Exception:
+                html = "<html><body><p>Mobile interface not available.</p></body></html>"
+            self.wfile.write(html.encode())
+        elif self.path == "/api/mobile/now":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            try:
+                import mobile_api as _mob
+                payload = _mob.build_now_payload(dict(dash))
+            except Exception as exc:
+                log.warning("[mobile][/now] error: %s", exc)
+                payload = {"error": "unavailable", "ts": ""}
+            self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/mobile/why":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            try:
+                import mobile_api as _mob
+                payload = _mob.build_why_payload()
+            except Exception as exc:
+                log.warning("[mobile][/why] error: %s", exc)
+                payload = {"error": "unavailable", "ts": ""}
+            self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/mobile/alpha":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            try:
+                import mobile_api as _mob
+                payload = _mob.build_alpha_payload()
+            except Exception as exc:
+                log.warning("[mobile][/alpha] error: %s", exc)
+                payload = {"error": "unavailable", "ts": ""}
+            self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/mobile/portfolio":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            try:
+                import mobile_api as _mob
+                payload = _mob.build_portfolio_payload(dict(dash))
+            except Exception as exc:
+                log.warning("[mobile][/portfolio] error: %s", exc)
+                payload = {"error": "unavailable", "ts": ""}
+            self.wfile.write(json.dumps(payload, default=str).encode())
         else:
             self.send_response(404)
             self.end_headers()
@@ -1634,6 +1689,31 @@ class DashHandler(BaseHTTPRequestHandler):
         )
 
     def do_POST(self):
+        # /api/mobile/ask is read-only (LLM question answering, no state mutation)
+        # and must be reachable from mobile.decifertrading.com — allowed before remote block.
+        if self.path == "/api/mobile/ask":
+            global _ask_last_ts
+            import time as _time
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length)) if length else {}
+            question = (body.get("question") or "").strip()
+            self.send_response(400 if not question else 429 if _time.monotonic() - _ask_last_ts < _ASK_COOLDOWN_SECS else 200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            if not question:
+                self.wfile.write(json.dumps({"ok": False, "error": "No question provided"}).encode())
+            elif _time.monotonic() - _ask_last_ts < _ASK_COOLDOWN_SECS:
+                self.wfile.write(json.dumps({"ok": False, "error": "cooldown"}).encode())
+            else:
+                _ask_last_ts = _time.monotonic()
+                try:
+                    from voice_agent import answer_voice_question
+                    answer = answer_voice_question(question, dash)
+                    self.wfile.write(json.dumps({"ok": True, "answer": answer}).encode())
+                except Exception as exc:
+                    self.wfile.write(json.dumps({"ok": False, "error": str(exc)}).encode())
+            return
+
         if self._is_remote_request():
             self.send_response(403)
             self.send_header("Content-Type", "application/json")
@@ -1891,7 +1971,6 @@ class DashHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": True, "effective_capital": get_effective_capital()}).encode())
         elif self.path == "/api/ask":
-            global _ask_last_ts
             import time as _time
 
             length = int(self.headers.get("Content-Length", 0))
