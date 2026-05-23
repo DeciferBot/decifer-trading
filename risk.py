@@ -431,20 +431,13 @@ def get_vix_rank(vix_override: float | None = None) -> float:
         return _vix_rank_cache
 
     try:
-        from concurrent.futures import ThreadPoolExecutor
-        from concurrent.futures import TimeoutError as _FTE
+        import fmp_client
 
-        def _fetch():
-            import yfinance as yf
-
-            return yf.Ticker("^VIX").history(period=f"{lookback + 15}d")["Close"].dropna()
-
-        with ThreadPoolExecutor(max_workers=1) as _pool:
-            try:
-                hist = _pool.submit(_fetch).result(timeout=10)
-            except _FTE:
-                log.warning("get_vix_rank: ^VIX fetch timed out (10s) — defaulting to 0.5")
-                return 0.5
+        df = fmp_client.get_index_bars("^VIX", period="1y", interval="1d")
+        if df is None or df.empty:
+            log.warning("get_vix_rank: ^VIX FMP fetch returned no data — defaulting to 0.5")
+            return 0.5
+        hist = df["Close"].dropna()
         if len(hist) < 20:
             log.warning("get_vix_rank: insufficient VIX history — defaulting to 0.5")
             return 0.5

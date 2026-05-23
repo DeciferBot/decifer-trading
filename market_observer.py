@@ -157,23 +157,12 @@ def _fetch_vix() -> tuple[float, float, float]:
     """
     Returns (current_vix, 1d_change, 5d_avg).
     Falls back to (0, 0, 0) if unavailable.
-    VIX is not available via Alpaca stock API; yfinance is the fallback source.
+    ^VIX is not on Alpaca's equity feed; FMP get_index_bars() is the source.
     """
     try:
-        from concurrent.futures import ThreadPoolExecutor
-        from concurrent.futures import TimeoutError as _FTE
+        import fmp_client
 
-        def _fetch():
-            import yfinance as yf
-
-            return yf.Ticker("^VIX").history(period="10d", interval="1d", auto_adjust=True)
-
-        with ThreadPoolExecutor(max_workers=1) as _pool:
-            try:
-                df = _pool.submit(_fetch).result(timeout=8)
-            except _FTE:
-                log.debug("market_observer: VIX fetch timed out (8s)")
-                return 0.0, 0.0, 0.0
+        df = fmp_client.get_index_bars("^VIX", period="10d", interval="1d")
         if df is None or df.empty or len(df) < 2:
             return 0.0, 0.0, 0.0
         closes = df["Close"].dropna()

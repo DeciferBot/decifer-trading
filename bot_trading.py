@@ -271,15 +271,11 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict, port
     # ── Company name (best-effort) ────────────────────────────────────────────
     company_name = symbol
     try:
-        import yfinance as yf
+        import fmp_client as _fmp
 
-        info = yf.Ticker(symbol).fast_info
-        long_name = getattr(info, "company_name", None) or getattr(info, "longName", None)
-        if not long_name:
-            full = yf.Ticker(symbol).info
-            long_name = full.get("longName") or full.get("shortName")
-        if long_name:
-            company_name = long_name
+        profile = _fmp.get_company_profile(symbol)
+        if profile and profile.get("company_name"):
+            company_name = profile["company_name"]
     except Exception:
         pass
 

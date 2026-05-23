@@ -2,13 +2,13 @@
 Real-time streaming market data from Interactive Brokers.
 
 This module provides live quote and bar data streaming via the IBKR API,
-replacing or supplementing yfinance polling for watched symbols.
+providing live quote and bar data for watched symbols.
 
 Key features:
 - Real-time quote streaming (bid/ask/last/volume/VWAP)
 - 5-second bar aggregation into 1-min and 5-min bars
 - Automatic historical backfill from IBKR
-- Smart data routing (IBKR > yfinance fallback)
+- Smart data routing (IBKR streaming > IBKR historical > Alpaca fallback)
 - Thread-safe concurrent access
 - Connection resilience and auto-resubscription
 
@@ -542,7 +542,7 @@ class SmartDataRouter:
         Priority:
         1. IBKR streaming (if subscribed and has bars)
         2. IBKR historical backfill
-        3. yfinance (fallback)
+        3. Alpaca (fallback)
 
         Args:
             symbol: Stock ticker symbol
@@ -587,14 +587,14 @@ class SmartDataRouter:
         except Exception as e:
             self.logger.warning(f"IBKR historical failed for {symbol}: {e}")
 
-        # Fallback to yfinance
+        # Fallback to Alpaca
         try:
-            self.logger.debug(f"Falling back to yfinance for {symbol}")
-            import yfinance as yf
+            self.logger.debug(f"Falling back to Alpaca for {symbol}")
+            from alpaca_data import fetch_bars
 
-            df = yf.download(symbol, period=period, interval=interval, progress=False)
-            if df.empty:
-                self.logger.warning(f"yfinance returned empty data for {symbol}")
+            df = fetch_bars(symbol, period=period, interval=interval)
+            if df is None or df.empty:
+                self.logger.warning(f"Alpaca returned empty data for {symbol}")
                 return pd.DataFrame()
 
             # Normalize column names to match IBKR format

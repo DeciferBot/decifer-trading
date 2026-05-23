@@ -13,7 +13,6 @@ Provides:
 Data source priority:
   1. FMP earning_calendar (1 call covers all symbols, cached — paid tier, best quality)
   2. Alpha Vantage EARNINGS_CALENDAR (1 call covers all symbols, cached 4 hours)
-  3. yfinance calendar (per-symbol fallback — fragile but covers stragglers)
 
 Both callers previously had independent yfinance calendar implementations.
 This module owns that logic in one place.
@@ -33,7 +32,7 @@ def get_earnings_within_hours(symbols: list[str], hours: int = 48) -> set[str]:
     Returns empty set on any failure — non-blocking, called infrequently.
 
     Tries FMP first (paid, best quality), then Alpha Vantage (cached, 1 call
-    covers all symbols), then falls back to yfinance for any stragglers.
+    covers all symbols).
     """
     flagged: set[str] = set()
     if not symbols:
@@ -84,34 +83,6 @@ def get_earnings_within_hours(symbols: list[str], hours: int = 48) -> set[str]:
         except Exception as exc:
             log.debug("earnings_calendar: AV source failed: %s", exc)
 
-    # ── Source 3: yfinance fallback for symbols not in FMP or AV calendar ───────
-    remaining = [s for s in symbols if s not in covered]
-    if not remaining:
-        return flagged
-
-    try:
-        import yfinance as yf
-
-        for sym in remaining:
-            try:
-                cal = yf.Ticker(sym).calendar
-                if cal is None or cal.empty:
-                    continue
-                for col in cal.columns:
-                    if "earnings" in col.lower():
-                        for val in cal[col].dropna():
-                            if hasattr(val, "to_pydatetime"):
-                                val = val.to_pydatetime()
-                            if isinstance(val, datetime):
-                                if val.tzinfo is None:
-                                    val = val.replace(tzinfo=UTC)
-                                if now_utc <= val <= cutoff:
-                                    flagged.add(sym)
-            except Exception:
-                continue
-    except Exception as exc:
-        log.debug("earnings_calendar.get_earnings_within_hours yfinance fallback failed: %s", exc)
-
     return flagged
 
 
@@ -120,8 +91,7 @@ def get_earnings_days(symbol: str) -> int | None:
     Return days until next earnings for a single symbol, or None.
     Returns None on any failure or if earnings are > 60 days out.
 
-    Tries FMP first (paid, best quality), then Alpha Vantage (cached calendar),
-    then falls back to yfinance.
+    Tries FMP first (paid, best quality), then Alpha Vantage (cached calendar).
     """
     from datetime import date as _date
 
@@ -157,40 +127,4 @@ def get_earnings_days(symbol: str) -> int | None:
     except Exception as exc:
         log.debug("earnings_calendar.get_earnings_days AV source failed for %s: %s", symbol, exc)
 
-    # ── Source 3: yfinance fallback ────────────────────────────────────────────
-    try:
-        import pandas as pd
-        import yfinance as yf
-
-        cal = yf.Ticker(symbol).calendar
-        if cal is None:
-            return None
-
-        ed = None
-        if isinstance(cal, dict):
-            ed = cal.get("Earnings Date")
-        elif isinstance(cal, pd.DataFrame):
-            if "Earnings Date" in cal.columns:
-                ed = cal["Earnings Date"].iloc[0]
-            elif "Earnings Date" in cal.index:
-                ed = cal.T["Earnings Date"].iloc[0]
-
-        if ed is None:
-            return None
-
-        if isinstance(ed, (list, pd.Series)):
-            ed = ed[0] if len(ed) > 0 else None
-        if ed is None:
-            return None
-
-        if hasattr(ed, "date"):
-            ed = ed.date()
-        elif isinstance(ed, str):
-            ed = datetime.strptime(ed[:10], "%Y-%m-%d").date()
-
-        days = (ed - _date.today()).days
-        return int(days) if 0 <= days <= 60 else None
-
-    except Exception as exc:
-        log.debug("earnings_calendar.get_earnings_days(%s) yfinance fallback failed: %s", symbol, exc)
-        return None
+    return None

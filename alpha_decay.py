@@ -104,54 +104,29 @@ def _parse_entry_date(trade: dict) -> date | None:
 
 def fetch_forward_returns(symbol: str, entry_dt: date, horizons: list) -> dict | None:
     """
-    Download daily OHLCV via yfinance and return the % price change at each
+    Download daily OHLCV via Alpaca and return the % price change at each
     forward horizon relative to the entry-bar closing price.
 
     Returns {1: 0.0234, 3: 0.0118, 5: -0.0082, 10: -0.0195}
     (positive = price rose from entry close)
 
     Returns None when data is unavailable (e.g. horizon not reached yet).
-
-    yfinance thread-safety: uses Ticker.history() per call (stateless).
-    The caller is responsible for not invoking this concurrently on the same
-    symbol (the HTTP handler is single-threaded so this is safe by default).
     """
     try:
-        import yfinance as yf
-
-        # Suppress noisy yfinance auth warnings
-        logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+        from alpaca_data import fetch_bars_range
 
         # Download window: entry date – 2 days buffer (for weekends/holidays at start)
-        #                  + max_horizon * 2 + 10 days buffer at end
+        #                  + max_horizon * 2 + 14 days buffer at end
         start = entry_dt - timedelta(days=2)
         end = entry_dt + timedelta(days=max(horizons) * 2 + 14)
         today = date.today()
         if end > today:
             end = today
 
-        # yfinance Ticker.history() is safe to call per-request; each call
-        # creates a new session object so there is no shared global state.
-        for attempt in range(3):
-            try:
-                ticker = yf.Ticker(symbol)
-                df = ticker.history(
-                    start=start.isoformat(),
-                    end=end.isoformat(),
-                    auto_adjust=True,
-                    raise_errors=False,
-                )
-                if df is not None and not df.empty:
-                    break
-            except Exception:
-                pass
-            if attempt < 2:
-                try:
-                    yf.cache.clear()
-                except Exception:
-                    pass
-                time.sleep(0.5)
-        else:
+        start_utc = datetime(start.year, start.month, start.day, tzinfo=UTC)
+        end_utc = datetime(end.year, end.month, end.day, tzinfo=UTC)
+        df = fetch_bars_range(symbol, start_utc, end_utc, interval="1d")
+        if df is None or df.empty:
             return None
 
         if df is None or df.empty:
@@ -207,7 +182,7 @@ def compute_alpha_decay(trades: list | None = None, horizons: list | None = None
       "direction_adj_returns": {1: float, ...},    # positive = favourable for direction
     }
 
-    Trades with no parseable entry date or no yfinance data are silently skipped.
+    Trades with no parseable entry date or no Alpaca data are silently skipped.
     """
     if horizons is None:
         horizons = HORIZONS

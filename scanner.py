@@ -36,7 +36,7 @@ log = logging.getLogger("decifer.scanner")
 def _regime_download(symbol: str, period: str = "5d", interval: str = "1h", auto_adjust: bool = True, **_ignored):
     """Download bars for regime detection.
 
-    Priority: Alpaca (equities/ETFs) → FMP (^index symbols) → yfinance (last resort).
+    Priority: Alpaca (equities/ETFs) → FMP (^index symbols).
     Module-level so tests can patch scanner._regime_download.
     """
     # Layer 1: Alpaca — primary for equities and ETFs
@@ -61,20 +61,6 @@ def _regime_download(symbol: str, period: str = "5d", interval: str = "1h", auto
         except Exception as _e:
             log.debug(f"_regime_download FMP {symbol} failed: {_e}")
 
-    # Layer 3: yfinance — last resort
-    import time as _t
-
-    import yfinance as _yf
-
-    for attempt in range(3):
-        try:
-            df = _yf.Ticker(symbol).history(period=period, interval=interval, auto_adjust=auto_adjust)
-            if df is not None and len(df) > 0:
-                return df
-        except Exception as _e:
-            log.debug(f"_regime_download yf {symbol} attempt {attempt + 1} failed: {_e}")
-        if attempt < 2:
-            _t.sleep(2)
     return None
 
 

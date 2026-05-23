@@ -3,7 +3,7 @@ Portfolio-level optimization module for Decifer Trading bot.
 Handles correlation-aware position sizing, risk parity, VaR calculations,
 sector concentration monitoring, and rebalancing signals.
 
-All calculations use yfinance for real-time data with 60-day historical lookback.
+All calculations use Alpaca REST for historical data with 60-day lookback.
 Correlation matrix cached and recomputed every 30 minutes for performance.
 """
 
@@ -11,11 +11,9 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +57,7 @@ class RebalanceSignal:
 class CorrelationTracker:
     """
     Maintains rolling correlation matrix between portfolio positions.
-    Caches results for 30 minutes to avoid redundant yfinance calls.
+    Caches results for 30 minutes.
     """
 
     def __init__(self, lookback_days: int = 60):
@@ -70,21 +68,19 @@ class CorrelationTracker:
         self.symbols_cached = None
 
     def _fetch_returns(self, symbols: list[str]) -> pd.DataFrame:
-        """Fetch daily returns for symbols using yfinance."""
+        """Fetch daily returns for symbols using Alpaca REST."""
         try:
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=self.lookback_days)
+            from alpaca_data import fetch_bars
 
-            # Fetch adjusted close prices
-            data = yf.download(" ".join(symbols), start=start_date, end=end_date, progress=False, threads=False)
-
-            # Handle single symbol case
-            if len(symbols) == 1:
-                prices = data["Adj Close"].to_frame(name=symbols[0])
-            else:
-                prices = data["Adj Close"]
-
-            # Calculate daily returns
+            frames = {}
+            for sym in symbols:
+                df = fetch_bars(sym, period=f"{self.lookback_days}d", interval="1d")
+                if df is not None and len(df) > 0 and "Close" in df.columns:
+                    frames[sym] = df["Close"]
+            if not frames:
+                return pd.DataFrame()
+            prices = pd.DataFrame(frames)
+            prices = prices.dropna(how="all")
             returns = prices.pct_change().dropna()
             return returns
         except Exception as e:
@@ -161,27 +157,23 @@ class RiskParitySizer:
         if lookback_days is None:
             lookback_days = self.lookback_days
 
-        # Check cache (valid for 1 hour)
         if symbol in self.volatility_cache and time.time() - self.cache_time[symbol] < 3600:
             return self.volatility_cache[symbol]
 
         try:
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=lookback_days)
+            from alpaca_data import fetch_bars
 
-            data = yf.download(symbol, start=start_date, end=end_date, progress=False)
-
-            if data.empty:
+            df = fetch_bars(symbol, period=f"{lookback_days}d", interval="1d")
+            if df is None or df.empty or "Close" not in df.columns:
                 logger.warning(f"No data for {symbol}, returning default vol")
-                return 0.20  # Default 20% volatility
+                return 0.20
 
-            returns = data["Adj Close"].pct_change().dropna()
+            returns = df["Close"].pct_change().dropna()
             daily_vol = returns.std()
             annual_vol = daily_vol * np.sqrt(252)
 
             self.volatility_cache[symbol] = annual_vol
             self.cache_time[symbol] = time.time()
-
             return annual_vol
         except Exception as e:
             logger.error(f"Error calculating volatility for {symbol}: {e}")
@@ -259,35 +251,35 @@ class PortfolioVaR:
     def _get_portfolio_returns(self, portfolio: dict[str, tuple[int, float]], symbols: list[str]) -> pd.Series:
         """Calculate portfolio returns from position weights."""
         try:
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=self.lookback_days)
+            from alpaca_data import fetch_bars
 
-            # Fetch price data
-            data = yf.download(" ".join(symbols), start=start_date, end=end_date, progress=False)
+            frames = {}
+            for sym in symbols:
+                df = fetch_bars(sym, period=f"{self.lookback_days}d", interval="1d")
+                if df is not None and len(df) > 0 and "Close" in df.columns:
+                    frames[sym] = df["Close"]
+            if not frames:
+                return pd.Series(dtype=float)
 
-            if len(symbols) == 1:
-                prices = data["Adj Close"].to_frame(name=symbols[0])
-            else:
-                prices = data["Adj Close"]
-
+            prices = pd.DataFrame(frames).dropna(how="all")
             returns = prices.pct_change().dropna()
 
-            # Calculate weighted portfolio returns
             weights = {}
             total_value = sum(qty * price for qty, price in portfolio.values())
-
             for symbol, (qty, price) in portfolio.items():
                 weights[symbol] = (qty * price) / total_value if total_value > 0 else 0
 
-            portfolio_returns = pd.Series(0.0, index=returns.index)
-            for symbol, weight in weights.items():
-                if symbol in returns.columns:
-                    portfolio_returns += returns[symbol] * weight
+            available_syms = [s for s in symbols if s in returns.columns]
+            if not available_syms:
+                return pd.Series(dtype=float)
 
+            w_series = pd.Series({s: weights.get(s, 0) for s in available_syms})
+            w_series = w_series / w_series.sum() if w_series.sum() > 0 else w_series
+            portfolio_returns = (returns[available_syms] * w_series).sum(axis=1)
             return portfolio_returns
         except Exception as e:
             logger.error(f"Error calculating portfolio returns: {e}")
-            return pd.Series()
+            return pd.Series(dtype=float)
 
     def historical_var(self, portfolio: dict[str, tuple[int, float]], symbols: list[str]) -> float:
         """
@@ -372,7 +364,7 @@ class PortfolioVaR:
 
 class SectorMonitor:
     """
-    Tracks sector exposure with auto-detection from yfinance.
+    Tracks sector exposure with auto-detection from FMP.
     Dynamically adjusts sector caps based on trading regime.
     Alerts when approaching concentration limits.
     """
@@ -411,18 +403,18 @@ class SectorMonitor:
             "PANIC": 0.15,  # 15% max in panic regime
         }
 
-    def _get_sector_from_yfinance(self, symbol: str) -> str:
-        """Fetch sector from yfinance ticker info."""
+    def _get_sector_from_fmp(self, symbol: str) -> str:
+        """Fetch sector from FMP company profile."""
         try:
-            ticker = yf.Ticker(symbol)
-            sector = ticker.info.get("sector", None)
+            import fmp_client as _fmp
 
-            if sector:
+            profile = _fmp.get_company_profile(symbol)
+            if profile and profile.get("sector"):
+                sector = profile["sector"]
                 self.sector_cache[symbol] = sector
                 self.cache_time[symbol] = time.time()
                 return sector
 
-            # Fallback to manual mapping
             return self.DEFAULT_SECTOR_MAP.get(symbol, "Other")
         except Exception as e:
             logger.warning(f"Could not fetch sector for {symbol}: {e}")
@@ -436,7 +428,7 @@ class SectorMonitor:
         return val  # already (qty, price)
 
     def get_sector(self, symbol: str) -> str:
-        """Get sector for symbol using DEFAULT_SECTOR_MAP first, then cache/yfinance."""
+        """Get sector for symbol using DEFAULT_SECTOR_MAP first, then cache/FMP."""
         # Check hard-coded map first — avoids any network call for well-known symbols
         if symbol in self.DEFAULT_SECTOR_MAP:
             return self.DEFAULT_SECTOR_MAP[symbol]
@@ -444,7 +436,7 @@ class SectorMonitor:
         if symbol in self.sector_cache and time.time() - self.cache_time.get(symbol, 0) < 86400:  # 24h cache
             return self.sector_cache[symbol]
 
-        return self._get_sector_from_yfinance(symbol)
+        return self._get_sector_from_fmp(symbol)
 
     def calculate_sector_weights(self, portfolio: dict[str, tuple[int, float]]) -> dict[str, float]:
         """Calculate current sector exposure as % of portfolio."""

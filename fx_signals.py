@@ -8,7 +8,7 @@
 # ║     • Macro (0-25)    — DXY direction + credit stress align  ║
 # ║   Total scaled to 0-50 to match equity signal schema.        ║
 # ║                                                              ║
-# ║   Data: yfinance (free, EURUSD=X format). No vol/float.      ║
+# ║   Data: FMP get_forex_bars() (EURUSD=X → FMP EURUSD format). ║
 # ║   Contract: IBKR Forex (already supported in orders_contracts)║
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
@@ -24,7 +24,8 @@ log = logging.getLogger("decifer.fx_signals")
 
 _EST = pytz.timezone("America/New_York")
 
-# ── FX pair config: symbol → (yfinance_ticker, direction_convention) ─────────
+# ── FX pair config: symbol → (pair_id, direction_convention) ─────────────────
+# pair_id uses the conventional "EURUSD=X" notation; get_forex_bars() strips =X.
 # direction_convention: "base_up" means score is LONG when base currency rises
 # e.g. EURUSD "base_up" → LONG if EUR strengthening vs USD
 # USDJPY "base_down" → LONG if USD strengthening (JPY falls), so same as base_up
@@ -127,14 +128,11 @@ def score_fx_pair(symbol: str, regime: dict) -> dict | None:
         return None
 
     try:
-        import yfinance as yf
+        import fmp_client as _fmp
 
-        df = yf.Ticker(pair_cfg["yf_ticker"]).history(period="5d", interval="1h", auto_adjust=True)
+        df = _fmp.get_forex_bars(pair_cfg["yf_ticker"], period="5d", interval="1h")
         if df is None or df.empty:
             return None
-        # Flatten multi-level columns from newer yfinance
-        if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
-            df.columns = df.columns.get_level_values(0)
     except Exception as exc:
         log.debug("score_fx_pair %s data fetch error: %s", symbol, exc)
         return None

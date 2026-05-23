@@ -208,6 +208,16 @@ def _fetch_bars_range(
         return None
 
 
+def fetch_bars_range(
+    symbol: str,
+    start_utc: "datetime",
+    end_utc: "datetime",
+    interval: str = "1d",
+) -> "pd.DataFrame | None":
+    """Public wrapper around _fetch_bars_range for external callers."""
+    return _fetch_bars_range(symbol, start_utc, end_utc, interval)
+
+
 def _get_extended_session_baseline(
     symbol: str,
     session: str,

@@ -71,7 +71,7 @@ class TestCorrelationTracker:
     def test_update_returns_identity_on_empty_data(self):
         """When yfinance returns empty, update() should return an identity matrix."""
         tracker = po.CorrelationTracker(lookback_days=60)
-        with patch("portfolio_optimizer.yf.download", return_value=pd.DataFrame()):
+        with patch("yfinance.download", return_value=pd.DataFrame()):
             result = tracker.update(["AAPL", "MSFT"])
         assert result.shape == (2, 2)
         np.testing.assert_array_equal(result, np.eye(2))
@@ -86,7 +86,7 @@ class TestCorrelationTracker:
         mock_data.__getitem__ = lambda self, key: prices
         mock_data.empty = False
 
-        with patch("portfolio_optimizer.yf.download", return_value=mock_data):
+        with patch("yfinance.download", return_value=mock_data):
             result = tracker = po.CorrelationTracker()
             corr = tracker.update(symbols)
 
@@ -105,7 +105,7 @@ class TestCorrelationTracker:
         tracker.symbols_cached = symbols[:]
         tracker.last_update = time.time()  # just set
 
-        with patch("portfolio_optimizer.yf.download") as mock_dl:
+        with patch("yfinance.download") as mock_dl:
             result = tracker.update(symbols)
             mock_dl.assert_not_called()
 
@@ -244,7 +244,7 @@ class TestPortfolioVaR:
         mock_data.__getitem__ = lambda self, key: prices
 
         portfolio = {"AAPL": (10, 150.0), "MSFT": (5, 200.0)}
-        with patch("portfolio_optimizer.yf.download", return_value=mock_data):
+        with patch("yfinance.download", return_value=mock_data):
             result = var_calc.historical_var(portfolio, symbols)
 
         # VaR >= 0 (it's a loss amount, not negative)
@@ -254,7 +254,7 @@ class TestPortfolioVaR:
     def test_historical_var_empty_data_returns_zero(self):
         """Insufficient data should return 0.0 gracefully."""
         var_calc = self._make_var_instance()
-        with patch("portfolio_optimizer.yf.download", return_value=pd.DataFrame()):
+        with patch("yfinance.download", return_value=pd.DataFrame()):
             result = var_calc.historical_var({"AAPL": (10, 150.0)}, ["AAPL"])
         assert result == 0.0
 
@@ -269,7 +269,7 @@ class TestPortfolioVaR:
         mock_data.__getitem__ = lambda self, key: prices
 
         portfolio = {"AAPL": (10, 150.0), "MSFT": (5, 200.0)}
-        with patch("portfolio_optimizer.yf.download", return_value=mock_data):
+        with patch("yfinance.download", return_value=mock_data):
             hvar = var_calc.historical_var(portfolio, symbols)
             cvar = var_calc.conditional_var(portfolio, symbols)
 
@@ -300,11 +300,11 @@ class TestPortfolioVaR:
 
 class TestSectorMonitor:
     def test_get_sector_uses_default_map(self):
-        """Known symbols should be returned from DEFAULT_SECTOR_MAP without yfinance."""
+        """Known symbols should be returned from DEFAULT_SECTOR_MAP without FMP call."""
         monitor = po.SectorMonitor()
-        with patch.object(monitor, "_get_sector_from_yfinance") as mock_yf:
+        with patch.object(monitor, "_get_sector_from_fmp") as mock_fmp:
             sector = monitor.get_sector("NVDA")
-            mock_yf.assert_not_called()  # should hit cache/default first
+            mock_fmp.assert_not_called()  # should hit cache/default first
         assert sector == "Technology"
 
     def test_calculate_sector_weights_sums_to_one(self):
@@ -399,7 +399,7 @@ class TestPortfolioOptimizer:
 
         # Patch all internal yfinance calls to avoid network
         with (
-            patch("portfolio_optimizer.yf.download", return_value=pd.DataFrame()),
+            patch("yfinance.download", return_value=pd.DataFrame()),
             patch.object(opt.sector_monitor, "check_concentration", return_value=[]),
             patch.object(opt.correlation_tracker, "update", return_value=np.eye(2)),
             patch.object(opt.risk_parity, "_calculate_volatility", return_value=0.20),
@@ -418,19 +418,19 @@ class TestModuleLevelFunctions:
     def test_get_optimal_size_returns_numeric(self):
         """Module-level get_optimal_size should return a number."""
         portfolio = {"AAPL": {"qty": 5, "current": 170.0}}
-        with patch("portfolio_optimizer.yf.download", return_value=pd.DataFrame()):
+        with patch("yfinance.download", return_value=pd.DataFrame()):
             result = po.get_optimal_size("MSFT", 50, portfolio, 100000)
         assert isinstance(result, (int, float))
 
     def test_check_portfolio_risk_returns_something(self):
         """Module-level check_portfolio_risk should not crash."""
         portfolio = {"AAPL": {"qty": 10, "current": 170.0}}
-        with patch("portfolio_optimizer.yf.download", return_value=pd.DataFrame()):
+        with patch("yfinance.download", return_value=pd.DataFrame()):
             result = po.check_portfolio_risk(portfolio, "RANGING")
         assert result is not None
 
     def test_suggest_rebalance_returns_list(self):
         """Module-level suggest_rebalance should return a list."""
-        with patch("portfolio_optimizer.yf.download", return_value=pd.DataFrame()):
+        with patch("yfinance.download", return_value=pd.DataFrame()):
             result = po.suggest_rebalance({})
         assert isinstance(result, list)

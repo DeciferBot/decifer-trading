@@ -654,6 +654,36 @@ def get_eps_acceleration(symbol: str) -> dict | None:
     }
 
 
+def get_earnings_surprise_history(symbol: str, limit: int = 8) -> list[dict]:
+    """
+    Return historical quarterly earnings with surprise data, newest first.
+    Used by the PEAD dimension to find the most recent earnings surprise.
+
+    Each item: { date: str (YYYY-MM-DD), surprise_pct: float|None, actual: float|None, estimated: float|None }
+    Returns empty list on failure.
+    """
+    raw = _get("earnings", {"symbol": symbol.upper(), "limit": limit})
+    if not raw or not isinstance(raw, list):
+        return []
+    results = []
+    for item in raw:
+        actual = _safe_float(item.get("epsActual"))
+        estimate = _safe_float(item.get("epsEstimated"))
+        date_str = (item.get("date") or "")[:10]
+        if not date_str or actual is None:
+            continue
+        surprise_pct = None
+        if estimate is not None and estimate != 0:
+            surprise_pct = round((actual - estimate) / abs(estimate) * 100, 2)
+        results.append({
+            "date": date_str,
+            "surprise_pct": surprise_pct,
+            "actual": actual,
+            "estimated": estimate,
+        })
+    return results
+
+
 # ── Company Profile / Sector ──────────────────────────────────────────────────
 
 
@@ -700,14 +730,16 @@ def get_company_profile(symbol: str) -> dict | None:
         return None
 
     sector = (item.get("sector") or "").strip()
+    raw_name = (item.get("companyName") or item.get("name") or "").strip()
     return {
-        "symbol":     symbol.upper(),
-        "sector_etf": GICS_ETF_MAP.get(sector),
-        "sector":     sector,
-        "market_cap": _safe_float(item.get("marketCap") or item.get("mktCap")),
-        "employees":  int(item["fullTimeEmployees"]) if item.get("fullTimeEmployees") else None,
-        "description": (item.get("description") or "")[:300],
-        "exchange":   item.get("exchangeShortName") or item.get("exchange") or "",
+        "symbol":       symbol.upper(),
+        "company_name": raw_name or None,
+        "sector_etf":   GICS_ETF_MAP.get(sector),
+        "sector":       sector,
+        "market_cap":   _safe_float(item.get("marketCap") or item.get("mktCap")),
+        "employees":    int(item["fullTimeEmployees"]) if item.get("fullTimeEmployees") else None,
+        "description":  (item.get("description") or "")[:300],
+        "exchange":     item.get("exchangeShortName") or item.get("exchange") or "",
     }
 
 
@@ -1326,6 +1358,38 @@ def get_index_bars(symbol: str, period: str = "5d", interval: str = "1h") -> "pd
     import pandas as pd
     from datetime import datetime, timedelta
 
+    _interval_map = {"1h": "1hour", "1d": "1day", "5m": "5min", "15m": "15min", "30m": "30min"}
+    fmp_interval = _interval_map.get(interval)
+    if not fmp_interval:
+        return None
+
+    _period_days = {"1d": 2, "5d": 8, "1mo": 35, "3mo": 95, "6mo": 185, "1y": 370}
+    days_back = _period_days.get(period, 8)
+    from_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+
+    data = _get(f"historical-chart/{fmp_interval}/{symbol}", params={"from": from_date}, ttl=300)
+    if not data or not isinstance(data, list):
+        return None
+
+    df = pd.DataFrame(data)
+    if "close" not in df.columns:
+        return None
+    df = df.rename(columns={"close": "Close", "open": "Open", "high": "High", "low": "Low", "volume": "Volume"})
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.set_index("date").sort_index()
+    return df if len(df) > 0 else None
+
+
+def get_forex_bars(pair: str, period: str = "5d", interval: str = "1h") -> "pd.DataFrame | None":
+    """Fetch OHLCV bars for a forex pair from FMP.
+
+    pair: FMP format 'EURUSD' or yfinance format 'EURUSD=X' (=X suffix is stripped).
+    Returns DataFrame with [Open, High, Low, Close, Volume] sorted oldest-first, or None.
+    """
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    symbol = pair.upper().replace("=X", "")
     _interval_map = {"1h": "1hour", "1d": "1day", "5m": "5min", "15m": "15min", "30m": "30min"}
     fmp_interval = _interval_map.get(interval)
     if not fmp_interval:
