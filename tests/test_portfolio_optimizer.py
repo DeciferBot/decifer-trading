@@ -206,6 +206,57 @@ class TestRiskParitySizer:
         result = sizer.adjust_for_correlation(weights, np.array([[1.0]]), ["AAPL"])
         assert abs(result["AAPL"] - 1.0) < 1e-6
 
+    # ── Missing-data / fail-closed behaviour ────────────────────────────────
+
+    def test_calculate_volatility_returns_none_when_alpaca_fails(self):
+        """_calculate_volatility must return None (not a default) when data missing."""
+        sizer = po.RiskParitySizer()
+        with patch("alpaca_data.fetch_bars", return_value=None):
+            result = sizer._calculate_volatility("AAPL")
+        assert result is None, (
+            "_calculate_volatility should return None on Alpaca failure, "
+            "not a moderate default that understates risk"
+        )
+
+    def test_calculate_volatility_returns_none_on_empty_df(self):
+        """Empty DataFrame should also produce None, not a default."""
+        import pandas as pd
+        sizer = po.RiskParitySizer()
+        with patch("alpaca_data.fetch_bars", return_value=pd.DataFrame()):
+            result = sizer._calculate_volatility("MSFT")
+        assert result is None
+
+    def test_calculate_weights_excludes_symbol_with_missing_volatility(self):
+        """Symbol that has no vol data must be excluded — not given a default weight."""
+        sizer = po.RiskParitySizer()
+        vols = {"AAPL": 0.25, "MSFT": None}  # MSFT vol unavailable
+        weights = sizer.calculate_weights(["AAPL", "MSFT"], volatilities=vols)
+        assert "MSFT" not in weights, "Symbol with None volatility must be excluded from weights"
+        assert "AAPL" in weights
+        assert abs(weights["AAPL"] - 1.0) < 1e-6  # only symbol → full weight
+
+    def test_calculate_weights_returns_empty_when_all_volatility_missing(self):
+        """If all symbols have no vol data, return empty dict — never guess weights."""
+        sizer = po.RiskParitySizer()
+        vols = {"AAPL": None, "MSFT": None}
+        weights = sizer.calculate_weights(["AAPL", "MSFT"], volatilities=vols)
+        assert weights == {}, "All-None volatilities must yield empty weights, not arbitrary defaults"
+
+    def test_calculate_weights_does_not_silently_increase_sizing(self):
+        """
+        A symbol that returns no vol data must not receive a weight that implies
+        low volatility (which would over-size the position). Specifically, a
+        missing symbol must not receive more weight than a real 20% vol symbol.
+        """
+        sizer = po.RiskParitySizer()
+        # RISKY has no data; STABLE has known vol
+        vols = {"RISKY": None, "STABLE": 0.20}
+        weights = sizer.calculate_weights(["RISKY", "STABLE"], volatilities=vols)
+        assert "RISKY" not in weights, (
+            "Symbol with missing volatility must be excluded, "
+            "not given a weight that could over-size a risky position"
+        )
+
     @pytest.mark.parametrize(
         "vols,expected_order",
         [

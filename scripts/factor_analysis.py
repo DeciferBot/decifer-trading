@@ -92,14 +92,16 @@ def load_records() -> list[dict]:
 def fetch_price_cache(records: list[dict]) -> dict[str, dict[str, float]]:
     """
     Return {symbol: {date_str: close_price}} covering the full signal date range.
-    Loads from disk cache if available; downloads via yfinance otherwise.
+    Loads from disk cache if available; fetches via Alpaca REST otherwise.
+    Fail closed — symbols unavailable from Alpaca are skipped (not substituted).
     """
     if "--clear-cache" not in sys.argv and os.path.exists(_PRICE_CACHE):
         print(f"Loading price cache from {_PRICE_CACHE} ...")
         with open(_PRICE_CACHE) as f:
             return json.load(f)
 
-    import yfinance as yf
+    sys.path.insert(0, _REPO)
+    from alpaca_data import fetch_bars_range  # noqa: PLC0415
 
     by_symbol: dict[str, list[datetime]] = defaultdict(list)
     for r in records:
@@ -112,25 +114,26 @@ def fetch_price_cache(records: list[dict]) -> dict[str, dict[str, float]]:
         except Exception:
             pass
 
-    print(f"Fetching daily bars for {len(by_symbol)} symbols ...")
+    print(f"Fetching daily bars for {len(by_symbol)} symbols via Alpaca ...")
     cache: dict[str, dict[str, float]] = {}
+    missing = 0
     for i, (sym, dates) in enumerate(sorted(by_symbol.items()), 1):
         if i % 100 == 0:
             print(f"  {i}/{len(by_symbol)} ...")
-        start = (min(dates) - timedelta(days=2)).strftime("%Y-%m-%d")
-        end = (max(dates) + timedelta(days=35)).strftime("%Y-%m-%d")
+        start_utc = min(dates) - timedelta(days=2)
+        end_utc = max(dates) + timedelta(days=35)
         try:
-            df = yf.download(sym, start=start, end=end, interval="1d",
-                             progress=False, auto_adjust=True)
-            if df is None or len(df) < 2:
+            df = fetch_bars_range(sym, start_utc, end_utc, interval="1d")
+            if df is None or len(df) < 2 or "Close" not in df.columns:
+                missing += 1
                 continue
-            if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
-                df.columns = df.columns.get_level_values(0)
             close = df["Close"].dropna()
             cache[sym] = {str(d.date()): float(p) for d, p in zip(close.index, close.values)}
         except Exception:
-            pass
+            missing += 1
 
+    if missing:
+        print(f"  WARNING: {missing} symbols had no Alpaca data — excluded from cache")
     with open(_PRICE_CACHE, "w") as f:
         json.dump(cache, f)
     print(f"Cached {len(cache)} symbols to {_PRICE_CACHE}")

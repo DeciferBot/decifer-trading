@@ -6,6 +6,70 @@
 
 ---
 
+## 2026-05-24 — yfinance final hardening (v4.31.4)
+
+**Closes the remaining 3 active yfinance import paths that were not removed in v4.31.3.**
+
+**Files hardened**:
+- `signals/catalyst_screen.py`: Removed yfinance fallback from `_fetch_info()`. FMP-only. Fail closed.
+- `signals/options_anomaly.py`: Removed yfinance fallbacks from `_fetch_chain()` and `_current_price()`. Alpaca-only. Fail closed.
+- `scripts/factor_analysis.py`: Replaced `yf.download()` with `alpaca_data.fetch_bars_range()`. Missing symbols logged and skipped, not silently absent.
+
+**Risk-sizing fail-closed hardening** (`portfolio_optimizer.py`):
+- `_calculate_volatility()` now returns `None` instead of `0.20` default when data unavailable.
+- A `0.20` default could understate volatility for high-risk symbols, silently increasing their position size.
+- `calculate_weights()` excludes symbols with `None` volatility from the output dict entirely. The caller receives only symbols for which a real volatility was measured. Empty dict if all symbols missing.
+- Missing symbols are logged at WARNING level with explicit message.
+
+**Broad guard test added** (`test_no_yfinance_runtime.py`):
+- Now walks all active source directories (excl. archive, tests, docs, Chief-Decifer-recovered, venv) and asserts no file contains an active `import yfinance` or `from yfinance` statement.
+- Covers future re-introduction automatically — not just the 4 specific files from v4.31.3.
+- 9 specific file checks + 1 broad scan + 1 module attribute binding check = 11 tests total.
+
+**`_safe_download` test rewrite** (`test_safe_download.py`):
+- Old tests described a 3-layer contract (Alpaca → yfinance → fail). yfinance layer was removed in v4.31.3.
+- Rewritten to document the 2-layer contract: Alpaca → fail closed. Includes test asserting no `yf` attribute on the signals module.
+
+**New portfolio optimizer tests** (5 new tests in `test_portfolio_optimizer.py`):
+- `_calculate_volatility` returns None on Alpaca failure (not 0.20)
+- `_calculate_volatility` returns None on empty DataFrame
+- `calculate_weights` excludes symbol with None volatility
+- `calculate_weights` returns empty dict when all volatility missing
+- Confirms no silent sizing increase from missing data
+
+**Task C verification** (`orders_core.py`):
+- `prices["Alpaca"] = yf_price` — confirmed correct. `yf_price` is a retained local variable name bound to `price` (the Alpaca-sourced price passed to `execute_buy`). The "Alpaca" label is accurate. No source confusion.
+
+---
+
+## 2026-05-23 — yfinance removed from all production paths (v4.31.3)
+
+**Decision**: yfinance is not approved for Decifer Trading runtime, fallback, enrichment, analytics, or validation paths. Removed entirely. Fail closed when data unavailable.
+
+**Root cause of removal**: yfinance had accumulated in 10 runtime usages across 4 files (`signals/__init__.py`, `portfolio_optimizer.py`, `bot.py`, `orders_core.py`). As a free, unofficial library it has no SLA, rate limits, and data structure changes without notice. The system already has two paid, reliable alternatives (Alpaca, FMP) that are preferred for all data needs.
+
+**What was removed** (all runtime usages):
+- `signals/__init__.py`: `_safe_download()` Layer 2 fallback, `fetch_multi_timeframe()` Layer 3 5m-bar fallback, PEAD dimension `get_earnings_dates()` call
+- `portfolio_optimizer.py`: `CorrelationTracker._fetch_returns()`, `RiskParitySizer._calculate_volatility()`, `PortfolioVaR._get_portfolio_returns()`
+- `bot.py`: `logging.getLogger("yfinance").setLevel(logging.CRITICAL)` suppression line
+- `orders_core.py`: price label `"yfinance"` renamed `"Alpaca"`
+
+**Replacements** (fail-closed):
+- PEAD dimension: replaced `yf.Ticker.get_earnings_dates()` with `fmp_client.get_earnings_surprise_history()` (new function using FMP `/earnings` endpoint — computes `surprise_pct = (actual - estimate) / abs(estimate) * 100`)
+- Portfolio optimizer: replaced `yf.download()` with `alpaca_data.fetch_bars()` per-symbol loop; returns 0.20 volatility default on Alpaca failure (documented fallback, not silent)
+- `_safe_download()`: removed Layer 2 entirely — returns None if Alpaca fails, callers handle gracefully
+- `fetch_multi_timeframe()`: removed Layer 3 — 5m bars unavailable if Alpaca fails; caller gets None
+
+**Non-production exceptions** (explicitly annotated as research-only):
+- `signals/catalyst_screen.py`: yfinance fallback kept for standalone research use only. Docstring updated: "NON-PRODUCTION RESEARCH TOOL — standalone script only. Not imported by any production runtime module."
+- `signals/options_anomaly.py`: same annotation applied.
+
+**Guard test**: `tests/test_no_yfinance_runtime.py` — 4 tests verifying that `signals/__init__.py`, `portfolio_optimizer.py`, `bot.py`, and `orders_core.py` contain no yfinance strings. Runs as part of full pytest suite.
+
+**CLAUDE.md and ARCHITECTURE.md updated** to reflect yfinance as removed.
+
+---
+
 ## 2026-05-23 — Options pipeline rewrite: real volume, provider contract, expression router
 
 **Root cause of 15-day non-execution**: `alpaca_options.py` used `bid_size + ask_size` (quote size) as a traded volume proxy and multiplied by 5 to fabricate open interest. This locked the unusual-volume ratio at exactly 0.200 for every symbol (below the 0.250 threshold), guaranteeing every options entry was blocked.

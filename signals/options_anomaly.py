@@ -1,8 +1,7 @@
 """
 Options Anomaly Detector
 ========================
-NON-PRODUCTION RESEARCH TOOL — standalone script only. Not imported by any
-production runtime module. yfinance fallback retained as research-only path.
+Standalone research script. Not imported by any production runtime module.
 
 Scans the options chain of M&A candidate tickers for unusual activity that
 often precedes acquisition announcements:
@@ -12,14 +11,11 @@ often precedes acquisition announcements:
   3. Near-term IV spike  — nearest expiry IV significantly elevated
   4. IV term compression — front-month IV / back-month IV > 1.20
 
-Data source priority:
-  1. Alpaca OPRA (paid, real-time) — used when client is available
-  2. yfinance (free, 15-20min delayed) — fallback only
+Data source: Alpaca OPRA (paid, real-time). Fail closed — returns None if
+Alpaca is unavailable. No fallback to unapproved sources.
 
 NOTE: Alpaca snapshot "volume" is bid_size + ask_size (quoted liquidity),
-not daily trade volume. It's real-time and accurate for OTM interest
-detection; semantically different from yfinance daily volume but more
-timely.
+not daily trade volume. Real-time and accurate for OTM interest detection.
 
 Run standalone:  python -m signals.options_anomaly --tickers AAPL MSFT
 Called from app: from signals.options_anomaly import run_anomaly_scan
@@ -45,9 +41,8 @@ def _fetch_chain(ticker: str) -> list[dict] | None:
     """
     Fetch options chain for the nearest two expiry dates.
     Returns list of dicts: [{"calls": df, "puts": df, "expiry_str": str, "dte": int}, ...]
-    Tries Alpaca OPRA first; falls back to yfinance.
+    Alpaca OPRA only. Returns None if unavailable — fail closed.
     """
-    # Primary: Alpaca OPRA (real-time)
     try:
         from alpaca_options import get_all_chains
         chains = get_all_chains(ticker, min_dte=0, max_dte=60)
@@ -55,33 +50,13 @@ def _fetch_chain(ticker: str) -> list[dict] | None:
             return chains[:2]
     except Exception as exc:
         log.debug(f"options_anomaly: Alpaca chain fetch failed for {ticker} — {exc}")
-
-    # Fallback: yfinance (15-20min delayed)
-    try:
-        import yfinance as yf
-        t = yf.Ticker(ticker)
-        expirations = t.options
-        if not expirations:
-            return None
-        selected = expirations[:2]
-        result = []
-        for exp in selected:
-            oc = t.option_chain(exp)
-            result.append({
-                "calls": oc.calls,
-                "puts": oc.puts,
-                "expiry_str": exp,
-                "dte": None,
-            })
-        return result if result else None
-    except Exception:
-        return None
+    return None
 
 
 # ── Current price ─────────────────────────────────────────────────────────────
 
 def _current_price(ticker: str) -> float | None:
-    # Primary: Alpaca (real-time)
+    # Alpaca only. Returns None if unavailable — fail closed.
     try:
         from alpaca_options import get_underlying_price
         price = get_underlying_price(ticker)
@@ -89,14 +64,7 @@ def _current_price(ticker: str) -> float | None:
             return price
     except Exception:
         pass
-
-    # Fallback: yfinance
-    try:
-        import yfinance as yf
-        info = yf.Ticker(ticker).fast_info
-        return getattr(info, "last_price", None) or getattr(info, "regularMarketPrice", None)
-    except Exception:
-        return None
+    return None
 
 
 # ── Anomaly scorer ────────────────────────────────────────────────────────────

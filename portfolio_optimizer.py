@@ -152,8 +152,13 @@ class RiskParitySizer:
         self.volatility_cache = {}
         self.cache_time = {}
 
-    def _calculate_volatility(self, symbol: str, lookback_days: int | None = None) -> float:
-        """Calculate annualized volatility for a symbol."""
+    def _calculate_volatility(self, symbol: str, lookback_days: int | None = None) -> float | None:
+        """Calculate annualized volatility for a symbol.
+
+        Returns None if data is unavailable. Callers must exclude None symbols
+        rather than substituting a default — a missing-data default can
+        understate risk and silently increase position sizing.
+        """
         if lookback_days is None:
             lookback_days = self.lookback_days
 
@@ -165,10 +170,19 @@ class RiskParitySizer:
 
             df = fetch_bars(symbol, period=f"{lookback_days}d", interval="1d")
             if df is None or df.empty or "Close" not in df.columns:
-                logger.warning(f"No data for {symbol}, returning default vol")
-                return 0.20
+                logger.warning(
+                    f"[portfolio_optimizer] No volatility data for {symbol} — "
+                    "symbol excluded from optimization"
+                )
+                return None
 
             returns = df["Close"].pct_change().dropna()
+            if returns.empty:
+                logger.warning(
+                    f"[portfolio_optimizer] Empty return series for {symbol} — "
+                    "symbol excluded from optimization"
+                )
+                return None
             daily_vol = returns.std()
             annual_vol = daily_vol * np.sqrt(252)
 
@@ -176,39 +190,57 @@ class RiskParitySizer:
             self.cache_time[symbol] = time.time()
             return annual_vol
         except Exception as e:
-            logger.error(f"Error calculating volatility for {symbol}: {e}")
-            return 0.20
+            logger.error(
+                f"[portfolio_optimizer] Error calculating volatility for {symbol}: {e} — "
+                "symbol excluded from optimization"
+            )
+            return None
 
     def calculate_weights(self, symbols: list[str], volatilities: dict[str, float] | None = None) -> dict[str, float]:
         """
         Calculate risk-parity weights for given symbols.
 
+        Symbols whose volatility cannot be computed are excluded from the
+        result rather than given a default — a moderate default could
+        understate risk and silently increase sizing.
+
         Args:
             symbols: List of ticker symbols
-            volatilities: Optional dict of pre-calculated volatilities
+            volatilities: Optional dict of pre-calculated volatilities (None values excluded)
 
         Returns:
-            Dict of symbol -> weight (sums to 1.0)
+            Dict of symbol -> weight (sums to 1.0, only eligible symbols present)
         """
         if not symbols:
             return {}
 
-        # Get volatilities
         if volatilities is None:
             vols = {sym: self._calculate_volatility(sym) for sym in symbols}
         else:
-            vols = volatilities
+            vols = {sym: volatilities.get(sym) for sym in symbols}
 
-        # Prevent division by zero
-        vols = {sym: max(vol, 0.001) for sym, vol in vols.items()}
+        # Exclude symbols with missing data — cannot size safely without volatility
+        excluded = [sym for sym, v in vols.items() if v is None]
+        if excluded:
+            logger.warning(
+                f"[portfolio_optimizer] Excluded from risk-parity sizing (no vol data): {excluded}"
+            )
+
+        eligible = {sym: vols[sym] for sym in symbols if vols.get(sym) is not None}
+        if not eligible:
+            logger.error(
+                "[portfolio_optimizer] No eligible symbols after volatility filtering — "
+                "returning empty weights"
+            )
+            return {}
+
+        # Prevent division by zero for very low volatility
+        eligible = {sym: max(vol, 0.001) for sym, vol in eligible.items()}
 
         # Inverse volatility weights: w_i = (1/vol_i) / sum(1/vol_j)
-        inverse_vols = {sym: 1.0 / vols[sym] for sym in symbols}
+        inverse_vols = {sym: 1.0 / vol for sym, vol in eligible.items()}
         total_inverse = sum(inverse_vols.values())
-
-        weights = {sym: inverse_vols[sym] / total_inverse for sym in symbols}
-
-        return weights
+        return {sym: inverse_vols[sym] / total_inverse for sym in eligible}
 
     def adjust_for_correlation(
         self, weights: dict[str, float], correlation_matrix: np.ndarray, symbols: list[str]

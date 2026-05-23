@@ -1,12 +1,15 @@
 """
 M&A Target Fundamental Screen
 ==============================
-NON-PRODUCTION RESEARCH TOOL — standalone script only. Not imported by any
-production runtime module. yfinance fallback retained as research-only path.
+M&A Target Fundamental Screen — standalone research script.
+Not imported by any production runtime module.
 
 Screens a broad stock universe for companies that exhibit classic acquisition-
 target characteristics: low EV/Revenue, net-cash balance sheet, meaningful
 revenue growth, and a market cap in the "acquisition sweet spot".
+
+Data source: FMP Premium (paid). Fail closed — returns None if FMP
+unavailable. No fallback to unapproved sources.
 
 Run standalone:  python -m signals.catalyst_screen
 Called from app: from signals.catalyst_screen import run_screen
@@ -108,54 +111,40 @@ def _load_watchlist() -> list[str]:
 def _fetch_info(ticker: str) -> dict | None:
     """
     Fetch fundamental data for M&A screening.
-    FMP Premium primary (same-day from SEC); yfinance fallback (1-2 day lag).
-    Returns a normalised info dict or None.
+    FMP Premium only. Returns None if FMP is unavailable or missing data.
+    Fail closed — no fallback to unapproved data sources.
     """
-    # Primary: FMP (paid, current)
     try:
         import fmp_client as fmp
-        if fmp.is_available():
-            profile = fmp.get_company_profile(ticker)
-            if profile and profile.get("market_cap"):
-                metrics = fmp.get_key_metrics_ttm(ticker)
-                growth  = fmp.get_revenue_growth(ticker)
-
-                ev_revenue      = metrics.get("ev_to_sales") if metrics else None
-                net_debt_ebitda = metrics.get("net_debt_to_ebitda") if metrics else None
-                # Negative net-debt/EBITDA = net cash positive (debt < cash)
-                net_cash_positive = (net_debt_ebitda < 0) if net_debt_ebitda is not None else None
-
-                rev_growth_pct = growth.get("revenue_growth_yoy") if growth else None
-                # get_revenue_growth returns %, convert to decimal for threshold comparison
-                rev_growth = rev_growth_pct / 100.0 if rev_growth_pct is not None else None
-
-                return {
-                    "_source":      "fmp",
-                    "sector":       profile.get("sector", ""),
-                    "shortName":    ticker,
-                    "marketCap":    profile.get("market_cap"),
-                    "enterpriseToRevenue": ev_revenue,
-                    "revenueGrowth":       rev_growth,
-                    "_net_cash_positive":  net_cash_positive,
-                    # sentinel values so _score_ticker net-cash branch works for both sources
-                    "totalCash": 1.0 if net_cash_positive else 0.0,
-                    "totalDebt": 0.0 if net_cash_positive else 1.0,
-                }
-            # profile missing or no market_cap — fall through to yfinance
-    except Exception:
-        pass
-
-    # Fallback: yfinance (1-2 day lag)
-    try:
-        import yfinance as yf
-        info = yf.Ticker(ticker).info
-        if not info or len(info) < 5:
+        if not fmp.is_available():
             return None
-        price = info.get("regularMarketPrice") or info.get("currentPrice") or info.get("previousClose")
-        if not price:
+        profile = fmp.get_company_profile(ticker)
+        if not profile or not profile.get("market_cap"):
             return None
-        info["_source"] = "yfinance"
-        return info
+        metrics = fmp.get_key_metrics_ttm(ticker)
+        growth  = fmp.get_revenue_growth(ticker)
+
+        ev_revenue      = metrics.get("ev_to_sales") if metrics else None
+        net_debt_ebitda = metrics.get("net_debt_to_ebitda") if metrics else None
+        # Negative net-debt/EBITDA = net cash positive (debt < cash)
+        net_cash_positive = (net_debt_ebitda < 0) if net_debt_ebitda is not None else None
+
+        rev_growth_pct = growth.get("revenue_growth_yoy") if growth else None
+        # get_revenue_growth returns %, convert to decimal for threshold comparison
+        rev_growth = rev_growth_pct / 100.0 if rev_growth_pct is not None else None
+
+        return {
+            "_source":      "fmp",
+            "sector":       profile.get("sector", ""),
+            "shortName":    ticker,
+            "marketCap":    profile.get("market_cap"),
+            "enterpriseToRevenue": ev_revenue,
+            "revenueGrowth":       rev_growth,
+            "_net_cash_positive":  net_cash_positive,
+            # sentinel values so _score_ticker net-cash branch works for both sources
+            "totalCash": 1.0 if net_cash_positive else 0.0,
+            "totalDebt": 0.0 if net_cash_positive else 1.0,
+        }
     except Exception:
         return None
 
