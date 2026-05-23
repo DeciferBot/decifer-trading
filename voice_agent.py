@@ -260,10 +260,11 @@ _SYSTEM_PROMPT = (
 )
 
 
-def answer_voice_question(query: str, dash: dict) -> str:
+def answer_voice_question(query: str, dash: dict, *, read_only: bool = False) -> str:
     """
     Classify the query, build focused context, call Haiku once, return spoken answer.
     Control commands (pause/resume) are executed without an LLM call.
+    Pass read_only=True (mobile) to block state-mutating control intents.
     Never raises — returns a plain fallback on any error.
     """
     if not query or not query.strip():
@@ -273,10 +274,12 @@ def answer_voice_question(query: str, dash: dict) -> str:
         intent, symbol = _classify(query)
 
         # ── Control intents: no LLM ──────────────────────────────────────────
-        if intent == "CONTROL_PAUSE":
-            dash["paused"] = True
-            return "Scanning paused."
-        if intent == "CONTROL_RESUME":
+        if intent in ("CONTROL_PAUSE", "CONTROL_RESUME"):
+            if read_only:
+                return "Control commands are not available on mobile. Use the dashboard to pause or resume scanning."
+            if intent == "CONTROL_PAUSE":
+                dash["paused"] = True
+                return "Scanning paused."
             dash["paused"] = False
             return "Resuming scans."
 

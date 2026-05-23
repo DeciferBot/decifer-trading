@@ -849,6 +849,13 @@ def _todays_closed_trades_from_events() -> list:
 _ask_last_ts: float = 0.0
 _ASK_COOLDOWN_SECS: float = 1.5
 
+# Mobile Ask rate limiting — separate from dashboard ask, stricter
+_mobile_ask_last_ts: float = 0.0
+_MOBILE_ASK_COOLDOWN_SECS: float = 10.0  # 10 s per-request floor
+_mobile_ask_window_start: float = 0.0
+_mobile_ask_window_count: int = 0
+_MOBILE_ASK_MAX_PER_5MIN: int = 20  # hard cap: 20 asks per 5-minute window
+
 
 class DashHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -1689,29 +1696,50 @@ class DashHandler(BaseHTTPRequestHandler):
         )
 
     def do_POST(self):
-        # /api/mobile/ask is read-only (LLM question answering, no state mutation)
-        # and must be reachable from mobile.decifertrading.com — allowed before remote block.
+        # /api/mobile/ask — read-only LLM Q&A for mobile surface.
+        # read_only=True blocks control intents (pause/resume) that would mutate state.
+        # Stricter rate limit than dashboard ask: 10 s cooldown + 20/5 min window cap.
         if self.path == "/api/mobile/ask":
-            global _ask_last_ts
+            global _mobile_ask_last_ts, _mobile_ask_window_start, _mobile_ask_window_count
             import time as _time
+            now = _time.monotonic()
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length)) if length else {}
             question = (body.get("question") or "").strip()
-            self.send_response(400 if not question else 429 if _time.monotonic() - _ask_last_ts < _ASK_COOLDOWN_SECS else 200)
+            if not question:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "error": "No question provided"}).encode())
+                return
+            # Per-request cooldown
+            if now - _mobile_ask_last_ts < _MOBILE_ASK_COOLDOWN_SECS:
+                self.send_response(429)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "error": "cooldown"}).encode())
+                return
+            # Sliding-window cap: reset counter if window has expired
+            if now - _mobile_ask_window_start >= 300:
+                _mobile_ask_window_start = now
+                _mobile_ask_window_count = 0
+            if _mobile_ask_window_count >= _MOBILE_ASK_MAX_PER_5MIN:
+                self.send_response(429)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "error": "rate limit"}).encode())
+                return
+            _mobile_ask_last_ts = now
+            _mobile_ask_window_count += 1
+            self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            if not question:
-                self.wfile.write(json.dumps({"ok": False, "error": "No question provided"}).encode())
-            elif _time.monotonic() - _ask_last_ts < _ASK_COOLDOWN_SECS:
-                self.wfile.write(json.dumps({"ok": False, "error": "cooldown"}).encode())
-            else:
-                _ask_last_ts = _time.monotonic()
-                try:
-                    from voice_agent import answer_voice_question
-                    answer = answer_voice_question(question, dash)
-                    self.wfile.write(json.dumps({"ok": True, "answer": answer}).encode())
-                except Exception as exc:
-                    self.wfile.write(json.dumps({"ok": False, "error": str(exc)}).encode())
+            try:
+                from voice_agent import answer_voice_question
+                answer = answer_voice_question(question, dash, read_only=True)
+                self.wfile.write(json.dumps({"ok": True, "answer": answer}).encode())
+            except Exception as exc:
+                self.wfile.write(json.dumps({"ok": False, "error": str(exc)}).encode())
             return
 
         if self._is_remote_request():
@@ -2030,8 +2058,21 @@ class DashHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def end_headers(self):
-        """Inject CORS headers on every response so the mobile PWA can call the API."""
-        self.send_header("Access-Control-Allow-Origin", "*")
+        """Inject CORS headers on every response.
+
+        Mobile routes (/mobile, /api/mobile/*) are restricted to the mobile
+        subdomain origin. All other routes keep the existing wildcard to avoid
+        breaking dashboard behaviour.
+        """
+        _MOBILE_ORIGIN = "https://mobile.decifertrading.com"
+        _path = getattr(self, "path", "") or ""
+        is_mobile_route = _path == "/mobile" or _path.startswith("/api/mobile/")
+        if is_mobile_route:
+            req_origin = self.headers.get("Origin", "")
+            allow_origin = req_origin if req_origin == _MOBILE_ORIGIN else _MOBILE_ORIGIN
+        else:
+            allow_origin = "*"
+        self.send_header("Access-Control-Allow-Origin", allow_origin)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         super().end_headers()
