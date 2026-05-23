@@ -720,6 +720,17 @@ canvas{display:block;width:100% !important}
         </div>
       </div>
 
+      <!-- NEW ENTRIES THIS SCAN -->
+      <div style="flex-shrink:0;border-top:1px solid var(--border)">
+        <div class="col-title" style="flex-shrink:0">
+          <span>New Entries This Scan</span>
+          <span id="apex-entries-count" style="font-size:10px;color:var(--muted2)"></span>
+        </div>
+        <div id="apex-entries-body" style="padding:8px 12px">
+          <div style="color:var(--muted2);font-size:11px">Waiting for Apex…</div>
+        </div>
+      </div>
+
       <!-- SCAN PROGRESS -->
       <div class="scan-wrap" style="flex-shrink:0">
         <div class="scan-bg"><div class="scan-fill" id="scan-fill" style="width:0%"></div></div>
@@ -835,9 +846,9 @@ canvas{display:block;width:100% !important}
 </div>
 
 <!-- VIEW 4: AGENTS / APEX -->
-<div class="view agents-view" id="view-agents" style="flex-direction:column;padding:14px 16px;gap:12px;overflow-y:auto">
+<div class="view agents-view" id="view-agents" style="flex-direction:column;padding:14px 16px;gap:14px;overflow-y:auto">
 
-  <!-- ZONE 1: Apex Synthesis — what happened last scan -->
+  <!-- ZONE 1: Apex Synthesis -->
   <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0">
     <div class="col-title" style="background:var(--bg2)">
       <span>Apex Synthesis</span>
@@ -851,65 +862,79 @@ canvas{display:block;width:100% !important}
         <button onclick="loadIntelligence()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:9px;padding:2px 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
       </span>
     </div>
-    <div id="agents-convo-full" style="padding:12px 14px">
+    <div id="agents-convo-full" style="padding:14px 16px">
       <div style="color:var(--muted2);font-size:11px">Apex synthesis appears after the first scan.</div>
     </div>
   </div>
 
-  <!-- ZONE 2: Three-column — Themes | Last Trade | Intelligence Feed -->
-  <div style="display:grid;grid-template-columns:220px 1fr 240px;gap:12px;flex:1;min-height:280px">
+  <!-- ZONE 2: Market Map + Active Themes -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0">
 
-    <!-- LEFT: Active Themes (non-dormant only) -->
+    <!-- What's Driving the Market -->
     <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column">
-      <div class="col-title" style="background:var(--bg2)">Active Themes</div>
-      <div id="intel-themes" style="padding:8px 12px;overflow-y:auto;flex:1">
+      <div class="col-title" style="background:var(--bg2)">What's Driving the Market</div>
+      <div id="intel-drivers" style="padding:10px 14px;overflow-y:auto;flex:1;max-height:260px">
         <div style="font-size:10px;color:var(--muted2)">Loading…</div>
       </div>
     </div>
 
-    <!-- CENTER: Last Trade Decision -->
+    <!-- Active Themes -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column">
+      <div class="col-title" style="background:var(--bg2)">Active Themes</div>
+      <div id="intel-themes" style="padding:10px 14px;overflow-y:auto;flex:1;max-height:260px">
+        <div style="font-size:10px;color:var(--muted2)">Loading…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ZONE 3: Intelligence Universe (full, paginated) -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0">
+    <div class="col-title" style="background:var(--bg2)">
+      <span>Intelligence Universe</span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <span id="intel-cand-count" style="font-size:10px;color:var(--muted2)">—</span>
+        <span id="intel-ts" style="font-size:9px;color:var(--muted2)"></span>
+      </span>
+    </div>
+    <div id="intel-candidates" style="padding:0 14px"></div>
+    <div id="intel-cand-pagination" style="display:flex;align-items:center;justify-content:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border)">
+      <button onclick="_intelPage(-1)" id="intel-page-prev" style="background:var(--card);border:1px solid var(--border);color:var(--muted2);font-size:11px;padding:3px 12px;border-radius:3px;cursor:pointer">← Prev</button>
+      <span id="intel-page-label" style="font-size:10px;color:var(--muted2)">—</span>
+      <button onclick="_intelPage(1)" id="intel-page-next" style="background:var(--card);border:1px solid var(--border);color:var(--muted2);font-size:11px;padding:3px 12px;border-radius:3px;cursor:pointer">Next →</button>
+    </div>
+  </div>
+
+  <!-- ZONE 4: Trade Activity — Last Trade + Session Trades -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0">
+
+    <!-- Last Trade -->
     <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column">
       <div class="col-title" style="background:var(--bg2)">
         <span>Last Trade <span id="trade-card-age" style="color:var(--muted2);font-size:9px;font-weight:400;letter-spacing:0;margin-left:6px"></span></span>
         <span style="display:flex;align-items:center;gap:4px">
-          <button id="tc-copy-btn" onclick="copyDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0;letter-spacing:1px">Copy</button>
-          <button id="tc-prev-btn" onclick="prevDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0 4px;line-height:1">&#8592;</button>
+          <button id="tc-prev-btn" onclick="prevDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:12px;padding:0 4px">&#8592;</button>
           <span id="tc-nav-pos" style="color:var(--muted2);font-size:9px"></span>
-          <button id="tc-next-btn" onclick="nextDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0 4px;line-height:1">&#8594;</button>
+          <button id="tc-next-btn" onclick="nextDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:12px;padding:0 4px">&#8594;</button>
         </span>
       </div>
-      <div class="trade-card-body" id="trade-card-body" style="flex:1;overflow-y:auto;max-height:none">
+      <div class="trade-card-body" id="trade-card-body" style="flex:1;overflow-y:auto">
         <div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>
       </div>
     </div>
 
-    <!-- RIGHT: Intelligence Feed (top candidates by confidence) -->
+    <!-- Session Trades -->
     <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column">
-      <div class="col-title" style="background:var(--bg2)">
-        <span>Intel Feed</span>
-        <span style="display:flex;align-items:center;gap:6px">
-          <span id="intel-cand-count" style="font-size:10px;font-weight:700;color:var(--orange)">—</span>
-          <span id="intel-ts" style="font-size:9px;color:var(--muted2)"></span>
-        </span>
-      </div>
-      <div id="intel-candidates" style="padding:8px 12px;overflow-y:auto;flex:1">
-        <div style="font-size:10px;color:var(--muted2)">Loading…</div>
+      <div class="col-title" style="background:var(--bg2)">Session Trades</div>
+      <div id="agents-grid" style="padding:10px 14px;overflow-y:auto;flex:1">
+        <div style="color:var(--muted2);font-size:11px">No orders submitted this session.</div>
       </div>
     </div>
 
   </div>
 
-  <!-- ZONE 3: Session Trade Log -->
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0">
-    <div class="col-title" style="background:var(--bg2)">Session Trades</div>
-    <div id="agents-grid" style="padding:8px 12px">
-      <div style="color:var(--muted2);font-size:11px;padding:4px 0">No orders submitted this session.</div>
-    </div>
-  </div>
-
-  <!-- Hidden elements: IDs required by JS, not shown in UI -->
+  <!-- Hidden: IDs required by JS -->
   <div style="display:none">
-    <div id="intel-drivers"></div>
     <div id="intel-universe"></div>
     <div id="intel-2col-grid"></div>
     <div id="intel-context-section"></div>
@@ -2971,6 +2996,79 @@ function toggleIntelCandidates() {
   if (tog) tog.textContent = _intelCandOpen ? '▲' : '▼';
 }
 
+// ── Intel Universe pagination ─────────────────────────────────────────────────
+window._intelAllCands = [];
+window._intelCandPage = 0;
+const _INTEL_PAGE_SIZE = 15;
+
+function _intelPage(dir) {
+  const total = window._intelAllCands.length;
+  const maxPage = Math.max(0, Math.ceil(total / _INTEL_PAGE_SIZE) - 1);
+  window._intelCandPage = Math.max(0, Math.min(maxPage, window._intelCandPage + dir));
+  _renderIntelPage();
+}
+
+function _renderIntelPage() {
+  const cands   = window._intelAllCands;
+  const page    = window._intelCandPage;
+  const total   = cands.length;
+  const maxPage = Math.max(0, Math.ceil(total / _INTEL_PAGE_SIZE) - 1);
+  const start   = page * _INTEL_PAGE_SIZE;
+  const slice   = cands.slice(start, start + _INTEL_PAGE_SIZE);
+
+  const countEl = document.getElementById('intel-cand-count');
+  const candEl  = document.getElementById('intel-candidates');
+  const pageEl  = document.getElementById('intel-page-label');
+  const prevBtn = document.getElementById('intel-page-prev');
+  const nextBtn = document.getElementById('intel-page-next');
+
+  if (countEl) countEl.textContent = total + ' symbols in universe';
+  if (pageEl)  pageEl.textContent  = total ? `Page ${page + 1} of ${maxPage + 1}` : '—';
+  if (prevBtn) prevBtn.disabled = page === 0;
+  if (nextBtn) nextBtn.disabled = page >= maxPage;
+
+  if (!candEl) return;
+  if (!slice.length) {
+    candEl.innerHTML = '<div style="padding:12px 0;font-size:11px;color:var(--muted2)">No candidates in feed.</div>';
+    return;
+  }
+
+  const fmtTheme  = t => (t||'').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+  const routeColor = r => r==='position' ? 'var(--green)' : r==='watchlist' ? 'var(--muted2)' : 'var(--orange)';
+
+  candEl.innerHTML = slice.map((c, i) => {
+    const confPct   = Math.round((c.confidence||0) * 100);
+    const confColor = confPct >= 75 ? 'var(--green)' : confPct >= 55 ? 'var(--orange)' : 'var(--muted2)';
+    const route     = (c.route_hint || [])[0] || '';
+    const risks     = (c.risk_flags || []).length;
+    const reason    = c.reason_to_care || c.reason || '—';
+    const rowNum    = start + i + 1;
+    return `<div style="display:grid;grid-template-columns:28px 60px 1fr auto;gap:8px;align-items:start;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:9px;color:var(--muted2);padding-top:2px">${rowNum}</span>
+      <div>
+        <div style="font-weight:700;font-size:13px;color:var(--orange);font-family:'Syne',sans-serif">${esc(c.symbol)}</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:3px">
+          <div style="width:32px;height:3px;border-radius:2px;background:rgba(255,255,255,0.07);overflow:hidden">
+            <div style="height:100%;width:${confPct}%;background:${confColor};border-radius:2px"></div>
+          </div>
+          <span style="font-size:9px;color:${confColor}">${confPct}%</span>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+          <span style="font-size:9px;padding:1px 6px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--muted2)">${esc(fmtTheme(c.theme))}</span>
+          ${route ? `<span style="font-size:9px;padding:1px 6px;border-radius:3px;border:1px solid ${routeColor(route)}44;color:${routeColor(route)}">${route}</span>` : ''}
+        </div>
+        <div style="font-size:11px;color:var(--text);line-height:1.5">${esc(reason)}</div>
+        ${risks > 0 ? `<div style="font-size:9px;color:var(--red);margin-top:3px">&#9888; ${risks} risk flag${risks>1?'s':''}</div>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding-top:2px">
+        ${(c.risk_flags||[]).slice(0,2).map(r => `<span style="font-size:8px;color:var(--muted2);background:rgba(255,255,255,0.04);padding:1px 4px;border-radius:2px">${esc(r)}</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function loadIntelligence() {
   fetch('/api/intelligence').then(r => r.json()).then(d => {
     if (!d.available && d.available !== undefined) return;
@@ -2988,16 +3086,17 @@ function loadIntelligence() {
       const blocked = mm.blocked_conditions || [];
       const ev = mm.evidence || {};
       const evKeys = Object.keys(ev).filter(k => k.endsWith('_reason'));
+      const fmtDriver = k => k.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
       driversEl.innerHTML = drivers.length
-        ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${drivers.map(dr =>
-            `<span style="padding:1px 6px;border-radius:3px;background:var(--orange)22;border:1px solid var(--orange)55;font-size:10px;color:var(--orange);font-family:'JetBrains Mono',monospace">${dr}</span>`
+        ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${drivers.map(dr =>
+            `<span style="padding:2px 8px;border-radius:3px;background:var(--orange)22;border:1px solid var(--orange)55;font-size:10px;color:var(--orange)">${esc(fmtDriver(dr))}</span>`
           ).join('')}</div>` +
-          (blocked.length ? `<div style="font-size:9px;color:var(--red);margin-bottom:4px">blocked: ${blocked.join(', ')}</div>` : '') +
+          (blocked.length ? `<div style="font-size:9px;color:var(--red);margin-bottom:6px">Blocked: ${blocked.map(fmtDriver).join(', ')}</div>` : '') +
           evKeys.map(k => {
             const dk = k.replace('_reason','');
             const isActive = drivers.includes(dk);
             const col = isActive ? 'var(--green)' : 'var(--muted)';
-            return `<div style="font-size:9px;color:${col};padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(ev[k])}">${isActive ? '●' : '○'} ${esc(ev[k])}</div>`;
+            return `<div style="font-size:10px;color:${col};padding:2px 0;line-height:1.45" title="${esc(ev[k])}">${isActive ? '●' : '○'} ${esc(ev[k])}</div>`;
           }).join('')
         : '<div style="font-size:10px;color:var(--muted2)">No drivers resolved</div>';
     }
@@ -3032,12 +3131,14 @@ function loadIntelligence() {
           (sorted.length ? sorted.map(t => {
             const st = (t.state || t.status || '').toLowerCase();
             const b = stateBadge(st);
-            const name = (t.name || t.theme_id || '?').replace(/_/g,' ');
+            const rawName = (t.name || t.theme_id || '?');
+            const name = rawName.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
             const conf = t.confidence != null ? Math.round((t.confidence||0) * 100) : null;
             const cands = t.candidate_count != null ? t.candidate_count : null;
             const dir = (t.direction||'').toLowerCase();
             const dirTag = dir === 'headwind' ? '↓' : dir === 'tailwind' ? '↑' : '';
             const dirColor = dir === 'headwind' ? '#f77' : dir === 'tailwind' ? 'var(--green)' : 'var(--muted2)';
+            const desc = t.reason || t.narrative || t.description || '';
             const confBar = conf != null
               ? `<div style="flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.06);overflow:hidden;min-width:30px">
                    <div style="height:100%;width:${conf}%;background:${b.color};border-radius:2px;opacity:0.7"></div>
@@ -3046,14 +3147,17 @@ function loadIntelligence() {
             const candPill = cands != null && cands > 0
               ? `<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.06);color:var(--muted2);white-space:nowrap">${cands}</span>`
               : '';
-            return `<div style="display:grid;grid-template-columns:52px 1fr auto auto;align-items:center;gap:5px;padding:3px 0">
-              <span style="font-size:8px;font-family:'JetBrains Mono',monospace;padding:1px 4px;border-radius:3px;background:${b.bg};border:1px solid ${b.border};color:${b.color};text-align:center;letter-spacing:0.03em">${b.label}</span>
-              <span style="font-size:10px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</span>
-              ${confBar}
-              <div style="display:flex;align-items:center;gap:4px">
-                ${candPill}
-                ${dirTag ? `<span style="font-size:11px;color:${dirColor}">${dirTag}</span>` : ''}
+            return `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+              <div style="display:grid;grid-template-columns:52px 1fr auto auto;align-items:center;gap:5px">
+                <span style="font-size:8px;font-family:'JetBrains Mono',monospace;padding:1px 4px;border-radius:3px;background:${b.bg};border:1px solid ${b.border};color:${b.color};text-align:center;letter-spacing:0.03em">${b.label}</span>
+                <span style="font-size:10px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</span>
+                ${confBar}
+                <div style="display:flex;align-items:center;gap:4px">
+                  ${candPill}
+                  ${dirTag ? `<span style="font-size:11px;color:${dirColor}">${dirTag}</span>` : ''}
+                </div>
               </div>
+              ${desc ? `<div style="font-size:9px;color:var(--muted2);margin-top:3px;padding-left:57px;line-height:1.4">${esc(desc)}</div>` : ''}
             </div>`;
           }).join('') : '<div style="font-size:10px;color:var(--muted2)">No active themes</div>');
       } else {
@@ -3061,41 +3165,10 @@ function loadIntelligence() {
       }
     }
 
-    const countEl = document.getElementById('intel-cand-count');
-    const candEl = document.getElementById('intel-candidates');
-    const allCands = d.candidates || [];
-    const sorted = [...allCands].sort((a,b) => (b.confidence||0) - (a.confidence||0));
-    const top = sorted.slice(0, 10);
-    if (countEl) countEl.textContent = top.length < allCands.length ? `top ${top.length} of ${allCands.length}` : `${allCands.length} symbols`;
-    if (candEl) {
-      const fmtTheme = t => (t||'').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
-      const routeColor = r => r === 'position' ? 'var(--green)' : r === 'watchlist' ? 'var(--muted2)' : 'var(--orange)';
-      if (top.length) {
-        candEl.innerHTML = top.map(c => {
-          const confPct = Math.round((c.confidence||0) * 100);
-          const confColor = confPct >= 75 ? 'var(--green)' : confPct >= 55 ? 'var(--orange)' : 'var(--muted2)';
-          const route = (c.route_hint || [])[0] || '';
-          const risks = (c.risk_flags || []).length;
-          return `<div style="padding:7px 0;border-bottom:1px solid var(--border)">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-              <span style="font-weight:700;font-family:'Syne',sans-serif;font-size:13px;color:var(--orange);min-width:44px">${esc(c.symbol)}</span>
-              <div style="flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.07);overflow:hidden">
-                <div style="height:100%;width:${confPct}%;background:${confColor};border-radius:2px"></div>
-              </div>
-              <span style="font-size:9px;font-family:'JetBrains Mono',monospace;color:${confColor};min-width:28px;text-align:right">${confPct}%</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-              <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--muted2);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${esc(fmtTheme(c.theme))}">${esc(fmtTheme(c.theme))}</span>
-              ${route ? `<span style="font-size:8px;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,0.04);color:${routeColor(route)};border:1px solid ${routeColor(route)}44;white-space:nowrap">${route}</span>` : ''}
-              ${risks > 0 ? `<span style="font-size:8px;color:var(--red);margin-left:auto">⚠ ${risks}</span>` : ''}
-            </div>
-            <div style="font-size:10px;color:var(--muted2);line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(c.reason || '—')}</div>
-          </div>`;
-        }).join('');
-      } else {
-        candEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No candidates in feed</div>';
-      }
-    }
+    // --- Intel Universe (full, paginated) ---
+    window._intelAllCands = d.candidates || [];
+    window._intelCandPage = 0;
+    _renderIntelPage();
 
     const uniEl = document.getElementById('intel-universe');
     if (uniEl) {
@@ -5394,6 +5467,34 @@ function renderOpusView(d) {
     (marketRead
       ? `<div style="font-size:10px;color:var(--muted2);line-height:1.55;${bodyOpacity}">${esc(marketRead)}</div>`
       : '');
+
+  // Render new entries on LIVE tab
+  const entriesEl    = document.getElementById('apex-entries-body');
+  const entriesCount = document.getElementById('apex-entries-count');
+  if (entriesEl && latest) {
+    const entries = (latest.new_entries || []).filter(e => e.trade_type !== 'AVOID');
+    if (entriesCount) entriesCount.textContent = entries.length ? entries.length + ' this scan' : '';
+    if (entries.length) {
+      const DIR_COLOR  = { LONG: '#51cf66', SHORT: '#ff6b6b' };
+      const TYPE_COLOR = { SWING: '#4dabf7', POSITION: 'var(--orange)', INTRADAY: 'var(--muted2)' };
+      entriesEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">' +
+        entries.map(e => {
+          const dc = DIR_COLOR[e.direction]  || 'var(--muted2)';
+          const tc = TYPE_COLOR[e.trade_type] || 'var(--muted2)';
+          return `<div style="padding:8px 10px;border-radius:4px;border-left:3px solid ${dc};background:${dc}0d">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(e.symbol||'')}</span>
+              <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:${dc}">${esc(e.direction||'')}</span>
+              <span style="font-size:9px;color:${tc}">${esc(e.trade_type||'')}</span>
+              <span style="font-size:9px;color:var(--muted2)">${esc(e.conviction||'')}</span>
+            </div>
+            ${e.rationale ? `<div style="font-size:11px;color:var(--muted2);line-height:1.5">${esc(e.rationale)}</div>` : ''}
+          </div>`;
+        }).join('') + '</div>';
+    } else {
+      entriesEl.innerHTML = '<div style="font-size:11px;color:var(--muted2)">No new entries this scan cycle.</div>';
+    }
+  }
 }
 
 function renderTradeCard(ld) {
@@ -5501,76 +5602,87 @@ function _updateApexNavCounter() {
   ctr.textContent = (cur + 1) + ' / ' + hist.length;
 }
 
+// ── Apex synthesis jargon cleanup + regime/macro maps ───────────────────────
+function _jargonClean(text) {
+  if (!text) return '';
+  return text
+    .replace(/DAR=pre-mkt/gi, '(using pre-market prices)')
+    .replace(/DAR=live/gi, '(using live prices)')
+    .replace(/DAR=(\w+)/gi, '(data: $1)')
+    .replace(/effective_score=(\d+)/gi, 'score $1')
+    .replace(/\bTRENDING_UP\b/g, 'Trending Up')
+    .replace(/\bTRENDING_DOWN\b/g, 'Trending Down')
+    .replace(/\bMOMENTUM_BULL\b/g, 'Strong Bull Momentum')
+    .replace(/\bFEAR_ELEVATED\b/g, 'Fear Elevated')
+    .replace(/\bDISTRIBUTION\b/g, 'Distribution')
+    .replace(/\bTRENDING_BEAR\b/g, 'Downtrend')
+    .replace(/\bRELIEF_RALLY\b/g, 'Relief Rally')
+    .replace(/\bCHOPPY\b/g, 'Choppy')
+    .replace(/\bPANIC\b/g, 'Panic')
+    .replace(/\bAPEX\b/g, 'Apex');
+}
+
+const _REGIME_MAP = {
+  MOMENTUM_BULL:  { label: 'Strong Bull Momentum', desc: 'Market is moving higher with conviction. Trend and breakout entries have the edge.', color: '#51cf66' },
+  RELIEF_RALLY:   { label: 'Relief Rally',          desc: 'Recovering from oversold levels. Gains may be limited — watch for fading into strength.', color: '#ffd43b' },
+  FEAR_ELEVATED:  { label: 'Fear Elevated',          desc: 'Volatility is high and sentiment is nervous. Size down, avoid chasing.', color: '#ff922b' },
+  DISTRIBUTION:   { label: 'Distribution',           desc: 'Smart money appears to be selling into strength. Be cautious on new long entries.', color: '#ff6b6b' },
+  TRENDING_BEAR:  { label: 'Downtrend',              desc: 'Market trending lower. Short setups are favoured; avoid catching falling knives.', color: '#ff6b6b' },
+  TRENDING_UP:    { label: 'Uptrend',                desc: 'Market trending higher with steady momentum. Good environment for swing entries.', color: '#51cf66' },
+  TRENDING_DOWN:  { label: 'Downtrend',              desc: 'Market trending lower. Defensive posture and short setups have the edge.', color: '#ff6b6b' },
+  CHOPPY:         { label: 'Choppy — No Direction',  desc: 'No clear trend in either direction. Mean-reversion works; avoid momentum trades.', color: '#adb5bd' },
+  PANIC:          { label: 'Panic / High Volatility', desc: 'Market in panic mode. Extreme caution — wait for stabilisation before entering.', color: '#ff1744' },
+};
+
+const _MACRO_MAP = {
+  BULLISH:   { label: 'Macro Tailwind',  desc: 'Big-picture backdrop supports risk assets.',    color: '#51cf66' },
+  BEARISH:   { label: 'Macro Headwind',  desc: 'Big-picture backdrop is working against longs.', color: '#ff6b6b' },
+  NEUTRAL:   { label: 'Macro Neutral',   desc: 'No strong macro push in either direction.',      color: '#adb5bd' },
+  UNCERTAIN: { label: 'Macro Mixed',     desc: 'Conflicting signals at the macro level.',         color: '#ffd43b' },
+};
+
 function _renderApexConvoEntry(msg) {
   const el = document.getElementById('agents-convo-full');
   if (!el || !msg) return;
 
-  const CHAR_COLOR = {
-    MOMENTUM_BULL: '#51cf66', RELIEF_RALLY: '#ffd43b',
-    FEAR_ELEVATED: '#ff922b', DISTRIBUTION: '#ff6b6b', TRENDING_BEAR: '#ff6b6b',
-  };
-  const BIAS_COLOR = { BULLISH: '#51cf66', BEARISH: '#ff6b6b', NEUTRAL: 'var(--muted2)' };
-  const DIR_COLOR  = { LONG: '#51cf66', SHORT: '#ff6b6b' };
-  const CONV_COLOR = { HIGH: 'var(--orange)', MEDIUM: '#4dabf7' };
-  const TYPE_COLOR = { INTRADAY: 'var(--muted2)', SWING: '#4dabf7', POSITION: 'var(--orange)' };
+  const regime = _REGIME_MAP[msg.session_character] || null;
+  const macro  = _MACRO_MAP[(msg.macro_bias||'').toUpperCase()] || null;
+  const marketRead = _jargonClean(
+    msg.market_read && !msg.market_read.startsWith('[fallback]') ? msg.market_read : ''
+  );
+  const latency = msg.latency_ms ? (msg.latency_ms / 1000).toFixed(1) + 's' : '';
+  const tokens  = msg.output_tokens ? msg.output_tokens + ' tok' : '';
 
-  const charColor = CHAR_COLOR[msg.session_character] || '#4dabf7';
-  const biasColor = BIAS_COLOR[msg.macro_bias]        || 'var(--muted2)';
-  const latency   = msg.latency_ms ? (msg.latency_ms / 1000).toFixed(1) + 's' : '';
-  const tokens    = msg.output_tokens ? msg.output_tokens + ' tok' : '';
-
-  const marketReadHtml = msg.market_read && !msg.market_read.startsWith('[fallback]')
-    ? `<div style="font-size:10px;color:var(--muted2);line-height:1.65;margin-bottom:4px">${esc(msg.market_read)}</div>`
+  const regimeBox = regime
+    ? `<div style="flex:1;min-width:180px;padding:10px 14px;border-radius:5px;background:${regime.color}11;border:1px solid ${regime.color}44">
+        <div style="font-size:9px;letter-spacing:1.2px;color:${regime.color};text-transform:uppercase;margin-bottom:4px;font-weight:700">Market Regime</div>
+        <div style="font-size:13px;font-weight:700;color:${regime.color};margin-bottom:4px">${esc(regime.label)}</div>
+        <div style="font-size:11px;color:var(--muted2);line-height:1.4">${esc(regime.desc)}</div>
+      </div>`
     : '';
 
-  let entriesHtml = '';
-  if (Array.isArray(msg.new_entries)) {
-    const active = msg.new_entries.filter(e => e.trade_type !== 'AVOID');
-    if (active.length) {
-      entriesHtml =
-        '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">' +
-        '<div style="font-size:8px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:8px">New Entries</div>' +
-        '<div style="display:flex;flex-direction:column;gap:6px">' +
-        active.map(e => {
-          const dc = DIR_COLOR[e.direction]  || 'var(--muted2)';
-          const cc = CONV_COLOR[e.conviction] || 'var(--muted2)';
-          const tc = TYPE_COLOR[e.trade_type] || 'var(--muted2)';
-          return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:4px;background:${dc}11;border:1px solid ${dc}33">
-            <div style="display:flex;flex-direction:column;gap:3px;min-width:130px;flex-shrink:0">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(e.symbol||'')}</span>
-                <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:${dc}">${esc(e.direction||'')}</span>
-              </div>
-              <div style="display:flex;gap:4px;flex-wrap:wrap">
-                <span style="font-size:8px;color:${cc}">${esc(e.conviction||'')}</span>
-                <span style="font-size:8px;color:var(--muted2)">·</span>
-                <span style="font-size:8px;color:${tc}">${esc(e.trade_type||'')}</span>
-                <span style="font-size:8px;color:var(--muted2)">·</span>
-                <span style="font-size:8px;color:var(--muted2)">${esc(e.instrument||'')}</span>
-              </div>
-            </div>
-            ${e.rationale ? `<div style="font-size:10px;color:var(--muted2);line-height:1.5">${esc(e.rationale)}</div>` : ''}
-          </div>`;
-        }).join('') +
-        '</div></div>';
-    } else {
-      entriesHtml = '<div style="margin-top:10px;font-size:10px;color:var(--muted2)">No new entries this cycle.</div>';
-    }
-  }
+  const macroBox = macro
+    ? `<div style="flex:1;min-width:160px;padding:10px 14px;border-radius:5px;background:${macro.color}11;border:1px solid ${macro.color}44">
+        <div style="font-size:9px;letter-spacing:1.2px;color:${macro.color};text-transform:uppercase;margin-bottom:4px;font-weight:700">Macro Picture</div>
+        <div style="font-size:13px;font-weight:700;color:${macro.color};margin-bottom:4px">${esc(macro.label)}</div>
+        <div style="font-size:11px;color:var(--muted2);line-height:1.4">${esc(macro.desc)}</div>
+      </div>`
+    : '';
 
-  el.innerHTML =
-    `<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid ${charColor};border-radius:6px;padding:12px 14px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        ${msg.session_character ? `<span style="font-size:8px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:3px;background:${charColor}22;border:1px solid ${charColor};color:${charColor}">${esc(msg.session_character)}</span>` : ''}
-        ${msg.macro_bias ? `<span style="font-size:8px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:3px;background:${biasColor}22;border:1px solid ${biasColor};color:${biasColor}">MACRO: ${esc(msg.macro_bias)}</span>` : ''}
-        <span style="flex:1"></span>
-        ${latency ? `<span style="font-size:9px;color:var(--muted2)">${esc(latency)}</span>` : ''}
-        ${tokens  ? `<span style="font-size:9px;color:var(--muted2)">${esc(tokens)}</span>` : ''}
-        ${msg.time ? `<span style="font-size:9px;color:var(--muted2)">${esc(msg.time)}</span>` : ''}
-      </div>
-      ${marketReadHtml}
-      ${entriesHtml}
-    </div>`;
+  const narrativeHtml = marketRead
+    ? `<div style="font-size:12px;color:var(--text);line-height:1.65;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">${esc(marketRead)}</div>`
+    : '';
+
+  const footerHtml = (latency || tokens || msg.time)
+    ? `<div style="margin-top:12px;font-size:9px;color:var(--muted2);display:flex;gap:10px">${[latency,tokens,msg.time].filter(Boolean).map(esc).join(' · ')}</div>`
+    : '';
+
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${regimeBox}${macroBox}
+    </div>
+    ${narrativeHtml}
+    ${footerHtml}`;
 }
 
 function renderAgentConvoFull(convo, lastScan) {
