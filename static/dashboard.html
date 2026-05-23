@@ -869,6 +869,11 @@ canvas{display:block;width:100% !important}
     </div>
   </div>
 
+  <!-- Market Story -->
+  <div id="intel-market-story" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:12px 14px;flex-shrink:0">
+    <div style="font-size:10px;color:var(--muted2)">Loading market story…</div>
+  </div>
+
   <!-- ZONE 2: Market Map + Active Themes -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0">
 
@@ -3069,15 +3074,186 @@ function _renderIntelPage() {
         ${risks > 0 ? `<div style="font-size:9px;color:var(--red);margin-top:3px">&#9888; ${risks} risk flag${risks>1?'s':''}</div>` : ''}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding-top:2px">
-        ${(c.risk_flags||[]).slice(0,2).map(r => `<span style="font-size:8px;color:var(--muted2);background:rgba(255,255,255,0.04);padding:1px 4px;border-radius:2px">${esc(r)}</span>`).join('')}
+        ${(c.risk_flags||[]).slice(0,2).map(r => `<span style="font-size:8px;color:var(--muted2);background:rgba(255,255,255,0.04);padding:1px 4px;border-radius:2px">${esc(_riskLabel(r))}</span>`).join('')}
       </div>
     </div>`;
   }).join('');
 }
 
+// ── Intelligence display dictionaries ────────────────────────────────────────
+const _DRIVER_LABELS = {
+  ai_capex_growth:          'AI Infrastructure Spending',
+  ai_compute_demand:        'AI Compute Demand',
+  geopolitical_risk_rising: 'Defence Sector Leading',
+  small_cap_risk_on:        'Small Cap Risk On',
+  yields_falling:           'Yields Falling',
+  yields_rising:            'Yields Rising',
+  credit_stress_easing:     'Credit Stress Easing',
+  credit_stress_rising:     'Credit Stress Rising',
+  risk_on_rotation:         'Risk-On Rotation',
+  risk_off_rotation:        'Risk-Off Rotation',
+  gold_safe_haven_bid:      'Gold Safe-Haven Bid',
+  oil_supply_shock:         'Oil Supply Shock',
+};
+const _THEME_LABELS = {
+  data_centre_power:         'Data Centre Power',
+  semiconductors:            'Semiconductors',
+  defence_aerospace:         'Defence & Aerospace',
+  ai_compute_infrastructure: 'AI Compute Infrastructure',
+  memory_storage:            'Memory & Storage',
+  software_cloud:            'Software & Cloud',
+  cybersecurity:             'Cybersecurity',
+  mega_cap_platforms:        'Mega-Cap Platforms',
+  consumer_discretionary:    'Consumer Discretionary',
+  travel_leisure:            'Travel & Leisure',
+  defensive_healthcare:      'Defensive Healthcare',
+  biotech:                   'Biotech',
+  regional_banks:            'Regional Banks',
+  infrastructure_reshoring:  'Infrastructure & Reshoring',
+  gold_precious_metals:      'Gold & Precious Metals',
+  copper_electrification:    'Copper & Electrification',
+  reits:                     'REITs',
+  reits_falling_yield:       'REITs (Yield Pressure)',
+  small_cap_basket:          'Small-Cap Basket',
+  utilities:                 'Utilities',
+  energy_transition:         'Energy Transition',
+  banks:                     'Banks',
+  consumer_staples:          'Consumer Staples',
+};
+const _RISK_FLAG_LABELS = {
+  valuation:                   'Valuation stretched',
+  crowding:                    'Crowded trade',
+  capex_delay:                 'CapEx delay risk',
+  credit_stress:               'Credit stress',
+  power_demand_disappointment: 'Power demand miss',
+  memory_cycle_risk:           'Memory cycle risk',
+  commodity_pricing:           'Commodity pricing pressure',
+  speculative_growth:          'Speculative growth',
+  financing_risk:              'Financing risk',
+  budget_risk:                 'Budget risk',
+  de_escalation:               'De-escalation risk',
+  geopolitical_sensitivity:    'Geopolitical sensitivity',
+  rate_sensitivity:            'Rate sensitivity',
+  liquidity:                   'Liquidity thin',
+  etf_tracking_error:          'ETF tracking error',
+  export_controls:             'Export control risk',
+  semiconductor_cycle:         'Semiconductor cycle risk',
+  deposit_pressure:            'Deposit pressure',
+  curve_inversion:             'Yield curve inversion',
+  recession_risk:              'Recession risk',
+  regulatory_risk:             'Regulatory risk',
+};
+function _driverLabel(id) { return _DRIVER_LABELS[id] || id.replace(/_/g,' ').replace(/\b[a-z]/g, c => c.toUpperCase()); }
+function _themeLabel(id)  { return _THEME_LABELS[id]  || id.replace(/_/g,' ').replace(/\b[a-z]/g, c => c.toUpperCase()); }
+function _riskLabel(id)   { return _RISK_FLAG_LABELS[id] || id.replace(/_/g,' ').replace(/\b[a-z]/g, c => c.toUpperCase()); }
+
+function _buildIntelMarketStory(drivers, themes) {
+  const riskOffDrivers  = ['risk_off_rotation','gold_safe_haven_bid','credit_stress_rising'];
+  const riskOnDrivers   = ['ai_capex_growth','ai_compute_demand','small_cap_risk_on','risk_on_rotation','credit_stress_easing'];
+  const isRiskOff = drivers.some(d => riskOffDrivers.includes(d));
+  const isRiskOn  = !isRiskOff && drivers.some(d => riskOnDrivers.includes(d));
+  const sentiment = isRiskOff ? 'risk-off' : isRiskOn ? 'risk-on' : 'neutral';
+
+  const activeTailwinds = (themes||[]).filter(t => {
+    const s = (t.state||'').toLowerCase();
+    return (s==='activated'||s==='active'||s==='strengthening') && (t.direction||'').toLowerCase()!=='headwind';
+  });
+  const activeHeadwinds = (themes||[]).filter(t => {
+    const s = (t.state||'').toLowerCase();
+    return (s==='activated'||s==='active'||s==='strengthening') && (t.direction||'').toLowerCase()==='headwind';
+  });
+
+  const driverPhrases = {
+    ai_capex_growth:          'AI infrastructure demand',
+    ai_compute_demand:        'AI compute buildout',
+    geopolitical_risk_rising: 'defence sector leadership',
+    small_cap_risk_on:        'small-cap breadth expansion',
+    yields_falling:           'easing rate pressure',
+    yields_rising:            'rising yields',
+    credit_stress_rising:     'credit stress',
+    risk_off_rotation:        'risk-off rotation',
+    gold_safe_haven_bid:      'gold safe-haven demand',
+    oil_supply_shock:         'oil supply shock',
+    risk_on_rotation:         'broad risk-on rotation',
+    credit_stress_easing:     'easing credit conditions',
+  };
+
+  const headwindIds   = ['yields_rising','credit_stress_rising','risk_off_rotation','oil_supply_shock'];
+  const tailwindForces = drivers.filter(d => !headwindIds.includes(d)).map(d => driverPhrases[d]).filter(Boolean);
+  const headwindForces = drivers.filter(d =>  headwindIds.includes(d)).map(d => driverPhrases[d]).filter(Boolean);
+
+  let headline;
+  if (!drivers.length) {
+    headline = 'No active market forces — system in observation mode.';
+  } else if (isRiskOff) {
+    headline = 'Risk-off environment — ' + (headwindForces.slice(0,2).join(' and ') || 'defensive rotation') + ' dominating.';
+  } else {
+    const forces = tailwindForces.slice(0,3);
+    headline = 'Bull market — ' + (forces.length ? forces.join(', ') + ' supporting the move.' : 'conditions broadly supportive.');
+  }
+
+  const bullets = [];
+  if (drivers.includes('ai_capex_growth') || drivers.includes('ai_compute_demand'))
+    bullets.push('AI infrastructure spending confirmed via semiconductor proxy data');
+  if (drivers.includes('geopolitical_risk_rising'))
+    bullets.push('Defence sector outperforming SPY — geopolitical premium in price action');
+  if (drivers.includes('small_cap_risk_on'))
+    bullets.push('Small caps outpacing large caps — breadth expanding beyond mega-cap');
+  if (drivers.includes('yields_falling'))
+    bullets.push('Rates falling — tailwind for rate-sensitive growth names and REITs');
+  if (drivers.includes('yields_rising'))
+    bullets.push('Rates rising — pressure on growth valuations and bond proxies');
+  if (drivers.includes('credit_stress_rising'))
+    bullets.push('Credit spreads widening — risk asset caution warranted');
+  if (drivers.includes('gold_safe_haven_bid'))
+    bullets.push('Gold bid — investors seeking safety outside equities');
+  if (drivers.includes('risk_off_rotation'))
+    bullets.push('Volatility elevated — risk-off rotation underway');
+  activeHeadwinds.forEach(t => bullets.push(_themeLabel(t.theme_id) + ' under pressure — headwind active'));
+
+  const focusThemes = activeTailwinds.slice(0,3).map(t => _themeLabel(t.theme_id));
+
+  let tradeMode;
+  if (isRiskOff)
+    tradeMode = 'Reduce exposure — risk-off environment. Defensive posture. Avoid new swing entries.';
+  else if (isRiskOn)
+    tradeMode = 'Swing and position entries in highest-conviction tailwind themes.';
+  else
+    tradeMode = 'Selective. Favour confirmed setups with IC-weighted scoring above threshold.';
+
+  return { headline, bullets, focusThemes, tradeMode, sentiment,
+           driverCount: drivers.length, activeThemeCount: activeTailwinds.length };
+}
+
+function _renderMarketStory(drivers, themes) {
+  const storyEl = document.getElementById('intel-market-story');
+  if (!storyEl) return;
+  const story = _buildIntelMarketStory(drivers, themes);
+  const col = story.sentiment === 'risk-on' ? 'var(--green)' : story.sentiment === 'risk-off' ? 'var(--red)' : 'var(--orange)';
+  const tag = story.sentiment === 'risk-on' ? 'RISK-ON' : story.sentiment === 'risk-off' ? 'RISK-OFF' : 'NEUTRAL';
+  storyEl.style.borderColor = col + '55';
+  storyEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:8px;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace;padding:1px 7px;border-radius:3px;background:${col}1a;border:1px solid ${col}55;color:${col}">${tag}</span>
+      <span style="font-size:9px;color:var(--muted2)">${story.driverCount} active force${story.driverCount!==1?'s':''} · ${story.activeThemeCount} tailwind theme${story.activeThemeCount!==1?'s':''}</span>
+    </div>
+    <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.45;margin-bottom:${story.bullets.length?'8px':'0'}">${esc(story.headline)}</div>
+    ${story.bullets.length ? `<ul style="margin:0 0 10px;padding-left:16px">${story.bullets.map(b=>`<li style="font-size:10px;color:var(--muted2);padding:1px 0;line-height:1.4">${esc(b)}</li>`).join('')}</ul>` : ''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${story.focusThemes.length ? `<div><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Where to focus</div><div style="font-size:10px;color:var(--text)">${esc(story.focusThemes.join(', '))}</div></div>` : '<div></div>'}
+      <div><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Trade mode</div><div style="font-size:10px;color:var(--text)">${esc(story.tradeMode)}</div></div>
+    </div>`;
+}
+
 function loadIntelligence() {
   fetch('/api/intelligence').then(r => r.json()).then(d => {
     if (!d.available && d.available !== undefined) return;
+
+    // Hoist shared data so driver section, theme section, and market story can all access it
+    const mm      = d.market_map || {};
+    const drivers = mm.active_drivers || [];
+    const ev      = mm.evidence || {};
+    const themes  = d.themes || [];
 
     const tsEl = document.getElementById('intel-ts');
     if (tsEl && d.ts) {
@@ -3085,77 +3261,105 @@ function loadIntelligence() {
       catch(e) { tsEl.textContent = d.ts; }
     }
 
+    // ── Market Story ──────────────────────────────────────────────────────────
+    _renderMarketStory(drivers, themes);
+
+    // ── What's Driving the Market ─────────────────────────────────────────────
     const driversEl = document.getElementById('intel-drivers');
     if (driversEl) {
-      const mm = d.market_map || {};
-      const drivers = mm.active_drivers || [];
       const blocked = mm.blocked_conditions || [];
-      const ev = mm.evidence || {};
-      const evKeys = Object.keys(ev).filter(k => k.endsWith('_reason'));
-      const fmtDriver = k => k.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
-      driversEl.innerHTML = drivers.length
-        ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${drivers.map(dr =>
-            `<span style="padding:2px 8px;border-radius:3px;background:var(--orange)22;border:1px solid var(--orange)55;font-size:10px;color:var(--orange)">${esc(fmtDriver(dr))}</span>`
-          ).join('')}</div>` +
-          (blocked.length ? `<div style="font-size:9px;color:var(--red);margin-bottom:6px">Blocked: ${blocked.map(fmtDriver).join(', ')}</div>` : '') +
-          evKeys.map(k => {
-            const dk = k.replace('_reason','');
-            const isActive = drivers.includes(dk);
-            const col = isActive ? 'var(--green)' : 'var(--muted)';
-            return `<div style="font-size:10px;color:${col};padding:2px 0;line-height:1.45" title="${esc(ev[k])}">${isActive ? '●' : '○'} ${esc(ev[k])}</div>`;
-          }).join('')
-        : '<div style="font-size:10px;color:var(--muted2)">No drivers resolved</div>';
+      const evKeys  = Object.keys(ev).filter(k => k.endsWith('_reason'));
+
+      if (!drivers.length && !evKeys.length) {
+        driversEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No drivers resolved — run intelligence pipeline first.</div>';
+      } else {
+        const activeChips = drivers.map(dr =>
+          `<span style="padding:2px 9px;border-radius:3px;background:var(--green)1a;border:1px solid var(--green)44;font-size:10px;color:var(--green);font-weight:600">${esc(_driverLabel(dr))}</span>`
+        ).join('');
+        const blockedLine = blocked.length
+          ? `<div style="font-size:9px;color:var(--red);margin-bottom:6px">Blocked: ${blocked.map(_driverLabel).map(esc).join(', ')}</div>` : '';
+        const evidenceRows = evKeys.map(k => {
+          const dk = k.replace('_reason','').replace(/^geopolitical$/, 'geopolitical_risk_rising')
+                                            .replace(/^credit_stress$/, 'credit_stress_rising')
+                                            .replace(/^risk_off$/, 'risk_off_rotation')
+                                            .replace(/^risk_on$/, 'risk_on_rotation')
+                                            .replace(/^gold$/, 'gold_safe_haven_bid')
+                                            .replace(/^credit_easing$/, 'credit_stress_easing');
+          const isActive = drivers.includes(dk) || drivers.some(d => k.startsWith(d.split('_')[0]));
+          const activeMatch = drivers.find(d => k === d + '_reason' || k.replace('_reason','') === d);
+          const confirmed = !!activeMatch;
+          const col = confirmed ? 'var(--green)' : 'var(--muted)';
+          const dot = confirmed ? '●' : '○';
+          return `<div style="font-size:10px;color:${col};padding:2px 0;line-height:1.5">${dot} ${esc(ev[k])}</div>`;
+        }).join('');
+        driversEl.innerHTML =
+          (activeChips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${activeChips}</div>` : '') +
+          blockedLine + evidenceRows;
+      }
     }
 
+    // ── Active Themes ─────────────────────────────────────────────────────────
     const themesEl = document.getElementById('intel-themes');
     if (themesEl) {
-      const themes = d.themes || [];
-      if (themes.length) {
-        const stateOrder = ['activated','strengthening','watchlist','weakening','crowded','dormant','invalidated'];
+      if (!themes.length) {
+        themesEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No theme data</div>';
+      } else {
+        const stateOrder = ['activated','active','strengthening','watchlist','weakening','crowded','dormant','invalidated'];
         const visibleThemes = themes.filter(t => {
           const s = (t.state||'').toLowerCase();
           return s !== 'dormant' && s !== 'invalidated';
         });
         const sorted = [...visibleThemes].sort((a,b) => {
-          const ai = stateOrder.indexOf((a.state||'').toLowerCase()), bi = stateOrder.indexOf((b.state||'').toLowerCase());
+          const ai = stateOrder.indexOf((a.state||'').toLowerCase());
+          const bi = stateOrder.indexOf((b.state||'').toLowerCase());
           return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
         });
         const stateBadge = st => {
           const s = (st||'').toLowerCase();
-          if (s==='activated'||s==='active')   return {label:'ACTIVE',   bg:'rgba(0,200,100,0.15)', border:'rgba(0,200,100,0.5)', color:'var(--green)'};
-          if (s==='strengthening')             return {label:'STRENGT',  bg:'rgba(0,200,100,0.08)', border:'rgba(0,200,100,0.35)', color:'#4fd'};
-          if (s==='watchlist')                 return {label:'WATCH',    bg:'rgba(255,160,0,0.12)', border:'rgba(255,160,0,0.5)',  color:'var(--orange)'};
-          if (s==='weakening')                 return {label:'WEAK',     bg:'rgba(255,80,80,0.12)', border:'rgba(255,80,80,0.45)', color:'#f77'};
-          if (s==='crowded')                   return {label:'CROWDED',  bg:'rgba(200,100,0,0.12)', border:'rgba(200,100,0,0.4)',  color:'#c80'};
-          if (s==='invalidated')               return {label:'INVAL',    bg:'rgba(120,0,0,0.12)',   border:'rgba(200,0,0,0.3)',    color:'#944'};
-          return                                       {label:'DORMANT',  bg:'transparent',          border:'rgba(80,80,100,0.3)', color:'var(--muted2)'};
+          if (s==='activated'||s==='active') return {label:'ACTIVE',  bg:'rgba(0,200,100,0.15)', border:'rgba(0,200,100,0.5)',  color:'var(--green)'};
+          if (s==='strengthening')           return {label:'STRONG',  bg:'rgba(0,200,100,0.08)', border:'rgba(0,200,100,0.35)', color:'#4fd'};
+          if (s==='watchlist')               return {label:'WATCH',   bg:'rgba(255,160,0,0.12)', border:'rgba(255,160,0,0.5)',  color:'var(--orange)'};
+          if (s==='weakening')               return {label:'WEAK',    bg:'rgba(255,80,80,0.12)', border:'rgba(255,80,80,0.45)', color:'#f77'};
+          if (s==='crowded')                 return {label:'CROWDED', bg:'rgba(200,100,0,0.12)', border:'rgba(200,100,0,0.4)',  color:'#c80'};
+          if (s==='invalidated')             return {label:'INVAL',   bg:'rgba(120,0,0,0.12)',   border:'rgba(200,0,0,0.3)',    color:'#944'};
+          return                                    {label:'DORMANT', bg:'transparent',           border:'rgba(80,80,100,0.3)', color:'var(--muted2)'};
         };
-        const activeCount = visibleThemes.filter(t => { const s=(t.state||'').toLowerCase(); return s==='activated'||s==='active'||s==='strengthening'; }).length;
+        const activeCount  = visibleThemes.filter(t => { const s=(t.state||'').toLowerCase(); return s==='activated'||s==='active'||s==='strengthening'; }).length;
+        const headwindCount = visibleThemes.filter(t => (t.direction||'').toLowerCase()==='headwind').length;
         const dormantCount = themes.length - visibleThemes.length;
-        themesEl.innerHTML =
-          `<div style="font-size:10px;color:var(--muted2);margin-bottom:6px">${activeCount} active · ${visibleThemes.filter(t=>(t.direction||'').toLowerCase()==='headwind').length} headwinds${dormantCount > 0 ? ` · <span style="color:var(--muted)">${dormantCount} dormant</span>` : ''}</div>` +
+        const summaryLine  = `${activeCount} active · ${headwindCount} headwind${headwindCount!==1?'s':''}` +
+                             (dormantCount > 0 ? ` · <span style="color:var(--muted)">${dormantCount} dormant</span>` : '');
+        themesEl.innerHTML = `<div style="font-size:10px;color:var(--muted2);margin-bottom:6px">${summaryLine}</div>` +
           (sorted.length ? sorted.map(t => {
-            const st = (t.state || t.status || '').toLowerCase();
-            const b = stateBadge(st);
-            const rawName = (t.name || t.theme_id || '?');
-            const name = rawName.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
-            const conf = t.confidence != null ? Math.round((t.confidence||0) * 100) : null;
+            const st    = (t.state||'').toLowerCase();
+            const b     = stateBadge(st);
+            const name  = _themeLabel(t.theme_id || t.name || '?');
+            const conf  = t.confidence != null ? Math.round((t.confidence||0) * 100) : null;
             const cands = t.candidate_count != null ? t.candidate_count : null;
-            const dir = (t.direction||'').toLowerCase();
-            const dirTag = dir === 'headwind' ? '↓' : dir === 'tailwind' ? '↑' : '';
-            const dirColor = dir === 'headwind' ? '#f77' : dir === 'tailwind' ? 'var(--green)' : 'var(--muted2)';
-            const desc = t.reason || t.narrative || t.description || '';
+            const dir   = (t.direction||'').toLowerCase();
+            const dirTag   = dir==='headwind' ? '↓' : dir==='tailwind' ? '↑' : '';
+            const dirColor = dir==='headwind' ? '#f77' : dir==='tailwind' ? 'var(--green)' : 'var(--muted2)';
+
+            // Activated-by chips — use translated driver labels, not raw IDs
+            const activatedBy = (t.active_drivers||[]).map(dr =>
+              `<span style="font-size:8px;padding:0px 5px;border-radius:2px;background:rgba(255,255,255,0.06);color:var(--muted2)">${esc(_driverLabel(dr))}</span>`
+            ).join('');
+
+            // Risk flags — translated
+            const riskChips = (t.risk_flags||[]).slice(0,3).map(r =>
+              `<span style="font-size:8px;padding:0px 5px;border-radius:2px;background:rgba(200,50,50,0.12);color:#f99">${esc(_riskLabel(r))}</span>`
+            ).join('');
+
             const confBar = conf != null
               ? `<div style="flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.06);overflow:hidden;min-width:30px">
                    <div style="height:100%;width:${conf}%;background:${b.color};border-radius:2px;opacity:0.7"></div>
-                 </div>`
-              : `<div style="flex:1"></div>`;
+                 </div>` : `<div style="flex:1"></div>`;
             const candPill = cands != null && cands > 0
-              ? `<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.06);color:var(--muted2);white-space:nowrap">${cands}</span>`
-              : '';
+              ? `<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.06);color:var(--muted2);white-space:nowrap">${cands} ↑</span>` : '';
+
             return `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
-              <div style="display:grid;grid-template-columns:52px 1fr auto auto;align-items:center;gap:5px">
-                <span style="font-size:8px;font-family:'JetBrains Mono',monospace;padding:1px 4px;border-radius:3px;background:${b.bg};border:1px solid ${b.border};color:${b.color};text-align:center;letter-spacing:0.03em">${b.label}</span>
+              <div style="display:grid;grid-template-columns:50px 1fr auto auto;align-items:center;gap:5px">
+                <span style="font-size:8px;font-family:'JetBrains Mono',monospace;padding:1px 4px;border-radius:3px;background:${b.bg};border:1px solid ${b.border};color:${b.color};text-align:center">${b.label}</span>
                 <span style="font-size:10px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</span>
                 ${confBar}
                 <div style="display:flex;align-items:center;gap:4px">
@@ -3163,11 +3367,10 @@ function loadIntelligence() {
                   ${dirTag ? `<span style="font-size:11px;color:${dirColor}">${dirTag}</span>` : ''}
                 </div>
               </div>
-              ${desc ? `<div style="font-size:9px;color:var(--muted2);margin-top:3px;padding-left:57px;line-height:1.4">${esc(desc)}</div>` : ''}
+              ${activatedBy ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;padding-left:55px">${activatedBy}</div>` : ''}
+              ${riskChips   ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:2px;padding-left:55px">${riskChips}</div>` : ''}
             </div>`;
           }).join('') : '<div style="font-size:10px;color:var(--muted2)">No active themes</div>');
-      } else {
-        themesEl.innerHTML = '<div style="font-size:10px;color:var(--muted2)">No theme data</div>';
       }
     }
 
