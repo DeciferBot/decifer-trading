@@ -3007,6 +3007,166 @@ function toggleIntelCandidates() {
   if (tog) tog.textContent = _intelCandOpen ? '▲' : '▼';
 }
 
+// ── Intelligence Universe — symbol dictionary (differentiated thesis per ticker) ──
+const _SYMBOL_DICT = {
+  // Data Centre Power
+  VRT:  { co: 'Vertiv Holdings',     short: 'Power & cooling infrastructure with direct sensitivity to AI data-centre buildout.' },
+  ETN:  { co: 'Eaton Corp',          short: 'Electrical systems & power management — broad industrial exposure plus AI infrastructure tailwind.' },
+  PWR:  { co: 'Quanta Services',     short: 'Grid, transmission & infrastructure execution contractor for large-scale power buildout.' },
+  CEG:  { co: 'Constellation Energy',short: 'Power generation exposure benefiting indirectly from increased electricity demand tied to AI compute.' },
+  EQIX: { co: 'Equinix',             short: 'Data-centre REIT capturing real-estate demand from hyperscaler AI capacity expansion.' },
+  DLR:  { co: 'Digital Realty',      short: 'Global data-centre REIT benefiting from AI-driven leasing demand and hyperscaler build-outs.' },
+  SMCI: { co: 'Super Micro Computer',short: 'AI server & rack infrastructure with high direct sensitivity to data-centre buildout timing.' },
+  XLU:  { co: 'Utilities Select ETF',short: 'Broad utilities ETF proxy — sector-level power-demand exposure, not a direct beneficiary.' },
+  AES:  { co: 'AES Corp',            short: 'Power generation & storage with long-term tech-company power purchase agreements.' },
+  NEE:  { co: 'NextEra Energy',      short: 'Renewable power utility benefiting from AI data-centre electricity demand growth.' },
+  // Semiconductors
+  NVDA: { co: 'NVIDIA',              short: 'GPU & AI accelerator market leader — primary beneficiary of AI training and inference demand.' },
+  AMD:  { co: 'Advanced Micro Devices', short: 'CPU/GPU challenger growing share in AI inference, datacenter compute, and hyperscaler adoption.' },
+  AVGO: { co: 'Broadcom',            short: 'Custom silicon & networking — AI ASIC design wins and datacenter interconnect demand.' },
+  MRVL: { co: 'Marvell Technology',  short: 'Networking & custom AI silicon with datacenter interconnect bandwidth driving growth.' },
+  SMH:  { co: 'VanEck Semi ETF',     short: 'Semiconductor ETF proxy — diversified exposure across the full AI chip supply chain.' },
+  MU:   { co: 'Micron Technology',   short: 'DRAM & NAND leader capturing HBM content gains driven by AI GPU demand.' },
+  LRCX: { co: 'Lam Research',        short: 'Semiconductor equipment — etch & deposition tools critical for advanced node production.' },
+  AMAT: { co: 'Applied Materials',   short: 'Semiconductor equipment leader with broad exposure to capacity additions across all chip types.' },
+  KLAC: { co: 'KLA Corp',            short: 'Process control & inspection equipment — benefits from increasing chip complexity and yields.' },
+  ASML: { co: 'ASML',                short: 'EUV lithography monopoly — indispensable for leading-edge semiconductor manufacturing.' },
+  TSM:  { co: 'TSMC',                short: 'World\'s dominant foundry — captures demand from every major AI chip designer.' },
+  // Defence & Aerospace
+  LMT:  { co: 'Lockheed Martin',     short: 'Defence prime contractor with elevated budget cycle and long-duration programme wins.' },
+  RTX:  { co: 'RTX Corp',            short: 'Aerospace & defence systems — missile replenishment and commercial aircraft MRO.' },
+  NOC:  { co: 'Northrop Grumman',    short: 'Advanced systems & stealth programmes benefiting from long-cycle elevated defence spending.' },
+  GD:   { co: 'General Dynamics',    short: 'Land systems & defence IT — budget-resilient with diversified programme exposure.' },
+  HII:  { co: 'Huntington Ingalls',  short: 'Naval shipbuilding specialist with a long, funded backlog from US Navy programmes.' },
+  ITA:  { co: 'iShares A&D ETF',     short: 'Aerospace & defence ETF providing diversified exposure to the sector re-rating.' },
+  // AI Compute Infrastructure
+  DELL: { co: 'Dell Technologies',   short: 'Enterprise AI server & infrastructure — captures AI deployment at hyperscaler and enterprise scale.' },
+  HPE:  { co: 'Hewlett Packard Enterprise', short: 'AI compute infrastructure and storage — benefiting from enterprise AI server demand.' },
+  // Software & Cloud
+  MSFT: { co: 'Microsoft',           short: 'Cloud & enterprise AI — Azure growth driven by AI workload adoption across enterprise.' },
+  AMZN: { co: 'Amazon',              short: 'Cloud infrastructure & AI services — AWS AI workload revenue and Bedrock platform.' },
+  GOOGL:{ co: 'Alphabet',            short: 'Cloud, search & AI — TPU-driven AI services and GCP infrastructure growth.' },
+  NOW:  { co: 'ServiceNow',          short: 'Enterprise workflow AI — platform adoption driven by enterprise automation demand.' },
+  // Memory & Storage
+  WDC:  { co: 'Western Digital',     short: 'Storage & NAND — AI inference storage demand and data-centre capacity growth.' },
+  STX:  { co: 'Seagate Technology',  short: 'HDD & enterprise storage benefiting from data explosion driven by AI workloads.' },
+  // Copper & Infrastructure
+  FCX:  { co: 'Freeport-McMoRan',    short: 'Copper mining leader — AI infrastructure and electrification drive structural copper demand.' },
+  NUE:  { co: 'Nucor',               short: 'Steel & structural products — infrastructure spending and industrial reshoring beneficiary.' },
+  // Gold
+  GLD:  { co: 'SPDR Gold ETF',       short: 'Gold ETF — safe-haven demand and inflation hedge in risk-off or uncertainty regimes.' },
+  NEM:  { co: 'Newmont Corp',        short: 'Gold mining — leveraged to safe-haven premium and rising gold price environment.' },
+  GDX:  { co: 'VanEck Gold Miners',  short: 'Gold miners ETF — amplified exposure to gold price moves with operational leverage.' },
+  // Consumer / Small Cap
+  AMZN_CONS: { co: 'Amazon',         short: 'Consumer discretionary leadership — spending resilience and Prime ecosystem growth.' },
+};
+
+const _ROLE_LABELS = {
+  direct_beneficiary:        { label: 'Direct', color: 'var(--green)',   bg: 'rgba(0,200,100,0.1)' },
+  second_order_beneficiary:  { label: '2nd Order', color: 'var(--orange)', bg: 'rgba(255,160,0,0.1)' },
+  etf_proxy:                 { label: 'ETF Proxy', color: 'var(--muted2)', bg: 'rgba(255,255,255,0.06)' },
+};
+
+const _ROUTE_LABELS = {
+  position:  { label: 'Position',  desc: 'Longer-duration idea — structural theme support',          color: 'var(--green)' },
+  swing:     { label: 'Swing',     desc: 'Short- to medium-term while momentum remains intact',      color: '#4fd' },
+  watchlist: { label: 'Watchlist', desc: 'Relevant but not yet ready for action',                    color: 'var(--muted2)' },
+  monitor:   { label: 'Monitor',   desc: 'Interesting but currently lacks enough confirmation',       color: 'var(--muted2)' },
+};
+
+const _RISK_DETAIL = {
+  valuation:                   { meaning: 'Price may already discount strong growth expectations.', effect: 'Reduces upside asymmetry; does not block the trade.', effectType: 'reduces_confidence', whatHelps: 'Consolidation, earnings support, or estimate revisions.' },
+  crowding:                    { meaning: 'Many traders are likely already positioned in this theme.', effect: 'Increases sharp-pullback risk if sentiment weakens.', effectType: 'reduces_confidence', whatHelps: 'Fresh catalyst or a price reset with a clean entry.' },
+  capex_delay:                 { meaning: 'Hyperscaler or enterprise capex plans could be postponed.', effect: 'Would delay revenue realisation and slow theme momentum.', effectType: 'reduces_confidence', whatHelps: 'Confirmed capex guidance in earnings or management commentary.' },
+  credit_stress:               { meaning: 'Tightening credit conditions could reduce capital spending.', effect: 'Medium confidence reduction; monitor HYG/LQD spread.', effectType: 'warns', whatHelps: 'Credit spreads tightening or Fed easing signals.' },
+  power_demand_disappointment: { meaning: 'Electricity demand forecasts may undershoot AI assumptions.', effect: 'Could weaken long-duration positioning conviction.', effectType: 'warns', whatHelps: 'Hyperscaler power purchase agreements or public capacity commitments.' },
+  memory_cycle_risk:           { meaning: 'Memory markets are cyclical; oversupply erodes pricing fast.', effect: 'Reduces near-term earnings visibility.', effectType: 'reduces_confidence', whatHelps: 'HBM demand evidence and supply discipline from producers.' },
+  export_controls:             { meaning: 'Regulatory restrictions may limit export of advanced chips.', effect: 'Could impair revenue from key international markets.', effectType: 'warns', whatHelps: 'Regulatory clarity or approved design-around solutions.' },
+  de_escalation:               { meaning: 'Geopolitical easing could remove the defence sector premium.', effect: 'Would weaken the driver that activated this theme.', effectType: 'warns', whatHelps: 'Sustained conflict environment or elevated threat signals.' },
+  budget_risk:                 { meaning: 'Government budget constraints or sequestration risk.', effect: 'Programme delays or reduced contract awards possible.', effectType: 'warns', whatHelps: 'Continuing resolution passage or bipartisan budget agreement.' },
+  speculative_growth:          { meaning: 'Thesis depends on future growth not yet in earnings.', effect: 'High sensitivity to guidance misses or multiple compression.', effectType: 'reduces_confidence', whatHelps: 'Earnings beats, accelerating revenue, or raised guidance.' },
+  financing_risk:              { meaning: 'Business model dependent on external capital access.', effect: 'Rising rates or tight credit could impair funding.', effectType: 'warns', whatHelps: 'Rate stability, successful capital raise, or cash-flow improvement.' },
+  commodity_pricing:           { meaning: 'Input cost exposure to volatile commodity prices.', effect: 'Margin pressure if commodity costs rise.', effectType: 'warns', whatHelps: 'Commodity price stabilisation or hedging visibility.' },
+  semiconductor_cycle:         { meaning: 'Semiconductor demand follows inventory and capex cycles.', effect: 'Down-cycle timing risk — earnings can fall sharply.', effectType: 'reduces_confidence', whatHelps: 'Inventory normalisation evidence and end-demand recovery.' },
+};
+
+function _getUniScoreBand(pct) {
+  if (pct >= 80) return { label: 'High Conviction', color: 'var(--green)' };
+  if (pct >= 65) return { label: 'Strong Watchlist', color: '#4fd' };
+  if (pct >= 50) return { label: 'Developing', color: 'var(--orange)' };
+  return { label: 'Low Confidence', color: 'var(--muted2)' };
+}
+
+function _getReadiness(pct, route) {
+  if (pct >= 80 && route === 'position') return 'Trade-ready — position entry';
+  if (pct >= 65 && (route === 'swing' || route === 'position')) return 'Trade-ready — swing';
+  if (pct >= 65) return 'Strong watchlist';
+  if (route === 'watchlist') return 'On watchlist';
+  return 'Monitor for entry';
+}
+
+function _shortThesis(c) {
+  const sym = c.symbol || '';
+  if (_SYMBOL_DICT[sym]) return _SYMBOL_DICT[sym].short;
+  // Fall back: extract sentence after the colon in reason_to_care, or use first 140 chars
+  const rtc = c.reason_to_care || c.reason || '';
+  const ci  = rtc.indexOf(': ');
+  const body = ci > 0 && ci < 100 ? rtc.slice(ci + 2) : rtc;
+  return body.length > 140 ? body.slice(0, 138) + '…' : body;
+}
+
+function _buildUniDetail(c, rowId) {
+  const sym     = c.symbol || '?';
+  const risks   = c.risk_flags || [];
+  const confs   = (c.confirmation_required || []);
+  const driver  = c.driver ? _driverLabel(c.driver) : '';
+  const fullNote = c.reason_to_care || c.reason || '';
+
+  const riskRows = risks.map(r => {
+    const info = _RISK_DETAIL[r] || { meaning: _riskLabel(r), effect: 'Monitor for impact.', effectType: 'warns', whatHelps: '' };
+    const col  = info.effectType === 'blocks' ? 'var(--red)' : info.effectType === 'reduces_confidence' ? 'var(--orange)' : '#c80';
+    const tag  = info.effectType === 'blocks' ? 'BLOCKS' : info.effectType === 'reduces_confidence' ? 'CAUTION' : 'WARN';
+    return `<div style="padding:8px 10px;background:rgba(0,0,0,0.2);border-radius:4px;border-left:2px solid ${col}66;margin-bottom:5px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        <span style="font-size:10px;font-weight:600;color:var(--text)">${esc(_riskLabel(r))}</span>
+        <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${col}1a;color:${col};font-family:'JetBrains Mono',monospace;letter-spacing:0.05em">${tag}</span>
+      </div>
+      <div style="font-size:10px;color:var(--muted2);line-height:1.45">${esc(info.meaning)}</div>
+      <div style="font-size:9px;color:var(--muted);margin-top:2px"><em>Effect:</em> ${esc(info.effect)}</div>
+      ${info.whatHelps ? `<div style="font-size:9px;color:var(--muted);margin-top:1px"><em>What helps:</em> ${esc(info.whatHelps)}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  const confirmList = confs.length
+    ? `<div style="font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin:10px 0 5px">Confirmation required</div>
+       <ul style="margin:0;padding-left:14px">${confs.map(cc => `<li style="font-size:9px;color:var(--muted2);padding:1px 0;line-height:1.45">${esc(cc.replace(/_/g,' '))}</li>`).join('')}</ul>` : '';
+
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px 0 4px">
+    <div>
+      <div style="font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Why selected</div>
+      <div style="font-size:10px;color:var(--text);line-height:1.55">${esc(fullNote)}</div>
+      ${driver ? `<div style="font-size:9px;color:var(--muted2);margin-top:6px">↳ Activated by: <span style="color:var(--green)">${esc(driver)}</span></div>` : ''}
+      ${confirmList}
+    </div>
+    <div>
+      ${risks.length
+        ? `<div style="font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Risks explained</div>${riskRows}`
+        : `<div style="font-size:10px;color:var(--muted2)">No significant risk flags.</div>`}
+    </div>
+  </div>`;
+}
+
+function _toggleUniDetail(rowId) {
+  const panel = document.getElementById('uni-d-' + rowId);
+  const btn   = document.getElementById('uni-b-' + rowId);
+  const row   = document.getElementById('uni-r-' + rowId);
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if (btn) btn.textContent = open ? '▼ Details' : '▲ Close';
+  if (row) row.style.background = open ? '' : 'rgba(255,255,255,0.025)';
+}
+
 // ── Intel Universe pagination ─────────────────────────────────────────────────
 window._intelAllCands = [];
 window._intelCandPage = 0;
@@ -3040,41 +3200,86 @@ function _renderIntelPage() {
 
   if (!candEl) return;
   if (!slice.length) {
-    candEl.innerHTML = '<div style="padding:12px 0;font-size:11px;color:var(--muted2)">No candidates in feed.</div>';
+    candEl.innerHTML = '<div style="padding:16px;font-size:11px;color:var(--muted2)">No candidates in feed.</div>';
     return;
   }
 
-  const fmtTheme  = t => (t||'').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
-  const routeColor = r => r==='position' ? 'var(--green)' : r==='watchlist' ? 'var(--muted2)' : 'var(--orange)';
-
   candEl.innerHTML = slice.map((c, i) => {
-    const confPct   = Math.round((c.confidence||0) * 100);
-    const confColor = confPct >= 75 ? 'var(--green)' : confPct >= 55 ? 'var(--orange)' : 'var(--muted2)';
-    const route     = (c.route_hint || [])[0] || '';
-    const risks     = (c.risk_flags || []).length;
-    const reason    = c.reason_to_care || c.reason || '—';
-    const rowNum    = start + i + 1;
-    return `<div style="display:grid;grid-template-columns:28px 60px 1fr auto;gap:8px;align-items:start;padding:10px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:9px;color:var(--muted2);padding-top:2px">${rowNum}</span>
-      <div>
-        <div style="font-weight:700;font-size:13px;color:var(--orange);font-family:'Syne',sans-serif">${esc(c.symbol)}</div>
-        <div style="display:flex;align-items:center;gap:4px;margin-top:3px">
-          <div style="width:32px;height:3px;border-radius:2px;background:rgba(255,255,255,0.07);overflow:hidden">
-            <div style="height:100%;width:${confPct}%;background:${confColor};border-radius:2px"></div>
+    const rowId    = start + i + 1;
+    const pct      = Math.round((c.confidence || 0) * 100);
+    const band     = _getUniScoreBand(pct);
+    const sym      = c.symbol || '?';
+    const symInfo  = _SYMBOL_DICT[sym] || {};
+    const company  = symInfo.co || '';
+    const theme    = _themeLabel(c.theme || '');
+    const role     = _ROLE_LABELS[c.role] || { label: c.role || '—', color: 'var(--muted2)', bg: 'rgba(255,255,255,0.05)' };
+    const route    = (c.route_hint || [])[0] || '';
+    const routeInf = _ROUTE_LABELS[route] || { label: '', desc: '', color: 'var(--muted2)' };
+    const driver   = c.driver ? _driverLabel(c.driver) : '';
+    const risks    = (c.risk_flags || []).slice(0, 3);
+    const thesis   = _shortThesis(c);
+    const ready    = _getReadiness(pct, route);
+
+    // 2-3 positive signal chips derived from available data
+    const signals = [];
+    if ((c.confidence || 0) >= 0.80) signals.push('High conviction');
+    else if ((c.confidence || 0) >= 0.65) signals.push('Strong setup');
+    if (c.role === 'direct_beneficiary') signals.push('Direct beneficiary');
+    if (driver) signals.push('Driver active');
+    if (route === 'position') signals.push('Structural position');
+    else if (route === 'swing') signals.push('Swing opportunity');
+    const sigChips = signals.slice(0, 3).map(s =>
+      `<span style="font-size:8px;padding:1px 7px;border-radius:9px;background:var(--green)12;border:1px solid var(--green)30;color:var(--green)">${esc(s)}</span>`
+    ).join('');
+    const riskChips = risks.map(r =>
+      `<span style="font-size:8px;padding:1px 7px;border-radius:9px;background:rgba(200,50,50,0.1);border:1px solid rgba(200,50,50,0.28);color:#f99">${esc(_riskLabel(r))}</span>`
+    ).join('');
+
+    return `<div id="uni-r-${rowId}" style="border-bottom:1px solid rgba(255,255,255,0.055);transition:background 0.12s">
+      <!-- Compact row -->
+      <div onclick="_toggleUniDetail(${rowId})"
+           style="display:grid;grid-template-columns:190px 1fr 148px;cursor:pointer;padding:11px 14px"
+           onmouseenter="this.parentElement.style.background='rgba(255,255,255,0.025)'"
+           onmouseleave="document.getElementById('uni-d-${rowId}')&&document.getElementById('uni-d-${rowId}').style.display!=='none'||( this.parentElement.style.background='')">
+        <!-- LEFT: identity -->
+        <div style="padding-right:12px;border-right:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;justify-content:space-between">
+          <div>
+            <div style="display:flex;align-items:baseline;gap:5px">
+              <span style="font-size:9px;color:var(--muted);min-width:14px">${rowId}</span>
+              <span style="font-size:16px;font-weight:700;color:var(--orange);font-family:'Syne',sans-serif;letter-spacing:0.02em">${esc(sym)}</span>
+            </div>
+            ${company ? `<div style="font-size:9px;color:var(--muted2);margin-top:1px;padding-left:19px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(company)}</div>` : ''}
           </div>
-          <span style="font-size:9px;color:${confColor}">${confPct}%</span>
+          <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:7px">
+            <span style="font-size:8px;padding:1px 7px;border-radius:9px;background:rgba(255,255,255,0.06);color:var(--muted2);white-space:nowrap">${esc(theme)}</span>
+            <span style="font-size:8px;padding:1px 7px;border-radius:9px;background:${role.bg};border:1px solid ${role.color}44;color:${role.color};white-space:nowrap">${esc(role.label)}</span>
+            ${routeInf.label ? `<span style="font-size:8px;padding:1px 7px;border-radius:9px;background:${routeInf.color}12;border:1px solid ${routeInf.color}35;color:${routeInf.color};font-weight:600;white-space:nowrap" title="${esc(routeInf.desc)}">${esc(routeInf.label)}</span>` : ''}
+          </div>
+        </div>
+        <!-- MIDDLE: thesis + chips -->
+        <div style="padding:0 12px">
+          <div style="font-size:11px;color:var(--text);line-height:1.45;margin-bottom:5px">${esc(thesis)}</div>
+          ${driver ? `<div style="font-size:9px;color:var(--muted2);margin-bottom:6px">↳ ${esc(driver)}</div>` : ''}
+          <div style="display:flex;flex-wrap:wrap;gap:3px">
+            ${sigChips}${riskChips}
+          </div>
+        </div>
+        <!-- RIGHT: score + action -->
+        <div style="padding-left:12px;border-left:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between">
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:700;color:${band.color};font-family:'Syne',sans-serif;line-height:1">${pct}</div>
+            <div style="font-size:8px;color:${band.color};opacity:0.75;margin-top:1px">${esc(band.label)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:9px;color:var(--muted2);margin-bottom:6px">${esc(ready)}</div>
+            <button id="uni-b-${rowId}" onclick="event.stopPropagation();_toggleUniDetail(${rowId})"
+                    style="font-size:8px;padding:2px 10px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;white-space:nowrap">▼ Details</button>
+          </div>
         </div>
       </div>
-      <div>
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
-          <span style="font-size:9px;padding:1px 6px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--muted2)">${esc(fmtTheme(c.theme))}</span>
-          ${route ? `<span style="font-size:9px;padding:1px 6px;border-radius:3px;border:1px solid ${routeColor(route)}44;color:${routeColor(route)}">${route}</span>` : ''}
-        </div>
-        <div style="font-size:11px;color:var(--text);line-height:1.5">${esc(reason)}</div>
-        ${risks > 0 ? `<div style="font-size:9px;color:var(--red);margin-top:3px">&#9888; ${risks} risk flag${risks>1?'s':''}</div>` : ''}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding-top:2px">
-        ${(c.risk_flags||[]).slice(0,2).map(r => `<span style="font-size:8px;color:var(--muted2);background:rgba(255,255,255,0.04);padding:1px 4px;border-radius:2px">${esc(_riskLabel(r))}</span>`).join('')}
+      <!-- Expandable detail panel -->
+      <div id="uni-d-${rowId}" style="display:none;padding:0 14px 14px;background:rgba(0,0,0,0.15);border-top:1px solid rgba(255,255,255,0.06)">
+        ${_buildUniDetail(c, rowId)}
       </div>
     </div>`;
   }).join('');
