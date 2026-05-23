@@ -228,7 +228,8 @@ canvas{display:block;width:100% !important}
 .cat-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
 .cat-body{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
 .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.cat-card{border-radius:6px;border:1px solid var(--border);background:var(--bg2);padding:10px 12px;display:flex;flex-direction:column;gap:4px;cursor:default;transition:border-color .15s}
+.cat-card{border-radius:6px;border:1px solid var(--border);background:var(--bg2);padding:10px 12px;display:flex;flex-direction:column;gap:4px;cursor:pointer;transition:border-color .15s}
+.cat-card:hover{border-color:var(--orange)}
 .cat-card.live{border-color:rgba(255,23,68,.35);border-left:3px solid var(--red)}
 .cat-card.warm{border-left:3px solid var(--yellow)}
 .cat-card.cool{border-left:3px solid #4dabf7}
@@ -255,6 +256,57 @@ canvas{display:block;width:100% !important}
 .edgar-tbl th{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);padding:4px 6px;border-bottom:1px solid var(--border);text-align:left}
 .edgar-tbl td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
 .edgar-tbl tr.wl{background:rgba(255,23,68,.04)}
+/* ── Catalyst Radar additions ── */
+.cat-radar-strip{display:flex;align-items:stretch;background:var(--bg2);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px;flex-shrink:0}
+.cat-radar-step{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 6px;border-right:1px solid var(--border);position:relative;min-width:0}
+.cat-radar-step:last-child{border-right:none}
+.cat-radar-step-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;line-height:1}
+.cat-radar-step-lbl{font-size:7.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted2);margin-top:3px;text-align:center;white-space:nowrap}
+.cat-radar-arrow{position:absolute;right:-5px;top:50%;transform:translateY(-50%);color:var(--border2);font-size:10px;z-index:1;pointer-events:none}
+.cat-section-hdr{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);padding:14px 0 8px;border-bottom:1px solid var(--border);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.cat-section-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block}
+.cat-spotlight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:10px}
+.cat-spotlight-card{border-radius:8px;border:1px solid var(--border);background:var(--bg2);padding:14px 16px;display:flex;flex-direction:column;gap:5px;cursor:pointer;transition:border-color .15s,transform .15s}
+.cat-spotlight-card:hover{border-color:var(--orange);transform:translateY(-1px)}
+.cat-spotlight-card.live{border-color:rgba(255,23,68,.35);border-left:3px solid var(--red)}
+.cat-spotlight-card.warm{border-left:3px solid var(--yellow)}
+.cat-spotlight-card.cool{border-left:3px solid #4dabf7}
+.cat-spotlight-card .cat-ticker{font-size:17px}
+.cat-spotlight-card .cat-score{font-size:22px}
+.cat-status-badge{display:inline-flex;align-items:center;gap:4px;font-size:8.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:3px 7px;border-radius:3px;border:1px solid;white-space:nowrap;flex-shrink:0;line-height:1.2}
+.cat-status-badge.trade-review{color:#ff6b6b;border-color:rgba(255,107,107,.45);background:rgba(255,107,107,.1)}
+.cat-status-badge.confirmed{color:var(--orange);border-color:rgba(255,107,0,.4);background:rgba(255,107,0,.1)}
+.cat-status-badge.edgar-signal{color:var(--red);border-color:rgba(255,23,68,.35);background:rgba(255,23,68,.08)}
+.cat-status-badge.send-apex{color:#a9e34b;border-color:rgba(169,227,75,.3);background:rgba(169,227,75,.07)}
+.cat-status-badge.options-anomaly{color:var(--yellow);border-color:rgba(255,214,0,.4);background:rgba(255,214,0,.08)}
+.cat-status-badge.watch-only{color:var(--muted2);border-color:var(--border2);background:transparent}
+.cat-evidence-stack{display:flex;flex-direction:column;gap:3px;padding:7px 9px;background:var(--bg3);border-radius:4px;border:1px solid var(--border);margin-top:5px}
+.cat-evidence-row{display:flex;justify-content:space-between;align-items:center;font-size:8.5px}
+.cat-evidence-lbl{color:var(--muted2)}
+.cat-evidence-val{font-weight:700;font-family:'JetBrains Mono',monospace}
+.cat-evidence-val.ev-strong,.cat-evidence-val.ev-confirmed,.cat-evidence-val.ev-bullish{color:var(--green)}
+.cat-evidence-val.ev-moderate{color:var(--yellow)}
+.cat-evidence-val.ev-missing,.cat-evidence-val.ev-bearish{color:var(--red)}
+.cat-evidence-val.ev-neutral,.cat-evidence-val.ev-waiting,.cat-evidence-val.ev-weak{color:var(--muted2)}
+.cat-evidence-val.ev-none{color:var(--border2)}
+.cat-why-now{font-size:9.5px;color:var(--muted2);line-height:1.5;border-top:1px solid var(--border);padding-top:6px;margin-top:3px}
+/* Catalyst detail drawer */
+.cat-detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2999;display:none;backdrop-filter:blur(2px)}
+.cat-detail-overlay.open{display:block}
+.cat-detail-drawer{position:fixed;right:-440px;top:0;bottom:0;width:420px;max-width:95vw;background:var(--bg2);border-left:1px solid var(--border);z-index:3000;display:flex;flex-direction:column;transition:right .25s cubic-bezier(.4,0,.2,1)}
+.cat-detail-drawer.open{right:0}
+.cat-detail-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)}
+.cat-detail-close{font-size:20px;cursor:pointer;margin-left:auto;border:none;background:none;line-height:1;padding:2px 8px;color:var(--muted2);font-family:'JetBrains Mono',monospace}
+.cat-detail-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column}
+.cat-detail-section{margin-bottom:14px}
+.cat-detail-section-lbl{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:5px;display:block}
+.cat-detail-section-val{font-size:11px;color:var(--text);line-height:1.55}
+.cat-detail-divider{height:1px;background:var(--border);margin:14px 0}
+.cat-detail-action{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;background:var(--bg2)}
+.cat-detail-action-btn{flex:1;padding:8px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--muted2);transition:background .15s}
+.cat-detail-action-btn:hover{background:var(--bg)}
+.cat-detail-action-btn.primary{background:rgba(255,107,0,.12);border-color:rgba(255,107,0,.4);color:var(--orange)}
+.cat-detail-action-btn.primary:hover{background:rgba(255,107,0,.22)}
 
 /* ── VIEW 7: NEWS ── */
 .news-view{flex-direction:column;height:calc(100vh - 46px - 66px - 32px - 34px);overflow:hidden}
@@ -552,6 +604,13 @@ canvas{display:block;width:100% !important}
 
   /* ── CATALYST TAB ── */
   .cat-card{padding:8px 10px}
+  .cat-spotlight-grid{grid-template-columns:1fr}
+  .cat-spotlight-card{padding:10px 12px}
+  .cat-radar-strip{overflow-x:auto}
+  .cat-radar-step{padding:8px 4px;min-width:52px}
+  .cat-radar-step-val{font-size:14px}
+  .cat-radar-step-lbl{font-size:6.5px}
+  .cat-detail-drawer{width:100%;right:-100%}
 
   /* ── STATS2 — shrink labels so they don't wrap ── */
   .stats2 .sl{font-size:7.5px;letter-spacing:.3px}
@@ -1054,13 +1113,64 @@ canvas{display:block;width:100% !important}
 <!-- VIEW: CATALYST -->
 <div class="view catalyst-view" id="view-catalyst">
   <div class="cat-hdr">
-    <span id="cat-count" style="font-weight:600;color:var(--orange)">— candidates</span>
-    <span id="cat-live-count" style="font-size:10px;color:var(--muted2)"></span>
+    <span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange)">CATALYST RADAR</span>
     <span id="cat-date" style="font-size:10px;color:var(--muted2);margin-left:auto"></span>
     <button id="cat-refresh-btn" onclick="loadCatalyst()" style="background:none;border:1px solid var(--border);color:var(--muted2);padding:3px 10px;border-radius:3px;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer">⟳ Refresh</button>
   </div>
   <div class="cat-body">
     <div id="cat-feed"><div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Loading catalyst data…</div></div>
+  </div>
+</div>
+<!-- Catalyst detail drawer -->
+<div class="cat-detail-overlay" id="cat-detail-overlay" onclick="closeCatalystDetail()"></div>
+<div class="cat-detail-drawer" id="cat-detail-drawer">
+  <div class="cat-detail-hdr">
+    <div style="min-width:0;flex:1">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span id="cat-detail-ticker" style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800"></span>
+        <span id="cat-detail-status-badge" class="cat-status-badge"></span>
+      </div>
+      <div id="cat-detail-name" style="font-size:10px;color:var(--muted2);margin-top:2px"></div>
+    </div>
+    <button class="cat-detail-close" onclick="closeCatalystDetail()">×</button>
+  </div>
+  <div class="cat-detail-body">
+    <div class="cat-detail-section">
+      <span class="cat-detail-section-lbl">Composite Score</span>
+      <div style="display:flex;align-items:baseline;gap:4px">
+        <span id="cat-detail-score" style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800"></span>
+      </div>
+    </div>
+    <div class="cat-detail-section">
+      <span class="cat-detail-section-lbl">Why Now?</span>
+      <div id="cat-detail-why" class="cat-detail-section-val"></div>
+    </div>
+    <div class="cat-detail-section">
+      <span class="cat-detail-section-lbl">Evidence Stack</span>
+      <div class="cat-evidence-stack" id="cat-detail-evidence" style="margin-top:0"></div>
+    </div>
+    <div class="cat-detail-divider"></div>
+    <div class="cat-detail-section">
+      <span class="cat-detail-section-lbl">What is missing?</span>
+      <div id="cat-detail-missing" class="cat-detail-section-val" style="color:var(--muted2)"></div>
+    </div>
+    <div class="cat-detail-section">
+      <span class="cat-detail-section-lbl">Invalidation trigger</span>
+      <div id="cat-detail-invalidation" class="cat-detail-section-val" style="color:var(--muted2)"></div>
+    </div>
+    <div class="cat-detail-section">
+      <span class="cat-detail-section-lbl">All detected signals</span>
+      <div id="cat-detail-flags" class="cat-detail-section-val" style="font-size:10px;color:var(--muted2)"></div>
+    </div>
+    <div class="cat-detail-divider"></div>
+    <div class="cat-detail-section">
+      <span class="cat-detail-section-lbl">Next action</span>
+      <div id="cat-detail-next" class="cat-detail-section-val" style="font-weight:600"></div>
+    </div>
+  </div>
+  <div class="cat-detail-action">
+    <button class="cat-detail-action-btn" onclick="closeCatalystDetail()">Close</button>
+    <button class="cat-detail-action-btn primary" onclick="closeCatalystDetail()">Send to Apex →</button>
   </div>
 </div>
 
@@ -1692,6 +1802,58 @@ async function loadOvernightNotes() {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const d = await resp.json();
 
+    // ── Calendar + earnings (always render, independent of brief availability) ──
+    const calEl = document.getElementById('on-calendar');
+    if (calEl) {
+      const SIG_COL = {BULLISH:'var(--correct)',BEARISH:'var(--incorrect)',VOLATILE:'var(--lightning)',NEUTRAL:'var(--muted2)'};
+      const SIG_DOT = {BULLISH:'▲',BEARISH:'▼',VOLATILE:'◆',NEUTRAL:'●'};
+
+      const calEvents = (d.calendar || []).map(ev => {
+        const impCol = ev.impact === 'High' ? 'var(--red)' : 'var(--orange)';
+        const estStr = ev.estimate != null ? ` · est ${ev.estimate}` : '';
+        const prevStr = ev.previous != null ? ` · prev ${ev.previous}` : '';
+        const sig = ev.signal || '';
+        const sigCol = SIG_COL[sig] || 'var(--muted2)';
+        const sigDot = SIG_DOT[sig] || '●';
+        const sigBadge = sig
+          ? `<span style="font-size:8px;font-weight:700;color:${sigCol};font-family:'JetBrains Mono',monospace;flex-shrink:0">${sig}</span>`
+          : `<span style="color:${impCol};font-size:8px;flex-shrink:0">●</span>`;
+        const whyRow = ev.why
+          ? `<div style="font-size:9px;color:var(--muted2);padding-left:14px;padding-bottom:3px;line-height:1.4">${esc(ev.why)}</div>`
+          : '';
+        const affectsRow = ev.affects
+          ? `<div style="padding-left:14px;padding-bottom:4px">${ev.affects.split(',').map(a => `<span style="font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--muted2);border:1px solid var(--border);border-radius:3px;padding:1px 4px;margin-right:3px">${esc(a.trim())}</span>`).join('')}</div>`
+          : '';
+        return `<div style="padding:3px 0 0">
+          <div style="display:flex;gap:6px;align-items:baseline">
+            ${sigBadge}
+            <span style="color:var(--muted2);flex-shrink:0;font-size:10px">${esc(ev.date.slice(5))}</span>
+            <span style="color:var(--text);font-size:10px">${esc(ev.event)}${esc(estStr)}${esc(prevStr)}</span>
+          </div>
+          ${whyRow}${affectsRow}
+        </div>`;
+      });
+
+      const earnEvents = (d.earnings || []).map(ev => {
+        const epsStr = ev.eps_est != null ? ` · EPS est $${ev.eps_est}` : '';
+        const priorStr = ev.eps_prior != null ? ` prior $${ev.eps_prior}` : '';
+        const timingStr = ev.timing ? ` ${ev.timing}` : '';
+        return `<div style="padding:3px 0">
+          <div style="display:flex;gap:6px;align-items:baseline">
+            <span style="color:var(--orange);font-size:8px;flex-shrink:0">◆</span>
+            <span style="color:var(--muted2);flex-shrink:0;font-size:10px">${esc(ev.date.slice(5))}</span>
+            <span style="color:var(--orange);font-weight:600;font-size:10px">${esc(ev.symbol)}</span>
+            <span style="color:var(--muted2);font-size:10px">${esc(timingStr + epsStr + priorStr)}</span>
+          </div>
+        </div>`;
+      });
+
+      const allItems = [...calEvents, ...earnEvents];
+      calEl.innerHTML = allItems.length
+        ? allItems.slice(0, 12).join('')
+        : '<span style="color:var(--muted2);font-size:10px">No events this week</span>';
+    }
+
     if (!d.available) {
       document.getElementById('on-tone-row').innerHTML =
         '<span style="color:var(--muted2);font-size:10px">No morning brief yet — generated automatically at 6:00 AM ET.</span>';
@@ -1747,34 +1909,6 @@ async function loadOvernightNotes() {
           </div>`;
         }).join('');
       }
-    }
-
-    // ── Calendar + earnings ────────────────────────────────────
-    const calEl = document.getElementById('on-calendar');
-    if (calEl) {
-      const calEvents = (D.calendar || []).map(ev => {
-        const impCol = ev.impact === 'High' ? 'var(--red)' : 'var(--orange)';
-        const estStr = ev.estimate != null ? ` est ${ev.estimate}` : '';
-        return `<div style="font-size:10px;padding:2px 0;display:flex;gap:6px;align-items:baseline">
-          <span style="color:${impCol};font-size:8px;flex-shrink:0">●</span>
-          <span style="color:var(--muted2);flex-shrink:0">${esc(ev.date.slice(5))}</span>
-          <span style="color:var(--text)">${esc(ev.event)}${esc(estStr)}</span>
-        </div>`;
-      });
-      const earnEvents = (D.earnings || []).map(ev => {
-        const epsStr = ev.eps_est != null ? ` EPS est $${ev.eps_est}` : '';
-        const timingStr = ev.timing ? ` ${ev.timing}` : '';
-        return `<div style="font-size:10px;padding:2px 0;display:flex;gap:6px;align-items:baseline">
-          <span style="color:var(--orange);font-size:8px;flex-shrink:0">◆</span>
-          <span style="color:var(--muted2);flex-shrink:0">${esc(ev.date.slice(5))}</span>
-          <span style="color:var(--orange);font-weight:600">${esc(ev.symbol)}</span>
-          <span style="color:var(--muted2)">${esc(timingStr + epsStr)}</span>
-        </div>`;
-      });
-      const allItems = [...calEvents, ...earnEvents];
-      calEl.innerHTML = allItems.length
-        ? allItems.slice(0, 12).join('')
-        : '<span style="color:var(--muted2);font-size:10px">No events this week</span>';
     }
 
     // ── Analyst changes ────────────────────────────────────────

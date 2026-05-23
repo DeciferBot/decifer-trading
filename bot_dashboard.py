@@ -146,6 +146,29 @@ def _fetch_alpaca_news() -> list[dict]:
         return []
 
 
+_calendar_enrichment_cache: dict = {}  # keyed by hash of event names
+
+
+def _get_enriched_calendar(cal_events: list) -> list:
+    """Return cal_events annotated with signal/why/affects, cached in memory."""
+    if not cal_events:
+        return cal_events
+    cache_key = hash(tuple(ev.get("event", "") for ev in cal_events))
+    if cache_key in _calendar_enrichment_cache:
+        return _calendar_enrichment_cache[cache_key]
+    # Only enrich if any event is missing annotations
+    if all(ev.get("signal") for ev in cal_events):
+        return cal_events
+    try:
+        from overnight_research import enrich_calendar_events
+        enriched = enrich_calendar_events(cal_events)
+        _calendar_enrichment_cache[cache_key] = enriched
+        return enriched
+    except Exception as exc:
+        log.debug("Live calendar enrichment failed: %s", exc)
+        return cal_events
+
+
 _MACRO_TYPES = {
     "FOMC": ("FED", "#ff6b35"),
     "CPI": ("CPI", "#ff4444"),
@@ -1436,13 +1459,17 @@ class DashHandler(BaseHTTPRequestHandler):
                 from datetime import datetime as _dt
                 from overnight_research import JSON_PATH, load_overnight_notes
 
-                payload: dict = {"available": False, "notes": "", "data": None}
+                payload: dict = {"available": False, "notes": "", "data": None, "calendar": [], "earnings": []}
                 if os.path.exists(JSON_PATH):
                     weekday = _dt.now(_zi.ZoneInfo("America/New_York")).weekday()
                     max_age = 80 * 3600 if weekday in (0, 6) else 20 * 3600
+                    with open(JSON_PATH) as _jf:
+                        _file_data = json.load(_jf)
+                    # Always expose calendar/earnings regardless of file age
+                    payload["calendar"] = _get_enriched_calendar(_file_data.get("calendar", []))
+                    payload["earnings"] = _file_data.get("earnings", [])
                     if _t.time() - os.path.getmtime(JSON_PATH) <= max_age:
-                        with open(JSON_PATH) as _jf:
-                            payload["data"] = json.load(_jf)
+                        payload["data"] = _file_data
                         payload["available"] = True
                 notes = load_overnight_notes()
                 if notes:

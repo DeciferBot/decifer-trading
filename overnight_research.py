@@ -594,6 +594,88 @@ def _get_analyst_changes(universe: list[str] | None) -> str:
 JSON_PATH = "data/overnight_notes.json"
 
 
+# ── Calendar enrichment ───────────────────────────────────────────────────────
+
+
+def enrich_calendar_events(cal_events: list[dict]) -> list[dict]:
+    """
+    Annotate economic calendar events with signal direction, why-it-matters,
+    and affected markets. Uses Claude Haiku for speed. Non-blocking — returns
+    unannotated events on any failure.
+    """
+    if not cal_events:
+        return cal_events
+    try:
+        import anthropic as _ant
+
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            try:
+                from dotenv import dotenv_values as _dv
+                api_key = _dv(os.path.join(os.path.dirname(__file__), ".env")).get("ANTHROPIC_API_KEY", "")
+            except Exception:
+                pass
+        if not api_key:
+            log.debug("Calendar enrichment: no Anthropic API key")
+            return cal_events
+
+        items = [
+            {
+                "i": i,
+                "event": ev["event"],
+                "impact": ev["impact"],
+                "estimate": ev.get("estimate"),
+                "previous": ev.get("previous"),
+            }
+            for i, ev in enumerate(cal_events)
+        ]
+        prompt = (
+            "You are a market analyst briefing active equity traders.\n\n"
+            "Annotate each economic calendar event below.\n\n"
+            "Events:\n" + json.dumps(items, indent=2) + "\n\n"
+            "Return a JSON array — one object per event — with these exact keys:\n"
+            '{"i":<index>,"signal":"BULLISH|BEARISH|VOLATILE|NEUTRAL",'
+            '"why":"<one sentence: what this measures and why equity traders watch it>",'
+            '"affects":"<3-5 comma-separated tickers or asset classes most moved: e.g. SPY, QQQ, XLF, TLT, USD>"}\n\n'
+            "signal rules:\n"
+            "  BULLISH  — strong print typically lifts equities\n"
+            "  BEARISH  — strong print typically hurts equities\n"
+            "  VOLATILE — data-dependent: beat vs miss produces opposite reactions\n"
+            "  NEUTRAL  — routine release, low equity impact\n"
+            "JSON array only, no markdown, no extra text."
+        )
+
+        client = _ant.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = msg.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        annotations = json.loads(raw)
+
+        enriched = [dict(ev) for ev in cal_events]
+        for ann in annotations:
+            idx = ann.get("i")
+            if isinstance(idx, int) and 0 <= idx < len(enriched):
+                enriched[idx].update(
+                    {
+                        "signal": ann.get("signal", "NEUTRAL"),
+                        "why": ann.get("why", ""),
+                        "affects": ann.get("affects", ""),
+                    }
+                )
+        log.info("Calendar enrichment: annotated %d events", len(enriched))
+        return enriched
+    except Exception as exc:
+        log.debug("Calendar enrichment failed: %s", exc)
+        return cal_events
+
+
 # ── Structured JSON builder ───────────────────────────────────────────────────
 
 
@@ -813,7 +895,7 @@ def _build_overnight_json(universe: list[str] | None, gen_time: str) -> dict:
                         "estimate": ev.get("estimate"),
                         "previous": ev.get("previous"),
                     })
-        data["calendar"] = cal_events
+        data["calendar"] = enrich_calendar_events(cal_events)
     except Exception:
         data["calendar"] = []
 
