@@ -851,7 +851,7 @@ canvas{display:block;width:100% !important}
     <button class="f-btn" onclick="filterOrders('options',this)">Options</button>
   </div>
   <div class="hist-table">
-    <div class="th" style="grid-template-columns:85px 90px 48px 72px 80px 70px 105px 70px 52px 52px 40px"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Notional</span><span>Limit</span><span>Fill / Slip</span><span>Status</span><span>Role</span><span>Score</span><span></span></div>
+    <div class="th" style="grid-template-columns:85px 90px 48px 72px 80px 70px 105px 70px 52px 52px 40px"><span>Time</span><span>Symbol</span><span title="Long (buy) or Short (inverse ETF sell)">Side</span><span title="Number of shares or contracts ordered">Qty</span><span title="Total order value in dollars (price × qty)">Notional</span><span title="Limit price submitted to the exchange">Limit</span><span title="Actual fill price and slippage vs limit (+ = paid more, − = saved)">Fill / Slip</span><span>Status</span><span title="Entry = new position, Exit = closing trade, Trim = partial reduce">Role</span><span title="Composite signal score that triggered this order (0–100)">Score</span><span></span></div>
     <div id="orders-body"><div class="empty">No orders logged yet. Orders appear here when the bot places them.</div></div>
   </div>
 </div>
@@ -868,7 +868,7 @@ canvas{display:block;width:100% !important}
     <button class="f-btn" onclick="filterTrades('fx',this)">FX</button>
   </div>
   <div class="hist-table">
-    <div class="th"><span>Time</span><span>Symbol</span><span>Side</span><span>Size</span><span>Entry</span><span>Exit</span><span>P&L</span><span>Hold</span><span>Reason</span></div>
+    <div class="th"><span>Time</span><span>Symbol</span><span title="Long (buy) or Short (inverse ETF sell)">Side</span><span title="Number of shares or contracts">Size</span><span title="Average entry price">Entry</span><span title="Average exit price">Exit</span><span title="Profit &amp; Loss — realised gain or loss in dollars">P&amp;L</span><span title="Total time position was held, from fill to close">Hold</span><span title="What triggered the exit: stop-loss, take-profit, Apex decision, or timeout">Reason</span></div>
     <div id="hist-body"><div class="empty">No closed trades yet. Trades appear here after positions are closed.</div></div>
   </div>
 </div>
@@ -1362,6 +1362,7 @@ canvas{display:block;width:100% !important}
     <div class="setting-row"><span class="setting-label">Bot Status</span><span class="setting-val" id="cfg-status">—</span></div>
     <div style="display:flex;gap:8px;padding-top:10px">
       <button class="apply-btn" onclick="applySettings()" style="flex:1">✅ Apply Settings</button>
+      <button class="apply-btn" id="cfg-revert-btn" onclick="revertSettings()" style="flex:1;border-color:var(--muted);color:var(--muted2);background:transparent" title="Discard unsaved edits and restore the current running config">↺ Revert</button>
       <button class="apply-btn" onclick="restartBot()" style="flex:1;border-color:var(--red);color:var(--red);background:rgba(255,23,68,.08)">🔄 Restart Bot</button>
     </div>
   </div>
@@ -1529,7 +1530,7 @@ canvas{display:block;width:100% !important}
       <div class="card-title" style="margin:0">Signal Interpretation</div>
       <button id="an-explain-refresh" onclick="loadAnalyticsExplain(true)"
               style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace">
-        ↻ REGENERATE
+        ↻ Refresh
       </button>
     </div>
     <div id="an-explain-body" style="font-size:12px;color:var(--muted2)">Loading AI interpretation…</div>
@@ -2446,7 +2447,7 @@ async function loadAnalyticsExplain(forceRegen) {
   const btn  = document.getElementById('an-explain-refresh');
   if (!body) return;
   body.innerHTML = '<span style="color:var(--muted2)">Reading the numbers…</span>';
-  if (btn) { btn.disabled = true; btn.textContent = '↻ WORKING…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
   try {
     // force=true bypasses the server-side cache; otherwise cache is keyed by trade_count
     const url = '/api/analytics/explain' + (forceRegen ? '?force=true&t=' + Date.now() : '');
@@ -2457,7 +2458,7 @@ async function loadAnalyticsExplain(forceRegen) {
     body.innerHTML = '<span style="color:var(--red)">Could not load interpretation.</span>';
     console.error('analytics explain error', e);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ REGENERATE'; }
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
   }
 }
 
@@ -2991,6 +2992,17 @@ function _artifactRow(a) {
     <span style="color:${sc}">${age}${slaNote}</span>
   </div>`;
 }
+
+// Plain-English description shown under each stage name in the Health tab
+const _STAGE_FRIENDLY = {
+  'Intelligence': 'Reads live market data (SPY, VIX, sector ETFs) and produces the thematic candidate feed used by the scanner. Runs once before market open.',
+  'Universe':     'Builds the master list of symbols the scanner evaluates each cycle — top-1000 by dollar volume plus dynamic adds. Refreshes weekly + daily.',
+  'Handoff':      'Publishes the session-ready candidate universe from the Intelligence pipeline to the live bot. Valid until market close.',
+  'Bot Core':     'Core process health: IBKR broker connection, Alpaca real-time data stream, and account value heartbeat. Both must be live to trade.',
+  'Scan Engine':  'Runs the 10-dimension signal engine across the universe, calls Apex to synthesise decisions, and submits approved entries. Must complete within 15 min.',
+  'Execution':    'Checks that every open position has a valid bracket (stop-loss + take-profit), no orders are stuck, and disk space is adequate.',
+  'Validation':   'Tracks IC quality of the signal weights and confirms the three statistical gates (sample, IC, Sharpe) that govern weight updates.',
+};
 
 // Render stage detail content (varies by stage name)
 function _stageDetail(s) {
@@ -4505,7 +4517,7 @@ function loadHealth() {
           <span style="color:${sc};font-size:13px;line-height:1">${si}</span>
           <div style="flex:1;min-width:0">
             <div style="font-size:11px;font-weight:600;color:var(--text)">${s.name}${critTag}</div>
-            <div style="font-size:9px;color:var(--muted2);margin-top:1px;letter-spacing:.3px">${s.description || ''}</div>
+            <div style="font-size:9px;color:var(--muted2);margin-top:1px;letter-spacing:.3px">${_STAGE_FRIENDLY[s.name] || s.description || ''}</div>
           </div>
           <span style="font-size:10px;font-weight:700;color:${sc};letter-spacing:1px">${sl}</span>
         </div>
@@ -7005,6 +7017,41 @@ function applySettings() {
     btn.style.color = 'var(--red)';
     setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 3000);
   });
+}
+
+// ── Settings Revert ────────────────────────────────────────
+function revertSettings() {
+  const s = _liveSettings;
+  if (!s) { alert('No saved settings available yet — wait for the first status poll.'); return; }
+  const btn = document.getElementById('cfg-revert-btn');
+  document.getElementById('cfg-risk-pct').value       = (s.risk_pct_per_trade * 100).toFixed(1);
+  document.getElementById('cfg-daily-limit').value    = (s.daily_loss_limit * 100).toFixed(1);
+  document.getElementById('cfg-max-pos').value        = s.max_positions;
+  document.getElementById('cfg-cash-reserve').value   = (s.min_cash_reserve * 100).toFixed(0);
+  document.getElementById('cfg-max-single').value     = (s.max_single_position * 100).toFixed(0);
+  document.getElementById('cfg-min-score').value      = s.min_score_to_trade;
+  document.getElementById('cfg-high-score').value     = s.high_conviction_score;
+  document.getElementById('cfg-opt-min-score').value  = s.options_min_score;
+  document.getElementById('cfg-opt-risk').value       = (s.options_max_risk_pct * 100).toFixed(1);
+  document.getElementById('cfg-opt-ivr').value        = s.options_max_ivr;
+  document.getElementById('cfg-opt-delta').value      = s.options_target_delta;
+  document.getElementById('cfg-opt-delta-range').value = s.options_delta_range;
+  if (s.sentinel_enabled != null) {
+    document.getElementById('cfg-sentinel-enabled').value  = String(s.sentinel_enabled);
+    document.getElementById('cfg-sentinel-poll').value     = s.sentinel_poll_seconds;
+    document.getElementById('cfg-sentinel-cooldown').value = s.sentinel_cooldown_minutes;
+    document.getElementById('cfg-sentinel-risk-mult').value  = s.sentinel_risk_multiplier;
+    document.getElementById('cfg-sentinel-kw-thresh').value  = s.sentinel_keyword_threshold;
+    document.getElementById('cfg-sentinel-min-conf').value   = s.sentinel_min_confidence;
+    document.getElementById('cfg-sentinel-ibkr').value     = String(s.sentinel_use_ibkr);
+    document.getElementById('cfg-sentinel-finviz').value   = String(s.sentinel_use_finviz);
+  }
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Reverted';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1800);
+  }
 }
 
 // ── Favourites ─────────────────────────────────────────────
