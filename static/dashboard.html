@@ -618,6 +618,7 @@ canvas{display:block;width:100% !important}
 <div class="tabs">
   <div class="tab active" onclick="switchTab('live',this)">Live</div>
   <div class="tab" onclick="switchTab('agents',this)">Apex</div>
+  <div class="tab" onclick="switchTab('activity',this)">Activity</div>
   <div class="tab" onclick="switchTab('news',this)">News</div>
   <div class="tab" onclick="switchTab('catalyst',this)">Catalyst</div>
   <div class="tab" onclick="switchTab('portfolio',this)">Portfolio</div>
@@ -649,6 +650,7 @@ canvas{display:block;width:100% !important}
   <div class="tabs-drawer-grid">
     <div class="tabs-drawer-item active" id="dm-live"      onclick="mobileNav('live')">Live</div>
     <div class="tabs-drawer-item"        id="dm-agents"    onclick="mobileNav('agents')">Apex</div>
+    <div class="tabs-drawer-item"        id="dm-activity"  onclick="mobileNav('activity')">Activity</div>
     <div class="tabs-drawer-item"        id="dm-news"      onclick="mobileNav('news')">News</div>
     <div class="tabs-drawer-item"        id="dm-catalyst"  onclick="mobileNav('catalyst')">Catalyst</div>
     <div class="tabs-drawer-item"        id="dm-portfolio" onclick="mobileNav('portfolio')">Portfolio</div>
@@ -905,10 +907,22 @@ canvas{display:block;width:100% !important}
     </div>
   </div>
 
-  <!-- ZONE 4: Trade Activity — Last Trade + Session Trades -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0">
+  <!-- Hidden: IDs required by JS -->
+  <div style="display:none">
+    <div id="intel-universe"></div>
+    <div id="intel-2col-grid"></div>
+    <div id="intel-context-section"></div>
+    <div id="intel-cand-toggle"></div>
+  </div>
 
-    <!-- Last Trade -->
+</div>
+
+<!-- VIEW: TRADE ACTIVITY -->
+<div class="view" id="view-activity" style="padding:14px 16px;gap:14px;overflow-y:auto;display:none;flex-direction:column">
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0">
+
+    <!-- Last Trade (with history nav) -->
     <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column">
       <div class="col-title" style="background:var(--bg2)">
         <span>Last Trade <span id="trade-card-age" style="color:var(--muted2);font-size:9px;font-weight:400;letter-spacing:0;margin-left:6px"></span></span>
@@ -931,14 +945,6 @@ canvas{display:block;width:100% !important}
       </div>
     </div>
 
-  </div>
-
-  <!-- Hidden: IDs required by JS -->
-  <div style="display:none">
-    <div id="intel-universe"></div>
-    <div id="intel-2col-grid"></div>
-    <div id="intel-context-section"></div>
-    <div id="intel-cand-toggle"></div>
   </div>
 
 </div>
@@ -2489,7 +2495,7 @@ function toggleTheme() {
   } catch(e) {}
 })();
 
-const _TAB_LABELS = {live:'Live',log:'Log',orders:'Orders',history:'Trades',growth:'Growth',agents:'Apex',risk:'Risk',news:'News',catalyst:'Catalyst',portfolio:'Portfolio',alpha:'Decay',analytics:'Analytics',settings:'Settings',health:'Health'};
+const _TAB_LABELS = {live:'Live',log:'Log',orders:'Orders',history:'Trades',growth:'Growth',agents:'Apex',activity:'Activity',risk:'Risk',news:'News',catalyst:'Catalyst',portfolio:'Portfolio',alpha:'Decay',analytics:'Analytics',settings:'Settings',health:'Health'};
 
 function toggleTabsDrawer() {
   document.getElementById('tabs-drawer').classList.toggle('open');
