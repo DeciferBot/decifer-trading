@@ -15,8 +15,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Vercel
-.vercel
+# Vercel — exclude everything except the project link
+.vercel/*
+!.vercel/project.json
 
 # TypeScript
 *.tsbuildinfo
