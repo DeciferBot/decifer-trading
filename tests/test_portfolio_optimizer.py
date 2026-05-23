@@ -54,12 +54,15 @@ def _make_returns(symbols, n_days=40, seed=42):
     return pd.DataFrame(data, index=dates, columns=symbols)
 
 
-def _fake_yf_download(returns_df):
-    """Return a mock that mimics yf.download returning adj-close prices."""
-    prices = (1 + returns_df).cumprod() * 100  # synthetic price series
-    mock = MagicMock()
-    mock.__getitem__ = lambda self, key: prices if key == "Adj Close" else MagicMock()
-    return mock
+def _fake_fetch_bars(returns_df):
+    """Return a side_effect function for alpaca_data.fetch_bars that returns per-symbol Close prices."""
+    def _side(symbol, period="60d", interval="1d"):
+        if symbol not in returns_df.columns:
+            return None
+        prices = (1 + returns_df[symbol]).cumprod() * 100
+        df = pd.DataFrame({"Open": prices, "High": prices, "Low": prices, "Close": prices, "Volume": 1000})
+        return df
+    return _side
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -69,9 +72,9 @@ def _fake_yf_download(returns_df):
 
 class TestCorrelationTracker:
     def test_update_returns_identity_on_empty_data(self):
-        """When yfinance returns empty, update() should return an identity matrix."""
+        """When Alpaca returns no data, update() should return an identity matrix."""
         tracker = po.CorrelationTracker(lookback_days=60)
-        with patch("yfinance.download", return_value=pd.DataFrame()):
+        with patch("alpaca_data.fetch_bars", return_value=None):
             result = tracker.update(["AAPL", "MSFT"])
         assert result.shape == (2, 2)
         np.testing.assert_array_equal(result, np.eye(2))
@@ -80,14 +83,9 @@ class TestCorrelationTracker:
         """Given sufficient price data, correlation matrix should be symmetric with 1s on diagonal."""
         symbols = ["AAPL", "MSFT", "NVDA"]
         returns = _make_returns(symbols, n_days=50)
-        prices = (1 + returns).cumprod() * 100
 
-        mock_data = MagicMock()
-        mock_data.__getitem__ = lambda self, key: prices
-        mock_data.empty = False
-
-        with patch("yfinance.download", return_value=mock_data):
-            result = tracker = po.CorrelationTracker()
+        with patch("alpaca_data.fetch_bars", side_effect=_fake_fetch_bars(returns)):
+            tracker = po.CorrelationTracker()
             corr = tracker.update(symbols)
 
         assert corr.shape == (3, 3)
@@ -95,7 +93,7 @@ class TestCorrelationTracker:
         np.testing.assert_allclose(corr, corr.T, atol=1e-6)
 
     def test_update_uses_cache_within_interval(self):
-        """A second call within 30 min should NOT re-fetch from yfinance."""
+        """A second call within 30 min should NOT re-fetch from Alpaca."""
         import time
 
         symbols = ["AAPL", "MSFT"]
@@ -105,9 +103,9 @@ class TestCorrelationTracker:
         tracker.symbols_cached = symbols[:]
         tracker.last_update = time.time()  # just set
 
-        with patch("yfinance.download") as mock_dl:
+        with patch("alpaca_data.fetch_bars") as mock_fb:
             result = tracker.update(symbols)
-            mock_dl.assert_not_called()
+            mock_fb.assert_not_called()
 
         np.testing.assert_array_equal(result, np.eye(2))
 
@@ -238,13 +236,9 @@ class TestPortfolioVaR:
         var_calc = self._make_var_instance()
         symbols = ["AAPL", "MSFT"]
         returns = _make_returns(symbols, n_days=50)
-        prices = (1 + returns).cumprod() * 100
-
-        mock_data = MagicMock()
-        mock_data.__getitem__ = lambda self, key: prices
 
         portfolio = {"AAPL": (10, 150.0), "MSFT": (5, 200.0)}
-        with patch("yfinance.download", return_value=mock_data):
+        with patch("alpaca_data.fetch_bars", side_effect=_fake_fetch_bars(returns)):
             result = var_calc.historical_var(portfolio, symbols)
 
         # VaR >= 0 (it's a loss amount, not negative)
@@ -254,7 +248,7 @@ class TestPortfolioVaR:
     def test_historical_var_empty_data_returns_zero(self):
         """Insufficient data should return 0.0 gracefully."""
         var_calc = self._make_var_instance()
-        with patch("yfinance.download", return_value=pd.DataFrame()):
+        with patch("alpaca_data.fetch_bars", return_value=None):
             result = var_calc.historical_var({"AAPL": (10, 150.0)}, ["AAPL"])
         assert result == 0.0
 
@@ -263,13 +257,9 @@ class TestPortfolioVaR:
         var_calc = self._make_var_instance()
         symbols = ["AAPL", "MSFT"]
         returns = _make_returns(symbols, n_days=60)
-        prices = (1 + returns).cumprod() * 100
-
-        mock_data = MagicMock()
-        mock_data.__getitem__ = lambda self, key: prices
 
         portfolio = {"AAPL": (10, 150.0), "MSFT": (5, 200.0)}
-        with patch("yfinance.download", return_value=mock_data):
+        with patch("alpaca_data.fetch_bars", side_effect=_fake_fetch_bars(returns)):
             hvar = var_calc.historical_var(portfolio, symbols)
             cvar = var_calc.conditional_var(portfolio, symbols)
 
@@ -397,9 +387,9 @@ class TestPortfolioOptimizer:
             "MSFT": {"qty": 5, "current": 300.0},
         }
 
-        # Patch all internal yfinance calls to avoid network
+        # Patch all internal Alpaca calls to avoid network
         with (
-            patch("yfinance.download", return_value=pd.DataFrame()),
+            patch("alpaca_data.fetch_bars", return_value=None),
             patch.object(opt.sector_monitor, "check_concentration", return_value=[]),
             patch.object(opt.correlation_tracker, "update", return_value=np.eye(2)),
             patch.object(opt.risk_parity, "_calculate_volatility", return_value=0.20),
@@ -418,19 +408,19 @@ class TestModuleLevelFunctions:
     def test_get_optimal_size_returns_numeric(self):
         """Module-level get_optimal_size should return a number."""
         portfolio = {"AAPL": {"qty": 5, "current": 170.0}}
-        with patch("yfinance.download", return_value=pd.DataFrame()):
+        with patch("alpaca_data.fetch_bars", return_value=None):
             result = po.get_optimal_size("MSFT", 50, portfolio, 100000)
         assert isinstance(result, (int, float))
 
     def test_check_portfolio_risk_returns_something(self):
         """Module-level check_portfolio_risk should not crash."""
         portfolio = {"AAPL": {"qty": 10, "current": 170.0}}
-        with patch("yfinance.download", return_value=pd.DataFrame()):
+        with patch("alpaca_data.fetch_bars", return_value=None):
             result = po.check_portfolio_risk(portfolio, "RANGING")
         assert result is not None
 
     def test_suggest_rebalance_returns_list(self):
         """Module-level suggest_rebalance should return a list."""
-        with patch("yfinance.download", return_value=pd.DataFrame()):
+        with patch("alpaca_data.fetch_bars", return_value=None):
             result = po.suggest_rebalance({})
         assert isinstance(result, list)

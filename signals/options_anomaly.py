@@ -1,6 +1,9 @@
 """
 Options Anomaly Detector
 ========================
+NON-PRODUCTION RESEARCH TOOL — standalone script only. Not imported by any
+production runtime module. yfinance fallback retained as research-only path.
+
 Scans the options chain of M&A candidate tickers for unusual activity that
 often precedes acquisition announcements:
 

@@ -1,6 +1,9 @@
 """
 M&A Target Fundamental Screen
 ==============================
+NON-PRODUCTION RESEARCH TOOL — standalone script only. Not imported by any
+production runtime module. yfinance fallback retained as research-only path.
+
 Screens a broad stock universe for companies that exhibit classic acquisition-
 target characteristics: low EV/Revenue, net-cash balance sheet, meaningful
 revenue growth, and a market cap in the "acquisition sweet spot".

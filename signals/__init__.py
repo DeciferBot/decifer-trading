@@ -32,7 +32,6 @@ from datetime import UTC, datetime
 import numpy as np
 import pandas as pd
 import requests as _requests
-import yfinance as yf
 
 try:
     import talib
@@ -91,8 +90,6 @@ def _get_catalyst_lookup() -> dict[str, float]:
         log.warning("[signals][_get_catalyst_lookup] failed to load catalyst file: %s", e, exc_info=True)
         return {}
 
-
-# yfinance now requires its own curl_cffi session — do not pass requests.Session.
 
 # ── REGIME SIGNAL ROUTER ─────────────────────────────────────────────────────
 
@@ -620,7 +617,7 @@ def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown", hmm_r
 # IBKR reqHistoricalData is thread-safe — no shared global state.
 # ThreadPoolExecutor replaces ProcessPoolExecutor, eliminating:
 #   - OS process spawn overhead (was 30–60s per scan, now ~5–10s)
-#   - yfinance cross-symbol data contamination risk
+#   - cross-symbol data contamination risk
 #   - multiprocessing fork issues on some platforms
 # 5m bar fetches go to Alpaca; 1d/1wk bars are pre-fetched in 2 batch calls
 # by fetch_bars_batch() before the executor runs, then served from the in-cycle
@@ -648,15 +645,12 @@ def _fetch_one_thread(args):
 
 log = logging.getLogger("decifer.signals")
 
-# Suppress noisy yfinance warnings (ETF fundamentals 404s, Invalid Crumb 401s)
-logging.getLogger("yfinance").setLevel(logging.CRITICAL)
-
 # ── Module-level caches for new alpha dimensions ─────────────────────────────
 # These live in the worker process memory (multiprocessing). TTL is enforced by
 # checking time.time() against the cache timestamp.
 import time as _cache_time
 
-_PEAD_CACHE: dict = {}  # symbol → (earnings_df, timestamp)
+_PEAD_CACHE: dict = {}  # symbol → (history, timestamp)
 _SHORT_FLOAT_CACHE: dict = {}  # symbol → (short_float_pct, timestamp)
 _ANALYST_REVISION_CACHE: dict = {}  # symbol → ((score, dir), timestamp)
 _INSIDER_BUYING_CACHE: dict = {}  # symbol → ((score, dir), timestamp)
@@ -673,11 +667,8 @@ def _safe_download(symbol: str, **kwargs) -> pd.DataFrame | None:
     Priority:
       1. Alpaca REST  — SIP consolidated tape, 10k req/min, split-adjusted.
                         Primary source for all timeframes.
-      2. yfinance     — Emergency fallback only (Alpaca keys not set or API
-                        unreachable). Retained because it covers market-closed
-                        periods where Alpaca may return no recent bars.
 
-    yfinance is NOT the primary source. Do not promote it.
+    Returns None if Alpaca is unavailable or returns no data. Fail closed.
     """
     interval = kwargs.get("interval", "1d")
     period = kwargs.get("period", "60d")
@@ -692,18 +683,6 @@ def _safe_download(symbol: str, **kwargs) -> pd.DataFrame | None:
     except Exception:
         pass
 
-    # ── Layer 2: yfinance (emergency fallback) ─────────────────────────────
-    # Uses Ticker.history() — thread-safe in yfinance 1.2.0+ unlike yf.download()
-    kwargs.pop("progress", None)
-    for attempt in range(3):
-        try:
-            df = yf.Ticker(symbol).history(**kwargs)
-            if df is not None and len(df) > 0:
-                return df
-        except Exception:
-            pass
-        if attempt < 2:
-            _time.sleep(1)
     return None
 
 
@@ -715,14 +694,14 @@ def normalize_bars(df: pd.DataFrame) -> pd.DataFrame:
                     index: DatetimeIndex
 
     Handles:
-    - yfinance: already capitalised, may have multi-level columns
+    - Alpaca: already capitalised, may have multi-level columns
     - IBKR (ib_insync BarData): lowercase open/high/low/close/volume
     - Any provider with single or multi-level column names
     """
     if df is None or df.empty:
         return df
 
-    # Flatten multi-level columns (yfinance sometimes returns ('Close','AAPL'))
+    # Flatten multi-level columns (some providers return ('Close','AAPL'))
     if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
         df = df.copy()
         df.columns = df.columns.get_level_values(0)
@@ -940,7 +919,7 @@ def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins", duration: s
 
 
 def _flatten_columns(df):
-    """Flatten multi-level columns from yfinance (e.g. ('Close','AAPL') → 'Close').
+    """Flatten multi-level columns from older data sources (e.g. ('Close','AAPL') → 'Close').
     Also deduplicates columns to prevent squeeze() returning DataFrames."""
     if df is not None and hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
         df.columns = df.columns.get_level_values(0)
@@ -956,17 +935,15 @@ def fetch_multi_timeframe(
     Fetch data across 3 timeframes for confluence scoring.
     Weekly → Daily → 5-minute
 
-    5m bars: IBKR reqHistoricalData (primary, thread-safe, no auth issues).
-             Falls back to yfinance if ib is None or IBKR call fails.
-    1d/1w bars: yfinance (stable, no thread-safety issues at daily frequency).
+    5m bars: IBKR streaming (primary) + Alpaca REST (fallback).
+    1d/1w bars: Alpaca REST (daily and weekly bars).
 
     Returns None if insufficient data.
     """
     try:
-        # 5-minute bars — three-layer priority:
-        #   1. Alpaca bar cache  (event-driven WebSocket, freshest — market hours)
+        # 5-minute bars — two-layer priority:
+        #   1. IBKR streaming    (event-driven, freshest — market hours)
         #   2. Alpaca REST       (historical, no pacing constraints)
-        #   3. yfinance fallback (Alpaca unavailable)
         df_5m = None
 
         # Layer 0: IBKR streaming (real-time, lowest latency — market hours only)
@@ -1003,12 +980,6 @@ def fetch_multi_timeframe(
                     log.debug(f"fetch_multi_timeframe: {symbol} 5m from Alpaca REST ({len(df_5m)} bars)")
             except Exception:
                 pass
-
-        # Layer 3: yfinance fallback
-        if df_5m is None or len(df_5m) < 5:
-            df_5m = normalize_bars(
-                _flatten_columns(_safe_download(symbol, period="5d", interval="5m", progress=False, auto_adjust=True))
-            )
 
         # Daily (trend confirmation) — cached 20 min; only fetched fresh once per session.
         df_1d = _get_cached_bars(
@@ -1886,20 +1857,20 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
     try:
         now = _cache_time.time()
         if symbol in _PEAD_CACHE:
-            cached_df, cached_ts = _PEAD_CACHE[symbol]
+            cached_history, cached_ts = _PEAD_CACHE[symbol]
             if now - cached_ts < _PEAD_CACHE_TTL:
-                earnings_df = cached_df
+                history = cached_history
             else:
-                earnings_df = None
+                history = None
         else:
-            earnings_df = None
+            history = None
 
-        if earnings_df is None:
+        if history is None:
             # ── AV earnings calendar pre-filter ──────────────────────────────
             # Alpha Vantage returns upcoming earnings dates (next 3 months).
             # If AV has NO upcoming entry for this symbol it means the next
             # earnings is > 3 months away, so the last earnings are also > 3
-            # months ago — outside the 60-day PEAD window.  Skip the yfinance
+            # months ago — outside the 60-day PEAD window.  Skip the FMP
             # call entirely and return early (saves one HTTP round-trip).
             try:
                 from alpha_vantage_client import get_earnings_calendar as _av_cal
@@ -1910,54 +1881,39 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
                     _PEAD_CACHE[symbol] = (None, now)
                     return (0, 0)
             except Exception:
-                pass  # AV unavailable — fall through to yfinance
+                pass  # AV unavailable — fall through to FMP
 
             try:
-                ticker = yf.Ticker(symbol)
-                earnings_df = ticker.get_earnings_dates(limit=8)
-                _PEAD_CACHE[symbol] = (earnings_df, now)
+                from fmp_client import get_earnings_surprise_history as _fmp_surprise
+                history = _fmp_surprise(symbol)
+                _PEAD_CACHE[symbol] = (history, now)
             except Exception:
                 return (0, 0)
 
-        if earnings_df is None or len(earnings_df) == 0:
+        if not history:
             return (0, 0)
 
-        # Find most recent past earnings with a known surprise
+        # Find most recent past earnings with a non-trivial surprise
         today = pd.Timestamp.now(tz="UTC").normalize()
-        surprise_col = None
-        for col in earnings_df.columns:
-            if "surprise" in col.lower() or "Surprise" in col:
-                surprise_col = col
-                break
-        if surprise_col is None:
+        today_str = pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d")
+        past = [h for h in history if h["date"] <= today_str and h.get("surprise_pct") is not None]
+        if not past:
             return (0, 0)
 
-        past = earnings_df[earnings_df.index <= today].dropna(subset=[surprise_col])
-        if len(past) == 0:
-            return (0, 0)
-
-        latest = past.iloc[0]  # Most recent (index is sorted descending)
-        raw_surprise = latest[surprise_col]
-
-        # yfinance occasionally returns non-numeric values (strings, None, NaN
-        # variants) that survive dropna.  Guard explicitly before using.
-        if raw_surprise is None or (hasattr(raw_surprise, "__float__") is False and not isinstance(raw_surprise, (int, float))):
-            return (0, 0)
-        try:
-            surprise_pct = float(raw_surprise)
-        except (TypeError, ValueError):
-            return (0, 0)
-        if pd.isna(surprise_pct):
+        latest = past[0]  # Newest first
+        surprise_pct = latest["surprise_pct"]
+        if not isinstance(surprise_pct, (int, float)) or pd.isna(surprise_pct):
             return (0, 0)
 
         if surprise_pct < 3.0:  # Below noise threshold
             return (0, 0)
 
         # Recency decay (linear: 1.0 at day 0 → 0.0 at day 60)
-        earnings_date = latest.name
-        if hasattr(earnings_date, "tz_localize") and earnings_date.tzinfo is None:
-            earnings_date = earnings_date.tz_localize("UTC")
-        days_since = (today - earnings_date).days
+        try:
+            earnings_date = pd.Timestamp(latest["date"], tz="UTC")
+            days_since = (today - earnings_date).days
+        except Exception:
+            return (0, 0)
         if days_since > 60 or days_since < 0:
             return (0, 0)
         decay = max(0.0, 1.0 - (days_since / 60.0))

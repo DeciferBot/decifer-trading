@@ -957,6 +957,7 @@ canvas{display:block;width:100% !important}
       <!-- Column 2: Themes for selected force -->
       <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden">
         <div class="col-title">Themes</div>
+        <div id="vt-force-summary" style="display:none;padding:10px 10px 8px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;font-size:10px;line-height:1.45"></div>
         <div id="vt-themes" style="overflow-y:auto;flex:1;padding:6px">
           <div style="font-size:10px;color:var(--muted2);padding:8px">Select a market force.</div>
         </div>
@@ -3122,9 +3123,14 @@ const _SYMBOL_DICT = {
 };
 
 const _ROLE_LABELS = {
-  direct_beneficiary:        { label: 'Direct', color: 'var(--green)',   bg: 'rgba(0,200,100,0.1)' },
-  second_order_beneficiary:  { label: '2nd Order', color: 'var(--orange)', bg: 'rgba(255,160,0,0.1)' },
-  etf_proxy:                 { label: 'ETF Proxy', color: 'var(--muted2)', bg: 'rgba(255,255,255,0.06)' },
+  direct_beneficiary:        { label: 'Direct',       color: 'var(--green)',   bg: 'rgba(0,200,100,0.10)', tip: 'Revenue or earnings tied directly to the active market force.' },
+  indirect_beneficiary:      { label: 'Indirect',     color: 'var(--orange)', bg: 'rgba(255,160,0,0.09)', tip: 'Benefits through a supply-chain or downstream relationship.' },
+  second_order_beneficiary:  { label: '2nd Order',    color: '#c80',           bg: 'rgba(200,128,0,0.09)', tip: 'Transmission mechanism is multiple steps removed from the force.' },
+  speculative_beneficiary:   { label: 'Speculative',  color: '#f77',           bg: 'rgba(255,100,100,0.08)', tip: 'Thesis depends on future growth or outcomes not yet in earnings.' },
+  defensive_exposure:        { label: 'Defensive',    color: '#4dabf7',        bg: 'rgba(74,171,247,0.08)', tip: 'Included for portfolio protection in risk-off or uncertain regimes.' },
+  etf_proxy:                 { label: 'ETF Proxy',    color: 'var(--muted2)', bg: 'rgba(255,255,255,0.06)', tip: 'Diversified sector ETF — indirect exposure across the whole theme.' },
+  watchlist_only:            { label: 'Watchlist',    color: 'var(--muted2)', bg: 'rgba(255,255,255,0.04)', tip: 'Relevant but not yet ready for action — awaiting confirmation.' },
+  pressure_candidate:        { label: 'Headwind',     color: '#f77',           bg: 'rgba(255,100,100,0.06)', tip: 'Under pressure from an active headwind force. Watchlist only.' },
 };
 
 const _ROUTE_LABELS = {
@@ -3150,11 +3156,33 @@ const _RISK_DETAIL = {
   semiconductor_cycle:         { meaning: 'Semiconductor demand follows inventory and capex cycles.', effect: 'Down-cycle timing risk — earnings can fall sharply.', effectType: 'reduces_confidence', whatHelps: 'Inventory normalisation evidence and end-demand recovery.' },
 };
 
+// ── Theme dormant context — explains why a theme is dormant and what would activate it ──
+const _THEME_DORMANT_CTX = {
+  software_cloud:           { why: 'Growth multiples compress when yields rise — this theme needs falling rates to activate.', activates: 'IEF rising (yields falling); risk-on rotation confirmed.' },
+  cybersecurity:            { why: 'No geopolitical escalation catalyst currently active.', activates: 'Geopolitical escalation, major breach event, or defence sector leadership.' },
+  mega_cap_platforms:       { why: 'Requires yield tailwind or strong risk-on rotation to expand multiples.', activates: 'Yields falling or broad risk-on rotation.' },
+  consumer_discretionary:   { why: 'Needs confirmed risk-on rotation; consumer spending signals not yet strong enough.', activates: 'Risk-on rotation with VIX declining and SPY breadth expanding.' },
+  travel_leisure:           { why: 'Oil supply shock creates a cost headwind that keeps this theme dormant.', activates: 'Oil price normalising; USO returning to 60-day average.' },
+  defensive_healthcare:     { why: 'Risk-off not active — defensive sectors underperform in risk-on environments.', activates: 'Risk-off rotation or VIX spike above threshold.' },
+  biotech:                  { why: 'Needs falling yields to activate (long-duration growth sector).', activates: 'IEF rising (yields falling) or credit stress easing.' },
+  regional_banks:           { why: 'Credit stress must ease for regional bank thesis to strengthen.', activates: 'HYG/LQD spreads tightening; credit stress easing signal.' },
+  infrastructure_reshoring: { why: 'Requires sustained commodity demand and industrial activity signals.', activates: 'Copper demand rising; AI infrastructure spending broadening.' },
+  gold_precious_metals:     { why: 'Gold safe-haven bid not currently active — risk-on environment reduces demand.', activates: 'Gold safe-haven bid or risk-off rotation confirmed.' },
+  copper_electrification:   { why: 'Structural theme that requires macro broadening beyond current AI focus.', activates: 'Infrastructure spending signals or commodities rotation.' },
+  reits:                    { why: 'REITs are rate-sensitive; need yield decline to see multiple expansion.', activates: 'Yields falling confirmed; IEF price rising.' },
+  reits_falling_yield:      { why: 'This headwind activates only when yields are rising — opposite of current state.', activates: 'Yields rising (IEF declining below key level).' },
+  small_cap_basket:         { why: 'Small caps need broader risk-on and credit easing beyond current conditions.', activates: 'Small-cap risk-on signal; IWM outperforming SPY.' },
+  utilities:                { why: 'Requires power demand catalyst beyond AI narrative to activate as standalone theme.', activates: 'Data-centre power demand; AI buildout broadening to grid infrastructure.' },
+  energy_transition:        { why: 'Oil supply shock creates cost headwind; transition stocks hurt by commodity inflation.', activates: 'Oil price stabilising; clean-energy policy signals.' },
+  banks:                    { why: 'Needs credit stress easing and curve normalisation for earnings rerating.', activates: 'HYG spreads tightening; yield curve steepening.' },
+  consumer_staples:         { why: 'Defensive — outperforms in risk-off only; underperforms in current risk-on environment.', activates: 'Risk-off rotation; VIX spike; defensive sector leadership.' },
+};
+
 function _getUniScoreBand(pct) {
-  if (pct >= 80) return { label: 'High Conviction', color: 'var(--green)' };
-  if (pct >= 65) return { label: 'Strong Watchlist', color: '#4fd' };
-  if (pct >= 50) return { label: 'Developing', color: 'var(--orange)' };
-  return { label: 'Low Confidence', color: 'var(--muted2)' };
+  if (pct >= 80) return { label: 'High Conviction', color: 'var(--green)',   tip: 'Trade-ready if entry setup confirms. Structural support strong.' };
+  if (pct >= 65) return { label: 'Strong Watchlist', color: '#4fd',           tip: 'Strong setup. Watch for entry confirmation before acting.' };
+  if (pct >= 50) return { label: 'Developing Setup', color: 'var(--orange)', tip: 'Thesis developing. Monitor only — not ready for action.' };
+  return               { label: 'Low Confidence',   color: 'var(--muted2)', tip: 'Low evidence. Avoid unless conditions improve significantly.' };
 }
 
 function _getReadiness(pct, route) {
@@ -3176,11 +3204,15 @@ function _shortThesis(c) {
 }
 
 function _buildUniDetail(c, rowId) {
-  const sym     = c.symbol || '?';
-  const risks   = c.risk_flags || [];
-  const confs   = (c.confirmation_required || []);
-  const driver  = c.driver ? _driverLabel(c.driver) : '';
+  const sym      = c.symbol || '?';
+  const risks    = c.risk_flags || [];
+  const confs    = (c.confirmation_required || []);
+  const driver   = c.driver ? _driverLabel(c.driver) : '';
   const fullNote = c.reason_to_care || c.reason || '';
+  const pct      = Math.round((c.confidence || 0) * 100);
+  const band     = _getUniScoreBand(pct);
+  const route    = (c.route_hint || [])[0] || '';
+  const routeInf = _ROUTE_LABELS[route] || {};
 
   const riskRows = risks.map(r => {
     const info = _RISK_DETAIL[r] || { meaning: _riskLabel(r), effect: 'Monitor for impact.', effectType: 'warns', whatHelps: '' };
@@ -3198,15 +3230,33 @@ function _buildUniDetail(c, rowId) {
   }).join('');
 
   const confirmList = confs.length
-    ? `<div style="font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin:10px 0 5px">Confirmation required</div>
-       <ul style="margin:0;padding-left:14px">${confs.map(cc => `<li style="font-size:9px;color:var(--muted2);padding:1px 0;line-height:1.45">${esc(cc.replace(/_/g,' '))}</li>`).join('')}</ul>` : '';
+    ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05)">
+         <div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">What confirms the thesis</div>
+         <ul style="margin:0;padding-left:14px">${confs.map(cc => `<li style="font-size:9px;color:var(--muted2);padding:1.5px 0;line-height:1.5">${esc(cc.replace(/_/g,' '))}</li>`).join('')}</ul>
+       </div>` : '';
+
+  const weakensList = risks.length
+    ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05)">
+         <div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">What weakens the thesis</div>
+         <ul style="margin:0;padding-left:14px">${risks.slice(0,3).map(r => {
+           const info = _RISK_DETAIL[r];
+           return `<li style="font-size:9px;color:var(--muted2);padding:1.5px 0;line-height:1.5">${esc(info ? info.whatHelps ? `If ${info.whatHelps.toLowerCase()} fails` : info.meaning : _riskLabel(r))}</li>`;
+         }).join('')}</ul>
+       </div>` : '';
+
+  const scoreExplain = `<div style="margin-top:10px;padding:7px 10px;background:${band.color}0a;border:1px solid ${band.color}25;border-radius:4px;font-size:9px;color:var(--muted2);line-height:1.45">
+    <span style="color:${band.color};font-weight:600">${pct} — ${esc(band.label)}:</span> ${esc(band.tip)}
+    ${routeInf.label ? `<span style="margin-left:6px;color:var(--muted)">Trade mode: ${esc(routeInf.label)} — ${esc(routeInf.desc)}</span>` : ''}
+  </div>`;
 
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px 0 4px">
     <div>
       <div style="font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Why selected</div>
       <div style="font-size:10px;color:var(--text);line-height:1.55">${esc(fullNote)}</div>
       ${driver ? `<div style="font-size:9px;color:var(--muted2);margin-top:6px">↳ Activated by: <span style="color:var(--green)">${esc(driver)}</span></div>` : ''}
+      ${scoreExplain}
       ${confirmList}
+      ${weakensList}
     </div>
     <div>
       ${risks.length
@@ -3312,7 +3362,7 @@ function _renderIntelPage() {
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:7px">
             <span style="font-size:8px;padding:1px 7px;border-radius:9px;background:rgba(255,255,255,0.06);color:var(--muted2);white-space:nowrap">${esc(theme)}</span>
-            <span style="font-size:8px;padding:1px 7px;border-radius:9px;background:${role.bg};border:1px solid ${role.color}44;color:${role.color};white-space:nowrap">${esc(role.label)}</span>
+            <span style="font-size:8px;padding:1px 7px;border-radius:9px;background:${role.bg};border:1px solid ${role.color}44;color:${role.color};white-space:nowrap" title="${esc(role.tip||'')}">${esc(role.label)}</span>
             ${routeInf.label ? `<span style="font-size:8px;padding:1px 7px;border-radius:9px;background:${routeInf.color}12;border:1px solid ${routeInf.color}35;color:${routeInf.color};font-weight:600;white-space:nowrap" title="${esc(routeInf.desc)}">${esc(routeInf.label)}</span>` : ''}
           </div>
         </div>
@@ -3326,7 +3376,7 @@ function _renderIntelPage() {
         </div>
         <!-- RIGHT: score + action -->
         <div style="padding-left:12px;border-left:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between">
-          <div style="text-align:right">
+          <div style="text-align:right" title="${esc(band.tip||band.label)}">
             <div style="font-size:22px;font-weight:700;color:${band.color};font-family:'Syne',sans-serif;line-height:1">${pct}</div>
             <div style="font-size:8px;color:${band.color};opacity:0.75;margin-top:1px">${esc(band.label)}</div>
           </div>
@@ -3678,6 +3728,12 @@ function _renderMarketForcesCards(drivers, evidence, blocked, themes, candidates
     else if (isBlocked) { badge='BLOCKED'; col='var(--orange)'; cls='fc fc-block'; }
     else                { badge='DORMANT'; col='var(--muted)';  cls='fc fc-off'; }
 
+    // Dormant: show what the system is watching for
+    const dormantWatch = (!isActive && !isBlocked && detail.whatToWatch)
+      ? `<div style="font-size:9px;color:var(--muted);background:rgba(255,255,255,0.03);border-radius:4px;padding:6px 8px;margin-bottom:8px;line-height:1.45;border:1px solid rgba(255,255,255,0.05)">
+           <span style="opacity:0.6">○ Watching for:</span> ${esc(detail.whatToWatch)}
+         </div>` : '';
+
     const cardId = 'fc-' + id.replace(/_/g,'-');
     return `<div class="${cls}" id="${cardId}" onclick="_toggleForceCard('${id}')">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
@@ -3686,13 +3742,12 @@ function _renderMarketForcesCards(drivers, evidence, blocked, themes, candidates
       </div>
       <div style="font-size:10px;color:var(--muted2);line-height:1.5;margin-bottom:8px">${esc(detail.meaning||'No description available.')}</div>
       ${evText
-        ? `<div style="font-size:9px;color:${isActive?'var(--green)':'var(--muted2)'};background:${isActive?'rgba(0,200,100,0.06)':'rgba(255,255,255,0.03)'};border-radius:4px;padding:6px 8px;margin-bottom:8px;line-height:1.45"><span style="opacity:0.7">${isActive?'● Confirmed:':'○ Not triggered:'}</span> ${esc(evText)}</div>`
-        : ''}
+        ? `<div style="font-size:9px;color:${isActive?'var(--green)':'var(--muted2)'};background:${isActive?'rgba(0,200,100,0.06)':'rgba(255,255,255,0.03)'};border-radius:4px;padding:6px 8px;margin-bottom:8px;line-height:1.45;border:1px solid ${isActive?'rgba(0,200,100,0.18)':'rgba(255,255,255,0.05)'}"><span style="opacity:0.7">${isActive?'● Evidence:':'○ Not triggered:'}</span> ${esc(evText)}</div>`
+        : dormantWatch}
       ${themeChips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">${themeChips}</div>` : ''}
-      <div id="${cardId}-exp" style="display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;display:none">
-        ${detail.whatToWatch ? `<div style="margin-bottom:8px"><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px">What to watch</div><div style="font-size:10px;color:var(--muted2);line-height:1.4">${esc(detail.whatToWatch)}</div></div>` : ''}
+      <div id="${cardId}-exp" style="display:none;border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;margin-top:8px">
         ${detail.invalidation ? `<div style="margin-bottom:8px"><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Invalidation triggers</div><div style="font-size:10px;color:var(--muted2);line-height:1.4">${esc(detail.invalidation)}</div></div>` : ''}
-        ${forceCands.length ? `<div><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Symbols in this force (${forceCands.length})</div><div style="display:flex;flex-wrap:wrap;gap:4px">${forceCands.slice(0,10).map(c=>`<span style="font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--text)">${esc(c.symbol)}</span>`).join('')}${forceCands.length>10?`<span style="font-size:9px;color:var(--muted2)">+${forceCands.length-10}</span>`:''}</div></div>` : ''}
+        ${forceCands.length ? `<div style="margin-top:4px"><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Symbols in this force (${forceCands.length})</div><div style="display:flex;flex-wrap:wrap;gap:4px">${forceCands.slice(0,12).map(c=>`<span style="font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--text)">${esc(c.symbol)}</span>`).join('')}${forceCands.length>12?`<span style="font-size:9px;color:var(--muted2)">+${forceCands.length-12}</span>`:''}</div></div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -3777,9 +3832,20 @@ function _buildThemeCard(t, candidates, dim) {
          <div style="height:100%;width:${conf}%;background:${sc};opacity:0.7;border-radius:1px"></div>
        </div>` : '';
 
-  return `<div style="background:var(--bg2);border:1px solid ${dim?'rgba(255,255,255,0.05)':sc+'40'};border-radius:6px;padding:12px;${dim?'opacity:0.55':''}">
+  const themeId   = t.theme_id || t.name || '';
+  const dormCtx   = _THEME_DORMANT_CTX[themeId];
+  const isDormant = dim || state === 'dormant' || state === 'invalidated';
+  const dormantBlock = (state === 'dormant' || state === 'invalidated') && dormCtx
+    ? `<div style="margin-top:8px;padding:7px 9px;background:rgba(255,255,255,0.02);border-radius:4px;border:1px solid rgba(255,255,255,0.06)">
+         <div style="font-size:8px;color:var(--muted);margin-bottom:3px">Why dormant</div>
+         <div style="font-size:9px;color:var(--muted2);line-height:1.45;margin-bottom:5px">${esc(dormCtx.why)}</div>
+         <div style="font-size:8px;color:var(--muted);margin-bottom:2px">Activates when</div>
+         <div style="font-size:9px;color:var(--muted2);line-height:1.45">${esc(dormCtx.activates)}</div>
+       </div>` : '';
+
+  return `<div style="background:var(--bg2);border:1px solid ${isDormant?'rgba(255,255,255,0.05)':sc+'40'};border-radius:6px;padding:12px;${isDormant?'opacity:0.55':''}">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:4px">
-      <div style="font-size:12px;font-weight:700;color:${dim?'var(--muted2)':'var(--text)'};line-height:1.2">${esc(name)}</div>
+      <div style="font-size:12px;font-weight:700;color:${isDormant?'var(--muted2)':'var(--text)'};line-height:1.2">${esc(name)}</div>
       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
         ${dirTag ? `<span style="font-size:8px;color:${dirColor}">${dirTag}</span>` : ''}
         <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${sc}1a;border:1px solid ${sc}40;color:${sc};font-family:'JetBrains Mono',monospace">${sl}</span>
@@ -3789,7 +3855,8 @@ function _buildThemeCard(t, candidates, dim) {
     ${cands != null && cands > 0 ? `<div style="font-size:9px;color:var(--muted2);margin-bottom:5px">${cands} candidate${cands!==1?'s':''} in universe</div>` : ''}
     ${byChips ? `<div style="margin-bottom:5px"><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Activated by</div><div style="display:flex;flex-wrap:wrap;gap:3px">${byChips}</div></div>` : ''}
     ${symChips ? `<div style="margin-bottom:5px"><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Symbols</div><div style="display:flex;flex-wrap:wrap;gap:3px">${symChips}</div></div>` : ''}
-    ${riskChips ? `<div><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Risks</div><div style="display:flex;flex-wrap:wrap;gap:3px">${riskChips}</div></div>` : ''}
+    ${riskChips ? `<div style="margin-bottom:${dormantBlock?'0':'4px'}"><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Risks</div><div style="display:flex;flex-wrap:wrap;gap:3px">${riskChips}</div></div>` : ''}
+    ${dormantBlock}
   </div>`;
 }
 
@@ -3839,6 +3906,27 @@ function _vtClickForce(forceId) {
   const allThemes = forceThemes.concat(extraItems);
 
   if (!themesEl) return;
+
+  // Show force summary above theme list
+  const forceDetail = _FORCE_DETAIL[forceId] || {};
+  const forceName   = _driverLabel(forceId);
+  const forceActive = window._vtData.drivers.includes(forceId);
+  const evText      = (window._vtData.evidence || {})[forceId + '_reason'] || '';
+  const forceSummaryEl = document.getElementById('vt-force-summary');
+  if (forceSummaryEl) {
+    const col = forceActive ? 'var(--green)' : 'var(--muted2)';
+    const badge = forceActive ? 'ACTIVE' : window._vtData.blocked.includes(forceId) ? 'BLOCKED' : 'DORMANT';
+    forceSummaryEl.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:7px">
+        ${esc(forceName)}
+        <span style="font-size:7px;padding:1px 6px;border-radius:2px;background:${col}18;border:1px solid ${col}44;color:${col};font-family:'JetBrains Mono',monospace">${badge}</span>
+      </div>
+      <div style="font-size:9px;color:var(--muted2);line-height:1.45;margin-bottom:${evText?'6px':'0'}">${esc(forceDetail.meaning||'')}</div>
+      ${evText ? `<div style="font-size:9px;color:${forceActive?'var(--green)':'var(--muted2)'};line-height:1.4">${forceActive?'● ':'○ '}${esc(evText)}</div>` : ''}
+      ${forceDetail.whatToWatch && !forceActive ? `<div style="font-size:9px;color:var(--muted);margin-top:4px">Watching: ${esc(forceDetail.whatToWatch)}</div>` : ''}`;
+    forceSummaryEl.style.display = 'block';
+  }
+
   if (!allThemes.length) {
     themesEl.innerHTML = '<div style="font-size:10px;color:var(--muted2);padding:8px">No themes linked to this force.</div>';
     return;

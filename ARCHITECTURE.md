@@ -7,7 +7,7 @@
 
 ## System Overview
 
-Decifer is an autonomous trading system built on Interactive Brokers (paper account), using Claude AI for signal analysis, with a free data stack (yfinance, TradingView Screener, Yahoo RSS, Finviz).
+Decifer is an autonomous trading system built on Interactive Brokers (paper account), using Claude AI for signal analysis, with Alpaca (primary market data), FMP (fundamentals/events), and Alpha Vantage (macro) as paid data sources.
 
 **Three actors in the development process:**
 
@@ -240,9 +240,8 @@ Chief Decifer lives in a **separate repo** (not in the main decifer-trading repo
 
 ## Known Constraints
 
-- **Free data only**: yfinance (thread-unsafe, rate-limited), TradingView Screener, Yahoo RSS, Finviz
 - **Paper account only**: IBKR paper (DUP...) for all trading, never live
-- **yfinance issues**: thread-safety bugs, data contamination between tickers, crumb failures
+- **yfinance removed (v4.31.1)**: not approved for runtime. Production modules fail closed to Alpaca/FMP. Guard test: `tests/test_no_yfinance_runtime.py`.
 - **TA-Lib dependency**: requires system-level C library (`brew install ta-lib`)
 
 ---

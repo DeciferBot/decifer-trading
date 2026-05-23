@@ -52,7 +52,6 @@ from config import CONFIG
 # ── Logging ───────────────────────────────────────────────────────────────────
 colorama_init()
 
-logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Rotating file handler — 50MB per file, keep 10 backups (500MB ceiling).
@@ -488,7 +487,7 @@ def main():
 
     # ── IBKR streaming data manager ───────────────────────────────────────────
     # Provides real-time quotes + 5s→1m→5m bar aggregation via the live IB connection.
-    # signals.py reads from this before falling back to Alpaca / yfinance.
+    # signals.py reads from this before falling back to Alpaca REST.
     try:
         from ibkr_streaming import IBKRDataManager
 

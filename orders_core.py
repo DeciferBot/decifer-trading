@@ -273,7 +273,7 @@ def execute_buy(
 ) -> bool:
     """
     Place a buy order with full OCO bracket.
-    Entry: Limit order at IBKR real-time price (yfinance price is only a fallback)
+    Entry: Limit order at IBKR real-time price; Alpaca price used when IBKR unavailable.
     Stop loss: Stop order (placed immediately)
     Take profit: Limit order (placed immediately)
     Returns True if order placed successfully.
@@ -463,8 +463,8 @@ def execute_buy(
         ib.qualifyContracts(contract)
 
         # ── GET REAL-TIME IBKR PRICE — this is the execution price ──
-        # yfinance is for scanning/scoring only; IBKR is source of truth for orders
-        yf_price = price  # save original for logging
+        # Alpaca is for scanning/scoring; IBKR is source of truth for orders
+        yf_price = price  # save original for logging (variable name retained)
         ibkr_price = _get_ibkr_price(ib, contract, fallback=0)
         ibkr_bid, ibkr_ask = _get_ibkr_bid_ask(ib, contract)
 
@@ -475,7 +475,7 @@ def execute_buy(
         if ibkr_price > 0:
             prices["IBKR"] = ibkr_price
         if yf_price > 0:
-            prices["yfinance"] = yf_price
+            prices["Alpaca"] = yf_price
 
         if not prices:
             log.error(f"No price data available for {symbol} from any source — aborting")
@@ -496,7 +496,7 @@ def execute_buy(
                     return False
 
         # Use the HIGHEST price from sources that agree within 10%.
-        # IBKR delayed data can be 15 min stale — yfinance/TV are more current.
+        # IBKR delayed data can be 15 min stale — Alpaca is more current.
         # Bidding at the highest confirmed price ensures the limit order can fill.
         best_price = max(price_vals)
         price = best_price
@@ -1536,7 +1536,7 @@ def execute_short(
         if ibkr_price > 0:
             prices["IBKR"] = ibkr_price
         if yf_price > 0:
-            prices["yfinance"] = yf_price
+            prices["Alpaca"] = yf_price
 
         if not prices:
             log.error(f"No price data for {symbol} — aborting short")
