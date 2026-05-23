@@ -56,6 +56,10 @@ cfg_mod.CONFIG = {
     "trade_log": "/tmp/test_trades.json",
     "order_log": "/tmp/test_orders.json",
     "ORDER_DUPLICATE_CHECK_ENABLED": False,
+    "agents_required_to_agree": 3,              # legacy field read by bot_state at import
+    "atr_stop_multiplier": 1.0,                 # stop = entry - (multiplier × ATR)
+    "min_reward_risk_ratio": 1.5,               # minimum R:R gate in execute_buy/short
+    "enable_active_opportunity_universe_handoff": True,
 }
 sys.modules.setdefault("config", cfg_mod)
 
