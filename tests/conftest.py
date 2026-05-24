@@ -474,6 +474,31 @@ def _redirect_training_store(tmp_path, monkeypatch):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _enable_paper_execution_for_tests(monkeypatch):
+    """
+    Patch runtime_config to simulate paper_execution mode for all tests.
+
+    Why: the Sprint 4.40 execution guard (assert_execution_allowed) fires at the
+    top of execute_buy / execute_short / execute_sell / execute_buy_option /
+    execute_sell_option / flatten_all.  Without this fixture every test that
+    exercises an execution path would see local_dev mode and return False early.
+
+    tests/test_intelligence_execution_separation.py tests the guard itself — those
+    tests reload runtime_config with their own env overrides via importlib.reload(),
+    so this fixture does not interfere with them (each reload re-derives module
+    state from os.environ, and monkeypatch restores attrs at teardown).
+    """
+    try:
+        import runtime_config
+
+        monkeypatch.setattr(runtime_config, "runtime_mode", "paper_execution")
+        monkeypatch.setattr(runtime_config, "execution_enabled", True)
+    except Exception:
+        pass
+    yield
+
+
 @pytest.fixture
 def config():
     """Return the Decifer CONFIG dict for signal tests."""

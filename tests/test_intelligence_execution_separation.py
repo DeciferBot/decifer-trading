@@ -17,6 +17,7 @@ import importlib
 import os
 import sys
 import types
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -237,7 +238,7 @@ class TestSaaSIntelligenceOutput:
             plain_english_summary="Markets are rising.",
             key_drivers=["AI capex expanding"],
             active_themes=["ai_compute_infrastructure"],
-            freshness_timestamp="2026-05-24T00:00:00+00:00",
+            freshness_timestamp=datetime.now(UTC).isoformat(),
             confidence_label="High",
         )
         self.validate(p.to_dict())  # must not raise
