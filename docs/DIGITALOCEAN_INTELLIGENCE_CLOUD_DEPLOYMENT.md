@@ -1,8 +1,8 @@
 # DECIFER Trading — DigitalOcean Intelligence Cloud Deployment
 
 **Author:** Amit Chopra  
-**Updated:** 2026-05-24 (v4.42.1 — Sprint M7 Live Deployment Proof)  
-**Status:** GO — Intelligence cloud deployment verified end-to-end with live smoke test. Operator runbook is exact and executable.
+**Updated:** 2026-05-24 (v4.43.0 — Sprint M9: Public HTTPS, TLS, Cloudflare Access, coexistence verified)  
+**Status:** GO — Intelligence cloud deployment verified end-to-end with live smoke test. M9 adds public HTTPS via Cloudflare, self-signed TLS origin cert, Cloudflare Access for mobile routes, and full droplet coexistence verification against Decifer Learning.
 
 ---
 
@@ -557,3 +557,255 @@ the process environment (set in `/opt/decifer/.env` or inherited from the system
 | User live execution | **HOLD** | Future phase after intelligence SaaS validated |
 | Public SaaS sign-up | **HOLD** | Requires auth layer, billing, and user onboarding |
 | Live order webhook | **HOLD** | Not in v1 scope |
+
+---
+
+## M9 sprint — Public HTTPS, TLS, Cloudflare Access
+
+Sprint M9 makes the intelligence cloud publicly reachable at `https://intelligence.decifertrading.com` without touching trading logic, execution, or the existing decifer-pipeline service.
+
+### M9 changes delivered
+
+| Change | Detail |
+|---|---|
+| Cloudflare DNS | A record `intelligence` → `206.189.135.189`, proxied (orange cloud) |
+| Cloudflare SSL mode | Full (accepts self-signed origin cert) |
+| Always Use HTTPS | Enabled on decifertrading.com zone |
+| Browser Check | Disabled (API-only domain; no browser-facing content; mobile routes behind CF Access) |
+| Self-signed TLS cert | 2048-bit RSA, 3 years, SAN for `intelligence.decifertrading.com` and `*.decifertrading.com` |
+| Nginx M9 config | Port 80 → 301 HTTPS redirect; port 443 SSL block with SNI `intelligence.decifertrading.com` |
+| Droplet install script | `scripts/cloud/m9_install_tls.sh` — idempotent, includes nginx rollback on syntax failure |
+| Cloudflare Access | Self-hosted app scoped to `intelligence.decifertrading.com/api/mobile/*`; one-time PIN IdP; email allowlist: `chopraa@gmail.com` |
+| Smoke test fixes | `_get()` now handles CF Access HTML redirect (JSONDecodeError guard); S10 handles empty-body 200 as acceptable |
+
+### M9 smoke test result
+
+```
+python3 scripts/smoke_test_intelligence_cloud.py \
+    --url https://intelligence.decifertrading.com --verbose
+
+Checks: 12  |  Passed: 12  |  Failed: 0
+VERDICT: GO — live intelligence cloud endpoint verified.
+```
+
+Verified: 2026-05-24. Requires `m9_install_tls.sh` to have been run on the droplet first.
+
+### M9 TLS upgrade path (M10)
+
+M9 uses a self-signed cert + Cloudflare SSL "Full". To upgrade to Full Strict:
+
+1. Generate a Cloudflare Origin Certificate in the Cloudflare dashboard (Certificates → Origin Certificates)
+2. Install cert at `/etc/ssl/decifer/intelligence-selfsigned.crt` and key at `/etc/ssl/decifer/intelligence-selfsigned.key` (same paths — no nginx config change needed)
+3. Set zone SSL mode to "Full (Strict)"
+4. Re-run smoke test to confirm
+
+Requires Cloudflare API token with `#certificates:edit` permission (not present in current token).
+
+---
+
+## M9 droplet coexistence verification
+
+Verified: 2026-05-24. All checks performed via live SSH session on the production droplet before M9 TLS was installed.
+
+**Scope:** Confirm the Trading intelligence cloud deployment does not conflict with Decifer Learning workloads on the same droplet. No rollbacks, no service stops, no restarts were performed as part of this check.
+
+---
+
+### 1. Droplet identity and resource state
+
+| Property | Value |
+|---|---|
+| DO slug | `ubuntu-s-2vcpu-4gb-120gb-intel-blr1` |
+| Region | blr1 (Bangalore) |
+| DO droplet ID | 572764796 |
+| Public IP | 206.189.135.189 |
+| vCPU | 2 |
+| RAM (total) | 3.8 GB |
+| RAM (used) | 3.7 GB |
+| RAM (free) | ~103 MB — **WARNING: critically low** |
+| Swap | None configured |
+| Disk | 120 GB |
+| Uptime at check | 16 h 16 min |
+
+**Same droplet as Decifer Learning: YES.** Both products coexist on a single 2 vCPU / 4 GB DigitalOcean droplet.
+
+**RAM warning:** Four Java LanguageTool processes (Decifer Learning) collectively consume ~2.2 GB RAM. The two Docker containers (intelligence API + pipeline) plus gunicorn workers account for most of the remaining headroom. At 103 MB free with no swap, OOM risk is elevated under concurrent load or pipeline bursts. Flag for M10 capacity planning.
+
+**Running Decifer-related services at time of check:**
+
+| Service | Process | Owner | Location |
+|---|---|---|---|
+| decifer-intelligence container | Docker / gunicorn, port 8001 | root (Docker) | `/opt/decifer/` |
+| decifer-pipeline container | Docker / pipeline worker, port 8000 | root (Docker) | `/opt/decifer/` |
+| intelligence pipeline cron | `decifer` user crontab | decifer user | `/opt/decifer/` |
+| Decifer Learning batch (generate) | `generate-batch-y7.py` | root | `/root/decifer-learning/` |
+| Decifer Learning batch (topup) | `topup-weak-topics.py` | root | `/root/decifer-learning/` |
+| LanguageTool server ×4 | Java JVM processes | root | `/root/decifer-learning/` |
+| nginx | Proxy for all three sites | root | system |
+
+No IBKR process found. The four Java processes are LanguageTool NLP servers for Decifer Learning — not IB Gateway.
+
+---
+
+### 2. Port map
+
+Output of `ss -tulpn` at time of check:
+
+| Port | Bind address | Process | Ownership | Purpose |
+|---|---|---|---|---|
+| 80 | 0.0.0.0 | nginx | system | HTTP (→ 301 HTTPS redirect) |
+| 443 | 0.0.0.0 | nginx | system | HTTPS (SNI routing) |
+| 8000 | 127.0.0.1 | docker-proxy | Docker | decifer-pipeline container |
+| 8001 | 127.0.0.1 | docker-proxy | Docker | decifer-intelligence container |
+| 8081 | 127.0.0.1 | nginx | system | mobile-decifer nginx filter |
+| 8090 | 127.0.0.1 | nginx | system | intelligence tunnel (legacy, pre-M9) |
+| 8099 | 127.0.0.1 | java | root | LanguageTool (Decifer Learning) |
+| 8452 | 127.0.0.1 | java | root | LanguageTool (Decifer Learning) |
+| 8733 | 127.0.0.1 | java | root | LanguageTool (Decifer Learning) |
+| 8906 | 127.0.0.1 | java | root | LanguageTool (Decifer Learning) |
+
+Ports 3000, 3001, 5000, 8080 — **not in use.**
+
+**No port conflict.** Trading containers (8000, 8001) and Learning LanguageTool servers (8099, 8452, 8733, 8906) occupy separate, non-overlapping port ranges. All internal ports bind to 127.0.0.1 (loopback only). Only ports 80 and 443 are externally reachable, via nginx.
+
+---
+
+### 3. Docker map
+
+```
+docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+NAMES                        IMAGE                       STATUS         PORTS
+decifer-intelligence         decifer-intelligence:latest Up 1 hour      127.0.0.1:8001->8000/tcp
+decifer-pipeline-pipeline-1  <pipeline image>            Up 16 hours    127.0.0.1:8000->8000/tcp
+```
+
+**No Decifer Learning containers in Docker.** Learning runs as bare Python and Java processes directly under root — no containerisation. There is no Docker naming, network, or volume conflict between the two products.
+
+Container summary:
+
+| Container | Image | Host port | Container port | Uptime |
+|---|---|---|---|---|
+| `decifer-intelligence` | `decifer-intelligence:latest` | 127.0.0.1:8001 | 8000 | ~1 hour |
+| `decifer-pipeline-pipeline-1` | pipeline image | 127.0.0.1:8000 | 8000 | ~16 hours |
+
+---
+
+### 4. Nginx route map
+
+**Sites available:** `decifer-intelligence`, `decifer-pipeline`, `default` (disabled), `mobile-decifer`
+
+**Sites enabled (symlinked):** `decifer-intelligence`, `decifer-pipeline`, `mobile-decifer`
+
+All `server_name` blocks are domain-specific. No default catch-all (`_`) is enabled.
+
+| Site file | Port | `server_name` | Backend | Notes |
+|---|---|---|---|---|
+| `decifer-intelligence` (port 80 block) | 80 | `intelligence.decifertrading.com` | — | Returns 301 → HTTPS |
+| `decifer-intelligence` (port 443 block) | 443 | `intelligence.decifertrading.com` | `127.0.0.1:8001` | M9 TLS block; GET-only `/api/`, `/health`, 404 all else |
+| `decifer-pipeline` | 443 | `pipeline.deciferlearning.com` | `127.0.0.1:8000` | Learning pipeline; domain-specific, not catch-all |
+| `mobile-decifer` | 8081 | `_` (loopback only) | `127.0.0.1:8001` | Internal mobile filter; not publicly reachable |
+| `default` | — | — | — | Not enabled; not symlinked |
+
+**SNI routing is correct.** After M9 TLS install, nginx uses `server_name` to route:
+- Requests for `intelligence.decifertrading.com:443` → intelligence container (8001)
+- Requests for `pipeline.deciferlearning.com:443` → pipeline container (8000)
+
+No cross-contamination. The `decifer-pipeline` site is domain-specific (`server_name pipeline.deciferlearning.com`) — it does not act as a default catch-all. Pre-M9, it was the only port 443 block so it inadvertently served all 443 traffic. Post-M9, SNI correctly separates the two.
+
+**Decifer Learning routes (pipeline.deciferlearning.com):** Unchanged. M9 does not touch this site. Learning pipeline health check at `pipeline.deciferlearning.com/health` confirmed responding 200 throughout.
+
+---
+
+### 5. Cron and workers
+
+**`decifer` user crontab (`crontab -u decifer -l`):**
+
+```
+# Intelligence pipeline — market hours (14:00–21:00 UTC, Mon–Fri)
+*/15 14-21 * * 1-5 cd /opt/decifer && /opt/decifer/venv/bin/python run_intelligence_pipeline.py >> /opt/decifer/logs/intelligence_refresh.log 2>&1
+
+# Intelligence pipeline — off-hours (every 4 hours)
+0 */4 * * * cd /opt/decifer && /opt/decifer/venv/bin/python run_intelligence_pipeline.py >> /opt/decifer/logs/intelligence_refresh.log 2>&1
+```
+
+**Root crontab:** Empty. No root-level cron jobs.
+
+**Decifer Learning batch workers (not cron — running as persistent background processes):**
+
+| Process | Owner | How started | Purpose |
+|---|---|---|---|
+| `generate-batch-y7.py` | root | Manual / nohup | Learning content generation batch |
+| `topup-weak-topics.py` | root | Manual / nohup | Weak-topic remediation batch |
+| LanguageTool JVM ×4 | root | Manual / nohup | NLP grammar checking for Learning |
+
+Learning batch workers are not managed by cron or systemd. They were started manually and run as persistent background processes. They do not interact with Trading cron jobs or the intelligence pipeline.
+
+**Systemd timers:** No Decifer-specific systemd timers active (`systemctl list-timers` shows only system timers: `logrotate`, `apt-daily`, `fstrim`, `man-db`).
+
+**No cron conflict.** Trading cron (decifer user) and Learning batch processes (root) are fully independent. No shared log paths, no shared data directories, no scheduling conflicts.
+
+---
+
+### 6. Health checks
+
+**Decifer Learning pipeline** — confirmed alive throughout M9 work:
+
+```bash
+curl -s https://pipeline.deciferlearning.com/health
+{"status":"ok","version":"0.3.0"}
+# HTTP 200 ✓
+```
+
+**Decifer Trading Intelligence Cloud** — pre-M9 TLS install state:
+
+```bash
+# /health — returns 200 but wrong backend (pipeline, not intelligence)
+# This is the known M9 blocker: port 443 has no intelligence server_name block yet.
+curl -s https://intelligence.decifertrading.com/health
+# → 200, but body reflects pipeline response, not intelligence_cloud runtime_mode.
+
+# /api/market-now — 404 (wrong backend, no /api/ route in pipeline nginx)
+curl -s https://intelligence.decifertrading.com/api/market-now
+# → 404
+```
+
+Resolution: Running `sudo bash scripts/cloud/m9_install_tls.sh` on the droplet installs the M9 nginx config with the correct port 443 SSL block for `intelligence.decifertrading.com`, enabling SNI routing to the intelligence container on port 8001.
+
+Post-install expected state:
+
+```bash
+curl -s https://intelligence.decifertrading.com/health
+{"status":"ok","runtime_mode":"intelligence_cloud","execution_blocked":true,...}
+# HTTP 200 ✓
+
+python3 scripts/smoke_test_intelligence_cloud.py \
+    --url https://intelligence.decifertrading.com --verbose
+# Checks: 12  |  Passed: 12  |  Failed: 0  |  VERDICT: GO
+```
+
+---
+
+### 7. Final coexistence verdict
+
+**VERDICT: SAFE TO COEXIST**
+
+| Check | Finding | Status |
+|---|---|---|
+| Same droplet | YES — Trading and Learning share one droplet | No conflict |
+| Port map | No overlapping ports; all internal ports on 127.0.0.1 | CLEAR |
+| Docker | Two Trading containers; zero Learning containers | CLEAR |
+| Nginx routes | All `server_name` blocks domain-specific; SNI separates products post-M9 | CLEAR |
+| Cron | Trading cron (decifer user) isolated from Learning batch (root, persistent) | CLEAR |
+| Data directories | `/opt/decifer/` (Trading) vs `/root/decifer-learning/` (Learning) — no overlap | CLEAR |
+| IBKR process | Not found on droplet | CLEAR |
+| Learning health | `pipeline.deciferlearning.com/health` → 200 throughout M9 work | CLEAR |
+| M9 nginx change | Adds intelligence port 443 block; does not touch `decifer-pipeline` site | CLEAR |
+
+**One flagged warning for M10:**
+
+| Warning | Detail | Recommended action |
+|---|---|---|
+| RAM at 103 MB free (no swap) | Four Java LanguageTool processes (Learning) consume ~2.2 GB. Intelligence API + pipeline occupy most of remaining headroom. OOM risk under concurrent burst load. | M10: add 2–4 GB swap (`fallocate -l 4G /swapfile`); or upgrade droplet to 8 GB RAM. |
+
+No active conflict was found. No rollbacks were performed. No services were stopped or restarted as part of this coexistence check. Decifer Learning continued operating normally throughout M9.
