@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0d0d14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Decifer Intelligence</title>
+<title>DECIFER Trading — Market Intelligence</title>
 <style>
 /* ── Reset & base ─────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -499,6 +499,35 @@ body{
 /* ── Dividers ────────────────────────────────────────────────────── */
 .divider{height:1px;background:var(--border);margin:12px 0}
 
+/* ── Disclaimer ──────────────────────────────────────────────────── */
+.disclaimer-block{
+  font-size:11px;color:var(--muted);text-align:center;
+  padding:14px 8px 6px;line-height:1.55;
+  border-top:1px solid var(--border);
+  margin-top:16px;
+}
+.ask-disclaimer{
+  font-size:11px;color:var(--muted);text-align:center;
+  padding:4px 16px 6px;line-height:1.4;
+}
+
+/* ── Tab intro subtitle ─────────────────────────────────────────── */
+.tab-intro{
+  font-size:12px;
+  color:var(--muted);
+  padding:8px 0 10px;
+  line-height:1.5;
+  letter-spacing:0.01em;
+}
+
+/* ── Brand header ────────────────────────────────────────────────── */
+#hdr-brand{display:flex;flex-direction:column;flex-shrink:0}
+#hdr-tagline{
+  font-size:9px;font-weight:500;
+  letter-spacing:0.10em;text-transform:uppercase;
+  color:var(--muted);margin-top:1px;
+}
+
 /* ── Misc utils ──────────────────────────────────────────────────── */
 .text-green{color:var(--green)}
 .text-red{color:var(--red)}
@@ -515,7 +544,10 @@ body{
 
 <!-- ── App header ────────────────────────────────────────────────── -->
 <header id="app-header">
-  <span id="hdr-wordmark">Decifer</span>
+  <div id="hdr-brand">
+    <div id="hdr-wordmark">DECIFER</div>
+    <div id="hdr-tagline">Market Intelligence</div>
+  </div>
   <span id="hdr-mood">—</span>
   <div id="hdr-actions">
     <span id="hdr-time"></span>
@@ -528,30 +560,39 @@ body{
 
   <!-- NOW -->
   <section id="tab-now" class="tab-panel active">
+    <p class="tab-intro">Decifer's live market brief — what's happening and what's driving it.</p>
     <div id="now-content"></div>
+    <div class="disclaimer-block">For informational purposes only. Not financial advice or brokerage services. All insights require your own judgement.</div>
   </section>
 
   <!-- WHY -->
   <section id="tab-why" class="tab-panel">
+    <p class="tab-intro">What's behind today's moves — macro context, active drivers, and themes in motion.</p>
     <div id="why-content"></div>
+    <div class="disclaimer-block">For informational purposes only. Not financial advice or brokerage services. All insights require your own judgement.</div>
   </section>
 
   <!-- ALPHA -->
   <section id="tab-alpha" class="tab-panel">
+    <p class="tab-intro">Names and themes gaining attention from Decifer's analysis.</p>
     <div id="alpha-content"></div>
+    <div class="disclaimer-block">For informational purposes only. Not financial advice or brokerage services. All insights require your own judgement.</div>
   </section>
 
   <!-- PORTFOLIO -->
   <section id="tab-portfolio" class="tab-panel">
+    <p class="tab-intro">Decifer's active positions — entry context, current signal, and what's changed.</p>
     <div id="portfolio-content"></div>
+    <div class="disclaimer-block">For informational purposes only. Not financial advice or brokerage services. All insights require your own judgement.</div>
   </section>
 
   <!-- ASK -->
   <section id="tab-ask" class="tab-panel">
     <div id="ask-suggestions"></div>
     <div id="ask-scroll" role="log" aria-live="polite"></div>
+    <div class="ask-disclaimer">For informational purposes only. Not financial advice or brokerage services.</div>
     <div id="ask-input-row">
-      <input id="ask-input" type="text" placeholder="Ask anything about the market…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <input id="ask-input" type="text" placeholder="Ask Decifer about today's markets…" autocomplete="off" autocorrect="off" spellcheck="false">
       <button id="ask-submit" onclick="submitAsk()" aria-label="Send" disabled>↑</button>
     </div>
   </section>
@@ -735,9 +776,9 @@ async function loadNow() {
 
   const statusDot = mood.is_open ? 'dot-active' : 'dot-idle';
   const watchLabel = d.watching_count > 0
-    ? `Watching <strong>${d.watching_count}</strong> symbols`
-    : 'Building universe…';
-  const scanLabel = d.last_scan ? `· Last scan ${esc(d.last_scan)}` : '';
+    ? `Tracking <strong>${d.watching_count}</strong> names across sectors`
+    : 'Building market picture…';
+  const scanLabel = d.last_scan ? `· Last updated ${esc(d.last_scan)}` : '';
   const posLabel = d.positions_count > 0
     ? `<div class="mt-4"><span class="fw-6 text-accent">${d.positions_count}</span> open position${d.positions_count !== 1 ? 's' : ''}</div>`
     : '';
@@ -759,7 +800,7 @@ async function loadNow() {
 
     ${forcesHtml}
 
-    <div class="section-label">Decifer status</div>
+    <div class="section-label">Status</div>
     <div class="card card-sm">
       <div class="status-row">
         <span class="dot ${statusDot}"></span>
@@ -830,7 +871,7 @@ async function loadWhy() {
           </div>`;
       }).join('');
     if (d.dormant_theme_count > 0) {
-      themesHtml += `<div class="sub-line" style="margin-top:4px;padding:0 2px">${d.dormant_theme_count} additional themes dormant or not yet activated.</div>`;
+      themesHtml += `<div class="sub-line" style="margin-top:4px;padding:0 2px">${d.dormant_theme_count} other themes not currently active.</div>`;
     }
   } else {
     themesHtml = `
@@ -838,12 +879,12 @@ async function loadWhy() {
       <div class="empty-state">
         <div class="empty-icon">○</div>
         <div class="empty-title">No themes active yet</div>
-        <div class="empty-body">The intelligence pipeline hasn't activated any themes for the current session.</div>
+        <div class="empty-body">No market themes are active for this session. Check back once markets are open.</div>
       </div>`;
   }
 
   if (!driversHtml && !readHtml && !themesHtml) {
-    el.innerHTML = errorState('No market context available. Intelligence pipeline may not have run yet.');
+    el.innerHTML = errorState('No market context available yet. Check back once markets are open.');
     return;
   }
 
@@ -862,11 +903,13 @@ async function loadAlpha() {
 
   // Last cycle — Apex entries
   if (d.apex_last_cycle && d.apex_last_cycle.length > 0) {
-    html += `<div class="section-label">Last cycle — what Decifer decided</div>`;
+    html += `<div class="section-label">Latest intelligence</div>`;
     html += d.apex_last_cycle.map(e => {
       const dirClass = e.direction === 'LONG' ? 'dir-long' : 'dir-short';
-      const dirLabel = e.direction === 'LONG' ? '↑ Long' : '↓ Short';
-      const ttLabel = e.trade_type ? `<span class="mood-pill">${esc(e.trade_type.toLowerCase())}</span>` : '';
+      const dirLabel = e.direction === 'LONG' ? '▲ Bullish' : '▼ Bearish';
+      const ttRaw = (e.trade_type || '').toLowerCase();
+      const ttDisplay = ttRaw === 'common' ? 'stock' : ttRaw;
+      const ttLabel = ttDisplay ? `<span class="mood-pill">${esc(ttDisplay)}</span>` : '';
       const convLabel = e.conviction ? `<span class="mood-pill">${esc(e.conviction.toLowerCase())} conviction</span>` : '';
       return `
         <div class="alpha-card apex-card">
@@ -887,7 +930,7 @@ async function loadAlpha() {
 
   // Under review — intelligence candidates
   if (d.under_review && d.under_review.length > 0) {
-    html += `<div class="section-label">Under review (${d.under_review.length})</div>`;
+    html += `<div class="section-label">Names in focus (${d.under_review.length})</div>`;
     html += d.under_review.map(c => {
       const confClass = `badge-${c.confidence || 'low'}`;
       const statusClass = c.entry_status === 'In consideration' ? 'badge-active' : 'badge-neutral';
@@ -916,8 +959,8 @@ async function loadAlpha() {
     html = `
       <div class="empty-state">
         <div class="empty-icon">◈</div>
-        <div class="empty-title">No opportunities in scope</div>
-        <div class="empty-body">The intelligence pipeline hasn't surfaced any candidates for this session. This usually means the market map hasn't activated any themes yet.</div>
+        <div class="empty-title">Nothing in focus right now</div>
+        <div class="empty-body">No names are currently in scope. Check back when markets are open or conditions change.</div>
       </div>`;
   }
 
@@ -961,7 +1004,7 @@ async function loadPortfolio() {
       <div class="empty-state">
         <div class="empty-icon">◧</div>
         <div class="empty-title">No open positions</div>
-        <div class="empty-body">Decifer is not holding any positions right now. Check the Alpha tab to see what's being watched.</div>
+        <div class="empty-body">No positions are currently held. Check the Alpha tab to see what names Decifer is tracking.</div>
       </div>`;
   } else {
     html += `<div class="section-label">Open positions (${positions.length})</div>`;
@@ -971,11 +1014,13 @@ async function loadPortfolio() {
       const pnlText = pnlPct != null ? fmtPct(pnlPct) : '—';
       const dirClass = p.direction === 'SHORT' ? 'dir-short' : 'dir-long';
       const dirLabel = p.direction === 'SHORT' ? '↓ Short' : '↑ Long';
-      const ttLabel = p.trade_type ? `<span class="mood-pill">${esc(p.trade_type.toLowerCase())}</span>` : '';
+      const ttRaw2 = (p.trade_type || '').toLowerCase();
+      const ttDisplay2 = ttRaw2 === 'common' ? 'stock' : ttRaw2;
+      const ttLabel = ttDisplay2 ? `<span class="mood-pill">${esc(ttDisplay2)}</span>` : '';
       const convLabel = p.conviction ? `<span class="mood-pill">${esc(p.conviction.toLowerCase())}</span>` : '';
       const thesisText = p.thesis
         ? `<div class="pos-thesis">${esc(p.thesis)}</div>`
-        : `<div class="pos-thesis text-muted" style="font-style:italic">No thesis recorded for this position.</div>`;
+        : `<div class="pos-thesis text-muted" style="font-style:italic">Entry context not available.</div>`;
       const changeHint = p.change_hint ? `<div class="pos-change-hint">${esc(p.change_hint)}</div>` : '';
 
       return `
@@ -1017,12 +1062,13 @@ async function loadPortfolio() {
 
 // ── ASK tab ────────────────────────────────────────────────────────────────────
 const SUGGEST_QS = [
-  'What is happening in markets right now?',
-  'Why is Decifer not trading?',
-  'What are the biggest risks in the portfolio?',
-  'Which names are closest to entry?',
-  'What changed since yesterday?',
-  'Why was this sector leading today?',
+  'What changed in the market today?',
+  'Explain today\'s market in plain English.',
+  'Which themes are gaining attention?',
+  'What names are in focus and why?',
+  'What risks should I watch today?',
+  'Why is tech leading or lagging?',
+  'What changed since the last update?',
 ];
 
 function initAsk() {

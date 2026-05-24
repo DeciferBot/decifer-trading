@@ -104,8 +104,40 @@ def _session_label(session: str) -> str:
     return _SESSION_LABELS.get(session, session)
 
 
+_THEME_NAMES: dict[str, str] = {
+    "ai_capex_growth":          "AI Capex Cycle",
+    "ai_compute_demand":        "AI Compute Demand",
+    "ai_compute_infrastructure":"AI Infrastructure",
+    "data_centre_power":        "Data Centre Power",
+    "memory_storage":           "Memory & Storage",
+    "semiconductors":           "Semiconductors",
+    "smh_tactical_weakness":    "Chip Sector Under Pressure",
+    "yields_rising":            "Rising Yields",
+    "yields_falling":           "Falling Yields",
+    "risk_on_rotation":         "Risk-On Rotation",
+    "gold_safe_haven_bid":      "Gold Safe-Haven Bid",
+    "gold_precious_metals":     "Gold & Precious Metals",
+    "credit_stress_easing":     "Credit Conditions Easing",
+    "small_cap_risk_on":        "Small-Cap Risk-On",
+    "oil_supply_shock":         "Oil Supply Shock",
+    "geopolitical_risk_rising": "Geopolitical Risk",
+    "software_cloud":           "Software & Cloud",
+    "cybersecurity":            "Cybersecurity",
+    "mega_cap_platforms":       "Mega-Cap Platforms",
+    "consumer_discretionary":   "Consumer Discretionary",
+    "travel_leisure":           "Travel & Leisure",
+    "defensive_healthcare":     "Defensive Healthcare",
+    "biotech":                  "Biotech",
+    "regional_banks":           "Regional Banks",
+    "infrastructure_reshoring": "Infrastructure & Reshoring",
+    "copper_electrification":   "Copper & Electrification",
+    "reits":                    "REITs",
+    "reits_falling_yield":      "REITs — Rate Sensitive",
+}
+
+
 def _theme_name(theme_id: str) -> str:
-    return theme_id.replace("_", " ").title()
+    return _THEME_NAMES.get(theme_id, theme_id.replace("_", " ").title())
 
 
 # Internal → plain-English replacements for Apex-generated free text.
@@ -220,17 +252,17 @@ def _load_pm_by_symbol() -> dict[str, dict]:
 
 def _pm_status_label(action: str, thesis: str) -> str:
     _map = {
-        "THESIS_INTACT":       "Holding — thesis intact",
-        "THESIS_STRENGTHENING": "Holding — thesis strengthening",
-        "INTACT_DEGRADED":     "Holding — monitoring",
-        "THESIS_DECAYING":     "Watching — thesis weakening",
-        "THESIS_BROKEN":       "Exit candidate — thesis broken",
-        "PLAYED_OUT":          "Position complete",
+        "THESIS_INTACT":        "Signal intact",
+        "THESIS_STRENGTHENING": "Signal strengthening",
+        "INTACT_DEGRADED":      "Monitoring",
+        "THESIS_DECAYING":      "Signal weakening — watching closely",
+        "THESIS_BROKEN":        "Reviewing — setup has changed",
+        "PLAYED_OUT":           "Position completed",
     }
     if thesis in _map:
         return _map[thesis]
     if action == "TRIM":
-        return "Trimming position"
+        return "Reducing exposure"
     if action == "FULL_EXIT":
         return "Exiting"
     if action in ("ADD", "DCA"):
@@ -251,7 +283,8 @@ def _shape_position(pos: dict, pm: dict) -> dict:
     pm_status = _pm_status_label(pm.get("action_type", ""), pm.get("thesis_status", ""))
     score_delta = pm.get("score_delta")
     if score_delta is not None and abs(score_delta) >= 5:
-        change_hint = f"Score has moved {score_delta:+.0f} since entry."
+        direction = "strengthened" if score_delta > 0 else "weakened"
+        change_hint = f"Signal has {direction} since entry."
     else:
         change_hint = ""
 
@@ -277,9 +310,8 @@ def _bot_status_label(dash: dict) -> str:
     if session in ("CLOSED", "WEEKEND", "HOLIDAY"):
         return f"Monitoring — {_session_label(session).lower()}"
     if session == "PRE":
-        return "Running pre-market checks"
-    count = int(dash.get("scan_count") or 0)
-    return f"Active — {count} scans this session" if count else "Active"
+        return "Pre-market analysis active"
+    return "Live"
 
 
 # ── Public payload builders ───────────────────────────────────────────────────
@@ -358,8 +390,8 @@ def build_alpha_payload() -> dict:
             conf = c.get("confidence", 0)
             hints = c.get("route_hint") or []
             status = (
-                "In consideration" if ("position" in hints or "swing" in hints)
-                else "Watching"
+                "In focus" if ("position" in hints or "swing" in hints)
+                else "On the radar"
             )
             under_review.append({
                 "symbol": c.get("symbol", ""),
@@ -389,7 +421,7 @@ def build_alpha_payload() -> dict:
         "ts": _now_iso(),
         "under_review": under_review,
         "apex_last_cycle": apex_entries,
-        "blocked_conditions": [],  # TODO: surface blocked reasons from live_driver_state blocked_conditions
+        "blocked_conditions": [],
     }
 
 
