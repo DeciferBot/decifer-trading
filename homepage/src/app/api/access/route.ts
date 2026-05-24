@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "DECIFER Trading <access@decifertrading.com>",
+          from: "DECIFER Trading <onboarding@resend.dev>",
           to: ["chopraa@gmail.com"],
           reply_to: submission.email,
           subject: `DECIFER Trading — Early access request from ${submission.name}`,
