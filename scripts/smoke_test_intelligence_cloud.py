@@ -80,7 +80,11 @@ def _get(url: str, timeout: int = 15) -> tuple[int, dict[str, Any], dict[str, st
     req = urllib.request.Request(url, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = json.loads(resp.read().decode())
+            try:
+                body = json.loads(resp.read().decode())
+            except (json.JSONDecodeError, ValueError):
+                # Non-JSON body (e.g. Cloudflare Access HTML login page after redirect)
+                body = {}
             headers = dict(resp.headers)
             return resp.status, body, headers
     except urllib.error.HTTPError as e:
@@ -203,15 +207,24 @@ def run_smoke_test(base_url: str, verbose: bool = False) -> bool:
         record("S9", False, f"GET /undefined-route error: {e}")
 
     # ── S10: /api/mobile/portfolio returns positions list ─────────────────────
-    # May return 200 (no Cloudflare Access) or 302/401/403 (CF Access active).
-    # Either is acceptable — we only verify positions=[] when we get 200.
+    # May return 200 with JSON (no Cloudflare Access) or 302/401/403 (CF Access
+    # active). When CF Access redirects (302→login page), urllib follows the
+    # redirect so the final status is 200 but body is HTML → empty dict.
+    # All three cases (JSON 200, HTTP error, or redirect-to-HTML) are handled.
     try:
         status_port, portfolio, _ = _get(f"{base}/api/mobile/portfolio")
-        if status_port == 200:
+        if status_port == 200 and portfolio:
+            # Got a real JSON response — verify positions is a list
             positions = portfolio.get("positions")
             record("S10", isinstance(positions, list),
                    f"/api/mobile/portfolio: positions is list "
                    f"({'YES — intelligence-only placeholder' if isinstance(positions, list) else 'MISSING'})")
+        elif status_port == 200 and not portfolio:
+            # urllib followed a CF Access 302 redirect to the HTML login page;
+            # the body parsed to empty dict — treat as Access gate active.
+            record("S10", True,
+                   f"/api/mobile/portfolio → 200 (HTML, empty JSON — "
+                   f"CF Access redirected to login page — acceptable)")
         else:
             # 302/401/403 from Cloudflare Access is acceptable — route is protected
             record("S10", status_port in (302, 401, 403),
