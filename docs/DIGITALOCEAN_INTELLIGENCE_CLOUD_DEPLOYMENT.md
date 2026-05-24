@@ -1,8 +1,8 @@
 # DECIFER Trading — DigitalOcean Intelligence Cloud Deployment
 
 **Author:** Amit Chopra  
-**Updated:** 2026-05-24 (v4.43.0 — Sprint M9: Public HTTPS, TLS, Cloudflare Access, coexistence verified)  
-**Status:** GO — Intelligence cloud deployment verified end-to-end with live smoke test. M9 adds public HTTPS via Cloudflare, self-signed TLS origin cert, Cloudflare Access for mobile routes, and full droplet coexistence verification against Decifer Learning.
+**Updated:** 2026-05-24 (v4.46.0 — Sprint M10: Swap, IC venv, cron hardening)  
+**Status:** GO — Intelligence cloud deployment verified end-to-end. M10 resolves M9 RAM warning: 4 GB swap active, venv created, IC weights running fully, smoke test 12/12.
 
 ---
 
@@ -557,6 +557,117 @@ the process environment (set in `/opt/decifer/.env` or inherited from the system
 | User live execution | **HOLD** | Future phase after intelligence SaaS validated |
 | Public SaaS sign-up | **HOLD** | Requires auth layer, billing, and user onboarding |
 | Live order webhook | **HOLD** | Not in v1 scope |
+
+---
+
+## M10 sprint — Stability Hardening: Swap, IC Venv, Cron
+
+Sprint M10 resolves the two warnings carried forward from M9: (1) critically low RAM with no swap, and (2) IC weight updates silently skipped because system Python lacked `numpy`. No Learning code, services, or deployments were touched.
+
+### M10 changes delivered
+
+| Change | Detail |
+|---|---|
+| 4 GB swapfile | `/swapfile`, mode 600, `mkswap`/`swapon`, persisted in `/etc/fstab` |
+| vm.swappiness=10 | Conservative — kernel prefers RAM, uses swap only under pressure; persisted in `/etc/sysctl.conf` |
+| `/opt/decifer/venv/` | Python venv owned by `decifer` user, created by root, `requirements.intelligence.txt` installed |
+| numpy confirmed | `numpy 2.4.6` present in venv; IC weight computation now runs fully |
+| No ib_async | Confirmed absent from venv; no broker SDK introduced |
+| No yfinance | Confirmed absent from venv |
+| Crontab updated | Both cron entries now use `/opt/decifer/venv/bin/python` instead of system `python3` |
+| Manual pipeline refresh | Run via venv as `decifer` user; IC weights updated, `data_freshness_status: ok` |
+
+### M10 memory before / after
+
+| Metric | Before M10 | After M10 |
+|---|---|---|
+| RAM available | ~100 MB | ~760 MB |
+| Swap | None | 4 GB active (785 MB in use — LanguageTool paged out) |
+| OOM risk | High | Low — 760 MB available headroom |
+
+The swap absorbed ~785 MB of LanguageTool (Decifer Learning) Java heap, releasing RAM for the intelligence API and pipeline.
+
+### M10 cron command (now active)
+
+```
+# Market hours (Mon–Fri 14:30–21:30 UTC)
+*/15 14-21 * * 1-5 cd /opt/decifer && DECIFER_RUNTIME_MODE=intelligence_cloud /opt/decifer/venv/bin/python run_intelligence_pipeline.py >> /opt/decifer/logs/intelligence_refresh.log 2>&1
+
+# Off-hours (every 4 hours)
+0 */4 * * * cd /opt/decifer && DECIFER_RUNTIME_MODE=intelligence_cloud /opt/decifer/venv/bin/python run_intelligence_pipeline.py >> /opt/decifer/logs/intelligence_refresh.log 2>&1
+```
+
+### M10 pipeline run output (via venv, manual)
+
+```
+[1/5] active_drivers=[] mode=no_data_available (market closed — Sunday)
+[2/5] 0 economic candidates
+[3/5] 0/23 themes activated
+[4/5] 68 candidates → data/live/active_opportunity_universe.json, manifest written
+[5/5] IC weights updated (ready_for_live=False, 4 dims above equal weight)
+      trend=0.098 momentum=0.000 squeeze=0.000 flow=0.000 breakout=0.054
+      mtf=0.000 news=0.400 social=0.310 reversion=0.091 iv_skew=0.000
+      pead=0.000 short_squeeze=0.046 overnight_drift=0.000
+      analyst_revision=0.000 insider_buying=0.000
+=== Done ===
+```
+
+IC note: `ready_for_live=False` because only 25 independent trading dates exist (60 required). Weights are advisory-only; live scoring uses `BASELINE_WEIGHTS`. Expected during ramp-up. Not a defect.
+
+### M10 smoke test result
+
+```
+python3 scripts/smoke_test_intelligence_cloud.py \
+    --url https://intelligence.decifertrading.com --verbose
+
+  Checks: 12  |  Passed: 12  |  Failed: 0
+  VERDICT: GO — live intelligence cloud endpoint verified.
+```
+
+### M10 health proof
+
+```
+GET /health
+{
+  "status": "ok",
+  "runtime_mode": "intelligence_cloud",
+  "execution_blocked": true,
+  "data_freshness_status": "ok",
+  "latest_pipeline_artifact_timestamp": "2026-05-24T11:14:07.349077+00:00",
+  "degraded_artifact_warnings": []
+}
+
+GET /api/market-now
+  freshness_timestamp: 2026-05-24T11:14:07Z
+  blocked_fields: NONE
+
+POST /api/market-now → HTTP 403 (nginx limit_except)
+GET /api/kill       → HTTP 404
+GET /api/scan       → HTTP 404
+GET /api/settings   → HTTP 404
+GET /api/state      → HTTP 404
+```
+
+### M10 coexistence proof
+
+```
+pipeline.deciferlearning.com/health → HTTP 200 — Learning unaffected
+nginx -t → syntax is ok
+docker ps → decifer-intelligence (8001), decifer-pipeline (8000) — unchanged
+ss -tulpn → 80/443 nginx, 8000 pipeline, 8001 intelligence, 8081 mobile-filter
+free -h   → 3.8 GiB total | 3.1 GiB used | 760 MiB available
+swapon    → /swapfile 4G, 785.8M used
+```
+
+No Learning services stopped. No Learning files touched. nginx not reloaded (no config change required). Execution blocked confirmed live.
+
+### Remaining risks (M11+)
+
+| Risk | Detail | Recommended action |
+|---|---|---|
+| IC weights advisory-only | `ready_for_live=False` until 60 trading dates. Weights improve automatically as history accumulates. | No action — resolves over time |
+| TLS: self-signed cert + CF "Full" | Upgrade to Cloudflare Origin Certificate + "Full (Strict)" when `#certificates:edit` token permission is added | M11 optional hardening |
+| Single droplet | Trading and Learning still share one box. Isolation improves fault tolerance. | Separate droplet in future if Learning workload grows |
 
 ---
 
