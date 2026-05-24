@@ -155,9 +155,10 @@ export function Footer() {
             }}
           >
             DECIFER Trading provides market intelligence and decision-support context. It does not
-            provide investment advice, trading recommendations, or guaranteed outcomes. All content
-            is for informational purposes only. Past performance in paper-trading environments does
-            not predict future results.
+            provide investment advice, trading recommendations, portfolio management, brokerage,
+            order services, or guaranteed outcomes. All content is for informational purposes only.
+            Past performance in research environments does not predict future results. Legal and
+            regulatory review is required before any commercial launch in any jurisdiction.
           </p>
           <p style={{ fontSize: "0.75rem", color: "var(--text-3)" }}>
             &copy; {new Date().getFullYear()} DECIFER. All rights reserved.

@@ -19,25 +19,47 @@ const INVESTOR_TYPES = [
 export function Access() {
   const [mounted, setMounted] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [investorType, setInvestorType] = useState("");
   const [interest, setInterest] = useState("");
 
   useEffect(() => { setMounted(true); }, []);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError(null);
+    setLoading(true);
+
     const form = e.currentTarget;
     const data = new FormData(form);
-    const name = data.get("name") as string;
-    const email = data.get("email") as string;
-    const investorType = data.get("investor_type") as string;
-    const interest = data.get("interest") as string;
 
-    const body = `Name: ${name}\nInvestor type: ${investorType}\nInterest: ${interest}`;
-    const subject = encodeURIComponent("DECIFER Trading — Early access request");
-    const bodyEncoded = encodeURIComponent(body);
-    window.location.href = `mailto:chopraa@gmail.com?subject=${subject}&body=${bodyEncoded}&from=${encodeURIComponent(email)}`;
-    setSubmitted(true);
+    try {
+      const res = await fetch("/api/access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.get("name"),
+          email: data.get("email"),
+          investor_type: data.get("investor_type"),
+          interest: data.get("interest"),
+          message: data.get("message"),
+          website: data.get("website"), // honeypot
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Something went wrong. Please try again.");
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -94,14 +116,14 @@ export function Access() {
               </svg>
             </div>
             <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-1)", marginBottom: "10px" }}>
-              Request sent.
+              Request received.
             </h3>
             <p style={{ fontSize: "0.9rem", color: "var(--text-2)", lineHeight: 1.65 }}>
-              Your email client should have opened with a draft. We will be in touch.
+              We will review your request and be in touch directly.
             </p>
           </div>
         ) : !mounted ? (
-          <div style={{ height: "480px" }} aria-hidden="true" />
+          <div style={{ height: "560px" }} aria-hidden="true" />
         ) : (
           <form
             onSubmit={handleSubmit}
@@ -113,6 +135,12 @@ export function Access() {
               padding: "36px 32px",
             }}
           >
+            {/* Honeypot — hidden from real users, filled only by bots */}
+            <div style={{ position: "absolute", left: "-9999px", overflow: "hidden" }} aria-hidden="true">
+              <label htmlFor="website">Website</label>
+              <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" />
+            </div>
+
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               <div>
                 <label
@@ -232,22 +260,57 @@ export function Access() {
                 </select>
               </div>
 
+              <div>
+                <label
+                  htmlFor="message"
+                  style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-2)", marginBottom: "8px", letterSpacing: "0.04em", textTransform: "uppercase" }}
+                >
+                  Message <span style={{ fontWeight: 400, color: "var(--text-3)" }}>(optional)</span>
+                </label>
+                <textarea
+                  id="message"
+                  name="message"
+                  rows={3}
+                  placeholder="Anything you would like to add"
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "10px",
+                    color: "var(--text-1)",
+                    fontSize: "14px",
+                    outline: "none",
+                    resize: "vertical",
+                    fontFamily: "inherit",
+                  }}
+                />
+              </div>
+
+              {error && (
+                <p style={{ fontSize: "0.8rem", color: "var(--red)", lineHeight: 1.5, margin: 0 }}>
+                  {error}
+                </p>
+              )}
+
               <button
                 type="submit"
+                disabled={loading}
                 style={{
                   width: "100%",
                   padding: "14px",
-                  background: "var(--orange)",
+                  background: loading ? "var(--border-strong)" : "var(--orange)",
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: "0.95rem",
                   borderRadius: "10px",
                   border: "none",
-                  cursor: "pointer",
+                  cursor: loading ? "not-allowed" : "pointer",
                   marginTop: "4px",
+                  transition: "background 0.15s",
                 }}
               >
-                Request early access
+                {loading ? "Sending..." : "Request early access"}
               </button>
             </div>
 

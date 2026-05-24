@@ -12,6 +12,11 @@ export const metadata: Metadata = {
     "market context",
     "research companion",
   ],
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/apple-touch-icon.svg",
+  },
   openGraph: {
     title: "DECIFER Trading — Market Decision Intelligence",
     description:
