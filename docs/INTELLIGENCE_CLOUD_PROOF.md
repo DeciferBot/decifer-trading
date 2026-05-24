@@ -1,7 +1,7 @@
 # DECIFER Intelligence Cloud — Execution Isolation Proof
 
-**Generated:** 2026-05-24  
-**Sprint:** DigitalOcean Intelligence Cloud Deployment (v4.37.0)  
+**Generated:** 2026-05-24 (updated: DO Intelligence Cloud Deployment sprint)  
+**Sprint:** DigitalOcean Intelligence Cloud Deployment (v4.37.1)  
 **Purpose:** Documented evidence that the intelligence cloud cannot execute trades.
 
 ---
@@ -88,22 +88,22 @@ Run command:
 DECIFER_RUNTIME_MODE=intelligence_cloud python3 scripts/verify_intelligence_cloud_deploy.py
 ```
 
-Expected output (checks E1–E6, P1–P4, R1–R3, B1 — 13 checks total):
+Actual output (verified 2026-05-24, checks E1–E6, P1–P4, R1–R3, B1 — 14 checks):
 ```
 Decifer Intelligence Cloud — Pre-Deploy Verification
-════════════════════════════════════════════════════
-  [PASS] E1: 'execute_buy' correctly raises ExecutionBlockedError
-  [PASS] E2: 'execute_short' correctly raises ExecutionBlockedError
-  [PASS] E3: 'execute_sell' correctly raises ExecutionBlockedError
-  [PASS] E4: 'execute_buy_option' correctly raises ExecutionBlockedError
-  [PASS] E5: 'execute_sell_option' correctly raises ExecutionBlockedError
-  [PASS] E6: 'flatten_all' correctly raises ExecutionBlockedError
-  [PASS] P1: Market Now payload is SaaS-safe
+════════════════════════════════════════════════════════════
+  [PASS] E1: 'execute_buy' correctly raises ExecutionBlockedError: Execution action 'execute_buy' is blocked: runtime_mode=intelligence_cloud.
+  [PASS] E2: 'execute_short' correctly raises ExecutionBlockedError: Execution action 'execute_short' is blocked: runtime_mode=intelligence_cloud.
+  [PASS] E3: 'execute_sell' correctly raises ExecutionBlockedError: Execution action 'execute_sell' is blocked: runtime_mode=intelligence_cloud.
+  [PASS] E4: 'execute_buy_option' correctly raises ExecutionBlockedError: Execution action 'execute_buy_option' is blocked: runtime_mode=intelligence_cloud.
+  [PASS] E5: 'execute_sell_option' correctly raises ExecutionBlockedError: Execution action 'execute_sell_option' is blocked: runtime_mode=intelligence_cloud.
+  [PASS] E6: 'flatten_all' correctly raises ExecutionBlockedError: Execution action 'flatten_all' is blocked: runtime_mode=intelligence_cloud.
+  [PASS] P1: Market Now payload is SaaS-safe (11 fields)
   [PASS] P2: No blocked fields in Market Now payload
   [PASS] P3: Portfolio route returns intelligence-only placeholder
   [PASS] P4: No mutation routes registered (GET-only API confirmed)
-  [PASS] R1: yfinance is absent from requirements.intelligence.txt
-  [PASS] R2: ib_async is absent from requirements.intelligence.txt
+  [PASS] R1: yfinance is absent from requirements.intelligence.txt (active lines)
+  [PASS] R2: ib_async is absent from requirements.intelligence.txt (active lines)
   [PASS] R3: No Railway reference in intelligence cloud files
   [PASS] B1: Layer boundary verifier: PASSED — 0 violations
 
@@ -116,7 +116,10 @@ Decifer Intelligence Cloud — Pre-Deploy Verification
 
 ```bash
 python3 scripts/verify_intelligence_execution_separation.py
-# Expected:
+# Actual output (verified 2026-05-24):
+#   Scanned: 290 Python files
+#   Checked (intelligence + saas_output): 63 modules
+#   Execution modules in registry: 30
 #   PASSED — no layer boundary violations detected.
 ```
 
@@ -124,7 +127,28 @@ python3 scripts/verify_intelligence_execution_separation.py
 
 ```bash
 pytest tests/test_intelligence_execution_separation.py -v
-# Expected: 49 passed
+# Actual output (verified 2026-05-24): 49 passed in 0.54s
+```
+
+### /health endpoint (via test client)
+
+```json
+{
+  "execution_blocked": true,
+  "runtime_mode": "intelligence_cloud",
+  "service": "decifer-intelligence-api",
+  "status": "ok",
+  "ts": "2026-05-24T01:17:51.051208+00:00"
+}
+```
+
+### /api/market-now response keys (verified live)
+
+```
+['active_themes', 'confidence_label', 'data_entitlement_note', 'freshness_timestamp',
+ 'generated_at', 'key_drivers', 'market_regime_label', 'opportunity_explanations',
+ 'plain_english_summary', 'risk_notes', 'source_category_labels', 'status', 'what_to_watch']
+Blocked fields present: NONE
 ```
 
 ---

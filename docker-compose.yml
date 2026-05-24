@@ -146,8 +146,13 @@ services:
   # Never start this profile on the Mac execution node.
   intelligence-api:
     profiles: [intelligence]   # Safety gate: requires --profile intelligence to start
-    build: .
-    image: decifer-trading:latest
+    # Uses the intelligence-only Dockerfile (requirements.intelligence.txt).
+    # No broker libraries (ib_async), no ML training packages.
+    # DECIFER_RUNTIME_MODE=intelligence_cloud is hardcoded in the image ENV.
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.intelligence
+    image: decifer-intelligence:latest
     command: >
       gunicorn intelligence_api:app
       --bind 0.0.0.0:8000

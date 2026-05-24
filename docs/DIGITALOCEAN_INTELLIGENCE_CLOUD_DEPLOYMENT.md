@@ -77,8 +77,9 @@ cp .env.example .env
 ```bash
 cd /opt/decifer
 
-# Build the image (uses existing Dockerfile — includes TA-Lib for pipeline)
-docker compose build
+# Build the intelligence-only image (uses deployment/Dockerfile.intelligence —
+# installs requirements.intelligence.txt only; no ib_async, no broker libs)
+docker compose --profile intelligence build intelligence-api
 
 # Start the intelligence API only (no execution bot, no live-bot)
 docker compose --profile intelligence up -d intelligence-api

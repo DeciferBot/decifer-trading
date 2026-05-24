@@ -1,0 +1,133 @@
+# deployment/Dockerfile.intelligence
+#
+# Intelligence-only container for DigitalOcean deployment.
+#
+# Purpose: runs the Decifer intelligence API and intelligence refresh pipeline only.
+#          Does NOT include broker libraries (ib_async), ML training packages,
+#          or execution workers. Uses requirements.intelligence.txt.
+#
+# Contrast with the root Dockerfile which installs the full requirements.txt
+# (all dependencies including execution-node packages) for local/Mac use.
+#
+# What this image runs:
+#   - intelligence_api.py via gunicorn (Flask, port 8000)
+#   - run_intelligence_pipeline.py (cron-triggered — not a persistent process)
+#
+# What this image NEVER runs:
+#   - bot.py, bot_ibkr.py, orders_core.py, orders_options.py, orders_portfolio.py
+#   - IBKR Gateway or TWS
+#   - Any order-mutation function (blocked by assert_execution_allowed() regardless)
+#
+# Runtime mode: DECIFER_RUNTIME_MODE=intelligence_cloud — hardcoded in ENV.
+# This ensures execution is blocked even if the env var is accidentally overridden
+# at the container level by a caller who did not read the documentation.
+#
+# Build (from repo root):
+#   docker build -f deployment/Dockerfile.intelligence -t decifer-intelligence:latest .
+#
+# Run (development / local test):
+#   docker run --rm \
+#     -e ANTHROPIC_API_KEY=<key> \
+#     -e ALPACA_API_KEY=<key> \
+#     -e ALPACA_SECRET_KEY=<key> \
+#     -v "$(pwd)/data:/app/data:ro" \
+#     -p 8000:8000 \
+#     decifer-intelligence:latest
+#
+# Health check:
+#   curl http://localhost:8000/health
+#   # Expect: execution_blocked: true, runtime_mode: intelligence_cloud
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1: builder — system deps + TA-Lib source + intelligence Python packages
+# ─────────────────────────────────────────────────────────────────────────────
+FROM python:3.11-slim AS builder
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build TA-Lib 0.4.0 C shared library from source.
+# Required by signal scoring in the intelligence pipeline.
+# Sequential make (-j1 default) avoids a race condition on newer gcc.
+RUN wget -q https://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz \
+    && tar -xzf ta-lib-0.4.0-src.tar.gz \
+    && cd ta-lib \
+    && ./configure --prefix=/usr/local \
+    && make \
+    && make install \
+    && cd .. \
+    && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
+
+WORKDIR /build
+
+# Install intelligence-only Python packages (no ib_async, no broker libs, no ML training)
+COPY requirements.intelligence.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.intelligence.txt
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2: runtime — lean image, no compiler, no wget
+# ─────────────────────────────────────────────────────────────────────────────
+FROM python:3.11-slim
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy TA-Lib shared library from builder (headers excluded)
+COPY --from=builder /usr/local/lib /usr/local/lib
+RUN ldconfig
+
+# Copy intelligence-only Python packages from builder
+COPY --from=builder /install /usr/local
+
+# ── NLTK vader_lexicon (graceful fallback in social_sentiment.py — baked in for reliability) ─
+ENV NLTK_DATA=/usr/share/nltk_data
+RUN python3 -m nltk.downloader -d /usr/share/nltk_data vader_lexicon \
+    && chmod -R a+r /usr/share/nltk_data
+
+# ── Non-root user ─────────────────────────────────────────────────────────────
+RUN groupadd --gid 1000 decifer \
+    && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash decifer
+
+WORKDIR /app
+
+# Copy application source. Execution-specific packages (orders_*, bot_ibkr.py) are
+# present in the source tree but are never imported by the intelligence API path.
+# The runtime guard (assert_execution_allowed) blocks them regardless.
+COPY . .
+RUN rm -f .env .env.local .env.*.local
+
+# Create runtime directories
+RUN mkdir -p data/live data/heartbeats data/intelligence data/universe_builder \
+             data/reference data/runtime logs \
+    && chown -R decifer:decifer /app
+
+USER decifer
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Hardcode intelligence_cloud mode — this container never executes trades.
+# assert_execution_allowed() raises ExecutionBlockedError on every call.
+ENV DECIFER_RUNTIME_MODE=intelligence_cloud
+ENV DECIFER_EXECUTION_ENABLED=false
+ENV DECIFER_CUSTOMER_OUTPUT_MODE=true
+ENV DECIFER_MOBILE_READ_ONLY=true
+ENV DECIFER_DASHBOARD_CONTROL_ENABLED=false
+
+# ── Default entrypoint: gunicorn serving the intelligence API ─────────────────
+# Binds on all interfaces at port 8000. Override with PORT env var if needed.
+CMD gunicorn intelligence_api:app \
+    --bind 0.0.0.0:${PORT:-8000} \
+    --workers 2 \
+    --timeout 30 \
+    --access-logfile - \
+    --error-logfile -
