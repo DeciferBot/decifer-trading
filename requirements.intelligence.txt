@@ -1,0 +1,48 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║   <>  DECIFER  —  requirements.intelligence.txt             ║
+# ║   Intelligence Cloud dependencies (DigitalOcean)           ║
+# ╚══════════════════════════════════════════════════════════════╝
+#
+# These packages are sufficient to run:
+#   - intelligence_api.py  (Flask API serving Market Now + mobile endpoints)
+#   - run_intelligence_pipeline.py  (5-stage intelligence refresh)
+#   - market_now_builder.py, mobile_api.py, saas_intelligence_output.py
+#
+# NOT included (execution-node only):
+#   - ib_async           — IBKR broker connection (Mac execution node)
+#   - py_vollib          — options Greeks (Mac execution node)
+#   - pyarrow            — parquet ML storage (Mac execution node)
+#   - scikit-learn       — ML model training (Mac execution node)
+#   - joblib             — ML model loading (Mac execution node)
+#   - yfinance           — REMOVED in v4.31.1; must not be re-introduced
+#
+# System prerequisite (required for TA-Lib Python wheel):
+#   Ubuntu/Debian: apt-get install -y libta-lib-dev
+#   Or build from source — see Dockerfile Stage 1.
+#
+# Install:
+#   pip install -r requirements.intelligence.txt
+
+# ── Web API ─────────────────────────────────────────────────────────────────
+flask>=3.0.0             # Intelligence Cloud HTTP API (intelligence_api.py)
+gunicorn>=21.0.0         # Production WSGI server (multi-worker, no dev server)
+
+# ── LLM / Apex ──────────────────────────────────────────────────────────────
+anthropic>=0.25.0        # Claude API for Apex synthesis calls (market_intelligence.py, apex_orchestrator.py)
+
+# ── Market data providers ────────────────────────────────────────────────────
+alpaca-py>=0.13.0        # Real-time price data for live_driver_resolver.py (read-only, no order placement)
+requests>=2.31.0         # HTTP client for FMP and FRED API calls (fmp_client.py, fred_client.py)
+
+# ── Data processing ──────────────────────────────────────────────────────────
+pandas>=2.0.0            # DataFrames (signals, intelligence pipeline)
+numpy>=1.24.0            # Numerical computation (signal scoring)
+
+# ── Technical analysis ───────────────────────────────────────────────────────
+TA-Lib>=0.4.28           # Technical indicators for signal scoring (requires C library — see Dockerfile)
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0     # .env loading
+nltk>=3.8.1              # VADER sentiment (social_sentiment.py — graceful fallback if missing)
+statsmodels>=0.14.0      # ADF test for REVERSION dimension (signals/__init__.py)
+scipy>=1.11.0            # Statistical tests (ic_calculator.py, alpha_validation.py)

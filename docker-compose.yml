@@ -125,6 +125,57 @@ services:
     # ports:
     #   - "8080:8080"   # bot dashboard
 
+  # ── Intelligence API ────────────────────────────────────────────────────────
+  # Customer-safe intelligence REST API.
+  # Runs on DigitalOcean — NEVER on the Mac execution node.
+  #
+  # DECIFER_RUNTIME_MODE=intelligence_cloud ensures execution is unconditionally
+  # blocked inside the container regardless of any other env var.
+  #
+  # Serves:
+  #   GET /health                 — liveness check
+  #   GET /api/market-now         — SaaS-safe Market Now payload
+  #   GET /api/mobile/now         — operational snapshot (no broker state)
+  #   GET /api/mobile/why         — macro drivers and theme transmission
+  #   GET /api/mobile/alpha       — intelligence candidates, last Apex read
+  #   GET /api/mobile/portfolio   — intelligence-only placeholder
+  #
+  # Start (DigitalOcean):
+  #   docker compose --profile intelligence up -d intelligence-api
+  #
+  # Never start this profile on the Mac execution node.
+  intelligence-api:
+    profiles: [intelligence]   # Safety gate: requires --profile intelligence to start
+    build: .
+    image: decifer-trading:latest
+    command: >
+      gunicorn intelligence_api:app
+      --bind 0.0.0.0:8000
+      --workers 2
+      --timeout 30
+      --access-logfile -
+      --error-logfile -
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - decifer-data:/app/data:ro   # read-only mount — intelligence cloud never writes execution state
+      - ./logs:/app/logs
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DECIFER_RUNTIME_MODE=intelligence_cloud
+      - DECIFER_EXECUTION_ENABLED=false
+      - DECIFER_CUSTOMER_OUTPUT_MODE=true
+      - DECIFER_MOBILE_READ_ONLY=true
+      - DECIFER_DASHBOARD_CONTROL_ENABLED=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
 # ── Named volume ──────────────────────────────────────────────────────────────
 # On first deploy, seed data/ via rsync from dev machine before compose up.
 # Then: chown -R 1000:1000 /opt/decifer/data /opt/decifer/logs

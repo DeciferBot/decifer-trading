@@ -66,6 +66,15 @@ def flatten_all(ib_fallback: IB = None):
     even while the main scanner is mid-scan.
     Uses aggressive LIMIT orders (not market) for extended hours compatibility.
     """
+    try:
+        from runtime_config import assert_execution_allowed, ExecutionBlockedError
+        assert_execution_allowed("flatten_all")
+    except ExecutionBlockedError as _exc:
+        log.error("flatten_all: blocked by runtime guard — %s", _exc)
+        return
+    except ImportError:
+        pass
+
     global _flatten_in_progress
     with _flatten_lock:
         if _flatten_in_progress:

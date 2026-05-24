@@ -167,6 +167,15 @@ def execute_buy_option(
     Entry is a limit order at the mid price.
     Returns True if order placed successfully.
     """
+    try:
+        from runtime_config import assert_execution_allowed, ExecutionBlockedError
+        assert_execution_allowed("execute_buy_option")
+    except ExecutionBlockedError as _exc:
+        log.error("execute_buy_option: blocked by runtime guard — %s", _exc)
+        return False
+    except ImportError:
+        pass
+
     symbol = contract_info["symbol"]
     opt_key = f"{symbol}_{contract_info['right']}_{contract_info['strike']}_{contract_info['expiry_str']}"
 
@@ -390,6 +399,15 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
     opt_key format: SYMBOL_RIGHT_STRIKE_EXPIRY  (e.g. NVDA_C_180_2026-04-01)
     Returns True if order filled.
     """
+    try:
+        from runtime_config import assert_execution_allowed, ExecutionBlockedError
+        assert_execution_allowed("execute_sell_option")
+    except ExecutionBlockedError as _exc:
+        log.error("execute_sell_option %s: blocked by runtime guard — %s", opt_key, _exc)
+        return False
+    except ImportError:
+        pass
+
     # Options only trade during regular market hours (9:30–16:00 ET)
     if not is_options_market_open():
         if opt_key in _option_exit_blacklist:

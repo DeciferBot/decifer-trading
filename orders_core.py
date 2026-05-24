@@ -279,6 +279,15 @@ def execute_buy(
     Returns True if order placed successfully.
     """
     try:
+        from runtime_config import assert_execution_allowed, ExecutionBlockedError
+        assert_execution_allowed("execute_buy")
+    except ExecutionBlockedError as _exc:
+        log.error("execute_buy %s: blocked by runtime guard — %s", symbol, _exc)
+        _block_reason[symbol] = "runtime_mode_block"
+        return False
+    except ImportError:
+        pass
+    try:
         import safety_overlay as _so
         _ok, _reason = _so.can_submit_order("buy")
         if not _ok:
@@ -1394,6 +1403,15 @@ def execute_short(
     Returns True if order placed successfully.
     """
     try:
+        from runtime_config import assert_execution_allowed, ExecutionBlockedError
+        assert_execution_allowed("execute_short")
+    except ExecutionBlockedError as _exc:
+        log.error("execute_short %s: blocked by runtime guard — %s", symbol, _exc)
+        _block_reason[symbol] = "runtime_mode_block"
+        return False
+    except ImportError:
+        pass
+    try:
         import safety_overlay as _so
         _ok, _reason = _so.can_submit_order("short")
         if not _ok:
@@ -2008,6 +2026,14 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
     Close an existing position at market.
     Returns True if order placed.
     """
+    try:
+        from runtime_config import assert_execution_allowed, ExecutionBlockedError
+        assert_execution_allowed("execute_sell")
+    except ExecutionBlockedError as _exc:
+        log.error("execute_sell %s: blocked by runtime guard — %s", symbol, _exc)
+        return False
+    except ImportError:
+        pass
     try:
         import safety_overlay as _so
         _ok, _reason = _so.can_submit_order("sell")
