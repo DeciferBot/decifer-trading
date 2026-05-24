@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -30,6 +31,17 @@ from saas_intelligence_output import SaaSIntelligencePayload, validate_customer_
 log = logging.getLogger("decifer.market_now")
 
 _BASE = os.path.dirname(os.path.abspath(__file__))
+
+# Maximum age (hours) before a key artefact is considered stale and triggers
+# a degraded response. Matches saas_intelligence_output._FRESHNESS_WINDOW_HOURS.
+_ARTIFACT_FRESHNESS_HOURS: float = 6.0
+
+# Key artefacts whose freshness is checked before building the payload.
+# Relative to _BASE. Do not expose these paths in customer-facing output.
+_KEY_ARTIFACTS: tuple[str, ...] = (
+    "data/live/current_manifest.json",
+    "data/intelligence/live_driver_state.json",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +223,40 @@ def _build_source_labels(drivers: list[str], apex_present: bool) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Artefact freshness check
+# ---------------------------------------------------------------------------
+
+def _is_degraded() -> tuple[bool, list[str]]:
+    """
+    Check whether key pipeline artefacts are missing or older than
+    _ARTIFACT_FRESHNESS_HOURS.
+
+    Returns (is_degraded, list_of_plain_english_warnings).
+    Warnings use category labels only — never internal file paths.
+    """
+    _LABELS = {
+        "data/live/current_manifest.json":            "Market pipeline manifest",
+        "data/intelligence/live_driver_state.json":   "Market drivers data",
+    }
+    now = time.time()
+    warnings: list[str] = []
+    for rel in _KEY_ARTIFACTS:
+        label = _LABELS.get(rel, rel.split("/")[-1])
+        path = os.path.join(_BASE, rel)
+        if not os.path.exists(path):
+            warnings.append(f"{label} not available")
+            continue
+        try:
+            age_h = (now - os.path.getmtime(path)) / 3600
+            if age_h > _ARTIFACT_FRESHNESS_HOURS:
+                warnings.append(f"{label} is stale ({age_h:.1f}h old)")
+        except Exception as exc:
+            warnings.append(f"{label} unreadable")
+            log.debug("_is_degraded: %s — %s", rel, exc)
+    return bool(warnings), warnings
+
+
+# ---------------------------------------------------------------------------
 # Public builder
 # ---------------------------------------------------------------------------
 
@@ -219,6 +265,10 @@ def build_market_now() -> SaaSIntelligencePayload:
     Build and return a validated SaaSIntelligencePayload from persisted
     intelligence artefacts.
 
+    If key artefacts are missing or stale, returns a degraded payload with
+    plain-language messaging ("market intelligence temporarily limited") and
+    a fresh timestamp so the customer output remains valid and honest.
+
     Raises SaaSPayloadValidationError if the assembled payload violates
     the customer-safe field allowlist (defensive check — should not happen
     unless saas_intelligence_output.py was modified incorrectly).
@@ -226,6 +276,31 @@ def build_market_now() -> SaaSIntelligencePayload:
     Never calls any broker, never reads execution state, never performs
     live market data requests.
     """
+    degraded, degraded_warnings = _is_degraded()
+    if degraded:
+        log.info("build_market_now: serving degraded payload — %s", "; ".join(degraded_warnings))
+        payload = SaaSIntelligencePayload(
+            market_regime_label="Assessing market conditions",
+            plain_english_summary=(
+                "Market intelligence is temporarily limited. "
+                "Analysis will resume when fresh data becomes available."
+            ),
+            key_drivers=[],
+            active_themes=[],
+            opportunity_explanations=[],
+            risk_notes=[],
+            what_to_watch=["Check back shortly for updated market analysis."],
+            freshness_timestamp=datetime.now(UTC).isoformat(),
+            confidence_label="Insufficient data",
+            source_category_labels=["market_data"],
+            data_entitlement_note=(
+                "Market intelligence powered by Decifer. "
+                "Not financial advice. For informational purposes only."
+            ),
+        )
+        validate_customer_payload(payload.to_dict())
+        return payload
+
     drivers, risk_notes_from_blocked = _load_drivers()
     active_theme_ids, opportunity_explanations = _load_active_themes()
     regime_label, freshness, confidence = _load_manifest_regime()

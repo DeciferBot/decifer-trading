@@ -1,8 +1,8 @@
 # DECIFER Intelligence Cloud — Execution Isolation Proof
 
-**Generated:** 2026-05-24 (updated: DO Intelligence Cloud Deployment sprint)  
-**Sprint:** DigitalOcean Intelligence Cloud Deployment (v4.37.1)  
-**Purpose:** Documented evidence that the intelligence cloud cannot execute trades.
+**Generated:** 2026-05-24 (updated: Sprint M6 Production Hardening, v4.42.0)  
+**Sprint:** Sprint M6 — Intelligence Cloud Production Hardening  
+**Purpose:** Documented evidence that the intelligence cloud cannot execute trades and is hardened for production monitoring and customer-safe access.
 
 ---
 
@@ -130,17 +130,40 @@ pytest tests/test_intelligence_execution_separation.py -v
 # Actual output (verified 2026-05-24): 49 passed in 0.54s
 ```
 
-### /health endpoint (via test client)
+### /health endpoint (via test client — Sprint M6 hardened)
 
 ```json
 {
-  "execution_blocked": true,
-  "runtime_mode": "intelligence_cloud",
-  "service": "decifer-intelligence-api",
   "status": "ok",
-  "ts": "2026-05-24T01:17:51.051208+00:00"
+  "service": "decifer-intelligence-api",
+  "runtime_mode": "intelligence_cloud",
+  "execution_blocked": true,
+  "customer_output_mode": true,
+  "data_freshness_status": "ok",
+  "latest_market_now_timestamp": "2026-05-24T...",
+  "latest_pipeline_artifact_timestamp": "2026-05-24T...",
+  "degraded_artifact_warnings": [],
+  "ts": "2026-05-24T..."
 }
 ```
+
+When artefacts are stale (pipeline not run recently), the response degrades safely:
+
+```json
+{
+  "status": "ok",
+  "data_freshness_status": "stale",
+  "degraded_artifact_warnings": [
+    "Market pipeline manifest is stale (6.6h old)",
+    "Theme activation data is stale (6.6h old)"
+  ],
+  "latest_market_now_timestamp": "2026-05-23T18:54:30Z",
+  "latest_pipeline_artifact_timestamp": "2026-05-24T00:27:48+00:00",
+  ...
+}
+```
+
+No file paths, secrets, broker state, or execution internals are exposed.
 
 ### /api/market-now response keys (verified live)
 
@@ -226,11 +249,56 @@ curl -s http://localhost:8000/health
 
 ---
 
+## Sprint M6 — Production Hardening Verification
+
+### verify_intelligence_cloud_production_hardening.py
+
+Run command:
+```bash
+DECIFER_RUNTIME_MODE=intelligence_cloud \
+DECIFER_CUSTOMER_OUTPUT_MODE=true \
+python3 scripts/verify_intelligence_cloud_production_hardening.py --verbose
+```
+
+Actual output (verified 2026-05-24, 24 checks):
+```
+  [PASS] H1–H7: /health reports all required fields, exposes no secrets
+  [PASS] M1–M2: /api/market-now passes validate_customer_payload, 0 blocked fields
+  [PASS] M3–M4: Degraded payload safe when artefacts missing; plain-language messaging confirmed
+  [PASS] V1: validate_customer_payload rejects execution-like wording in values
+  [PASS] V2: validate_customer_payload rejects broker-like field names
+  [PASS] V3: validate_customer_payload rejects raw internal artefact names in values
+  [PASS] V4: validate_customer_payload rejects missing freshness_timestamp
+  [PASS] V5: validate_customer_payload rejects stale freshness_timestamp (8h old)
+  [PASS] V6: validate_customer_payload rejects empty data_entitlement_note
+  [PASS] E1: execute_buy blocked in intelligence_cloud mode
+  [PASS] E2: No mutation routes registered
+  [PASS] R1–R3: yfinance absent, ib_async absent, no Railway references
+  [PASS] D1: /api/mobile/* documented as requiring Cloudflare Access
+  [PASS] B1: Layer boundary verifier PASSED — 0 violations
+
+  Checks: 24  |  Passed: 24  |  Failed: 0
+
+  VERDICT: GO — Intelligence cloud production hardening verified.
+```
+
+### What was hardened (Sprint M6)
+
+| Component | Before | After |
+|---|---|---|
+| `/health` | 5 fields (status, service, runtime_mode, execution_blocked, ts) | 10 fields — adds customer_output_mode, data_freshness_status, latest_market_now_timestamp, latest_pipeline_artifact_timestamp, degraded_artifact_warnings |
+| `validate_customer_payload()` | 2 rules (blocked fields, allowed fields) | 7 rules — adds broker-like field name check, execution-wording-in-values check, internal-artefact-name check, data_entitlement_note required, freshness_timestamp age check |
+| `market_now_builder` | No degraded path — missing artefacts silently served as empty | Explicit degraded path: stale/missing artefacts → "market intelligence temporarily limited" response with `confidence_label: "Insufficient data"` and fresh timestamp |
+| Verifier script | `verify_intelligence_cloud_deploy.py` (14 checks) | + `verify_intelligence_cloud_production_hardening.py` (24 new checks) |
+
+---
+
 ## Final verdict
 
 | Deployment | Status | Evidence |
 |---|---|---|
 | DigitalOcean intelligence cloud | **GO** | E1–E6 all block, P1–P4 pass, B1 passes, no ib_async, no yfinance, no Railway |
+| Intelligence cloud production hardening | **GO** | M6 verifier: 24/24 checks pass |
 | User broker connection | **HOLD** | Not in v1 scope |
 | User live execution | **HOLD** | Not in v1 scope |
-| Public SaaS intelligence API | **GO** | SaaS-safe validation passes on `/api/market-now` |
+| Public SaaS intelligence API | **GO** | SaaS-safe validation passes, degraded path verified |

@@ -37,8 +37,10 @@ before starting — the import of runtime_config enforces this.
 """
 from __future__ import annotations
 
+import json as _json
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
@@ -60,6 +62,8 @@ log = logging.getLogger("decifer.intelligence_api")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = Flask(__name__)
+
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ---------------------------------------------------------------------------
 # Start-up guard: fail loudly if accidentally started outside intelligence_cloud
@@ -114,21 +118,117 @@ def _strip_broker_fields(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Health freshness helper (Sprint M6)
+# ---------------------------------------------------------------------------
+
+# Thresholds in hours: ≤ ok_hours → "ok", ok_hours < x ≤ stale_hours → "degraded", > stale_hours → "stale"
+_HEALTH_FRESHNESS_OK_HOURS: float = 2.0
+_HEALTH_FRESHNESS_STALE_HOURS: float = 6.0
+
+# Key artefacts tracked for freshness. Labels are exposed in warnings — never expose paths.
+_HEALTH_ARTIFACTS: dict[str, str] = {
+    "Market pipeline manifest":  "data/live/current_manifest.json",
+    "Market drivers data":       "data/intelligence/live_driver_state.json",
+    "Theme activation data":     "data/intelligence/theme_activation.json",
+}
+
+
+def _build_health_freshness() -> dict[str, Any]:
+    """
+    Read artefact timestamps and return freshness fields for /health.
+    Never exposes internal file paths, secrets, broker details, or stack traces.
+    """
+    now = time.time()
+    warnings: list[str] = []
+    ages: list[float] = []
+
+    # latest_pipeline_artifact_timestamp = most recent mtime across tracked artefacts
+    latest_mtime: float | None = None
+    for label, rel in _HEALTH_ARTIFACTS.items():
+        path = os.path.join(_BASE_DIR, rel)
+        if not os.path.exists(path):
+            warnings.append(f"{label} not available")
+            continue
+        try:
+            mt = os.path.getmtime(path)
+            age_h = (now - mt) / 3600
+            ages.append(age_h)
+            if latest_mtime is None or mt > latest_mtime:
+                latest_mtime = mt
+            if age_h > _HEALTH_FRESHNESS_STALE_HOURS:
+                warnings.append(f"{label} is stale ({age_h:.1f}h old)")
+        except Exception:
+            warnings.append(f"{label} timestamp unreadable")
+
+    # latest_market_now_timestamp from manifest published_at (informational)
+    latest_market_now: str = "unknown"
+    try:
+        manifest_path = os.path.join(_BASE_DIR, "data/live/current_manifest.json")
+        if os.path.exists(manifest_path):
+            with open(manifest_path, encoding="utf-8") as f:
+                manifest_data = _json.load(f)
+            pa = manifest_data.get("published_at", "")
+            if pa:
+                latest_market_now = str(pa)
+    except Exception:
+        pass
+
+    # latest_pipeline_artifact_timestamp
+    latest_pipeline: str = "unknown"
+    if latest_mtime is not None:
+        latest_pipeline = datetime.fromtimestamp(latest_mtime, tz=UTC).isoformat()
+
+    # data_freshness_status based on manifest mtime (primary freshness indicator)
+    manifest_path = os.path.join(_BASE_DIR, "data/live/current_manifest.json")
+    if not os.path.exists(manifest_path):
+        freshness_status = "stale"
+    else:
+        try:
+            manifest_age_h = (now - os.path.getmtime(manifest_path)) / 3600
+            if manifest_age_h <= _HEALTH_FRESHNESS_OK_HOURS:
+                freshness_status = "ok"
+            elif manifest_age_h <= _HEALTH_FRESHNESS_STALE_HOURS:
+                freshness_status = "degraded"
+            else:
+                freshness_status = "stale"
+        except Exception:
+            freshness_status = "stale"
+
+    return {
+        "data_freshness_status": freshness_status,
+        "latest_market_now_timestamp": latest_market_now,
+        "latest_pipeline_artifact_timestamp": latest_pipeline,
+        "degraded_artifact_warnings": warnings,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 @app.route("/health")
 def health() -> Response:
     """
-    Liveness check. Returns 200 if the service is running.
-    Also confirms execution is blocked (intelligence_cloud invariant).
+    Liveness and readiness check. Returns 200 if the service is running.
+
+    Reports runtime mode, execution guard state, customer output mode,
+    data freshness status, and artifact timestamps.
+
+    Does not expose secrets, provider keys, broker state, internal file paths,
+    stack traces, or private runtime internals.
     """
     execution_blocked = not runtime_config.is_execution_enabled()
+    freshness = _build_health_freshness()
     return _json_response({
         "status": "ok",
         "service": "decifer-intelligence-api",
         "runtime_mode": _RUNTIME_MODE,
         "execution_blocked": execution_blocked,
+        "customer_output_mode": runtime_config.customer_output_mode,
+        "data_freshness_status": freshness["data_freshness_status"],
+        "latest_market_now_timestamp": freshness["latest_market_now_timestamp"],
+        "latest_pipeline_artifact_timestamp": freshness["latest_pipeline_artifact_timestamp"],
+        "degraded_artifact_warnings": freshness["degraded_artifact_warnings"],
         "ts": _now_iso(),
     })
 

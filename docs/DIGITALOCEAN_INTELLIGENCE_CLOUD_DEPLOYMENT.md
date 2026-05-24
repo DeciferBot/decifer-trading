@@ -1,8 +1,8 @@
 # DECIFER Trading — DigitalOcean Intelligence Cloud Deployment
 
 **Author:** Amit Chopra  
-**Updated:** 2026-05-24 (v4.37.0)  
-**Status:** GO — Cleared for intelligence deployment. Execution remains on Mac.
+**Updated:** 2026-05-24 (v4.42.0 — Sprint M6 Production Hardening)  
+**Status:** GO — Intelligence cloud deployment hardened for production monitoring and customer-safe access.
 
 ---
 
@@ -129,20 +129,65 @@ The pipeline reads Alpaca and FMP (data only — no order placement) and writes 
 
 ---
 
-## Public routes
+## Route access classification
 
 All routes are **GET-only**. No mutation routes exist.
 
-| Route | Method | Access | Description |
+| Route | Method | Access tier | Description |
 |---|---|---|---|
-| `/health` | GET | Internal (DO health checks) | Liveness check, confirms execution blocked |
-| `/api/market-now` | GET | Customer-facing | SaaS-safe Market Now payload |
-| `/api/mobile/now` | GET | Authenticated (Cloudflare Access) | Market snapshot, broker state stripped |
-| `/api/mobile/why` | GET | Authenticated | Macro drivers and theme transmission |
-| `/api/mobile/alpha` | GET | Authenticated | Intelligence candidates, last Apex read |
-| `/api/mobile/portfolio` | GET | Authenticated | Intelligence-only placeholder |
+| `/health` | GET | **Internal only** — DO health checks and operator tooling. Not intended for public exposure. | Liveness and freshness check; confirms execution blocked |
+| `/api/market-now` | GET | **Public SaaS** — SaaS-safe, no broker state, may be publicly accessible. Should still sit behind Cloudflare for rate limiting. | Customer-facing Market Now intelligence payload |
+| `/api/mobile/now` | GET | **Protected — Cloudflare Access required** | Market snapshot, broker state stripped |
+| `/api/mobile/why` | GET | **Protected — Cloudflare Access required** | Macro drivers and theme transmission |
+| `/api/mobile/alpha` | GET | **Protected — Cloudflare Access required** | Intelligence candidates, last Apex read |
+| `/api/mobile/portfolio` | GET | **Protected — Cloudflare Access required** | Intelligence-only placeholder |
+
+### Why the distinction matters
+
+- **`/api/market-now`**: contains no broker state, no positions, no account data, no execution signals. Safe for public exposure. Validated by `saas_intelligence_output.validate_customer_payload()` on every response.
+- **`/api/mobile/*`**: contains richer operational context (candidate counts, bot status, theme data). These must remain behind Cloudflare Access (email OTP or SSO) before any external exposure.
+- **`/health`**: reports artefact freshness timestamps, pipeline state, and runtime flags. Useful for operators but not intended as a public endpoint. Restrict to Cloudflare Access or internal IPs.
+
+### Cloudflare Access wiring for `/api/mobile/*`
+
+```
+1. In the Cloudflare Access dashboard: create an Application for
+   mobile.decifertrading.com or the appropriate subdomain.
+2. Set the path pattern: /api/mobile/*
+3. Add a policy: Allow → email OTP to chopraa@gmail.com (or SSO).
+4. Leave /api/market-now outside the Access Application
+   (or add Cloudflare Rate Limiting only).
+5. Leave /health restricted to DO health-check IP or Cloudflare Tunnel only.
+```
 
 **Admin/private access required for `/api/mobile/*`:** Wire these behind Cloudflare Access (email OTP or SSO) using the same pattern as `mobile.decifertrading.com`. See `deployment/MOBILE_DEPLOYMENT.md`.
+
+### Verification commands for access boundaries
+
+```bash
+# 1. /api/market-now should return 200 without auth (public SaaS route)
+curl -s -o /dev/null -w "%{http_code}" https://<DO_HOST>/api/market-now
+# Expected: 200
+
+# 2. /api/mobile/now should redirect or return 403 without Cloudflare Access auth
+# (Cloudflare Access redirects unauthenticated browsers to its login page —
+#  for curl, it will typically return a 302 or 403 depending on CF Access config)
+curl -s -o /dev/null -w "%{http_code}" https://<DO_HOST>/api/mobile/now
+# Expected: 302 or 403 — NOT 200
+
+# 3. /health should confirm execution_blocked: true
+curl -s https://<DO_HOST>/health | python3 -m json.tool | grep execution_blocked
+# Expected: "execution_blocked": true
+
+# 4. /health should confirm runtime_mode and freshness
+curl -s https://<DO_HOST>/health | python3 -m json.tool
+# Expected keys include: runtime_mode, execution_blocked, customer_output_mode,
+#   data_freshness_status, latest_market_now_timestamp, degraded_artifact_warnings
+
+# 5. No mutation routes should be accessible
+curl -s -o /dev/null -w "%{http_code}" -X POST https://<DO_HOST>/api/market-now
+# Expected: 405 Method Not Allowed
+```
 
 **`/api/market-now` can be public** (no broker state, no positions, no account data) but should still sit behind Cloudflare for rate limiting and DDoS protection.
 
