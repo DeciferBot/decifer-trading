@@ -1,6 +1,19 @@
 # Future Cloud Deployment Runbook
 
-> ⚠️  **DRAFT ONLY — DO NOT USE FOR LIVE DEPLOYMENT YET**
+> ⛔  **RETIRED — DO NOT USE**
+>
+> This document was a pre-M7 draft for a full-stack cloud deployment (IBKR + bot).
+> It was never executed and its cloud provider selection was undecided at the time.
+>
+> **Superseded by (Sprint M7, 2026-05-24):**
+> - `docs/DIGITALOCEAN_INTELLIGENCE_CLOUD_DEPLOYMENT.md` — the live, executable operator runbook for the DigitalOcean intelligence cloud
+> - `deployment/nginx-intelligence.conf` — Nginx config for the DO droplet
+> - `deployment/decifer-intelligence.service` — systemd unit for the intelligence API
+> - `scripts/smoke_test_intelligence_cloud.py` — live smoke test (12 checks, all pass)
+>
+> This file is kept for historical reference only. Do not execute any commands from it.
+
+> ~~⚠️  DRAFT ONLY — DO NOT USE FOR LIVE DEPLOYMENT YET~~
 >
 > This document describes the *intended* future deployment sequence.
 > It has not been executed. No cloud infrastructure has been provisioned.

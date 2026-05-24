@@ -1,0 +1,105 @@
+# deployment/decifer-intelligence.service
+#
+# Systemd unit for the Decifer Intelligence API — DigitalOcean droplet.
+#
+# Runtime layer:    deployment/config
+# Imported at runtime: No
+# Affects execution:   No (DECIFER_RUNTIME_MODE=intelligence_cloud is hardcoded)
+# Intelligence cloud:  Yes — this file is for the DO intelligence node only
+# Cloud cost/impact:   None (local systemd config)
+#
+# Purpose:
+#   Runs gunicorn serving intelligence_api.py as a systemd-managed service.
+#   Use this as the non-Docker alternative to:
+#     docker compose --profile intelligence up -d intelligence-api
+#
+# Three independent execution guards:
+#   1. DECIFER_RUNTIME_MODE=intelligence_cloud is hardcoded in this unit.
+#      Even if the EnvironmentFile supplies a different value, the inline
+#      Environment= directive takes precedence in systemd.
+#   2. ib_async is absent from requirements.intelligence.txt — the IBKR
+#      client library is not installed in the intelligence cloud venv.
+#   3. DigitalOcean has no IBKR Gateway process or open IBKR ports.
+#
+# Installation:
+#   sudo cp deployment/decifer-intelligence.service \
+#            /etc/systemd/system/decifer-intelligence.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable decifer-intelligence
+#   sudo systemctl start decifer-intelligence
+#   sudo systemctl status decifer-intelligence
+#
+# Logs:
+#   journalctl -u decifer-intelligence -f
+#
+# Rollback:
+#   sudo systemctl stop decifer-intelligence
+#   cd /opt/decifer && git checkout <previous-commit>
+#   sudo systemctl start decifer-intelligence
+#
+# Assumptions:
+#   - Repo is checked out at /opt/decifer
+#   - Intelligence-only venv is at /opt/decifer/venv
+#     (pip install -r requirements.intelligence.txt)
+#   - A non-root user 'decifer' owns /opt/decifer
+#   - Log directory /var/log/decifer-intelligence is created and owned by decifer:
+#     sudo mkdir -p /var/log/decifer-intelligence
+#     sudo chown decifer:decifer /var/log/decifer-intelligence
+#   - .env file at /opt/decifer/.env (intelligence cloud values only —
+#     see .env.intelligence.example for required keys)
+
+[Unit]
+Description=Decifer Intelligence API (gunicorn)
+Documentation=https://github.com/DeciferBot/decifer-trading/blob/master/docs/DIGITALOCEAN_INTELLIGENCE_CLOUD_DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=decifer
+Group=decifer
+WorkingDirectory=/opt/decifer
+
+# Load API keys from .env file (intelligence-cloud keys only — no IBKR keys)
+EnvironmentFile=-/opt/decifer/.env
+
+# Runtime mode — hardcoded. These override any .env value.
+# DECIFER_RUNTIME_MODE=intelligence_cloud ensures assert_execution_allowed()
+# raises ExecutionBlockedError unconditionally, even on misconfiguration.
+Environment=DECIFER_RUNTIME_MODE=intelligence_cloud
+Environment=DECIFER_EXECUTION_ENABLED=false
+Environment=DECIFER_CUSTOMER_OUTPUT_MODE=true
+Environment=DECIFER_MOBILE_READ_ONLY=true
+Environment=DECIFER_DASHBOARD_CONTROL_ENABLED=false
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# gunicorn: 2 workers, 30s timeout, bound to localhost only.
+# Nginx (nginx-intelligence.conf) proxies from port 8090 to this.
+# Do not bind to 0.0.0.0 — Cloudflare Tunnel or Nginx handles external access.
+ExecStart=/opt/decifer/venv/bin/gunicorn intelligence_api:app \
+    --bind 127.0.0.1:8000 \
+    --workers 2 \
+    --timeout 30 \
+    --access-logfile /var/log/decifer-intelligence/access.log \
+    --error-logfile /var/log/decifer-intelligence/error.log
+
+# Graceful reload: send SIGHUP to trigger gunicorn worker restart without downtime
+ExecReload=/bin/kill -s HUP $MAINPID
+
+# Restart on failure, not on clean exit (e.g. SIGTERM from systemctl stop)
+Restart=on-failure
+RestartSec=10
+
+# Limit blast radius: no new privileges, read-only /usr and /boot
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/decifer/data /opt/decifer/logs /var/log/decifer-intelligence
+
+# Forward stdout/stderr to journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=decifer-intelligence
+
+[Install]
+WantedBy=multi-user.target

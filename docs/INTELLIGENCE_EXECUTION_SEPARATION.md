@@ -239,5 +239,29 @@ persisted artefacts (JSON files), not a shared runtime.
 
 ---
 
+---
+
+## Glossary
+
+These terms are used consistently across all Decifer deployment docs and code comments.
+Do not use synonyms or abbreviations — ambiguity in this domain creates real risk.
+
+| Term | Definition |
+|---|---|
+| **Intelligence Cloud** | The DigitalOcean deployment of `intelligence_api.py`. Serves market intelligence only. Never connects to IBKR. Never submits orders. Runtime mode: `intelligence_cloud`. |
+| **Execution Runtime** | The Mac paper bot (`bot.py`) connected to IBKR DUP481326. Runtime mode: `paper_execution` with `DECIFER_EXECUTION_ENABLED=true`. Runs independently from Intelligence Cloud. |
+| **Runtime Mode** | The value of `DECIFER_RUNTIME_MODE` env var. One of: `local_dev`, `intelligence_cloud`, `paper_execution`, `full_trading`. Set once at startup via `.env`. Read at `runtime_config.py` import time. |
+| **SaaSIntelligencePayload** | The `dataclass` in `saas_intelligence_output.py` defining the exact 11 fields allowed in a customer-facing intelligence response. All 40+ blocked fields are explicitly enumerated. Validated on every `/api/market-now` response. |
+| **Market Now Builder** | `market_now_builder.py` — reads JSON artefacts from `data/intelligence/` and `data/live/` and assembles a `SaaSIntelligencePayload`. No live API calls. Degrades gracefully if artefacts are stale or missing. |
+| **Customer Intelligence Surface** | The set of GET routes served by `intelligence_api.py`: `/health`, `/api/market-now`, `/api/mobile/*`. No broker state. No positions. No account data. No mutation routes. |
+| **Execution Guard** | The call to `assert_execution_allowed()` at the top of every order-mutation function (`execute_buy`, `execute_short`, `execute_sell`, `execute_buy_option`, `execute_sell_option`, `flatten_all`). Raises `ExecutionBlockedError` unconditionally in `intelligence_cloud` mode. |
+| **Fail-closed** | A system that denies action when in doubt, rather than defaulting to the unsafe option. Intelligence cloud fails closed: missing artefacts → degraded payload (not a crash). Execution blocked on unknown mode → `ExecutionBlockedError` raised (not silently proceeding). |
+| **Public Surface** | Routes safe for unauthenticated public access: `/api/market-now` only. Validated by `saas_intelligence_output.validate_customer_payload()` before every response. |
+| **Admin Surface** | Routes that must never be publicly reachable: `dashboard.decifertrading.com` (bot dashboard, port 8080), `/api/state`, `/api/kill`, `/api/scan`, `/api/settings`, `/api/restart`. Never proxied through the intelligence cloud. |
+| **Broker Boundary** | The point beyond which IBKR connectivity is required. The Intelligence Cloud is entirely above the broker boundary. It never crosses it. The execution node is below the broker boundary. |
+| **DigitalOcean Deployment Boundary** | Intelligence Cloud runs on DigitalOcean. Execution Runtime runs on Mac. These are separate machines with no shared state at runtime. DO has no IBKR port access. Mac has no public intelligence API. |
+
+---
+
 *This document is the authoritative reference for the Intelligence/Execution boundary.
 Update it whenever a new module is created or the runtime topology changes.*
