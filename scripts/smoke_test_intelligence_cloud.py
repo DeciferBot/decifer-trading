@@ -180,11 +180,17 @@ def run_smoke_test(base_url: str, verbose: bool = False) -> bool:
            f"/api/market-now: freshness_timestamp present = "
            f"{'YES' if 'freshness_timestamp' in market_now else 'MISSING'}")
 
-    # ── S8: POST /api/market-now → 405 ────────────────────────────────────────
+    # ── S8: POST /api/market-now → 405 or 403 ────────────────────────────────
+    # Flask returns 405 Method Not Allowed (app-level guard).
+    # Nginx limit_except GET { deny all; } returns 403 Forbidden (proxy-level guard).
+    # Both prove mutation is blocked. 403 is actually stricter — the request
+    # never reaches the app. Accept either as a valid "no mutation" signal.
     try:
         status_post, _ = _post(f"{base}/api/market-now")
-        record("S8", status_post == 405,
-               f"POST /api/market-now → {status_post} (expected 405 Method Not Allowed)")
+        blocked = status_post in (403, 405)
+        record("S8", blocked,
+               f"POST /api/market-now → {status_post} "
+               f"({'mutation blocked at proxy (403) or app (405)' if blocked else 'UNEXPECTED — mutation may be possible'})")
     except RuntimeError as e:
         record("S8", False, f"POST /api/market-now error: {e}")
 
