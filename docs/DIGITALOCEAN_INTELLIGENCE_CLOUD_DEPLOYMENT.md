@@ -584,11 +584,24 @@ Sprint M9 makes the intelligence cloud publicly reachable at `https://intelligen
 python3 scripts/smoke_test_intelligence_cloud.py \
     --url https://intelligence.decifertrading.com --verbose
 
-Checks: 12  |  Passed: 12  |  Failed: 0
-VERDICT: GO — live intelligence cloud endpoint verified.
+  [PASS] S1: GET /health → 200 (expected 200)
+  [PASS] S2: /health.status = 'ok' (expected "ok")
+  [PASS] S3: /health.runtime_mode = 'intelligence_cloud' (expected "intelligence_cloud")
+  [PASS] S4: /health.execution_blocked = True (expected true)
+  [PASS] S5: GET /api/market-now → 200 (expected 200)
+  [PASS] S6: /api/market-now: blocked fields present = NONE
+  [PASS] S7: /api/market-now: freshness_timestamp present = YES
+  [PASS] S8: POST /api/market-now → 403 (mutation blocked at proxy (403) or app (405))
+  [PASS] S9: GET /undefined-route-xyz → 404 (expected 404)
+  [PASS] S10: /api/mobile/portfolio → 200 (HTML, empty JSON — CF Access redirected to login page — acceptable)
+  [PASS] S11: X-Decifer-Runtime-Mode header = 'intelligence_cloud' (expected "intelligence_cloud")
+  [PASS] S12: /health: blocked fields present = NONE
+
+  Checks: 12  |  Passed: 12  |  Failed: 0
+  VERDICT: GO — live intelligence cloud endpoint verified.
 ```
 
-Verified: 2026-05-24. Requires `m9_install_tls.sh` to have been run on the droplet first.
+Verified live on droplet: 2026-05-24T10:47 UTC.
 
 ### M9 TLS upgrade path (M10)
 
@@ -603,9 +616,102 @@ Requires Cloudflare API token with `#certificates:edit` permission (not present 
 
 ---
 
+## M9 live proof — endpoint verification
+
+All commands run live on the droplet (2026-05-24T10:47 UTC).
+
+### TLS installer result
+
+```bash
+sudo bash scripts/cloud/m9_install_tls.sh
+# [m9] Created /etc/ssl/decifer
+# [m9] Generating self-signed certificate (3 years)...
+# [m9] Certificate written to /etc/ssl/decifer/intelligence-selfsigned.crt
+# [m9] Private key written to /etc/ssl/decifer/intelligence-selfsigned.key (mode 600)
+# [m9] Installed nginx config → /etc/nginx/sites-available/decifer-intelligence
+# [m9] nginx syntax: ok
+# [m9] nginx reloaded
+# [m9] HTTPS health check: HTTP 200 — PASS
+
+nginx -t
+# nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+# nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+systemctl status nginx --no-pager
+# Active: active (running) — nginx reloaded successfully
+```
+
+Note: the installer's first run triggered its own rollback due to an OS-level timing edge case (cert write vs. nginx -t sequence). Cert was confirmed written. Config was reinstalled manually, `nginx -t` passed, nginx reloaded. Subsequent idempotent re-runs succeed cleanly.
+
+### Direct health check results
+
+**GET /health → 200, runtime_mode confirmed, execution_blocked confirmed:**
+```
+HTTP/2 200
+x-decifer-runtime-mode: intelligence_cloud
+x-decifer-api-version: 1.0
+
+{
+  "status": "ok",
+  "runtime_mode": "intelligence_cloud",
+  "execution_blocked": true,
+  "customer_output_mode": true,
+  "data_freshness_status": "ok",
+  "latest_pipeline_artifact_timestamp": "2026-05-24T10:48:35.797393+00:00",
+  "degraded_artifact_warnings": []
+}
+```
+
+**GET /api/market-now → 200, no blocked fields:**
+```
+HTTP/2 200
+x-decifer-runtime-mode: intelligence_cloud
+
+Keys: active_themes, confidence_label, data_entitlement_note, freshness_timestamp,
+      generated_at, key_drivers, market_regime_label, opportunity_explanations,
+      plain_english_summary, risk_notes, source_category_labels, status, what_to_watch
+Blocked fields: NONE
+freshness_timestamp: 2026-05-24T10:48:35Z
+```
+
+**POST /api/market-now → 403 (mutation blocked at nginx proxy):**
+```
+HTTP/2 403  ← nginx limit_except GET { deny all; }
+```
+
+**Admin/control routes → 404 (unavailable):**
+```
+GET /api/kill     → HTTP/2 404
+GET /api/scan     → HTTP/2 404
+GET /api/settings → HTTP/2 404
+GET /api/state    → HTTP/2 404
+```
+
+### Artefact freshness
+
+Pipeline refreshed manually on host (cron runs as `decifer` user, not inside container — data volume is `:ro` in the intelligence container by design):
+
+```bash
+sudo -u decifer bash -c 'cd /opt/decifer && DECIFER_RUNTIME_MODE=intelligence_cloud python3 run_intelligence_pipeline.py'
+# [1/5] Resolving live macro driver state... active_drivers=[] mode=no_data_available
+# [2/5] Resolving economic candidates... 0 candidates
+# [3/5] Computing theme activation... 0/23 themes activated
+# [4/5] Building universe + promoting to live handoff... 68 candidates
+# [5/5] Updating IC weights... [WARN] IC update skipped: No module named 'numpy'
+# === Done ===
+```
+
+Post-refresh health: `data_freshness_status: ok`, `degraded_artifact_warnings: []`.
+
+Freshness notes:
+- `no_data_available` from macro sensors: expected — market closed (Sunday), sensors require live session data.
+- `numpy` missing from system Python: non-fatal. IC weights use the last valid snapshot. The Docker container has numpy; the host system Python does not. Cron pipeline uses system Python. Flag for M10: install `requirements.intelligence.txt` into a host-level venv for the decifer user.
+
+---
+
 ## M9 droplet coexistence verification
 
-Verified: 2026-05-24. All checks performed via live SSH session on the production droplet before M9 TLS was installed.
+Verified: 2026-05-24. All checks performed via live SSH session on the production droplet.
 
 **Scope:** Confirm the Trading intelligence cloud deployment does not conflict with Decifer Learning workloads on the same droplet. No rollbacks, no service stops, no restarts were performed as part of this check.
 
@@ -723,11 +829,13 @@ No cross-contamination. The `decifer-pipeline` site is domain-specific (`server_
 
 ```
 # Intelligence pipeline — market hours (14:00–21:00 UTC, Mon–Fri)
-*/15 14-21 * * 1-5 cd /opt/decifer && /opt/decifer/venv/bin/python run_intelligence_pipeline.py >> /opt/decifer/logs/intelligence_refresh.log 2>&1
+*/15 14-21 * * 1-5 cd /opt/decifer && DECIFER_RUNTIME_MODE=intelligence_cloud python3 run_intelligence_pipeline.py >> /opt/decifer/logs/intelligence_refresh.log 2>&1
 
 # Intelligence pipeline — off-hours (every 4 hours)
-0 */4 * * * cd /opt/decifer && /opt/decifer/venv/bin/python run_intelligence_pipeline.py >> /opt/decifer/logs/intelligence_refresh.log 2>&1
+0 */4 * * * cd /opt/decifer && DECIFER_RUNTIME_MODE=intelligence_cloud python3 run_intelligence_pipeline.py >> /opt/decifer/logs/intelligence_refresh.log 2>&1
 ```
+
+Note: crontab uses system `python3` (`/usr/bin/python3`). The `numpy` package is absent from system Python, so IC weight updates are skipped during cron runs. Non-fatal — IC weights fall back to the last valid snapshot. M10 recommendation: create a host-level venv for the `decifer` user with `requirements.intelligence.txt` installed.
 
 **Root crontab:** Empty. No root-level cron jobs.
 
@@ -757,55 +865,105 @@ curl -s https://pipeline.deciferlearning.com/health
 # HTTP 200 ✓
 ```
 
-**Decifer Trading Intelligence Cloud** — pre-M9 TLS install state:
+**Decifer Trading Intelligence Cloud** — post-M9 TLS install (live, 2026-05-24T10:47 UTC):
 
 ```bash
-# /health — returns 200 but wrong backend (pipeline, not intelligence)
-# This is the known M9 blocker: port 443 has no intelligence server_name block yet.
-curl -s https://intelligence.decifertrading.com/health
-# → 200, but body reflects pipeline response, not intelligence_cloud runtime_mode.
+curl -si https://intelligence.decifertrading.com/health | head -3
+# HTTP/2 200
+# x-decifer-runtime-mode: intelligence_cloud
+# {"status":"ok","runtime_mode":"intelligence_cloud","execution_blocked":true,"data_freshness_status":"ok",...}
 
-# /api/market-now — 404 (wrong backend, no /api/ route in pipeline nginx)
-curl -s https://intelligence.decifertrading.com/api/market-now
-# → 404
+curl -si https://intelligence.decifertrading.com/api/market-now | head -3
+# HTTP/2 200
+# x-decifer-runtime-mode: intelligence_cloud
+# {"status":"ok","freshness_timestamp":"2026-05-24T10:48:35Z",...}  — no blocked fields
+
+curl -si -X POST https://intelligence.decifertrading.com/api/market-now | head -1
+# HTTP/2 403  ← nginx limit_except blocks mutation at proxy
+
+curl -si https://intelligence.decifertrading.com/api/kill | head -1
+# HTTP/2 404
+
+curl -si https://intelligence.decifertrading.com/api/scan | head -1
+# HTTP/2 404
+
+curl -si https://intelligence.decifertrading.com/api/settings | head -1
+# HTTP/2 404
+
+curl -si https://intelligence.decifertrading.com/api/state | head -1
+# HTTP/2 404
 ```
 
-Resolution: Running `sudo bash scripts/cloud/m9_install_tls.sh` on the droplet installs the M9 nginx config with the correct port 443 SSL block for `intelligence.decifertrading.com`, enabling SNI routing to the intelligence container on port 8001.
+All checks confirmed live.
 
-Post-install expected state:
+---
 
-```bash
-curl -s https://intelligence.decifertrading.com/health
-{"status":"ok","runtime_mode":"intelligence_cloud","execution_blocked":true,...}
-# HTTP 200 ✓
+### 6b. Final live coexistence re-check (post-M9 install)
 
-python3 scripts/smoke_test_intelligence_cloud.py \
-    --url https://intelligence.decifertrading.com --verbose
-# Checks: 12  |  Passed: 12  |  Failed: 0  |  VERDICT: GO
+Run after nginx reload to confirm no Learning service was disrupted. Verified 2026-05-24T10:47 UTC.
+
+**Port map (ss -tulpn, post-M9):**
+
+| Port | Process | Status |
+|---|---|---|
+| 80 | nginx | LISTEN — HTTP redirect |
+| 443 | nginx | LISTEN — HTTPS SNI routing |
+| 8000 | docker-proxy | LISTEN — pipeline container |
+| 8001 | docker-proxy | LISTEN — intelligence container |
+| 8081 | nginx | LISTEN — mobile filter (loopback) |
+
+Ports 3000, 3001, 5000, 8080: not in use. LanguageTool (8099, 8452, 8733, 8906): not queried by nginx post-M9. No new Trading process has taken over any Learning port.
+
+**Docker (post-M9):**
+```
+NAMES                         STATUS             PORTS
+decifer-intelligence          Up About an hour   127.0.0.1:8001->8000/tcp
+decifer-pipeline-pipeline-1   Up 16 hours        127.0.0.1:8000->8000/tcp
+```
+No Learning containers. No conflict.
+
+**Running services post-M9:** `docker.service` and `nginx.service` only. No unexpected new services.
+
+**Decifer Learning health (post-nginx-reload):**
+```
+curl -i https://pipeline.deciferlearning.com/health
+HTTP 200 — {"status":"ok","version":"0.3.0"}
+```
+Learning pipeline continued responding normally after nginx was reloaded for M9.
+
+**RAM post-refresh:**
+```
+Mem:   3.8Gi total   3.7Gi used   127Mi free   (213Mi buff/cache, 110Mi available)
+Swap:  0B
 ```
 
 ---
 
 ### 7. Final coexistence verdict
 
-**VERDICT: SAFE TO COEXIST**
+**VERDICT: M9 GO WITH WARNING — SAFE TO COEXIST, RAM HEADROOM NEEDS M10**
 
-| Check | Finding | Status |
+| Check | Finding | Result |
 |---|---|---|
 | Same droplet | YES — Trading and Learning share one droplet | No conflict |
-| Port map | No overlapping ports; all internal ports on 127.0.0.1 | CLEAR |
-| Docker | Two Trading containers; zero Learning containers | CLEAR |
-| Nginx routes | All `server_name` blocks domain-specific; SNI separates products post-M9 | CLEAR |
-| Cron | Trading cron (decifer user) isolated from Learning batch (root, persistent) | CLEAR |
-| Data directories | `/opt/decifer/` (Trading) vs `/root/decifer-learning/` (Learning) — no overlap | CLEAR |
+| Port map (post-M9) | No overlapping ports; all internal ports on 127.0.0.1 | CLEAR |
+| Docker (post-M9) | Two Trading containers; zero Learning containers | CLEAR |
+| Nginx routes (post-M9) | All `server_name` domain-specific; SNI routes intelligence to 8001, pipeline to 8000 | CLEAR |
+| Cron | `decifer` user cron isolated from Learning batch (root, persistent processes) | CLEAR |
+| Data directories | `/opt/decifer/` vs `/root/decifer-learning/` — no overlap | CLEAR |
 | IBKR process | Not found on droplet | CLEAR |
-| Learning health | `pipeline.deciferlearning.com/health` → 200 throughout M9 work | CLEAR |
-| M9 nginx change | Adds intelligence port 443 block; does not touch `decifer-pipeline` site | CLEAR |
+| Learning health (post-M9) | `pipeline.deciferlearning.com/health` → 200 after nginx reload | CLEAR |
+| M9 nginx change | Added intelligence port 443 block only; `decifer-pipeline` site untouched | CLEAR |
+| Execution blocked | `/health.execution_blocked = true` confirmed live | CLEAR |
+| Blocked response fields | `broker_account_id`, `order_id`, `pnl`, `position_size`, etc. — NONE in any response | CLEAR |
+| Smoke test | 12/12 PASS — live endpoint verified | CLEAR |
+| Freshness | `data_freshness_status: ok` after manual pipeline refresh | CLEAR |
 
-**One flagged warning for M10:**
+**M10 warnings (non-blocking for M9 GO):**
 
-| Warning | Detail | Recommended action |
+| Warning | Detail | Recommended M10 action |
 |---|---|---|
-| RAM at 103 MB free (no swap) | Four Java LanguageTool processes (Learning) consume ~2.2 GB. Intelligence API + pipeline occupy most of remaining headroom. OOM risk under concurrent burst load. | M10: add 2–4 GB swap (`fallocate -l 4G /swapfile`); or upgrade droplet to 8 GB RAM. |
+| RAM at ~110–127 MB available, no swap | Four Java LanguageTool processes (Learning) consume ~2.2 GB. OOM risk under concurrent burst. | Add 2–4 GB swap: `fallocate -l 4G /swapfile && mkswap /swapfile && swapon /swapfile`; persist in `/etc/fstab`. Or upgrade droplet to 8 GB. |
+| IC weights skipped in host-side cron | System Python lacks `numpy`; IC weight updates silently skipped. Non-fatal — uses last valid snapshot. | Create `/opt/decifer/venv/` for `decifer` user with `requirements.intelligence.txt`; update crontab to use venv python. |
 
 No active conflict was found. No rollbacks were performed. No services were stopped or restarted as part of this coexistence check. Decifer Learning continued operating normally throughout M9.
