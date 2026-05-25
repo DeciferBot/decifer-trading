@@ -101,11 +101,16 @@ def _json_response(data: dict, status: int = 200) -> Response:
 
 @app.after_request
 def _apply_cors(response: Response) -> Response:
-    """Add CORS headers to every response — required for browser fetches from Vercel."""
+    """Add CORS and cache headers to every response.
+
+    CORS headers allow browser fetches from Vercel (simple GET — no preflight).
+    Cache-Control: no-store prevents browsers from caching intelligence payloads.
+    """
     response.headers["Access-Control-Allow-Origin"] = _CORS_ORIGIN
     response.headers["Access-Control-Allow-Methods"] = _CORS_METHODS
     response.headers["Access-Control-Allow-Headers"] = _CORS_HEADERS
     response.headers["Access-Control-Max-Age"] = _CORS_MAX_AGE
+    response.headers["Cache-Control"] = "no-store, max-age=0"
     return response
 
 

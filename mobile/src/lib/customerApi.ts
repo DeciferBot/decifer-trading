@@ -84,7 +84,10 @@ export interface MarketNowPayload {
 
 export async function fetchMarketNow(): Promise<MarketNowPayload> {
   const base = getIntelligenceApiBase().replace(/\/$/, "");
-  const res = await fetch(`${base}/api/market-now`, { cache: "no-store" });
+  // Plain fetch — no cache: "no-store" to avoid triggering CORS preflight.
+  // cache: "no-store" adds Cache-Control + Pragma request headers which are not
+  // CORS-safelisted. Response-side Cache-Control: no-store is set by the API.
+  const res = await fetch(`${base}/api/market-now`);
   if (!res.ok) throw new Error(`/api/market-now → ${res.status}`);
   return res.json();
 }
