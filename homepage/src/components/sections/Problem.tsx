@@ -83,7 +83,7 @@ export function Problem() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: card.state === "missing" ? "rgba(249,115,22,0.15)" : "var(--surface-2)",
+                  background: card.state === "missing" ? "rgba(240,90,40,0.15)" : "var(--surface-2)",
                   color: card.state === "missing" ? "var(--orange)" : "var(--text-3)",
                   fontWeight: 800,
                   fontSize: "16px",

@@ -22,7 +22,7 @@ export function LogoMark({ size = 36, className = "" }: LogoMarkProps) {
       {/* < left bracket — lower position, orange */}
       <path
         d="M 20 30 L 7 24 L 20 18"
-        stroke="#f97316"
+        stroke="var(--orange)"
         strokeWidth="2.6"
         strokeLinecap="round"
         strokeLinejoin="round"

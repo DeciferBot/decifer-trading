@@ -18,7 +18,7 @@ const PREVIEW_CARDS = [
     content: "The move is being driven by growth appetite, not broad market strength.",
     sub: "AI infrastructure names are being watched for follow-through.",
     badge: null,
-    color: "#f97316",
+    color: "var(--orange)",
   },
   {
     label: "Under review",
@@ -39,7 +39,7 @@ const PREVIEW_CARDS = [
     content: '"Why are semiconductors moving today?"',
     sub: "Ask the market in plain English. Get a structured answer, not a summary.",
     badge: null,
-    color: "#f97316",
+    color: "var(--orange)",
     isAsk: true,
   },
 ];

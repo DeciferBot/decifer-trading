@@ -18,7 +18,7 @@ const PRODUCT_FEATURES = [
     tab: "Alpha",
     headline: "Where could opportunity be forming?",
     body: "Symbols and setups under review, explained through reason-to-care, not raw score noise. Each candidate comes with context.",
-    color: "#f97316",
+    color: "var(--orange)",
   },
   {
     id: "portfolio",

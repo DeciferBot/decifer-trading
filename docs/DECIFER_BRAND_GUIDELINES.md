@@ -78,7 +78,7 @@ Right bracket >: M 20 22 L 33 16 L 20 10   (tip at y=16, upper center)
 ```
 
 **Mark colours:**
-- Left bracket `<`: orange (`#f97316`) — the active, searching side
+- Left bracket `<`: orange (`#F05A28`) — the active, searching side
 - Right bracket `>`: white/light (`#e8f0fa`) — the receiving, clarifying side
 
 **Usage:**
@@ -184,10 +184,10 @@ Clear. Direct. Intelligent. Useful. Calm.
 | Text primary | `#e8f0fa` | Headlines, primary body copy |
 | Text secondary | `#7a8fa8` | Supporting copy, labels |
 | Text muted | `#3d5166` | Metadata, fine print |
-| **Orange** | `#f97316` | **DECIFER action colour — CTAs, accent, left bracket** |
-| Orange light | `#fb923c` | Hover states |
-| Orange bg | `rgba(249,115,22,0.08)` | Tinted card backgrounds |
-| Orange border | `rgba(249,115,22,0.20)` | Tinted borders |
+| **Orange** | `#F05A28` | **DECIFER action colour — CTAs, accent, left bracket** |
+| Orange light | `#F47040` | Hover states |
+| Orange bg | `rgba(240,90,40,0.08)` | Tinted card backgrounds |
+| Orange border | `rgba(240,90,40,0.20)` | Tinted borders |
 | Green | `#10b981` | Positive, active, live indicators |
 | Amber | `#f59e0b` | Under review, caution |
 | Red | `#f43f5e` | Blocked, negative, destructive |

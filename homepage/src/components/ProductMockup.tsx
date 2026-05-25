@@ -12,7 +12,7 @@ function Card({ label, content, sub, badge }: CardProps) {
     amber: { bg: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "rgba(245,158,11,0.25)" },
     slate: { bg: "rgba(100,116,139,0.12)", color: "#94a3b8", border: "rgba(100,116,139,0.25)" },
     green: { bg: "rgba(16,185,129,0.12)", color: "#10b981", border: "rgba(16,185,129,0.25)" },
-    orange: { bg: "rgba(249,115,22,0.10)", color: "#f97316", border: "rgba(249,115,22,0.25)" },
+    orange: { bg: "rgba(240,90,40,0.10)", color: "var(--orange)", border: "rgba(240,90,40,0.25)" },
   };
 
   return (
@@ -66,7 +66,7 @@ export function ProductMockup() {
         border: "1px solid rgba(26,40,64,0.9)",
         borderRadius: "24px",
         overflow: "hidden",
-        boxShadow: "0 0 0 1px rgba(249,115,22,0.06), 0 40px 80px rgba(0,0,0,0.6), 0 0 60px rgba(249,115,22,0.04)",
+        boxShadow: "0 0 0 1px rgba(240,90,40,0.06), 0 40px 80px rgba(0,0,0,0.6), 0 0 60px rgba(240,90,40,0.04)",
       }}
     >
       {/* Device chrome */}
@@ -81,7 +81,7 @@ export function ProductMockup() {
           <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
             {/* Mini mark */}
             <svg width="18" height="18" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-              <path d="M 20 30 L 7 24 L 20 18" stroke="#f97316" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M 20 30 L 7 24 L 20 18" stroke="var(--orange)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M 20 22 L 33 16 L 20 10" stroke="#e8f0fa" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span style={{ fontSize: "11px", fontWeight: 700, color: "#e8f0fa", letterSpacing: "-0.01em" }}>
@@ -114,8 +114,8 @@ export function ProductMockup() {
                 paddingBottom: "10px",
                 fontSize: "10px",
                 fontWeight: i === 0 ? 700 : 500,
-                color: i === 0 ? "#f97316" : "#3d5166",
-                borderBottom: i === 0 ? "2px solid #f97316" : "2px solid transparent",
+                color: i === 0 ? "var(--orange)" : "#3d5166",
+                borderBottom: i === 0 ? "2px solid var(--orange)" : "2px solid transparent",
                 cursor: "default",
               }}
             >
@@ -161,14 +161,14 @@ export function ProductMockup() {
           margin: "0 12px 12px",
           padding: "10px 12px",
           borderRadius: "10px",
-          background: "rgba(249,115,22,0.06)",
-          border: "1px solid rgba(249,115,22,0.15)",
+          background: "rgba(240,90,40,0.06)",
+          border: "1px solid rgba(240,90,40,0.15)",
           display: "flex",
           alignItems: "center",
           gap: "8px",
         }}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
         </svg>
         <span style={{ fontSize: "10px", color: "#7a8fa8" }}>

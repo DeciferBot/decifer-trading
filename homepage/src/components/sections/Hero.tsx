@@ -24,7 +24,7 @@ export function Hero() {
           transform: "translateX(-50%)",
           width: "900px",
           height: "600px",
-          background: "radial-gradient(ellipse at 50% 0%, rgba(249,115,22,0.07) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse at 50% 0%, rgba(240,90,40,0.07) 0%, transparent 70%)",
           pointerEvents: "none",
         }}
       />
