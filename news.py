@@ -45,6 +45,50 @@ def push_alpaca_article(symbol: str, headline: str, age_hours: float = 0.0) -> N
     bucket.insert(0, entry)
     _ALPACA_ARTICLE_CACHE[symbol] = bucket[:10]
 
+
+# ── Sprint M11A — fail-soft customer Event Tape emit hook ───────────────────
+#
+# This helper is the single bridge from news intake to the customer-only
+# Event Tape. It is called from:
+#   - alpaca_news._process_article() (every Benzinga article, even those
+#     dropped by the universe filter — macro headlines without symbols are
+#     valuable for customer Market Map)
+#   - batch_news_sentiment() (every Yahoo RSS / Alpha Vantage article that
+#     ends up scored)
+#   - catalyst_engine._fire() (every fired catalyst — earnings, M&A, EDGAR)
+#
+# Fail-soft: any exception is swallowed. Tape failures cannot break news
+# intake, scoring, NEWS_INTERRUPT dispatch, execution, or trigger handlers.
+#
+# Does NOT trigger NEWS_INTERRUPT, execution, PM, universe scoring, or
+# handoff eligibility — it only writes to data/intelligence/customer_event_tape.json.
+def record_article_for_customer_tape(
+    headline: str,
+    symbols: list[str] | None = None,
+    source: str = "news",
+    source_published_at: str | None = None,
+    source_type: str = "news",
+    body_or_snippet: str = "",
+) -> None:
+    """Forward an article to the customer Event Tape. Fail-soft.
+
+    See customer_event_tape.maybe_record_customer_event for the schema and
+    classification behaviour.
+    """
+    try:
+        from customer_event_tape import maybe_record_customer_event
+        maybe_record_customer_event(
+            headline=headline or "",
+            body_or_snippet=body_or_snippet or "",
+            symbols=symbols or [],
+            source=source or "news",
+            source_published_at=source_published_at,
+            source_type=source_type,
+        )
+    except Exception as exc:
+        # Tape is advisory — never break news intake on failure.
+        log.debug("record_article_for_customer_tape: fail-soft (%s)", exc)
+
 # ── SENTIMENT KEYWORD DICTIONARIES ───────────────────────────
 # Curated for financial news. Weighted: strong words = 2, normal = 1.
 BULLISH_STRONG = {
@@ -561,6 +605,20 @@ def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None =
         for future in as_completed(futures):
             sym, _articles, headlines, recency, kw = future.result()
             rss_results[sym] = (headlines, recency, kw)
+            # Sprint M11A — fail-soft customer Event Tape emit.
+            # Each fresh headline (< 4h) is forwarded to the customer tape.
+            # Does not alter trigger dispatch, scoring, or NEWS_INTERRUPT.
+            try:
+                for h in headlines[:5]:
+                    if h and recency < 4.0:
+                        record_article_for_customer_tape(
+                            headline=h,
+                            symbols=[sym],
+                            source="yahoo_rss",
+                            source_type="news",
+                        )
+            except Exception as _exc:
+                log.debug("customer_event_tape emit (RSS): %s", _exc)
 
     # ── Phase 2: Alpha Vantage Tier 2 — structured NLP from professional sources ──
     # One call covers the whole batch. Cached 4 hours (25 call/day free tier).

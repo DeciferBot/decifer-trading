@@ -6,6 +6,98 @@
 
 ---
 
+## 2026-05-26 — Customer Event Tape is customer-only, never feeds execution (Sprint M11A)
+
+### Decision
+
+Fresh real-time event evidence (news/catalysts) is captured in a customer-only
+artefact, `data/intelligence/customer_event_tape.json`, and reconciled with
+price drivers ONLY at the customer Market Map layer. The Event Tape does not
+feed `live_driver_resolver.py`, `universe_builder.py`, `handoff_reader.py`,
+`bot_trading.py`, PM actions, or any execution path.
+
+### Why this matters
+
+Layers 1–4 of the intelligence pipeline (price drivers → candidates → themes →
+universe handoff) must remain deterministic and replayable. If event
+intelligence rewrote price drivers, two systems would compete to define what
+"the market regime is," and re-running the pipeline against the same prices
+would no longer reproduce. Reconciliation belongs at the publisher (the
+Market Map), not at the driver layer.
+
+### Implementation
+
+- **NEW** customer-only modules (all SAAS_OUTPUT layer, registered in
+  `architecture/layer_boundary.py`):
+  - `customer_event_classifier.py` — deterministic 15-category classifier
+    (geopolitics, commodities, earnings, M&A, central bank, macro, China/India
+    policy, regulation, credit, technology, company shock). Pure function.
+    No LLM dependency so golden tests are reproducible.
+  - `customer_event_tape.py` — fail-soft writer. Exposes
+    `maybe_record_customer_event(...)`.
+  - `market_now_reconciler.py` — helper for `market_now_builder.py` only;
+    encodes the `(driver, event_type) → conflict_message` matrix.
+- **MODIFIED**:
+  - `saas_intelligence_output.py` — 10 new approved customer fields
+    (`key_events`, `what_changed`, `known_conflicts`, `section_freshness`,
+    `sectors`, `themes`, `radar`, `watch_next`, `market_mood`,
+    `source_notes`) + new nested-blocked-field guard that rejects banned
+    keys anywhere in the payload (e.g. `radar[0].position_size`).
+  - `market_now_builder.py` — always reconciles; degraded path still surfaces
+    fresh events.
+  - `news.py` / `alpaca_news.py` / `catalyst_engine.py` — single fail-soft
+    emit hook each. No scoring or dispatch change.
+
+### Boundaries enforced by `scripts/verify_customer_event_tape_safety.py`
+
+- E1: customer_event_tape not imported by execution modules.
+- E2: customer_event_tape not imported by universe_builder.
+- E3: customer_event_tape not imported by handoff_reader.
+- E4: market_now_reconciler imported only by market_now_builder.
+- E5: customer_event_classifier imported only by customer_event_tape.
+- E6: no yfinance in any M11A module.
+- E7: no Mac-only paths in any M11A module.
+- E8: persisted tape file contains no banned nested keys.
+
+### What known_conflicts looks like (runtime proof)
+
+Headline: "US says Iran deal could happen today; oil falls 5 percent as Hormuz reopening hopes rise."
+
+Active price driver: `geopolitical_risk_rising`.
+
+Reconciled Market Map emits:
+- "Defence and energy still reflect recent geopolitical risk, but fresh
+  de-escalation headlines suggest the risk premium may be fading."
+- "Price-based geopolitical risk drivers are still active, but oil is falling
+  on de-escalation or peace hopes — the risk premium may be unwinding."
+
+This is the new product behaviour. Previously the Market Map only saw the
+price driver — the contradicting event was invisible to customers.
+
+### Why three new files and not two
+
+`customer_event_classifier` is split from the tape so golden tests run with
+pure-function determinism (no I/O, no file system). The reconciler is split
+from `market_now_builder` so the publisher stays under the 200-line module
+guideline. The split was approved by Amit before any code was written.
+
+### Allowlist expansion approval
+
+`saas_intelligence_output._ALLOWED_FIELDS` was tight (11 fields) and its own
+comment requires Amit's explicit approval to add fields. Approved scope is
+exactly the 10 Sprint M11A names above and no others. The expansion comment
+in the file reads: "Approved by Amit for customer-only Market Map fields in
+Sprint M11A."
+
+### Ask Decifer
+
+Deferred to a follow-up sprint. `section_freshness.ask_context` carries a
+note: "Ask grounding is deferred to a follow-up sprint." When wired,
+`voice_context_builder.py` will gain a customer-only path that loads the
+Market Map.
+
+---
+
 ## 2026-05-24 — yfinance final hardening (v4.31.4)
 
 **Closes the remaining 3 active yfinance import paths that were not removed in v4.31.3.**

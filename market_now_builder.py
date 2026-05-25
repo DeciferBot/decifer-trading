@@ -11,9 +11,16 @@ Reads exclusively from the intelligence pipeline's persisted artefacts:
   data/intelligence/theme_activation.json      — theme states
   data/live/current_manifest.json              — pipeline freshness / regime
   data/apex_conversation_log.jsonl             — last Apex market read (optional)
+  data/intelligence/customer_event_tape.json   — fresh customer-safe events
+                                                  (Sprint M11A — reconciled
+                                                   with price drivers below)
 
 Produces a SaaSIntelligencePayload with no raw prices, no broker state,
 no execution signals, and no internal scores.
+
+Sprint M11A — Market Map sections (market_mood, what_changed, key_events,
+sectors, themes, radar, watch_next, known_conflicts, section_freshness,
+source_notes) are produced by market_now_reconciler.reconcile_market_map().
 
 This module must NOT import from any execution module.
 """
@@ -26,6 +33,10 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
+from market_now_reconciler import (
+    get_event_tape_freshness,
+    reconcile_market_map,
+)
 from saas_intelligence_output import SaaSIntelligencePayload, validate_customer_payload
 
 log = logging.getLogger("decifer.market_now")
@@ -131,27 +142,48 @@ def _load_drivers() -> tuple[list[str], list[str]]:
         return [], []
 
 
-def _load_active_themes() -> tuple[list[str], list[dict[str, str]]]:
-    """Returns (active_theme_ids, opportunity_explanations)."""
+def _load_active_themes() -> tuple[list[str], list[dict[str, str]], dict[str, str]]:
+    """Returns (active_theme_ids, opportunity_explanations, theme_states_by_id)."""
     try:
         ta = _read_json("data/intelligence/theme_activation.json")
         active_ids: list[str] = []
         explanations: list[dict[str, str]] = []
+        states: dict[str, str] = {}
         for t in ta.get("themes", []):
             state = t.get("state", "dormant")
+            tid = t.get("theme_id", "")
+            if tid:
+                states[tid] = state
             if state not in ("activated", "strengthening"):
                 continue
-            tid = t.get("theme_id", "")
             active_ids.append(tid)
             reason_raw = (t.get("reason") or "").split(",")[0].strip()
             explanations.append({
                 "theme": _theme_name(tid),
                 "explanation": reason_raw or f"{_theme_name(tid)} is active.",
             })
-        return active_ids, explanations
+        return active_ids, explanations, states
     except Exception as exc:
         log.debug("_load_active_themes: %s", exc)
-        return [], []
+        return [], [], {}
+
+
+def _load_blocked_conditions() -> list[str]:
+    """Returns the active blocked_conditions list from live_driver_state."""
+    try:
+        ld = _read_json("data/intelligence/live_driver_state.json")
+        return list(ld.get("blocked_conditions", []))
+    except Exception:
+        return []
+
+
+def _load_active_driver_keys() -> list[str]:
+    """Returns the raw active_driver keys (not labels) for reconciler use."""
+    try:
+        ld = _read_json("data/intelligence/live_driver_state.json")
+        return list(ld.get("active_drivers", []))
+    except Exception:
+        return []
 
 
 def _load_manifest_regime() -> tuple[str, str, str]:
@@ -266,9 +298,17 @@ def build_market_now() -> SaaSIntelligencePayload:
     Build and return a validated SaaSIntelligencePayload from persisted
     intelligence artefacts.
 
+    Sprint M11A: reconciles the customer Event Tape with price drivers to
+    publish Market Map sections (market_mood, what_changed, key_events,
+    sectors, themes, radar, watch_next, known_conflicts, section_freshness,
+    source_notes). If price drivers and events conflict, the conflict is
+    published in `known_conflicts` rather than hidden.
+
     If key artefacts are missing or stale, returns a degraded payload with
     plain-language messaging ("market intelligence temporarily limited") and
-    a fresh timestamp so the customer output remains valid and honest.
+    a fresh timestamp so the customer output remains valid and honest. The
+    Event Tape, if fresh independently, will still be surfaced — see
+    section_freshness for per-section status.
 
     Raises SaaSPayloadValidationError if the assembled payload violates
     the customer-safe field allowlist (defensive check — should not happen
@@ -278,34 +318,99 @@ def build_market_now() -> SaaSIntelligencePayload:
     live market data requests.
     """
     degraded, degraded_warnings = _is_degraded()
+
+    # Always load whatever we can — even when degraded, fresh events may exist.
+    drivers, risk_notes_from_blocked = _load_drivers()
+    active_driver_keys = _load_active_driver_keys()
+    blocked_conditions = _load_blocked_conditions()
+    active_theme_ids, opportunity_explanations, theme_states = _load_active_themes()
+    regime_label, manifest_published_at, confidence = _load_manifest_regime()
+    apex_read = _load_apex_market_read()
+
+    # Reconcile price + event evidence into Market Map sections
+    try:
+        sections = reconcile_market_map(
+            active_drivers=active_driver_keys,
+            blocked_conditions=blocked_conditions,
+            active_theme_ids=active_theme_ids,
+            theme_states=theme_states,
+            regime_label=regime_label,
+            apex_read=apex_read,
+            manifest_published_at=manifest_published_at,
+            confidence_label=confidence,
+        )
+    except Exception as exc:
+        log.warning("reconcile_market_map failed (%s) — serving without M11A sections.", exc)
+        sections = {
+            "market_mood": regime_label or "Assessing market conditions",
+            "what_changed": [],
+            "key_events": [],
+            "sectors": [],
+            "themes": [],
+            "radar": [],
+            "watch_next": [],
+            "known_conflicts": [],
+            "section_freshness": {},
+            "source_notes": [],
+        }
+
     if degraded:
-        log.info("build_market_now: serving degraded payload — %s", "; ".join(degraded_warnings))
-        payload = SaaSIntelligencePayload(
-            market_regime_label="Assessing market conditions",
-            plain_english_summary=(
+        log.info(
+            "build_market_now: serving degraded payload — %s",
+            "; ".join(degraded_warnings),
+        )
+        # If the Event Tape is independently fresh, note that the price view
+        # is stale while events remain live ("fresh event detected, price
+        # confirmation pending").
+        tape_state = get_event_tape_freshness()
+        if tape_state.get("status") == "fresh" and sections.get("key_events"):
+            summary = (
+                "Latest market view is stale, but fresh event headlines are "
+                "available. Scenario-style explanation is possible — do not "
+                "treat as a live price confirmation."
+            )
+            confidence_label = "Degraded (events fresh, price view stale)"
+        else:
+            summary = (
                 "Market intelligence is temporarily limited. "
                 "Analysis will resume when fresh data becomes available."
-            ),
-            key_drivers=[],
-            active_themes=[],
-            opportunity_explanations=[],
-            risk_notes=[],
-            what_to_watch=["Check back shortly for updated market analysis."],
+            )
+            confidence_label = "Insufficient data"
+
+        risk_notes = list(risk_notes_from_blocked)
+        risk_notes.extend(_to_customer_risk_notes(degraded_warnings))
+
+        payload = SaaSIntelligencePayload(
+            market_regime_label=regime_label or "Assessing market conditions",
+            plain_english_summary=summary,
+            key_drivers=drivers,
+            active_themes=active_theme_ids,
+            opportunity_explanations=opportunity_explanations,
+            risk_notes=risk_notes,
+            what_to_watch=sections.get("watch_next") or [
+                "Check back shortly for updated market analysis.",
+            ],
             freshness_timestamp=datetime.now(UTC).isoformat(),
-            confidence_label="Insufficient data",
-            source_category_labels=["market_data"],
+            confidence_label=confidence_label,
+            source_category_labels=_build_source_labels(drivers, bool(apex_read)),
             data_entitlement_note=(
                 "Market intelligence powered by Decifer. "
                 "Not financial advice. For informational purposes only."
             ),
+            # Sprint M11A — Market Map sections (degraded but honest)
+            market_mood=sections.get("market_mood", ""),
+            what_changed=sections.get("what_changed", []),
+            key_events=sections.get("key_events", []),
+            sectors=sections.get("sectors", []),
+            themes=sections.get("themes", []),
+            radar=sections.get("radar", []),
+            watch_next=sections.get("watch_next", []),
+            known_conflicts=sections.get("known_conflicts", []),
+            section_freshness=sections.get("section_freshness", {}),
+            source_notes=sections.get("source_notes", []),
         )
         validate_customer_payload(payload.to_dict())
         return payload
-
-    drivers, risk_notes_from_blocked = _load_drivers()
-    active_theme_ids, opportunity_explanations = _load_active_themes()
-    regime_label, freshness, confidence = _load_manifest_regime()
-    apex_read = _load_apex_market_read()
 
     # Plain-English summary: prefer Apex synthesis; fall back to driver summary
     if apex_read:
@@ -323,9 +428,12 @@ def build_market_now() -> SaaSIntelligencePayload:
             "Intelligence pipeline is gathering data."
         )
 
-    what_to_watch = _build_what_to_watch(drivers, active_theme_ids)
+    what_to_watch = sections.get("watch_next") or _build_what_to_watch(drivers, active_theme_ids)
     source_labels = _build_source_labels(drivers, bool(apex_read))
 
+    # freshness_timestamp = when THIS payload was built, not the source manifest.
+    # Per-source freshness is exposed via section_freshness so customers see
+    # both "payload built now" and "macro_drivers last updated 2.3h ago".
     payload = SaaSIntelligencePayload(
         market_regime_label=regime_label,
         plain_english_summary=summary,
@@ -334,19 +442,41 @@ def build_market_now() -> SaaSIntelligencePayload:
         opportunity_explanations=opportunity_explanations,
         risk_notes=risk_notes_from_blocked,
         what_to_watch=what_to_watch,
-        freshness_timestamp=freshness or datetime.now(UTC).isoformat(),
+        freshness_timestamp=datetime.now(UTC).isoformat(),
         confidence_label=confidence,
         source_category_labels=source_labels,
         data_entitlement_note=(
             "Market intelligence powered by Decifer. "
             "Not financial advice. For informational purposes only."
         ),
+        # Sprint M11A — Market Map sections
+        market_mood=sections.get("market_mood", ""),
+        what_changed=sections.get("what_changed", []),
+        key_events=sections.get("key_events", []),
+        sectors=sections.get("sectors", []),
+        themes=sections.get("themes", []),
+        radar=sections.get("radar", []),
+        watch_next=sections.get("watch_next", []),
+        known_conflicts=sections.get("known_conflicts", []),
+        section_freshness=sections.get("section_freshness", {}),
+        source_notes=sections.get("source_notes", []),
     )
 
     # Defensive: validate the assembled payload against the allowlist
     validate_customer_payload(payload.to_dict())
 
     return payload
+
+
+def _to_customer_risk_notes(warnings: list[str]) -> list[str]:
+    """Sanitise degraded warnings before exposing them to customers."""
+    out: list[str] = []
+    for w in warnings:
+        # Warnings already use category labels (no file paths), but strip any
+        # leaked file-name fragments defensively.
+        cleaned = w.replace(".json", "").replace(".jsonl", "")
+        out.append(cleaned)
+    return out
 
 
 def get_market_now_dict() -> dict:

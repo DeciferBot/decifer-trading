@@ -655,6 +655,26 @@ class CatalystEngine:
             f"screener={'score=' + str(trigger['screener_context']['catalyst_score']) if 'screener_context' in trigger else 'not tracked'}"
         )
 
+        # ── Sprint M11A — fail-soft customer Event Tape emit ──
+        # Forward the trigger to the customer-only tape so earnings, M&A, EDGAR,
+        # and Congressional events surface in the customer Market Map.
+        # Does NOT alter ranking, daily_promoted logic, or live trading inputs.
+        try:
+            from customer_event_tape import maybe_record_customer_event
+            _trigger_headlines = trigger.get("headlines") or []
+            _trigger_headline = (
+                _trigger_headlines[0] if _trigger_headlines
+                else f"{trigger.get('trigger_type', 'catalyst')} signal on {sym}"
+            )
+            maybe_record_customer_event(
+                headline=str(_trigger_headline),
+                symbols=[sym] if sym else [],
+                source=f"catalyst_engine:{trigger.get('trigger_type', 'unknown')}",
+                source_type="catalyst",
+            )
+        except Exception as _exc:
+            log.debug("CatalystEngine: customer_event_tape emit failed (%s)", _exc)
+
         from risk import is_trading_day
         if not is_trading_day():
             log.info(f"Catalyst trigger for {sym} — not a trading day, skipping execution")

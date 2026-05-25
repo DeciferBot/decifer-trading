@@ -148,6 +148,10 @@ _SAAS_OUTPUT_MODULES: frozenset[str] = frozenset({
     "saas_intelligence_output",
     "market_now_builder",
     "intelligence_api",   # Flask app serving the DigitalOcean intelligence cloud surface
+    # ── Sprint M11A — Customer Event Tape (customer-only) ──
+    "customer_event_classifier",  # pure deterministic event classifier
+    "customer_event_tape",        # customer-only tape writer/reader
+    "market_now_reconciler",      # helper for market_now_builder only
 })
 
 _DASHBOARD_ADMIN_MODULES: frozenset[str] = frozenset({

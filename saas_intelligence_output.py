@@ -51,6 +51,14 @@ _BLOCKED_FIELDS: frozenset[str] = frozenset({
 
 # Allowed top-level field names for SaaSIntelligencePayload.
 # Anything outside this set is rejected by validate_customer_payload().
+#
+# Sprint M11A additions: key_events, what_changed, known_conflicts,
+#   section_freshness, sectors, themes, radar, watch_next, market_mood,
+#   source_notes.
+# Approved by Amit for customer-only Market Map fields in Sprint M11A.
+#
+# All Sprint M11A fields are subject to the same nested-blocked-field
+# validation as every other field — see _validate_no_nested_blocked().
 _ALLOWED_FIELDS: frozenset[str] = frozenset({
     "market_regime_label",
     "plain_english_summary",
@@ -63,7 +71,42 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset({
     "confidence_label",
     "source_category_labels",
     "data_entitlement_note",
+    # ── Sprint M11A — customer Market Map sections (approved by Amit) ──
+    "key_events",
+    "what_changed",
+    "known_conflicts",
+    "section_freshness",
+    "sectors",
+    "themes",
+    "radar",
+    "watch_next",
+    "market_mood",
+    "source_notes",
 })
+
+# Field-name substrings that are forbidden anywhere in the payload — even
+# nested inside an approved field. Sprint M11A guardrail: an approved
+# top-level field MUST NOT smuggle private trading data through nested keys.
+_FORBIDDEN_NESTED_FIELD_SUBSTRINGS: tuple[str, ...] = (
+    # Position / order / execution
+    "position_size", "qty", "quantity", "shares",
+    "entry_price", "exit_price", "stop_price", "limit_price",
+    "take_profit", "stop_order", "market_order",
+    "order_id", "client_order_id", "ibkr_order_id",
+    # Account / broker
+    "broker_account", "account_id", "ibkr_account",
+    "buying_power", "account_value", "portfolio_value",
+    # P&L
+    "pnl", "unrealized_pnl", "realized_pnl", "cost_basis",
+    "daily_pnl", "total_pnl",
+    # Raw market data / scores
+    "raw_score", "signal_score", "ic_weight", "raw_quote", "raw_bar",
+    # PM / trade history internals
+    "pm_action", "trade_id", "execution_signal",
+    # Radar guardrail — keep radar strictly intelligence
+    "buy_signal", "sell_signal", "trade_recommendation",
+    "execution_readiness", "account_exposure",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +166,53 @@ class SaaSIntelligencePayload:
         "This is not financial advice. For informational purposes only."
     )
 
+    # ── Sprint M11A — Market Map sections (customer-only) ──
+    #
+    # All optional. When omitted from to_dict() output (they're empty by
+    # default), the validator treats them as absent and applies its normal
+    # allowlist rules. When populated they MUST contain only customer-safe
+    # data — see _FORBIDDEN_NESTED_FIELD_SUBSTRINGS for the nested guard.
+
+    # One-line plain-English market mood.
+    # Example: "Risk-on — fresh de-escalation or risk-premium unwind"
+    market_mood: str = ""
+
+    # Short bullets describing what just changed in the last ~30 minutes.
+    what_changed: list[str] = field(default_factory=list)
+
+    # Customer-safe summaries of recent events from customer_event_tape.json.
+    # Each entry must NOT contain prices, position sizes, or execution fields.
+    key_events: list[dict[str, Any]] = field(default_factory=list)
+
+    # Per-sector mood: {name, mood, reasons[], from_events[]}.
+    sectors: list[dict[str, Any]] = field(default_factory=list)
+
+    # Per-theme state: {theme, state, event_signal?, from_events?}.
+    themes: list[dict[str, Any]] = field(default_factory=list)
+
+    # Symbols on the radar — strictly customer intelligence.
+    # Each entry: {symbol, reason_to_watch, theme_link, confirmation_signal,
+    #               invalidation_signal}.
+    # MUST NOT contain: buy/sell, entry/exit, stop, target, position size,
+    #                    trade recommendation, execution readiness, account
+    #                    exposure, or P&L. (Enforced by nested-field guard.)
+    radar: list[dict[str, Any]] = field(default_factory=list)
+
+    # What the intelligence layer is monitoring next.
+    watch_next: list[str] = field(default_factory=list)
+
+    # Plain-English description of conflicts between price drivers and event
+    # evidence — e.g. "Defence stocks still reflect recent geopolitical risk,
+    # but fresh de-escalation headlines suggest the premium may be fading."
+    known_conflicts: list[str] = field(default_factory=list)
+
+    # Per-section freshness: {events, macro_drivers, sectors, themes, radar,
+    #                          ask_context} -> {status, age_hours, processed_at}.
+    section_freshness: dict[str, Any] = field(default_factory=dict)
+
+    # Plain-English provenance notes — never includes file paths or APIs.
+    source_notes: list[str] = field(default_factory=list)
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
@@ -179,6 +269,60 @@ def _collect_string_values(value: Any) -> list[str]:
     return []
 
 
+def _collect_nested_field_names(value: Any, *, path: str = "") -> list[tuple[str, str]]:
+    """Recursively collect (full_path, key) for every dict key in `value`.
+
+    Returns a list of (path, leaf_key) tuples so callers can report where
+    a forbidden field was found.
+    """
+    out: list[tuple[str, str]] = []
+    if isinstance(value, dict):
+        for k, v in value.items():
+            sub_path = f"{path}.{k}" if path else str(k)
+            out.append((sub_path, str(k)))
+            out.extend(_collect_nested_field_names(v, path=sub_path))
+    elif isinstance(value, (list, tuple)):
+        for i, item in enumerate(value):
+            sub_path = f"{path}[{i}]"
+            out.extend(_collect_nested_field_names(item, path=sub_path))
+    return out
+
+
+def _validate_no_nested_blocked(payload: dict[str, Any]) -> None:
+    """Sprint M11A guardrail — block private trading data inside nested fields.
+
+    Top-level allowlist isn't enough: an approved field like ``radar`` could
+    smuggle private state via nested keys (e.g. ``radar[0].position_size``).
+    This walker rejects any blocked or broker-like key anywhere in the payload.
+    """
+    nested = _collect_nested_field_names(payload)
+    for full_path, key in nested:
+        kl = key.lower()
+        # Explicit blocked set
+        if key in _BLOCKED_FIELDS:
+            raise SaaSPayloadValidationError(
+                f"Payload contains nested blocked field at {full_path!r} "
+                f"(key={key!r}). Blocked fields are forbidden anywhere, "
+                "including inside approved containers like 'radar' or 'key_events'."
+            )
+        # Broker-like substrings
+        for sub in _BROKER_FIELD_SUBSTRINGS:
+            if sub in kl:
+                raise SaaSPayloadValidationError(
+                    f"Payload contains nested broker-like field at {full_path!r} "
+                    f"(key={key!r}). Broker/account state must not appear in "
+                    "customer output, even nested."
+                )
+        # Sprint M11A forbidden nested substrings
+        for sub in _FORBIDDEN_NESTED_FIELD_SUBSTRINGS:
+            if sub in kl:
+                raise SaaSPayloadValidationError(
+                    f"Payload contains forbidden nested field at {full_path!r} "
+                    f"(key={key!r}; matched substring {sub!r}). Private trading "
+                    "state must not appear in customer output."
+                )
+
+
 class SaaSPayloadValidationError(ValueError):
     """Raised when a payload dict contains blocked or unexpected fields."""
 
@@ -222,6 +366,11 @@ def validate_customer_payload(payload: dict[str, Any]) -> None:
             f"Payload contains broker-like field names: {broker_like}. "
             "These suggest account or execution state and must not appear in customer output."
         )
+
+    # Rule 3b (Sprint M11A): nested-blocked-field guard.
+    # Approved containers like 'radar', 'key_events', 'sectors' must not smuggle
+    # private trading data through nested keys.
+    _validate_no_nested_blocked(payload)
 
     # Rule 4: no execution-like wording in string values
     all_strings = _collect_string_values(payload)

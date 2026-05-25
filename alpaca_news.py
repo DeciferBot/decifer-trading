@@ -126,7 +126,38 @@ class AlpacaNewsStream:
         headline = getattr(article, "headline", "") or ""
         symbols = getattr(article, "symbols", []) or []
 
-        if not headline or not symbols:
+        if not headline:
+            return
+
+        # ── 0. Sprint M11A — fail-soft customer Event Tape emit ──
+        # Fires BEFORE the universe filter so macro/global headlines (which
+        # often have no symbols or no universe symbols) still reach the
+        # customer Market Map. Customer-only side effect — does NOT trigger
+        # NEWS_INTERRUPT, execution, PM, universe scoring, or handoff.
+        # Routed via news.record_article_for_customer_tape so the only
+        # imported module from this execution layer remains `news` (which is
+        # already imported below). Keeps alpaca_news → tape import cleanly
+        # forbidden.
+        try:
+            from news import record_article_for_customer_tape
+            created = getattr(article, "created_at", None)
+            spt = None
+            if created is not None and hasattr(created, "isoformat"):
+                try:
+                    spt = created.isoformat()
+                except Exception:
+                    spt = None
+            record_article_for_customer_tape(
+                headline=headline,
+                symbols=symbols,
+                source="alpaca_benzinga",
+                source_published_at=spt,
+                source_type="news",
+            )
+        except Exception as _exc:
+            log.debug("AlpacaNewsStream: customer_event_tape emit failed (%s)", _exc)
+
+        if not symbols:
             return
 
         # ── 1. Universe filter ────────────────────────────────
