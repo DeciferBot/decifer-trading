@@ -155,3 +155,6 @@ chief_icon.png
 
 # Office temp files
 ~$*
+
+# Quarantined files — excluded from scans and version control
+quarantine/

@@ -1,16 +1,15 @@
 "use client";
 
-import { TrendingUp, Wallet, Clock, BarChart3, Sparkles, Globe, type LucideIcon } from "lucide-react";
+import { TrendingUp, Wallet, Clock, BarChart3, Sparkles, type LucideIcon } from "lucide-react";
 
-export type Tab = "market" | "today" | "holdings" | "activity" | "results" | "apex";
+export type Tab = "today" | "holdings" | "activity" | "results" | "apex";
 
 const TABS: { id: Tab; icon: LucideIcon; label: string }[] = [
-  { id: "market",   icon: Globe,     label: "Market"   },
-  { id: "apex",     icon: Sparkles,  label: "Apex"     },
+  { id: "apex",     icon: Sparkles,   label: "Apex"      },
   { id: "today",    icon: TrendingUp, label: "Portfolio" },
-  { id: "holdings", icon: Wallet,    label: "Holdings" },
-  { id: "activity", icon: Clock,     label: "Activity" },
-  { id: "results",  icon: BarChart3, label: "Results"  },
+  { id: "holdings", icon: Wallet,     label: "Holdings"  },
+  { id: "activity", icon: Clock,      label: "Activity"  },
+  { id: "results",  icon: BarChart3,  label: "Results"   },
 ];
 
 interface Props {
