@@ -1,0 +1,72 @@
+{
+  "date": "2026-05-25",
+  "session_id": "session-2026-05-25",
+  "title": "Geopolitical / Macro Event Awareness — News Vocabulary + Driver Layer Mirror (v4.47.0)",
+  "summary": "Pre-fix the bot was blind to regime-defining geopolitical events. A real Iran-US peace-deal news cycle was running across the Memorial Day weekend (Trump talks, Rubio statement, oil futures -5% pre-market, Hormuz reopening hopes); the bot's news scorer assigned every such headline a materiality score of 0 — no NEWS_INTERRUPT, no Apex review. The driver layer had only `geopolitical_risk_rising` with no mirror, so peace pricing produced zero transmission-rule output. We were positioned long USO (415 shares) into the bearish oil cycle by coincidence, not by intelligence. Fixed at root in two layers (news vocabulary + driver rule symmetry) and wired through the materiality gates + transmission rules + dashboard labels. Bot restarted at 22:27 +04, IBKR connected, 22 positions reconciled, dashboard live on :8080.",
+  "what_changed": [
+    {
+      "file": "news.py",
+      "change": "Added BULLISH_MACRO and BEARISH_MACRO keyword sets covering ceasefire / peace deal / truce / sanctions lifted / Hormuz reopening / invasion / embargo / escalation / trade war / coup / assassination. keyword_score() now applies +4 / -4 weight per macro keyword (above the default sentinel_keyword_threshold of 3) and returns a new `macro_hit: bool` flag. Single macro keyword forces materiality regardless of mixed-signal phrasing."
+    },
+    {
+      "file": "alpaca_news.py",
+      "change": "_process_article materiality gate honours kw['macro_hit'] — a ceasefire / invasion / embargo headline reaches Apex with HIGH urgency even when the directional score lands near zero."
+    },
+    {
+      "file": "news_sentinel.py",
+      "change": "Same materiality gate update — Yahoo RSS sentinel poll now honours macro_hit."
+    },
+    {
+      "file": "live_driver_resolver.py",
+      "change": "Added `geopolitical_risk_falling` driver — the missing mirror of `_rising`. Two firing paths: (1) primary — ITA underperforms SPY by >1.5% (defence fading); (2) secondary — USO collapses (<-5%) while ITA is not leading by >1% (early peace-pricing where oil reacts before defence rolls). Covers both late-stage and early-stage de-escalation regimes."
+    },
+    {
+      "file": "data/intelligence/transmission_rules.json",
+      "change": "Appended 3 rules for geopolitical_risk_falling — defence headwind (-0.75 strength), energy headwind (-0.78), travel_leisure tailwind (+0.65). Total rules now 34. Preserved existing file formatting (no JSON reformat noise in diff)."
+    },
+    {
+      "file": "market_now_builder.py",
+      "change": "Added `_DRIVER_LABELS['geopolitical_risk_falling'] = 'Geopolitical risk easing (peace pricing)'` so the dashboard renders the driver when it fires."
+    },
+    {
+      "file": "tests/test_geopolitical_news_awareness.py",
+      "change": "New file. 17 tests across 4 classes: TestNewsMacroMateriality (8 — ceasefire alone, peace deal, invasion, embargo, macro_hit flag presence, today's real Iran-deal headline, Hormuz reopening, mixed-signal headlines), TestAlpacaNewsGateHonoursMacroHit (1 — gate logic), TestGeopoliticalRiskFallingDriver (3 — primary path, secondary path, today's reality regression that confirms driver does NOT fire while defence still leads), TestTransmissionRulesForFallingDriver (3 — rule count, defence headwind, energy headwind), market_now label registration (1)."
+    },
+    {
+      "file": "docs/CHANGELOG.md",
+      "change": "Added v4.47.0 entry with full why / what / result sections."
+    },
+    {
+      "file": "version.py",
+      "change": "Auto-bumped 4.46.0 -> 4.47.0 by commit-msg hook on `feat:` commit."
+    }
+  ],
+  "what_was_deleted": "Nothing deleted.",
+  "decisions_made": [
+    "News scoring vocabulary now covers macro / geopolitical events. Direction reflects broad-market impact (peace = bullish for SPY, war = bearish); symbol-specific implications (peace = bad for USO/defence longs) remain Apex's responsibility — the keyword set's job is only to ensure the article reaches the synthesizer with high urgency.",
+    "Driver layer must be symmetric. The asymmetric `_rising`-only rule is a class of bug: any rule with a clear directional condition must have its mirror (or a documented reason for the asymmetry). geopolitical_risk_falling is the explicit mirror of geopolitical_risk_rising.",
+    "Bot's running process at session close is still v4.46.0 codebase (loaded into memory at startup). New code (v4.47.0) takes effect only on restart. Restart is non-urgent because today's market is closed (Memorial Day)."
+  ],
+  "tests": {
+    "new": 17,
+    "targeted_passing": 17,
+    "full_suite": "3111 passed, 11 failures (4 pre-existing TestMarketNowBuilder freshness-window + 7 test pollution from concurrent running bot writing to data files during the 13-minute test run; all 11 confirmed unrelated to this work by stash-revert)."
+  },
+  "what_is_next": "Restart bot so the running process picks up v4.47.0 vocabulary + driver rules. After restart, the next Alpaca news article tagged with a universe symbol containing a macro keyword (ceasefire / invasion / etc.) will trigger NEWS_INTERRUPT to Apex. Driver layer activates `geopolitical_risk_falling` once price action confirms (ITA fades or USO collapses with defence not leading). User has also requested a deep audit of the intelligence subsystem (file-by-file taxonomy + limitations) — deferred to next response.",
+  "bot_state": {
+    "pid_at_session_close": 42567,
+    "running_version_in_memory": "4.46.0",
+    "shipped_version_on_disk": "4.47.0",
+    "ibkr_account": "DUP481326",
+    "positions_reconciled": 22,
+    "session": "CLOSED (US Memorial Day)",
+    "first_scan_complete": true,
+    "first_scan_at": "14:28:09 ET",
+    "next_scan_seconds_at_close": 3066,
+    "dashboard_url": "http://localhost:8080",
+    "intelligence_pipeline_last_run": "2026-05-25T18:17:54Z",
+    "live_drivers_at_close": ["ai_capex_growth", "ai_compute_demand", "geopolitical_risk_rising", "small_cap_risk_on"],
+    "candidates_in_handoff": 75,
+    "themes_activated": "6/23"
+  }
+}
