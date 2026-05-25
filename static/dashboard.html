@@ -3851,6 +3851,19 @@ const _FORCE_DETAIL = {
     themes: ['energy_transition'],
     isHeadwind: true,
   },
+  futures_risk_on: {
+    meaning: 'ES and NQ futures are advancing on a 5-day basis — broad market and tech directional bias is bullish heading into the next session. Most useful as a pre-market confirmation when equity ETF prices are stale.',
+    whatToWatch: 'ES=F and NQ=F overnight price action. Gap between futures and prior ETF close. Pre-market volume on SPY/QQQ.',
+    invalidation: 'ES 5d return drops below +0.75%; overnight macro shock; gap-down open that reverses futures lead.',
+    themes: ['risk_on_rotation', 'small_cap_basket'],
+  },
+  futures_risk_off: {
+    meaning: 'ES futures are declining on a 5-day basis — broad market directional bias is bearish heading into the next session. Most relevant pre-market and on weekends/holidays when equity ETF prices are stale.',
+    whatToWatch: 'ES=F 5-day trend, overnight geopolitical or macro news, VIX futures, bond market action.',
+    invalidation: 'ES 5d return recovers above -0.75%; positive macro catalyst overnight; gap-up reversal.',
+    themes: ['defensive_healthcare', 'gold_precious_metals'],
+    isHeadwind: true,
+  },
 };
 
 // ── Market Forces cards renderer ──────────────────────────────────────────────
@@ -5991,6 +6004,7 @@ setInterval(async () => {
 }, 2000);
 setInterval(fetchPrices, 1000);  // live price updates between full polls
 setInterval(loadNews, 90_000);   // auto-refresh news every 90 s
+setInterval(loadIntelligence, 300_000);  // auto-refresh intelligence panels every 5 min
 loadNews();                       // load immediately on page open
 loadOvernightNotes();             // morning brief lives on Live tab, load at startup
 setInterval(() => {               // auto-refresh Catalyst 4× per trading day (~97 min)

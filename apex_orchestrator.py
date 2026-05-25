@@ -45,6 +45,90 @@ log = logging.getLogger("decifer.apex_orchestrator")
 
 _shadow_log_lock = threading.Lock()
 
+_DRIVER_STATE_PATH = os.path.join("data", "intelligence", "live_driver_state.json")
+_THEME_STATE_PATH  = os.path.join("data", "intelligence", "theme_activation.json")
+
+
+def _load_driver_notes() -> dict:
+    """Read driver + theme state and return plain-English notes for Apex.
+
+    Returns a dict with:
+      active_drivers: list[str]
+      warnings:       list[str]  — sensor proximity alerts and theme-state conflicts
+      summary:        str        — 2-3 sentence narrative for the [INTELLIGENCE NOTES] block
+    Never raises — returns empty dict on any failure.
+    """
+    try:
+        with open(_DRIVER_STATE_PATH, encoding="utf-8") as f:
+            ds = json.load(f)
+        active = ds.get("active_drivers", [])
+        evidence = ds.get("evidence", {})
+
+        warnings: list[str] = []
+
+        # ── Sensor proximity warnings ──────────────────────────────────────────
+        # Flag any evidence string that the resolver already marked with ⚠
+        for key, val in evidence.items():
+            if key.endswith("_reason") and isinstance(val, str) and "⚠" in val:
+                warnings.append(val)
+
+        # ── Theme-state conflicts: active driver but theme weakening ───────────
+        try:
+            with open(_THEME_STATE_PATH, encoding="utf-8") as f:
+                ta = json.load(f)
+            for t in ta.get("themes", []):
+                state = (t.get("state") or "").lower()
+                if state == "weakening":
+                    activated_by = t.get("activated_by") or t.get("active_drivers") or []
+                    for drv in activated_by:
+                        if drv in active:
+                            warnings.append(
+                                f"{t['theme_id']} theme is WEAKENING despite {drv} still active"
+                                f" — probable late-cycle thesis exhaustion, monitor for reversal"
+                            )
+        except Exception:
+            pass
+
+        # ── Plain-English summary ──────────────────────────────────────────────
+        driver_labels = {
+            "ai_capex_growth":         "AI infrastructure capex",
+            "ai_compute_demand":       "AI compute demand",
+            "geopolitical_risk_rising":"geopolitical risk premium",
+            "small_cap_risk_on":       "small-cap breadth expansion",
+            "futures_risk_on":         "futures bullish confirmation",
+            "futures_risk_off":        "futures bearish signal",
+            "risk_on_rotation":        "broad risk-on rotation",
+            "risk_off_rotation":       "risk-off / defensive rotation",
+            "yields_falling":          "falling yields tailwind",
+            "yields_rising":           "rising yields headwind",
+            "gold_safe_haven_bid":     "gold safe-haven bid",
+            "credit_stress_easing":    "credit stress easing",
+            "credit_stress_rising":    "credit stress rising",
+            "oil_supply_shock":        "oil supply shock",
+        }
+        active_labels = [driver_labels.get(d, d.replace("_", " ")) for d in active]
+        if active_labels:
+            summary = f"Active macro forces: {', '.join(active_labels)}."
+        else:
+            summary = "No macro drivers active — degraded or market-closed data."
+
+        es_ret = evidence.get("es_5d_ret")
+        nq_ret = evidence.get("nq_5d_ret")
+        if es_ret is not None and nq_ret is not None:
+            summary += (
+                f" Futures: ES 5d={es_ret*100:+.2f}%, NQ 5d={nq_ret*100:+.2f}%"
+                f" — {'confirming bullish' if es_ret > 0 else 'bearish lean'} into Tuesday open."
+            )
+
+        if warnings:
+            summary += f" Watch: {warnings[0]}"
+
+        return {"active_drivers": active, "warnings": warnings, "summary": summary}
+
+    except Exception as exc:
+        log.debug("_load_driver_notes failed: %s", exc)
+        return {}
+
 _SHADOW_LOG_PATH = os.path.join(
     CONFIG.get("data_dir", "data"), "apex_shadow_log.jsonl"
 )
@@ -221,6 +305,7 @@ def build_scan_cycle_apex_input(
             "regime": regime or {},
             "overnight_research": overnight_research,
             "options_flow": list(options_flow or []),
+            "driver_notes": _load_driver_notes(),
         },
         "portfolio_state": portfolio_state or {},
         "scan_ts": datetime.now(UTC).isoformat(),

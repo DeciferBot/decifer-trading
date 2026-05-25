@@ -1124,6 +1124,14 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
     parts.append(f"  regime={regime.get('regime')} vix={regime.get('vix')}")
     parts.append(f"  tape={mctx.get('tape')}")
     parts.append(f"  session_age_minutes={session_age_minutes}  (minutes since 9:30 AM ET; 0=pre-market)")
+
+    driver_notes = mctx.get("driver_notes") or {}
+    if driver_notes:
+        parts.append("\n[INTELLIGENCE NOTES]")
+        if driver_notes.get("summary"):
+            parts.append(f"  {driver_notes['summary']}")
+        for w in driver_notes.get("warnings", []):
+            parts.append(f"  ⚠ {w}")
     if sctx:
         parts.append(f"  market_read (cached): {sctx.market_read}")
         if sctx.overnight_text:

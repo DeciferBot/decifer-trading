@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-05-26 — yfinance carve-out for ES=F / NQ=F futures (v4.49.0)
+
+### Decision
+
+yfinance is approved ONLY in `futures_data.py` for ES=F and NQ=F 5-day returns. All other runtime yfinance uses were removed in v4.31.1 and are prohibited. `tests/test_no_yfinance_runtime.py::_YFINANCE_APPROVED` is the authoritative exception list.
+
+### Reasoning
+
+Alpaca has no futures support (no futures client in `alpaca.data.historical`). FMP Premium has ESUSD but blocks NQUSD. yfinance has both freely. The futures sensor is advisory only — it never affects the core 11-sensor fail-closed count. `futures_data.py` wraps all yfinance calls in `try/except`, returning `(None, None)` on any failure. `live_driver_resolver.py` also wraps the import so it degrades gracefully if the module is missing or the package is uninstalled (e.g. on the intelligence cloud where `requirements.intelligence.txt` excludes yfinance).
+
+### Constraints
+
+- Only `futures_data.py` may import yfinance. Any other file that adds `import yfinance` will fail the broad scan in `test_no_yfinance_runtime.py`.
+- Futures sensors must always be fetched AFTER `fetch_ok` is computed so they cannot trigger degraded mode.
+- If yfinance breaks (Yahoo API change), the sensor silently returns None. No alert needed — it's advisory.
+
+---
+
 ## 2026-05-26 — Customer Event Tape is customer-only, never feeds execution (Sprint M11A)
 
 ### Decision

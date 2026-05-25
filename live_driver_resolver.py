@@ -34,9 +34,16 @@ Drivers resolved (deterministic, no LLM):
   credit_stress_easing  — HYG outperforms LQD by > 0.4% over 5d
   small_cap_risk_on     — IWM outperforms SPY by > 1.5% over 5d
 
+  futures_risk_on       — ES 5d return > +0.75% (advisory evidence only)
+  futures_risk_off      — ES 5d return < -0.75% (advisory evidence only)
+
 blocked_conditions:
   credit_stress_rising  — added when that driver fires (blocks banks rule)
   smh_tactical_weakness — added when SMH 5d return between -4% and -8%
+
+Futures sensors (ES=F, NQ=F) are fetched via futures_data.py (yfinance) after
+the 11-sensor core block. They do not affect the fail-closed count or degraded
+mode, and are not wired into transmission_rules.json — evidence/narrative only.
 """
 from __future__ import annotations
 
@@ -177,7 +184,12 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
     # ai_compute_demand: NVDA structural (off only if NVDA down >5%)
     if nvda_ret is not None and nvda_ret > -0.05:
         active_drivers.append("ai_compute_demand")
-        evidence["ai_compute_demand_reason"] = f"NVDA 5d={_pct(nvda_ret)} > -5% threshold"
+        bp_from_threshold = int((-0.05 - nvda_ret) * 10000)  # negative = bp above threshold
+        proximity_note = (
+            f" ⚠ {abs(bp_from_threshold)}bp from deactivation"
+            if bp_from_threshold > -100 else ""  # warn if within 100bp of -5%
+        )
+        evidence["ai_compute_demand_reason"] = f"NVDA 5d={_pct(nvda_ret)} > -5% threshold{proximity_note}"
     elif nvda_ret is not None:
         evidence["ai_compute_demand_reason"] = f"NVDA 5d={_pct(nvda_ret)} collapsed — driver inactive"
     else:
@@ -308,6 +320,49 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
             evidence["small_cap_risk_on_reason"] = f"IWM vs SPY={_pct(iwm_vs_spy)} > +1.5%"
         else:
             evidence["small_cap_risk_on_reason"] = f"IWM vs SPY={_pct(iwm_vs_spy)} — no small-cap leadership"
+
+    # ── Futures sensors (advisory — do not affect core sensor count) ─────────
+    # ES=F and NQ=F via futures_data.py (yfinance). Fetched after fetch_ok so
+    # futures failure never triggers degraded mode for the core 11 sensors.
+    try:
+        from futures_data import fetch_futures_returns
+        es_ret, nq_ret = fetch_futures_returns()
+    except Exception:
+        es_ret, nq_ret = None, None
+
+    evidence["es_5d_ret"] = es_ret
+    evidence["nq_5d_ret"] = nq_ret
+
+    # futures_risk_on: broad market and tech futures both advancing
+    if es_ret is not None and es_ret > 0.0075:
+        active_drivers.append("futures_risk_on")
+        nq_note = f", NQ={_pct(nq_ret)}" if nq_ret is not None else ""
+        bp_margin = int((es_ret - 0.0075) * 10000)
+        margin_note = f" — {bp_margin}bp above threshold, marginal" if bp_margin < 50 else ""
+        evidence["futures_risk_on_reason"] = (
+            f"ES 5d={_pct(es_ret)} > +0.75%{nq_note} — futures bullish{margin_note}"
+        )
+    elif es_ret is not None:
+        nq_note = f", NQ={_pct(nq_ret)}" if nq_ret is not None else ""
+        bp_from = int((0.0075 - es_ret) * 10000)
+        approaching = f" — {bp_from}bp below threshold" if 0 < bp_from < 50 else ""
+        evidence["futures_risk_on_reason"] = (
+            f"ES 5d={_pct(es_ret)}{nq_note} — futures not bullish{approaching}"
+        )
+    else:
+        evidence["futures_risk_on_reason"] = "ES=F unavailable — futures sensor skipped"
+
+    # futures_risk_off: broad market futures declining
+    if es_ret is not None and es_ret < -0.0075:
+        active_drivers.append("futures_risk_off")
+        nq_note = f", NQ={_pct(nq_ret)}" if nq_ret is not None else ""
+        evidence["futures_risk_off_reason"] = (
+            f"ES 5d={_pct(es_ret)} < -0.75%{nq_note} — futures bearish"
+        )
+    elif es_ret is not None:
+        evidence["futures_risk_off_reason"] = (
+            f"ES 5d={_pct(es_ret)} — futures not bearish"
+        )
 
     mode = "live_market_data" if fetch_ok == _total_sensors else "degraded_partial_data"
 

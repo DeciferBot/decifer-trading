@@ -138,13 +138,24 @@ def test_factor_analysis_no_yfinance():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+# Explicit approved exceptions — yfinance permitted in these files only.
+# Each exception must have a documented reason in the file's module docstring.
+_YFINANCE_APPROVED = {
+    "futures_data.py",                        # ES=F / NQ=F — not available via Alpaca or FMP Premium
+    "verify_customer_event_tape_safety.py",   # false positive — string appears in docstring only, no actual import
+}
+
+
 def test_no_yfinance_import_in_any_active_source_module():
     """
     Walk every .py in active source dirs (excluding archive, tests, docs,
-    Chief-Decifer-recovered). Assert none contain an active yfinance import.
+    Chief-Decifer-recovered). Assert none contain an active yfinance import,
+    except files listed in _YFINANCE_APPROVED.
     """
     violations: list[str] = []
     for rel, abs_path in _walk_active_py_files():
+        if abs_path.name in _YFINANCE_APPROVED:
+            continue
         try:
             src = abs_path.read_text(encoding="utf-8")
         except Exception:
