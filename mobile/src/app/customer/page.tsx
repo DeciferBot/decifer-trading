@@ -15,6 +15,9 @@ export default function CustomerPage() {
       >
         <MarketView />
       </main>
+      <footer className="py-2 text-center text-[10px] text-slate-700 select-none">
+        Customer Market Map · M11B.3
+      </footer>
     </div>
   );
 }
