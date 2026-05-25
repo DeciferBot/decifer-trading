@@ -191,6 +191,13 @@ def assess_materiality(articles: list[dict]) -> list[dict]:
             if abs(kw["score"]) >= 6:
                 urgency = "CRITICAL"
 
+        # Check 1b: Macro/geopolitical events (ceasefire, invasion, embargo)
+        # always reach Apex regardless of net directional score.
+        if kw.get("macro_hit"):
+            is_material = True
+            if urgency == "MODERATE":
+                urgency = "HIGH"
+
         # Check 2: Contains strong keywords (even if net score is low)
         headline_text = " ".join(headlines).lower()
         has_strong_bull = any(kw in headline_text for kw in BULLISH_STRONG)

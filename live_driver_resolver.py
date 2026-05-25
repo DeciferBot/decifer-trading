@@ -24,7 +24,9 @@ Drivers resolved (deterministic, no LLM):
   yields_rising         — IEF 5d return < -0.4% (bond price falling = yields rising)
   yields_falling        — IEF 5d return > +0.4% (bond price rising = yields falling)
   oil_supply_shock      — USO 5d return > 4% or < -6% (price shock in either direction)
-  geopolitical_risk_rising — ITA outperforms SPY by > 2% (defence outperformance)
+  geopolitical_risk_rising  — ITA outperforms SPY by > 2% (defence outperformance)
+  geopolitical_risk_falling — ITA underperforms SPY by > 1.5% OR (USO < -5% AND ITA
+                              not leading by > 1%) — peace pricing / de-escalation
   credit_stress_rising  — HYG underperforms LQD by > 0.4% over 5d
   risk_off_rotation     — UVXY 5d return > 15% OR SPY 5d return < -2.5%
   risk_on_rotation      — UVXY 5d return < -10% AND SPY 5d return > +1.5%
@@ -217,6 +219,35 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
             evidence["geopolitical_reason"] = f"ITA vs SPY={_pct(ita_vs_spy)} > 2% — defence leading"
         else:
             evidence["geopolitical_reason"] = f"ITA vs SPY={_pct(ita_vs_spy)} — no defence outperformance"
+
+    # geopolitical_risk_falling: peace pricing / de-escalation signal.
+    # Primary: ITA underperforms SPY by >1.5% (defence fading as catalyst eases).
+    # Secondary: oil collapsing (USO < -5%) while ITA is not strongly leading
+    # (vs_spy < +1%) — captures early peace-pricing where oil leads defence.
+    # The two paths cover both late-stage (defence has rolled) and early-stage
+    # (oil reacts first) de-escalation regimes.
+    if ita_ret is not None and spy_ret is not None:
+        ita_vs_spy_falling = spy_ret - ita_ret  # positive = defence underperforming
+        oil_collapsing = uso_ret is not None and uso_ret < -0.05
+        defence_not_leading = (ita_ret - spy_ret) < 0.01
+        primary = ita_vs_spy_falling > 0.015
+        secondary = oil_collapsing and defence_not_leading
+        if primary or secondary:
+            active_drivers.append("geopolitical_risk_falling")
+            if primary:
+                evidence["geopolitical_falling_reason"] = (
+                    f"ITA underperforms SPY by {_pct(ita_vs_spy_falling)} — defence fading"
+                )
+            else:
+                evidence["geopolitical_falling_reason"] = (
+                    f"USO 5d={_pct(uso_ret)} collapsing + defence not leading "
+                    f"(ITA-SPY={_pct(ita_ret - spy_ret)}) — peace pricing"
+                )
+        else:
+            evidence["geopolitical_falling_reason"] = (
+                f"ITA-SPY={_pct(ita_ret - spy_ret)}, USO={_pct(uso_ret)} — "
+                f"no de-escalation signal"
+            )
 
     # credit_stress_rising: HYG underperforms LQD by >0.4%
     if hyg_ret is not None and lqd_ret is not None:

@@ -81,6 +81,7 @@ _DRIVER_LABELS: dict[str, str] = {
     "yields_falling":             "Bond yields falling — tailwind for growth",
     "oil_supply_shock":           "Oil supply shock active",
     "geopolitical_risk_rising":   "Geopolitical risk elevated",
+    "geopolitical_risk_falling":  "Geopolitical risk easing (peace pricing)",
     "credit_stress_easing":       "Credit conditions easing",
     "risk_on_rotation":           "Risk-on rotation underway",
     "gold_safe_haven_bid":        "Safe-haven demand for gold elevated",

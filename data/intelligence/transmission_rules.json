@@ -681,7 +681,61 @@
       "source_type": "deterministic_rule",
       "source_label": "intelligence_first_static_rule",
       "last_reviewed": "2026-05-21"
+    },
+    {
+      "rule_id": "geopolitical_risk_falling_to_defence_headwind",
+      "driver": "geopolitics",
+      "driver_alias": "geopolitical_risk_falling",
+      "condition": "geopolitical risk easing, ceasefire/peace pricing, defence sector relative-strength fading as conflict premium unwinds",
+      "output_type": "theme_headwind",
+      "affected_targets": ["defence"],
+      "direction": "negative",
+      "strength": 0.75,
+      "confidence": 0.72,
+      "horizon": "multi_day_to_multi_week",
+      "required_confirmations": ["defence_sector_relative_strength_fading", "oil_or_vix_confirming_de_escalation", "price_and_volume_confirmation_by_trading_bot"],
+      "blocked_if": ["fresh_geopolitical_escalation", "defence_sector_rebounds_strongly"],
+      "reason": "Peace pricing / de-escalation removes the conflict premium from defence names — backlog narrative intact but tactical bid evaporates",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-25"
+    },
+    {
+      "rule_id": "geopolitical_risk_falling_to_energy_headwind",
+      "driver": "geopolitics",
+      "driver_alias": "geopolitical_risk_falling",
+      "condition": "peace pricing / Strait of Hormuz reopening / supply premium unwinding removes geopolitical bid from crude and energy equities",
+      "output_type": "theme_headwind",
+      "affected_targets": ["energy"],
+      "direction": "negative",
+      "strength": 0.78,
+      "confidence": 0.74,
+      "horizon": "multi_day_to_multi_week",
+      "required_confirmations": ["uso_or_brent_relative_weakness", "supply_route_reopening_evidence", "price_and_volume_confirmation_by_trading_bot"],
+      "blocked_if": ["fresh_supply_disruption", "demand_shock_replaces_supply_premium"],
+      "reason": "De-escalation unwinds the war-risk premium in crude; oil retraces and energy sector relative strength fades",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-25"
+    },
+    {
+      "rule_id": "geopolitical_risk_falling_to_travel_leisure_tailwind",
+      "driver": "geopolitics",
+      "driver_alias": "geopolitical_risk_falling",
+      "condition": "peace pricing / de-escalation lowers crude and jet-fuel costs, lifting margin outlook for airlines, cruise lines, and travel-adjacent names",
+      "output_type": "theme_tailwind",
+      "affected_targets": ["travel_leisure"],
+      "direction": "positive",
+      "strength": 0.65,
+      "confidence": 0.65,
+      "horizon": "multi_day_to_multi_week",
+      "required_confirmations": ["uso_falling", "travel_sector_relative_strength_improving", "price_and_volume_confirmation_by_trading_bot"],
+      "blocked_if": ["fresh_geopolitical_escalation", "consumer_demand_breakdown"],
+      "reason": "Lower crude on de-escalation reduces airline fuel costs and consumer discretionary travel friction — risk-on rotation supports travel/leisure",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-25"
     }
   ],
-  "last_updated": "2026-05-21"
+  "last_updated": "2026-05-25"
 }

@@ -173,6 +173,15 @@ class AlpacaNewsStream:
             is_material = True
             urgency = "CRITICAL" if abs(kw["score"]) >= 6 else "HIGH"
 
+        # Macro events (ceasefire, invasion, embargo, sanctions lifted, etc.)
+        # force materiality regardless of directional score — a regime-defining
+        # headline must always reach Apex, even if mixed-sentiment phrasing
+        # nets out near zero.
+        if kw.get("macro_hit"):
+            is_material = True
+            if urgency == "MODERATE":
+                urgency = "HIGH"
+
         headline_lower = headline.lower()
         if any(k in headline_lower for k in BULLISH_STRONG) or any(k in headline_lower for k in BEARISH_STRONG):
             is_material = True

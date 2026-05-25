@@ -207,6 +207,61 @@ BEARISH_NORMAL = {
     "sanctions",
 }
 
+# ── Macro / geopolitical event keywords — high-impact materiality (+4 / -4) ──
+# These represent regime-defining events that must reach Apex regardless of
+# corporate sentiment context. Direction reflects broad-market impact: peace and
+# de-escalation are risk-on (BULLISH_MACRO); war and supply disruption are
+# risk-off (BEARISH_MACRO). Symbol-specific implications (peace = bad for
+# defence/oil longs) are Apex's responsibility — the keyword set's job is only
+# to ensure the article reaches the synthesizer with high urgency.
+# Single hit = +/-4 points, above the default sentinel_keyword_threshold of 3,
+# so one keyword in a headline is enough to flag the article material.
+BULLISH_MACRO = {
+    "ceasefire",
+    "cease-fire",
+    "truce",
+    "peace deal",
+    "peace agreement",
+    "peace talks",
+    "path to peace",
+    "iran deal",
+    "sanctions lifted",
+    "embargo lifted",
+    "trade deal signed",
+    "de-escalation",
+    "deescalation",
+    "diplomatic breakthrough",
+    "hormuz reopens",
+    "hormuz reopening",
+    "war ends",
+    "war ended",
+    "conflict resolved",
+}
+
+BEARISH_MACRO = {
+    "war begins",
+    "war breaks out",
+    "invasion",
+    "invades",
+    "missile strike",
+    "airstrike",
+    "nuclear strike",
+    "nuclear test",
+    "embargo",
+    "trade war",
+    "escalation",
+    "tensions escalate",
+    "conflict escalates",
+    "hormuz closed",
+    "hormuz blockade",
+    "supply shock",
+    "regime change",
+    "coup",
+    "assassination",
+    "sanctions imposed",
+    "sanctions expanded",
+}
+
 # Pre-compute: separate single-word and multi-word keywords for fast matching
 _BULL_STRONG_SINGLE = {kw for kw in BULLISH_STRONG if " " not in kw}
 _BULL_STRONG_MULTI = {kw for kw in BULLISH_STRONG if " " in kw}
@@ -216,6 +271,10 @@ _BEAR_STRONG_SINGLE = {kw for kw in BEARISH_STRONG if " " not in kw}
 _BEAR_STRONG_MULTI = {kw for kw in BEARISH_STRONG if " " in kw}
 _BEAR_NORMAL_SINGLE = {kw for kw in BEARISH_NORMAL if " " not in kw}
 _BEAR_NORMAL_MULTI = {kw for kw in BEARISH_NORMAL if " " in kw}
+_BULL_MACRO_SINGLE = {kw for kw in BULLISH_MACRO if " " not in kw and "-" not in kw}
+_BULL_MACRO_MULTI = {kw for kw in BULLISH_MACRO if " " in kw or "-" in kw}
+_BEAR_MACRO_SINGLE = {kw for kw in BEARISH_MACRO if " " not in kw and "-" not in kw}
+_BEAR_MACRO_MULTI = {kw for kw in BEARISH_MACRO if " " in kw or "-" in kw}
 
 
 def fetch_yahoo_rss(symbol: str, max_articles: int = 10) -> list[dict]:
@@ -269,11 +328,16 @@ def keyword_score(headlines: list[str]) -> dict:
     """
     Fast keyword sentiment scoring using set intersection for single-word
     keywords and substring search only for multi-word phrases.
-    Returns {score: -10 to +10, bull_hits: int, bear_hits: int, keywords: list}.
+    Returns {score: -10 to +10, bull_hits, bear_hits, keywords, macro_hit}.
+
+    macro_hit is True when any BULLISH_MACRO or BEARISH_MACRO keyword fires —
+    used by callers to force materiality even when the directional score lands
+    near zero (e.g. "Iran ceasefire reached" alone, or mixed-signal headlines).
     """
     bull_pts = 0
     bear_pts = 0
     matched_keywords = []
+    macro_hit = False
 
     for headline in headlines:
         h = headline.lower()
@@ -292,6 +356,15 @@ def keyword_score(headlines: list[str]) -> dict:
         for kw in words & _BEAR_NORMAL_SINGLE:
             bear_pts += 1
             matched_keywords.append(f"-{kw}")
+        # Macro events: +4 / -4 weight ensures single-keyword materiality
+        for kw in words & _BULL_MACRO_SINGLE:
+            bull_pts += 4
+            matched_keywords.append(f"++{kw}")
+            macro_hit = True
+        for kw in words & _BEAR_MACRO_SINGLE:
+            bear_pts += 4
+            matched_keywords.append(f"--{kw}")
+            macro_hit = True
 
         # Multi-word phrases need substring search (fewer keywords)
         for kw in _BULL_STRONG_MULTI:
@@ -310,6 +383,16 @@ def keyword_score(headlines: list[str]) -> dict:
             if kw in h:
                 bear_pts += 1
                 matched_keywords.append(f"-{kw}")
+        for kw in _BULL_MACRO_MULTI:
+            if kw in h:
+                bull_pts += 4
+                matched_keywords.append(f"++{kw}")
+                macro_hit = True
+        for kw in _BEAR_MACRO_MULTI:
+            if kw in h:
+                bear_pts += 4
+                matched_keywords.append(f"--{kw}")
+                macro_hit = True
 
     raw_score = bull_pts - bear_pts
     if raw_score > 0:
@@ -324,6 +407,7 @@ def keyword_score(headlines: list[str]) -> dict:
         "bull_hits": bull_pts,
         "bear_hits": bear_pts,
         "keywords": matched_keywords[:10],
+        "macro_hit": macro_hit,
     }
 
 

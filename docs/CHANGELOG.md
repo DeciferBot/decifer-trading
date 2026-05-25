@@ -5,6 +5,62 @@ Format: newest entries at the top. Each entry includes the date, what changed, a
 
 ---
 
+## v4.47.0 — 2026-05-25 — "Nexus" (Geopolitical awareness)
+
+### Why
+Pre-fix, the bot was blind to regime-defining geopolitical events. A real-world Iran-US
+peace-deal news cycle was running across the weekend (Trump talks, Rubio statement, oil
+futures −5% pre-market, Hormuz reopening hopes). The bot's news scorer assigned every such
+headline a materiality score of 0 — no NEWS_INTERRUPT, no Apex review — and the driver layer
+had only `geopolitical_risk_rising` with no mirror, so peace pricing produced zero
+transmission-rule output. We were positioned long USO (415 shares) into the bearish oil
+cycle, by coincidence not by intelligence.
+
+### News vocabulary (`news.py`)
+- **Added**: `BULLISH_MACRO` and `BEARISH_MACRO` keyword sets covering ceasefire / peace
+  deal / truce / sanctions lifted / Hormuz reopening / invasion / embargo / escalation /
+  trade war / coup / assassination.
+- **Changed**: `keyword_score()` now applies +4 / −4 weight per macro keyword (above the
+  default `sentinel_keyword_threshold` of 3) so a single macro keyword forces materiality.
+- **Changed**: `keyword_score()` return now includes `macro_hit: bool` flag.
+
+### Materiality gates
+- **Changed**: `alpaca_news.py._process_article` honours `macro_hit` — regime-defining
+  headlines reach Apex even when the directional score lands near zero (mixed-signal phrasing).
+- **Changed**: `news_sentinel.py` honours `macro_hit` in the same way.
+
+### Driver layer (`live_driver_resolver.py`)
+- **Added**: `geopolitical_risk_falling` driver — the missing mirror of
+  `geopolitical_risk_rising`. Two firing paths: (1) primary — ITA underperforms SPY by
+  >1.5% (defence fading); (2) secondary — USO collapses (<−5%) while ITA is not leading
+  by >1% (early peace-pricing where oil reacts before defence rolls). The two paths cover
+  both late- and early-stage de-escalation regimes.
+
+### Transmission rules (`data/intelligence/transmission_rules.json`)
+- **Added**: 3 rules for `geopolitical_risk_falling` — defence headwind, energy headwind,
+  travel_leisure tailwind. Rules now total 34.
+
+### UI labels (`market_now_builder.py`)
+- **Added**: `_DRIVER_LABELS["geopolitical_risk_falling"] = "Geopolitical risk easing
+  (peace pricing)"` so the dashboard renders the driver when it fires.
+
+### Tests
+- **Added**: `tests/test_geopolitical_news_awareness.py` — 17 tests covering keyword
+  materiality (8), gate honouring (1), driver firing on each path (3), transmission rule
+  completeness (3), market_now label registration (1), and a regression test using the
+  actual current 5d-return values to confirm the falling driver does NOT fire while
+  defence is still leading strongly (today's reality).
+
+### Result
+- 17 new tests passing; full suite green except the 4 pre-existing
+  `TestMarketNowBuilder` freshness-window failures (unrelated).
+- Next ceasefire / invasion / embargo headline reaches Apex with HIGH urgency.
+- Once price action confirms peace pricing (ITA fading or USO collapsing), the driver
+  layer activates `geopolitical_risk_falling` and the transmission rules fire defence/energy
+  headwinds + travel_leisure tailwind — giving Apex grounded thematic signals.
+
+---
+
 ## v4.1.0 — 2026-05-19 — "Nexus" (Intelligence Layer + Health Tab sprint)
 
 Version correction: the previous 4.0.x patch series should have produced multiple MINOR bumps for
