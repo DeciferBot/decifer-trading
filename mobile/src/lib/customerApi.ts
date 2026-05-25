@@ -2,9 +2,13 @@
 // Reads exclusively from NEXT_PUBLIC_INTELLIGENCE_API_URL.
 // Must NOT reference private bot routes, broker state, or execution data.
 
-const INTELLIGENCE_API_URL =
-  process.env.NEXT_PUBLIC_INTELLIGENCE_API_URL ??
-  "https://intelligence.decifertrading.com";
+const DEFAULT_INTELLIGENCE_API_BASE = "https://intelligence.decifertrading.com";
+
+// Use || not ?? so that an empty-string env var also falls back to the default.
+function getIntelligenceApiBase(): string {
+  const raw = process.env.NEXT_PUBLIC_INTELLIGENCE_API_URL?.trim();
+  return raw || DEFAULT_INTELLIGENCE_API_BASE;
+}
 
 // M11A key event shape
 export interface KeyEvent {
@@ -79,9 +83,8 @@ export interface MarketNowPayload {
 }
 
 export async function fetchMarketNow(): Promise<MarketNowPayload> {
-  const res = await fetch(`${INTELLIGENCE_API_URL}/api/market-now`, {
-    cache: "no-store",
-  });
+  const base = getIntelligenceApiBase().replace(/\/$/, "");
+  const res = await fetch(`${base}/api/market-now`, { cache: "no-store" });
   if (!res.ok) throw new Error(`/api/market-now → ${res.status}`);
   return res.json();
 }

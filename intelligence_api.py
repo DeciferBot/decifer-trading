@@ -45,7 +45,7 @@ from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
 
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, request
 
 # runtime_config is read at import time — ensures intelligence_cloud mode is enforced
 # before any route handler runs.
@@ -85,6 +85,9 @@ if _RUNTIME_MODE != runtime_config.MODE_INTELLIGENCE_CLOUD:
 # ---------------------------------------------------------------------------
 
 _CORS_ORIGIN = os.environ.get("INTELLIGENCE_API_CORS_ORIGIN", "*")
+_CORS_METHODS = "GET, OPTIONS"
+_CORS_HEADERS = "Content-Type, Cache-Control, Origin, Accept"
+_CORS_MAX_AGE = "3600"
 _API_VERSION = "1.0"
 
 
@@ -93,8 +96,17 @@ def _json_response(data: dict, status: int = 200) -> Response:
     r.status_code = status
     r.headers["X-Decifer-Runtime-Mode"] = _RUNTIME_MODE
     r.headers["X-Decifer-API-Version"] = _API_VERSION
-    r.headers["Access-Control-Allow-Origin"] = _CORS_ORIGIN
     return r
+
+
+@app.after_request
+def _apply_cors(response: Response) -> Response:
+    """Add CORS headers to every response — required for browser fetches from Vercel."""
+    response.headers["Access-Control-Allow-Origin"] = _CORS_ORIGIN
+    response.headers["Access-Control-Allow-Methods"] = _CORS_METHODS
+    response.headers["Access-Control-Allow-Headers"] = _CORS_HEADERS
+    response.headers["Access-Control-Max-Age"] = _CORS_MAX_AGE
+    return response
 
 
 def _error(message: str, status: int = 500) -> Response:
@@ -233,7 +245,7 @@ def health() -> Response:
     })
 
 
-@app.route("/api/market-now")
+@app.route("/api/market-now", methods=["GET", "OPTIONS"])
 def market_now() -> Response:
     """
     SaaS-safe Market Now intelligence payload.
@@ -249,6 +261,9 @@ def market_now() -> Response:
 
     Excludes: all broker state, raw prices, execution signals, internal scores.
     """
+    if request.method == "OPTIONS":
+        return Response(status=204)
+
     try:
         payload = get_market_now_dict()
     except Exception as exc:

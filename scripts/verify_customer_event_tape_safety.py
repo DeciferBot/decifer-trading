@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-verify_customer_event_tape_safety.py — Sprint M11A safety verifier.
+verify_customer_event_tape_safety.py — Sprint M11A + M11B safety verifier.
 
 Scans the repository and fails if any of the following invariants are
 violated:
 
   E1  customer_event_tape is imported by an execution module
-       (orders_*, bot_trading, bot_ibkr, apex_orchestrator,
-        options_entries, alpaca_news, news_sentinel, pm_*, …)
   E2  customer_event_tape is imported by universe_builder.py for live scoring
   E3  customer_event_tape is imported by handoff_reader.py for live trading
   E4  market_now_reconciler is imported by anything other than
@@ -17,6 +15,14 @@ violated:
   E6  yfinance is imported by any new M11A module
   E7  Mac-only absolute paths leak into any of the three new modules
   E8  data/intelligence/customer_event_tape.json fails saas safety walk
+
+  C1  /customer route imports an operator view
+       (ApexView, TodayView, HoldingsView, ActivityView, ResultsView)
+  C2  customerApi.ts references NEXT_PUBLIC_BOT_API_URL, a relative
+       /api/market-now URL, or operator api.ts
+  C3  customerApi.ts is missing the safe default Intelligence API URL
+  C4  customer-facing TSX code exposes private trading terms
+  C5  customer route introduces a mutation method (POST, PUT, PATCH, DELETE)
 
 Exit codes
 ──────────
@@ -312,6 +318,130 @@ def check_tape_file_safety() -> list[str]:
     return violations
 
 
+# ─── M11B TypeScript / customer-surface checks ───────────────────────────────
+
+_MOBILE_SRC = _REPO_ROOT / "mobile" / "src"
+
+_OPERATOR_VIEWS = frozenset({
+    "ApexView", "TodayView", "HoldingsView", "ActivityView", "ResultsView",
+})
+
+# Private trading terms that must not appear in customer-facing rendering code.
+# Chosen to be high-confidence — specific enough to avoid false positives on
+# common English words or CSS property names.
+_PRIVATE_RENDERING_TERMS = (
+    "ibkr", "ibroker",
+    "signal_score", "ic_weight", "ic_weights",
+    "stop_loss", "stop loss",
+    "buy_signal", "sell_signal", "execution_signal",
+    "trade_recommendation", "execution_readiness",
+    "unrealized_pnl", "realized_pnl", "daily_pnl",
+    "broker_account", "account_id", "ibkr_account", "ibkr_order",
+    "buy now", "sell now",
+)
+
+_SAFE_INTELLIGENCE_URL = "https://intelligence.decifertrading.com"
+
+
+def _read_ts(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def check_customer_surface_imports() -> list[str]:
+    """C1 — /customer route does not import operator views."""
+    violations: list[str] = []
+    customer_dir = _MOBILE_SRC / "app" / "customer"
+    if not customer_dir.exists():
+        return []
+    for path in customer_dir.rglob("*.tsx"):
+        src = _read_ts(path)
+        for view in sorted(_OPERATOR_VIEWS):
+            if view in src:
+                violations.append(
+                    f"[C1] {path.relative_to(_REPO_ROOT)}: customer route "
+                    f"imports or references operator view {view!r}."
+                )
+    return violations
+
+
+def check_customer_api_ts() -> list[str]:
+    """C2, C3 — customerApi.ts uses Intelligence API, not bot dashboard."""
+    violations: list[str] = []
+    path = _MOBILE_SRC / "lib" / "customerApi.ts"
+    if not path.exists():
+        violations.append("[C2] mobile/src/lib/customerApi.ts not found.")
+        return violations
+    src = _read_ts(path)
+    if "NEXT_PUBLIC_BOT_API_URL" in src:
+        violations.append(
+            "[C2] customerApi.ts references NEXT_PUBLIC_BOT_API_URL. "
+            "Customer API must not reference the bot dashboard env var."
+        )
+    # Relative /api/market-now as a bare string literal (not as a URL suffix)
+    if '"/api/market-now"' in src or "'/api/market-now'" in src:
+        violations.append(
+            "[C2] customerApi.ts contains a bare relative URL '/api/market-now'. "
+            "Must use absolute URL via getIntelligenceApiBase()."
+        )
+    # Import of operator api.ts
+    for bad_import in ('from "./api"', 'from "@/lib/api"', "from '../lib/api'", 'from "./api.ts"'):
+        if bad_import in src:
+            violations.append(
+                f"[C2] customerApi.ts imports operator api.ts ({bad_import!r}). "
+                "Customer API must be isolated from the bot dashboard client."
+            )
+    # C3: safe default URL must be present
+    if _SAFE_INTELLIGENCE_URL not in src:
+        violations.append(
+            f"[C3] customerApi.ts is missing the safe default Intelligence API URL "
+            f"({_SAFE_INTELLIGENCE_URL!r}). Empty NEXT_PUBLIC_INTELLIGENCE_API_URL "
+            "must fall back to this constant."
+        )
+    return violations
+
+
+def check_no_private_terms_in_customer_tsx() -> list[str]:
+    """C4 — customer-facing TSX does not expose private trading internals."""
+    violations: list[str] = []
+    files_to_check: list[Path] = []
+    customer_dir = _MOBILE_SRC / "app" / "customer"
+    if customer_dir.exists():
+        files_to_check.extend(customer_dir.rglob("*.tsx"))
+    market_view = _MOBILE_SRC / "views" / "MarketView.tsx"
+    if market_view.exists():
+        files_to_check.append(market_view)
+    for path in files_to_check:
+        src = _read_ts(path).lower()
+        for term in _PRIVATE_RENDERING_TERMS:
+            if term.lower() in src:
+                violations.append(
+                    f"[C4] {path.relative_to(_REPO_ROOT)}: customer-facing "
+                    f"code contains private trading term {term!r}."
+                )
+    return violations
+
+
+def check_no_mutation_methods_in_customer_routes() -> list[str]:
+    """C5 — customer routes do not export POST/PUT/PATCH/DELETE handlers."""
+    violations: list[str] = []
+    customer_dir = _MOBILE_SRC / "app" / "customer"
+    if not customer_dir.exists():
+        return []
+    for path in customer_dir.rglob("*.ts"):
+        src = _read_ts(path)
+        for method in ("POST", "PUT", "PATCH", "DELETE"):
+            if (f"export async function {method}" in src
+                    or f"export function {method}" in src):
+                violations.append(
+                    f"[C5] {path.relative_to(_REPO_ROOT)}: customer route "
+                    f"exports mutation handler {method!r}. Customer routes are GET-only."
+                )
+    return violations
+
+
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 def main() -> int:
@@ -324,8 +454,13 @@ def main() -> int:
     all_violations.extend(check_no_yfinance_in_m11a(files))
     all_violations.extend(check_no_mac_only_paths(files))
     all_violations.extend(check_tape_file_safety())
+    # M11B customer-surface checks
+    all_violations.extend(check_customer_surface_imports())
+    all_violations.extend(check_customer_api_ts())
+    all_violations.extend(check_no_private_terms_in_customer_tsx())
+    all_violations.extend(check_no_mutation_methods_in_customer_routes())
 
-    print("Decifer Sprint M11A — Customer Event Tape safety verifier")
+    print("Decifer Sprint M11A/M11B — Customer safety verifier")
     print(f"  Scanned: {len(files)} Python files")
     print(f"  New M11A modules: {', '.join(_NEW_M11A_MODULES)}")
     print(f"  Allowed tape importers: {sorted(_ALLOWED_TAPE_IMPORTERS)}")
@@ -337,7 +472,7 @@ def main() -> int:
         print()
         return 1
 
-    print("\n  PASSED — all Sprint M11A safety invariants hold.\n")
+    print("\n  PASSED — all Sprint M11A/M11B safety invariants hold.\n")
     return 0
 
 
