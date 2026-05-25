@@ -1,12 +1,12 @@
 {
-  "name": "Decifer",
+  "name": "Decifer Market Intelligence",
   "short_name": "Decifer",
-  "description": "Autonomous AI trading bot dashboard",
-  "theme_color": "#0a0a0a",
-  "background_color": "#0a0a0a",
+  "description": "Market intelligence — signals, themes, and evidence. Not financial advice.",
+  "theme_color": "#0c1427",
+  "background_color": "#0c1427",
   "display": "standalone",
   "orientation": "portrait",
-  "start_url": "/",
+  "start_url": "/customer",
   "scope": "/",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },

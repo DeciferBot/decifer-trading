@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Decifer",
-  description: "Autonomous AI trading dashboard",
+  title: "Decifer Market Intelligence",
+  description: "Market intelligence — signals, themes, and evidence. Not financial advice.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -16,23 +16,36 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0a0a0a",
+  themeColor: "#0c1427",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark h-full">
       <head>
-        {/* Unregister any stale service workers left by the previous tunnel-based app */}
+        {/* M11B.4 kill-switch: unregister any stale service workers from previous app shells */}
         <script dangerouslySetInnerHTML={{ __html: `
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) { r.unregister(); });
   });
+  caches.keys().then(function(keys) {
+    keys.forEach(function(k) {
+      if (k.startsWith('decifer-') || k.startsWith('workbox-') || k.includes('mobile')) {
+        caches.delete(k);
+      }
+    });
+  });
 }
 ` }} />
       </head>
-      <body suppressHydrationWarning className="h-full bg-[#0a0a0a] text-white antialiased">{children}</body>
+      <body
+        suppressHydrationWarning
+        className="h-full antialiased"
+        style={{ background: "#0c1427", color: "#fff" }}
+      >
+        {children}
+      </body>
     </html>
   );
 }
