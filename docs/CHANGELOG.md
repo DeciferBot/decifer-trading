@@ -5,6 +5,15 @@ Format: newest entries at the top. Each entry includes the date, what changed, a
 
 ---
 
+## v4.65.1 — 2026-05-27 — "Nexus" (M13G closure + session data)
+
+### What
+Sprint M13G confirmed complete: `buildWhyItMattersNow()` and `buildRiskNoteLine()` are live
+in `nameResearchModel.ts`. NameResearchSheet renders company-aware authored copy. 366 mobile
+tests passing. Session runtime data committed.
+
+---
+
 ## v4.47.0 — 2026-05-25 — "Nexus" (Geopolitical awareness)
 
 ### Why
