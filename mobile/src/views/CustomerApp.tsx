@@ -260,17 +260,19 @@ export default function CustomerApp() {
                 v{process.env.NEXT_PUBLIC_APP_VERSION}
               </span>
             </div>
-            <p className="text-[13px] font-medium text-slate-200 leading-snug">
+            {/* suppressHydrationWarning: clock values are computed from new Date()
+                — server (UTC) and client (local timezone) always differ */}
+            <p className="text-[13px] font-medium text-slate-200 leading-snug" suppressHydrationWarning>
               {clock.greeting}. Here is your market briefing.
             </p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className="text-[11px] text-slate-400">{clock.localTime}</span>
+              <span className="text-[11px] text-slate-400" suppressHydrationWarning>{clock.localTime}</span>
               <span className="text-[10px] text-slate-600">·</span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-slate-400" suppressHydrationWarning>
                 {clock.newYorkTime} <span className="text-slate-500">ET</span>
               </span>
               <span className="text-[10px] text-slate-600">·</span>
-              <span className="text-[11px] font-semibold" style={{ color: sessionColor }}>
+              <span className="text-[11px] font-semibold" style={{ color: sessionColor }} suppressHydrationWarning>
                 {clock.sessionLabel}
               </span>
             </div>

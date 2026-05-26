@@ -2,9 +2,17 @@ import type { NextConfig } from "next";
 import fs from "fs";
 import path from "path";
 
-// Read the system version from the monorepo root version.py.
-// Injected at build time so the UI always shows the deployed version.
+// Read the deployed version for build-time injection into NEXT_PUBLIC_APP_VERSION.
+// Resolution order:
+//   1. version.json (mobile/ root) — present in Vercel deployment, always wins
+//   2. ../version.py (monorepo root) — local dev when running from mobile/
+//   3. "dev" fallback
 function getSystemVersion(): string {
+  try {
+    const local = fs.readFileSync(path.join(__dirname, "version.json"), "utf8");
+    const v = JSON.parse(local).version;
+    if (v) return v;
+  } catch {}
   try {
     const file = fs.readFileSync(path.join(__dirname, "../version.py"), "utf8");
     const match = file.match(/__version__ = "([^"]+)"/);
