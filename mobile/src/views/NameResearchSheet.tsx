@@ -12,6 +12,8 @@ import {
   buildFundamentalsLine,
   buildAnalystLine,
   buildDetailQuestions,
+  buildWhyItMattersNow,
+  buildRiskNoteLine,
   mergeFreshPrice,
   buildPriceFreshnessLabel,
 } from "@/lib/nameResearchModel";
@@ -112,6 +114,26 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
     card.companyName !== card.symbol ? card.companyName : undefined,
   );
 
+  const whyItMattersLine = buildWhyItMattersNow(
+    card.symbol,
+    card.storyGroup,
+    card.reasonToCare,
+    {
+      companyName: card.companyName !== card.symbol ? card.companyName : undefined,
+      confidenceLanguage: card.confidenceLanguage,
+      watchType: card.watchType,
+      driverActive: card.driverActive,
+    },
+  );
+
+  const riskLine = card.riskNote
+    ? buildRiskNoteLine(
+        card.symbol,
+        card.riskNote,
+        card.companyName !== card.symbol ? card.companyName : undefined,
+      )
+    : null;
+
   const priceAction = mergeFreshPrice(freshPrice, card.priceAction);
   const freshnessLabel = buildPriceFreshnessLabel(priceTs);
   const { tone, displayText, price } = priceAction;
@@ -204,10 +226,10 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
             )}
           </div>
 
-          {/* Why connected */}
+          {/* Why it matters now */}
           <section>
             <SectionLabel>Why it matters now</SectionLabel>
-            <p className="text-[12px] text-slate-300 leading-relaxed">{card.reasonToCare}</p>
+            <p className="text-[12px] text-slate-300 leading-relaxed">{whyItMattersLine}</p>
           </section>
 
           {/* Company context */}
@@ -244,8 +266,8 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
             </section>
           )}
 
-          {/* Risk note */}
-          {card.riskNote && (
+          {/* Risk to watch */}
+          {riskLine && (
             <div
               className="rounded-xl px-4 py-3"
               style={{
@@ -255,7 +277,7 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
             >
               <SectionLabel>Risk to watch</SectionLabel>
               <p className="text-[11px] leading-relaxed" style={{ color: "#fbbf24" }}>
-                {card.riskNote}
+                {riskLine}
               </p>
             </div>
           )}

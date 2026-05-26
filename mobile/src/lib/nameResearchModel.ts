@@ -261,18 +261,18 @@ export function buildFundamentalsLine(
 
   const parts: string[] = [];
 
-  if (fundamentals.peRatio != null && fundamentals.peRatio > 0) {
-    parts.push(`trading at approximately ${fundamentals.peRatio.toFixed(0)}× trailing earnings`);
-  }
-  if (fundamentals.grossMargin != null && fundamentals.grossMargin > 0) {
-    const marginPct = (fundamentals.grossMargin * 100).toFixed(0);
-    parts.push(`gross margin around ${marginPct}%`);
-  }
+  // Revenue growth first — most forward-looking
   if (fundamentals.revenueGrowth != null) {
     const pct = Math.abs(fundamentals.revenueGrowth * 100).toFixed(0);
     const direction = fundamentals.revenueGrowth >= 0 ? "growing" : "contracting";
     parts.push(`revenue ${direction} ${pct}% year over year`);
   }
+  // Gross margin
+  if (fundamentals.grossMargin != null && fundamentals.grossMargin > 0) {
+    const marginPct = (fundamentals.grossMargin * 100).toFixed(0);
+    parts.push(`gross margin around ${marginPct}%`);
+  }
+  // EPS
   if (fundamentals.eps != null) {
     const epsStr =
       fundamentals.eps >= 0
@@ -280,11 +280,25 @@ export function buildFundamentalsLine(
         : `-$${Math.abs(fundamentals.eps).toFixed(2)}`;
     parts.push(`trailing earnings per share ${epsStr}`);
   }
+  // Valuation last
+  if (fundamentals.peRatio != null && fundamentals.peRatio > 0) {
+    parts.push(`trading at approximately ${fundamentals.peRatio.toFixed(0)}× trailing earnings`);
+  }
 
   if (parts.length === 0) {
     return "Detailed financial context is not available from the current data source.";
   }
-  return `Recent figures show ${parts.join(", ")}. These reflect trailing reported data and should be read alongside current guidance.`;
+
+  let joined: string;
+  if (parts.length === 1) {
+    joined = parts[0];
+  } else if (parts.length === 2) {
+    joined = `${parts[0]}, and ${parts[1]}`;
+  } else {
+    joined = `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+  }
+  const cap = joined.charAt(0).toUpperCase() + joined.slice(1);
+  return `${cap}. Trailing figures — may not reflect recent guidance.`;
 }
 
 // ── Analyst context line ──────────────────────────────────────────────────────
@@ -306,16 +320,87 @@ export function buildAnalystLine(
     return "Analyst context is not available — the story here leans more on price action and theme exposure.";
   }
 
-  const parts: string[] = [];
-  if (analyst.ratingCount) parts.push(`${analyst.ratingCount} analysts on record`);
+  const coverageParts: string[] = [];
+  if (analyst.ratingCount) coverageParts.push(`${analyst.ratingCount} analysts on record`);
   const sentiment = normaliseConsensus(analyst.consensus);
-  if (sentiment) parts.push(`sentiment ${sentiment}`);
-  if (analyst.priceTarget) parts.push(`price context around $${analyst.priceTarget.toFixed(0)}`);
+  if (sentiment) coverageParts.push(`sentiment ${sentiment}`);
 
-  if (parts.length === 0) {
+  const sentence1 = coverageParts.length > 0
+    ? `Analyst coverage shows ${coverageParts.join(", ")}.`
+    : "";
+
+  const sentence2 = analyst.priceTarget
+    ? `Price context is around $${analyst.priceTarget.toFixed(0)}.`
+    : "";
+
+  if (!sentence1 && !sentence2) {
     return "Some analyst context is on record, though a detailed breakdown is not available.";
   }
-  return `Coverage shows ${parts.join(", ")}, provided here as market context only — not a recommendation.`;
+
+  const caveat = "Market context only — not a recommendation.";
+  return [sentence1, sentence2, caveat].filter(Boolean).join(" ");
+}
+
+// ── Connection phrase map (used by buildWhyItMattersNow) ─────────────────────
+
+const CONNECTION_PHRASES: Record<string, string> = {
+  "Directly connected":       "appears as a direct exposure",
+  "Supply chain exposure":    "has supply chain exposure",
+  "Indirect exposure":        "has indirect exposure",
+  "ETF basket exposure":      "is part of a broader basket",
+  "Potential pressure point": "may face headwinds",
+};
+
+// ── Company-aware narrative intro ─────────────────────────────────────────────
+
+export function buildWhyItMattersNow(
+  symbol: string,
+  storyGroup: string,
+  reasonToCare: string,
+  options: {
+    companyName?: string;
+    confidenceLanguage?: string;
+    watchType?: WatchType;
+    driverActive?: boolean;
+  } = {},
+): string {
+  const label = TTG_STORY_LABELS[storyGroup] ?? storyGroup;
+  const name =
+    options.companyName && options.companyName !== symbol ? options.companyName : symbol;
+  const connectionPhrase =
+    (options.confidenceLanguage && CONNECTION_PHRASES[options.confidenceLanguage]) ??
+    "is connected";
+
+  const intro = `${name} ${connectionPhrase} within the ${label} story.`;
+
+  const driverNote = options.driverActive ? " The underlying driver is currently active." : "";
+
+  const watchNote =
+    options.watchType === "Catalyst watch"
+      ? " A catalyst event may be in play for this name."
+      : options.watchType === "Structural watch"
+        ? " The connection is structural — longer-term exposure rather than a near-term event."
+        : "";
+
+  return `${intro} ${reasonToCare}${driverNote}${watchNote}`.trim();
+}
+
+// ── Company-aware risk note ───────────────────────────────────────────────────
+
+export function buildRiskNoteLine(
+  symbol: string,
+  riskNote: string,
+  companyName?: string,
+): string {
+  // Only prefix when a real company name distinct from the symbol is available
+  const label = companyName && companyName !== symbol ? companyName : null;
+  if (!label) return riskNote;
+  // Don't double-prefix if the note already names the company or symbol
+  const noteLC = riskNote.toLowerCase();
+  if (noteLC.includes(label.toLowerCase()) || noteLC.includes(symbol.toLowerCase())) {
+    return riskNote;
+  }
+  return `For ${label}: ${riskNote}`;
 }
 
 // ── Contextual Ask questions ──────────────────────────────────────────────────

@@ -13,6 +13,8 @@ import {
   buildFundamentalsLine,
   buildAnalystLine,
   buildDetailQuestions,
+  buildWhyItMattersNow,
+  buildRiskNoteLine,
   mergeFreshPrice,
   buildPriceFreshnessLabel,
   type NameFundamentalsResponse,
@@ -807,6 +809,135 @@ describe("buildFundamentalsLine — EPS and revenueGrowth", () => {
     const forbidden = ["buy", "sell", "order", "broker", "account", "stop loss", "conviction"];
     for (const w of forbidden) {
       expect(line.toLowerCase()).not.toContain(w);
+    }
+  });
+});
+
+// ── buildWhyItMattersNow ──────────────────────────────────────────────────────
+
+describe("buildWhyItMattersNow", () => {
+  const SYMBOL = "NVDA";
+  const STORY  = "AI Infrastructure & Energy";
+  const REASON = "Dominant AI chip supplier benefiting from hyperscaler capex growth.";
+
+  it("uses company name when provided and differs from symbol", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON, {
+      companyName: "NVIDIA Corporation",
+    });
+    expect(line).toContain("NVIDIA Corporation");
+    expect(line.startsWith("NVIDIA Corporation")).toBe(true);
+  });
+
+  it("falls back to symbol when companyName equals symbol", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON, { companyName: SYMBOL });
+    expect(line.startsWith("NVDA")).toBe(true);
+  });
+
+  it("falls back to symbol when companyName is undefined", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON);
+    expect(line.startsWith("NVDA")).toBe(true);
+  });
+
+  it("maps 'Directly connected' to a direct exposure phrase", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON, {
+      confidenceLanguage: "Directly connected",
+    });
+    expect(line).toContain("direct exposure");
+  });
+
+  it("maps 'Supply chain exposure' to supply chain phrasing", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON, {
+      confidenceLanguage: "Supply chain exposure",
+    });
+    expect(line).toContain("supply chain exposure");
+  });
+
+  it("adds driver note when driverActive is true", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON, { driverActive: true });
+    expect(line.toLowerCase()).toContain("driver");
+    expect(line.toLowerCase()).toContain("active");
+  });
+
+  it("does not add driver note when driverActive is false", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON, { driverActive: false });
+    expect(line.toLowerCase()).not.toContain("driver is currently active");
+  });
+
+  it("translates raw theme IDs via TTG_STORY_LABELS", () => {
+    const line = buildWhyItMattersNow(SYMBOL, "ai_energy_nuclear", REASON);
+    expect(line).not.toContain("ai_energy_nuclear");
+    expect(line).toContain("AI Infrastructure & Energy");
+  });
+
+  it("adds catalyst note for Catalyst watch type", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON, { watchType: "Catalyst watch" });
+    expect(line.toLowerCase()).toContain("catalyst");
+  });
+
+  it("adds structural note for Structural watch type", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON, { watchType: "Structural watch" });
+    expect(line.toLowerCase()).toContain("structural");
+  });
+
+  it("contains no forbidden execution language", () => {
+    const forbidden = ["buy", "sell", "order", "position", "entry", "exit", "broker",
+      "account", "stop loss", "recommendation", "p&l"];
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON, {
+      companyName: "NVIDIA Corporation",
+      confidenceLanguage: "Directly connected",
+      driverActive: true,
+    });
+    for (const w of forbidden) {
+      expect(line.toLowerCase()).not.toContain(w);
+    }
+  });
+
+  it("always ends with a non-empty string", () => {
+    const line = buildWhyItMattersNow(SYMBOL, STORY, REASON);
+    expect(line.trim().length).toBeGreaterThan(10);
+  });
+});
+
+// ── buildRiskNoteLine ─────────────────────────────────────────────────────────
+
+describe("buildRiskNoteLine", () => {
+  it("returns riskNote as-is when company name is not provided", () => {
+    const note = "Valuation is stretched relative to near-term catalysts.";
+    expect(buildRiskNoteLine("NVDA", note)).toBe(note);
+  });
+
+  it("prefixes with company name when name is available and not in note", () => {
+    const note = "Valuation is stretched relative to near-term catalysts.";
+    const result = buildRiskNoteLine("NVDA", note, "NVIDIA Corporation");
+    expect(result.startsWith("For NVIDIA Corporation:")).toBe(true);
+    expect(result).toContain(note);
+  });
+
+  it("does NOT prefix if company name already appears in the note", () => {
+    const note = "NVIDIA Corporation faces margin pressure from rising memory costs.";
+    const result = buildRiskNoteLine("NVDA", note, "NVIDIA Corporation");
+    expect(result).toBe(note);
+  });
+
+  it("does NOT prefix if symbol already appears in the note", () => {
+    const note = "NVDA earnings guidance may disappoint relative to elevated expectations.";
+    const result = buildRiskNoteLine("NVDA", note, "NVIDIA Corporation");
+    expect(result).toBe(note);
+  });
+
+  it("returns note as-is when companyName equals symbol (redundant prefix)", () => {
+    const note = "Valuation is stretched relative to near-term catalysts.";
+    // companyName === symbol → label is null → no prefix
+    const result = buildRiskNoteLine("NVDA", note, "NVDA");
+    expect(result).toBe(note);
+  });
+
+  it("contains no forbidden execution language in generated prefix", () => {
+    const note = "Sector rotation may reduce attention on this name.";
+    const result = buildRiskNoteLine("MSFT", note, "Microsoft Corporation");
+    const forbidden = ["buy", "sell", "order", "stop loss", "broker"];
+    for (const w of forbidden) {
+      expect(result.toLowerCase()).not.toContain(w);
     }
   });
 });
