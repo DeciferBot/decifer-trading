@@ -1,13 +1,11 @@
 "use client";
-// Universe tab — names on the Decifer intelligence map.
-// Primary: TTG evidence-gated symbols from /api/intelligence/themes (M12A).
-// Overlay: live radar items from event tape (shown above TTG when present).
-// Filter chips by route_hint: All | In Focus | On the Radar | ETF Route | Monitor.
-// Suppressed symbols (needs_review/proposed) are filtered by the Python evidence
-// gate and never appear in TTG API responses.
+// Names tab — story-grouped research cards.
+// Phase 1: TTG structural themes from /api/intelligence/themes.
+// Phase 2: live prices via /api/name-prices for top-50 priority symbols.
+// Customer-safe language only — no execution, broker, or trading-control terms.
 
-import { useMemo, useState, useEffect } from "react";
-import { ChevronRight, Zap, ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowRight, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import type {
   MarketNowPayload,
   RadarItem,
@@ -15,197 +13,204 @@ import type {
   TtgSymbolCard,
 } from "@/lib/customerApi";
 import { fetchTtgThemes, fetchTtgThemeDetail } from "@/lib/customerApi";
+import type { NamePriceEntry } from "@/lib/namePriceUtils";
+import { MAX_SYMBOLS } from "@/lib/namePriceUtils";
+import {
+  buildStoryGroups,
+  buildRadarCards,
+  prioritySymbols,
+  type ResearchNameCard,
+  type ResearchStoryGroup,
+} from "@/lib/nameResearchModel";
 
-type Filter = "all" | "in_focus" | "on_radar" | "etf" | "monitor";
+// ── Watch type badge ───────────────────────────────────────────────────────────
 
-function routeFilter(hint: string): Filter {
-  const h = hint.toLowerCase();
-  if (h === "in focus") return "in_focus";
-  if (h === "on the radar") return "on_radar";
-  if (h.includes("etf") || h.includes("route")) return "etf";
-  if (h.includes("monitor")) return "monitor";
-  return "in_focus";
-}
-
-// ── Route hint chip ────────────────────────────────────────────────────────────
-
-function RouteChip({ hint }: { hint: string }) {
-  const h = hint.toLowerCase();
-  let bg = "rgba(249,115,22,0.12)";
-  let color = "#fb923c";
-  if (h.includes("etf") || h.includes("route")) { bg = "rgba(99,102,241,0.12)"; color = "#818cf8"; }
-  else if (h === "on the radar")                 { bg = "rgba(59,130,246,0.12)"; color = "#60a5fa"; }
-  else if (h.includes("monitor"))                { bg = "rgba(245,158,11,0.12)"; color = "#fbbf24"; }
+function WatchBadge({ watchType }: { watchType: ResearchNameCard["watchType"] }) {
+  const styles: Record<string, { bg: string; color: string }> = {
+    "Catalyst watch":  { bg: "rgba(16,185,129,0.12)",  color: "#34d399" },
+    "Structural watch":{ bg: "rgba(99,102,241,0.12)",  color: "#818cf8" },
+    "Market attention":{ bg: "rgba(148,163,184,0.10)", color: "#94a3b8" },
+  };
+  const s = styles[watchType] ?? styles["Market attention"];
   return (
-    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0"
-      style={{ background: bg, color }}>
-      {hint}
+    <span
+      className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0"
+      style={{ background: s.bg, color: s.color }}
+    >
+      {watchType}
     </span>
   );
 }
 
-// ── Exposure type label ────────────────────────────────────────────────────────
+// ── Price action display ───────────────────────────────────────────────────────
 
-function ExposureLabel({ type }: { type: string }) {
-  const map: Record<string, { label: string; color: string }> = {
-    direct_beneficiary:       { label: "Direct",        color: "#34d399" },
-    supply_chain_beneficiary: { label: "Supply Chain",  color: "#2dd4bf" },
-    second_order_beneficiary: { label: "Indirect",      color: "#60a5fa" },
-    etf_basket:               { label: "ETF",           color: "#818cf8" },
-    pressure_or_negative:     { label: "Pressure Watch",color: "#f87171" },
-  };
-  const e = map[type] ?? { label: type.replace(/_/g, " "), color: "#94a3b8" };
-  return <span className="text-[9px] font-medium" style={{ color: e.color }}>{e.label}</span>;
+function PriceChip({ card }: { card: ResearchNameCard }) {
+  const { tone, displayText } = card.priceAction;
+  if (tone === "unknown") {
+    return <span className="text-[9px] text-slate-600">{displayText}</span>;
+  }
+  const color = tone === "positive" ? "#34d399" : tone === "negative" ? "#f87171" : "#94a3b8";
+  return (
+    <span className="text-[10px] font-semibold" style={{ color }}>
+      {displayText}
+    </span>
+  );
 }
 
-// ── TTG symbol card ────────────────────────────────────────────────────────────
+// ── Research card ─────────────────────────────────────────────────────────────
 
-function TtgCard({
+function ResearchCard({
   card,
-  onSelect,
   onAskAbout,
 }: {
-  card: TtgSymbolCard;
-  onSelect?: (card: TtgSymbolCard) => void;
+  card: ResearchNameCard;
   onAskAbout?: (context: string) => void;
 }) {
-  const isPressure = card.exposure_type === "pressure_or_negative";
-  const path = card.reason_path;
-  // Abbreviate long chains: first + "..." + last when > 3 items
-  const pathDisplay = path.length > 3
-    ? `${path[0]} → ... → ${path[path.length - 1]}`
-    : path.join(" → ");
-
-  const inner = (
-    <>
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-base font-black text-slate-100">{card.symbol}</span>
-            {card.label && (
-              <span className="text-[11px] text-slate-500 truncate max-w-[180px]">{card.label}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <ExposureLabel type={card.exposure_type} />
-            {card.driver_active && (
-              <span className="text-[9px] font-bold" style={{ color: "#34d399" }}>
-                ● Driver Active
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <RouteChip hint={card.route_hint} />
-          {onSelect && <ChevronRight size={12} className="text-slate-600" />}
-        </div>
-      </div>
-
-      <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-3">
-        {card.reason_to_care}
-      </p>
-
-      {path.length > 1 && (
-        <p className="text-[9px] text-slate-600 mt-2 leading-relaxed truncate">
-          {pathDisplay}
-        </p>
-      )}
-
-      {card.risk_note && (
-        <p className="text-[9px] text-amber-600 mt-1.5 leading-relaxed line-clamp-2">
-          ⚠ {card.risk_note}
-        </p>
-      )}
-
-      <p className="text-[9px] text-slate-700 mt-1.5">
-        Price data unavailable from approved source.
-      </p>
-
-      {onAskAbout && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAskAbout(`Tell me about ${card.symbol} and why it is connected to ${card.theme_label}`);
-          }}
-          className="mt-2 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
-          style={{ color: "#94a3b8" }}
-        >
-          Ask Decifer about this
-          <ArrowRight size={9} />
-        </button>
-      )}
-    </>
-  );
-
-  const borderColor = isPressure ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.07)";
-
-  if (onSelect) {
-    return (
-      <button
-        onClick={() => onSelect(card)}
-        className="w-full rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
-        style={{ background: "#141b26", border: `1px solid ${borderColor}` }}
-      >
-        {inner}
-      </button>
-    );
-  }
+  const borderColor = card.isPressure
+    ? "rgba(239,68,68,0.15)"
+    : "rgba(255,255,255,0.07)";
 
   return (
     <div
       className="rounded-2xl p-4"
       style={{ background: "#141b26", border: `1px solid ${borderColor}` }}
     >
-      {inner}
-    </div>
-  );
-}
-
-// ── Live radar card ────────────────────────────────────────────────────────────
-
-function RadarCard({
-  item,
-  onSelect,
-  onAskAbout,
-}: {
-  item: RadarItem;
-  onSelect: (item: RadarItem) => void;
-  onAskAbout?: (context: string) => void;
-}) {
-  return (
-    <button
-      onClick={() => onSelect(item)}
-      className="w-full rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
-      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-    >
+      {/* Header row */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <span className="text-base font-black text-slate-100">{item.symbol}</span>
-          {item.reason_to_watch && (
-            <p className="text-xs text-slate-400 leading-relaxed mt-1 line-clamp-2">
-              {item.reason_to_watch}
-            </p>
-          )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-base font-black text-slate-100">{card.symbol}</span>
+            {card.companyName && card.companyName !== card.symbol && (
+              <span className="text-[11px] text-slate-500 truncate max-w-[180px]">
+                {card.companyName}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-[9px] text-slate-500">{card.confidenceLanguage}</span>
+          </div>
         </div>
-        <ChevronRight size={14} className="text-slate-500 shrink-0 mt-1" />
+        <WatchBadge watchType={card.watchType} />
       </div>
-      <p className="text-[9px] text-slate-700">
-        Price data unavailable from approved source.
+
+      {/* Price action */}
+      <div className="mb-2">
+        <PriceChip card={card} />
+      </div>
+
+      {/* Reason to care */}
+      <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-3 mb-2">
+        {card.reasonToCare}
       </p>
+
+      {/* Risk note */}
+      {card.riskNote && (
+        <p className="text-[9px] text-amber-600 leading-relaxed line-clamp-2 mb-1.5">
+          ⚠ {card.riskNote}
+        </p>
+      )}
+
+      {/* Ask CTA */}
       {onAskAbout && (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAskAbout(`Tell me about ${item.symbol} and why it is on the radar`);
-          }}
-          className="mt-1.5 flex items-center gap-1 text-[10px] font-semibold"
+          onClick={() =>
+            onAskAbout(
+              `Tell me about ${card.symbol} and why it is connected to ${card.customerStory}`,
+            )
+          }
+          className="mt-1 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
           style={{ color: "#94a3b8" }}
         >
           Ask Decifer about this
           <ArrowRight size={9} />
         </button>
       )}
-    </button>
+    </div>
+  );
+}
+
+// ── Story group section ────────────────────────────────────────────────────────
+
+const CARDS_DEFAULT_VISIBLE = 5;
+
+function StoryGroupSection({
+  group,
+  onAskAbout,
+  onThemeSelect,
+}: {
+  group: ResearchStoryGroup;
+  onAskAbout?: (context: string) => void;
+  onThemeSelect: (themeId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? group.cards : group.cards.slice(0, CARDS_DEFAULT_VISIBLE);
+  const hasMore = group.cards.length > CARDS_DEFAULT_VISIBLE;
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p
+            className="text-[10px] font-bold uppercase tracking-[0.15em]"
+            style={{ color: "#f97316" }}
+          >
+            {group.storyLabel}
+          </p>
+          {group.driverActive && (
+            <span
+              className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+              style={{ background: "rgba(16,185,129,0.12)", color: "#34d399" }}
+            >
+              In play
+            </span>
+          )}
+          <span className="text-[9px] text-slate-600">{group.cards.length}</span>
+        </div>
+        {group.themeId && (
+          <button
+            onClick={() => onThemeSelect(group.themeId)}
+            className="text-[9px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+            style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+          >
+            Theme Map →
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {visible.map((card, i) => (
+          <ResearchCard
+            key={`${card.symbol}-${i}`}
+            card={card}
+            onAskAbout={onAskAbout}
+          />
+        ))}
+      </div>
+
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="mt-2 w-full flex items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-semibold transition-all active:scale-[0.98]"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            color: "#64748b",
+          }}
+        >
+          {expanded ? (
+            <>
+              <ChevronUp size={10} />
+              Show less
+            </>
+          ) : (
+            <>
+              <ChevronDown size={10} />
+              {group.cards.length - CARDS_DEFAULT_VISIBLE} more in this story
+            </>
+          )}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -219,186 +224,150 @@ interface Props {
   onAskAbout?: (context: string) => void;
 }
 
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all",      label: "All" },
-  { id: "in_focus", label: "In Focus" },
-  { id: "on_radar", label: "On the Radar" },
-  { id: "etf",      label: "ETF Route" },
-  { id: "monitor",  label: "Monitor" },
-];
-
-export default function UniverseTab({ data, onNameSelect, onThemeSelect, onSymbolSelect, onAskAbout }: Props) {
-  const [ttgData, setTtgData]   = useState<TtgThemeDetail[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [filter, setFilter]     = useState<Filter>("all");
+export default function UniverseTab({
+  data,
+  onNameSelect,
+  onThemeSelect,
+  onSymbolSelect: _onSymbolSelect,
+  onAskAbout,
+}: Props) {
+  const [ttgData, setTtgData] = useState<TtgThemeDetail[]>([]);
+  const [priceMap, setPriceMap] = useState<Map<string, NamePriceEntry>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [pricesLoading, setPricesLoading] = useState(false);
 
   const radar = data.radar ?? [];
 
+  // Phase 1 → TTG data; Phase 2 → prices for priority symbols
   useEffect(() => {
-    fetchTtgThemes()
-      .then(themes =>
-        Promise.allSettled(themes.map(t => fetchTtgThemeDetail(t.theme_id)))
-      )
-      .then(results => {
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const themes = await fetchTtgThemes();
+        const results = await Promise.allSettled(
+          themes.map(t => fetchTtgThemeDetail(t.theme_id)),
+        );
+        if (cancelled) return;
         const loaded = results
           .filter(r => r.status === "fulfilled" && r.value !== null)
           .map(r => (r as PromiseFulfilledResult<TtgThemeDetail | null>).value as TtgThemeDetail);
         setTtgData(loaded);
-      })
-      .catch(() => setTtgData([]))
-      .finally(() => setLoading(false));
+        setLoading(false);
+
+        const syms = prioritySymbols(loaded, MAX_SYMBOLS);
+        if (syms.length === 0 || cancelled) return;
+        setPricesLoading(true);
+        const res = await fetch(`/api/name-prices?symbols=${syms.join(",")}`);
+        if (cancelled) return;
+        if (res.ok) {
+          const json: { prices: NamePriceEntry[] } = await res.json();
+          if (!cancelled) setPriceMap(new Map(json.prices.map(p => [p.symbol, p])));
+        }
+      } catch {
+        if (!cancelled) { setTtgData([]); setLoading(false); }
+      } finally {
+        if (!cancelled) setPricesLoading(false);
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
   }, []);
 
-  const allSymbols = useMemo(() => ttgData.flatMap(t => t.symbols), [ttgData]);
-
-  const counts = useMemo(() => ({
-    all:      allSymbols.length,
-    in_focus: allSymbols.filter(s => routeFilter(s.route_hint) === "in_focus").length,
-    on_radar: allSymbols.filter(s => routeFilter(s.route_hint) === "on_radar").length,
-    etf:      allSymbols.filter(s => routeFilter(s.route_hint) === "etf").length,
-    monitor:  allSymbols.filter(s => routeFilter(s.route_hint) === "monitor").length,
-  }), [allSymbols]);
-
-  // Group filtered symbols by TTG theme, omitting empty theme groups
-  const filteredByTheme = useMemo(() => {
-    return ttgData
-      .map(theme => ({
-        theme,
-        symbols: filter === "all"
-          ? theme.symbols
-          : theme.symbols.filter(s => routeFilter(s.route_hint) === filter),
-      }))
-      .filter(({ symbols }) => symbols.length > 0);
-  }, [ttgData, filter]);
+  const storyGroups = buildStoryGroups(ttgData, priceMap);
+  const radarCards = buildRadarCards(radar, priceMap);
+  const totalNames = ttgData.reduce((acc, t) => acc + t.symbols.length, 0);
 
   // ── Loading skeleton
   if (loading) {
     return (
       <div className="px-4 pt-8 space-y-3">
         {[1, 2, 3].map(i => (
-          <div key={i} className="rounded-2xl h-24 animate-pulse"
-            style={{ background: "rgba(255,255,255,0.04)" }} />
+          <div
+            key={i}
+            className="rounded-2xl h-24 animate-pulse"
+            style={{ background: "rgba(255,255,255,0.04)" }}
+          />
         ))}
         <p className="text-[10px] text-slate-600 text-center pt-2">
-          Loading structural intelligence universe…
+          Loading connected names…
         </p>
       </div>
     );
   }
 
-  // ── Error / empty state
-  if (ttgData.length === 0 && radar.length === 0) {
+  // ── Empty state
+  if (storyGroups.length === 0 && radarCards.length === 0) {
     return (
       <div className="px-4 pt-12 flex flex-col items-center gap-3 text-center">
-        <p className="text-slate-400 text-sm">No structural context available right now.</p>
+        <p className="text-slate-400 text-sm">
+          No connected names available right now.
+        </p>
         <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
-          Theme context remains accessible in the Theme Map. Connected names will appear here as the intelligence layer refreshes.
+          Market story context is available in the Theme Map. Connected names will appear here as the intelligence layer refreshes.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="px-4 pt-2 pb-8 space-y-5">
+    <div className="px-4 pt-2 pb-8 space-y-6">
 
-      {/* Live radar overlay (from event tape) */}
-      {radar.length > 0 && (
+      {/* Intro card */}
+      <div
+        className="rounded-2xl px-4 py-3"
+        style={{
+          background: "rgba(249,115,22,0.05)",
+          border: "1px solid rgba(249,115,22,0.12)",
+        }}
+      >
+        <p className="text-[11px] font-semibold text-slate-300 leading-snug">
+          Where today&rsquo;s market stories connect to names
+        </p>
+        <p className="text-[10px] text-slate-500 mt-0.5">
+          {totalNames} evidence-verified names · {storyGroups.length} market stories
+          {pricesLoading && " · Updating prices…"}
+        </p>
+      </div>
+
+      {/* Live intelligence overlay */}
+      {radarCards.length > 0 && (
         <section>
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5 flex items-center gap-1.5"
-            style={{ color: "#f97316" }}>
+          <p
+            className="text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5 flex items-center gap-1.5"
+            style={{ color: "#f97316" }}
+          >
             <Zap size={9} />
-            Live Intelligence — On the Radar
+            Live Intelligence
           </p>
           <div className="space-y-2">
-            {radar.map((item, i) => (
-              <RadarCard key={i} item={item} onSelect={onNameSelect} onAskAbout={onAskAbout} />
-            ))}
+            {radar.map((radarItem, i) => {
+              const card = radarCards[i];
+              if (!card) return null;
+              return (
+                <button
+                  key={`radar-${radarItem.symbol}-${i}`}
+                  onClick={() => onNameSelect(radarItem)}
+                  className="w-full text-left"
+                >
+                  <ResearchCard card={card} onAskAbout={onAskAbout} />
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
 
-      {/* TTG structural universe */}
-      {ttgData.length > 0 && (
-        <>
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: "#f97316" }}>
-              {radar.length > 0 ? "Structural Intelligence Universe" : "Intelligence Universe"}
-            </p>
-            <p className="text-[9px] text-slate-600">{allSymbols.length} names</p>
-          </div>
-
-          <p className="text-[11px] text-slate-500 -mt-3 leading-relaxed">
-            Names connected to active themes and market drivers.
-            Evidence-verified. Not a recommendation.
-          </p>
-
-          {/* Filter chips */}
-          <div className="flex flex-wrap gap-1.5">
-            {FILTERS.filter(f => f.id === "all" || counts[f.id] > 0).map(f => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                className="px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all active:scale-95"
-                style={
-                  filter === f.id
-                    ? { background: "#f97316", color: "#fff" }
-                    : { background: "rgba(255,255,255,0.06)", color: "#94a3b8" }
-                }
-              >
-                {f.label}{f.id !== "all" && counts[f.id] > 0 ? ` (${counts[f.id]})` : ""}
-              </button>
-            ))}
-          </div>
-
-          {/* Theme sections */}
-          {filteredByTheme.length > 0 ? (
-            <div className="space-y-6">
-              {filteredByTheme.map(({ theme, symbols }) => (
-                <section key={theme.theme_id}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.15em]"
-                        style={{ color: "#f97316" }}>
-                        {theme.label}
-                      </p>
-                      {theme.driver_active && (
-                        <span
-                          className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{ background: "rgba(16,185,129,0.12)", color: "#34d399" }}
-                        >
-                          Driver Active
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => onThemeSelect(theme.theme_id)}
-                      className="text-[9px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                      style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
-                    >
-                      Theme Map →
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {symbols.map((card, i) => (
-                      <TtgCard key={i} card={card} onSelect={onSymbolSelect} onAskAbout={onAskAbout} />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          ) : (
-            <div
-              className="rounded-xl px-6 py-8 text-center"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
-            >
-              <p className="text-sm text-slate-400">No {filter.replace("_", " ")} names right now.</p>
-              <p className="text-xs text-slate-500 mt-1.5">
-                Switch to &ldquo;All&rdquo; to see all {allSymbols.length} names.
-              </p>
-            </div>
-          )}
-        </>
-      )}
+      {/* Story groups */}
+      {storyGroups.map(group => (
+        <StoryGroupSection
+          key={group.themeId}
+          group={group}
+          onAskAbout={onAskAbout}
+          onThemeSelect={onThemeSelect}
+        />
+      ))}
 
       <p className="text-[10px] text-slate-600 text-center pt-2">
         Market intelligence only. Not financial advice. No trade execution.
