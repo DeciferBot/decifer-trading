@@ -87,8 +87,27 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .tabs-mobile{display:none}
 .tabs-drawer{display:none}
 
-/* ── LIVE VIEW — 3-column grid ──────────────────────────────────────────────── */
-.live-grid{display:grid;grid-template-columns:1fr 1fr 340px;width:100%;height:100%;overflow:hidden}
+/* ── LIVE VIEW ──────────────────────────────────────────────────────────────── */
+
+/* Market signal strip — indices + sectors horizontal scroll */
+.mkt-strip{display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;overflow-x:auto;scrollbar-width:none;min-height:44px}
+.mkt-strip::-webkit-scrollbar{display:none}
+.mkt-indices{display:flex;align-items:center;gap:5px;flex-shrink:0;padding:6px 10px;border-right:1px solid var(--border)}
+.mkt-sectors{display:flex;align-items:center;gap:5px;flex:1;padding:6px 8px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}
+.mkt-sectors::-webkit-scrollbar{display:none}
+.mkt-strip-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;padding:0 10px;border-left:1px solid var(--border)}
+
+/* Market stage spectrum bar */
+.mkt-stage-bar{display:flex;align-items:stretch;border-bottom:2px solid var(--border);background:var(--bg);flex-shrink:0;overflow-x:auto;scrollbar-width:none;min-height:34px}
+.mkt-stage-bar::-webkit-scrollbar{display:none}
+.mkt-stage-track{display:flex;align-items:stretch;flex:1;min-width:max-content}
+
+/* Mover table column headers */
+.mover-hdr{display:grid;grid-template-columns:56px 72px 72px 1fr;gap:4px;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:.2px;color:var(--muted2);margin-bottom:2px}
+.mover-row{display:grid;grid-template-columns:56px 72px 72px 1fr;gap:4px;padding:2.5px 0;font-size:11px;font-family:'JetBrains Mono',monospace;align-items:center;border-bottom:1px solid rgba(255,255,255,.04)}
+
+/* 3-column grid */
+.live-grid{display:grid;grid-template-columns:1fr 1fr 340px;width:100%;flex:1;min-height:0;overflow:hidden}
 .col{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
 .col:last-child{border-right:none}
 
@@ -631,8 +650,10 @@ canvas{display:block;width:100% !important}
 
   /* ── PORTFOLIO TAB ── */
   #view-portfolio{padding:10px !important;gap:10px !important}
-  #on-movers-grid{grid-template-columns:1fr !important}
-  #on-movers-grid>div:first-child{border-right:none !important;border-bottom:1px solid var(--border)}
+  /* mkt-strip: wrap instead of scroll on mobile */
+  .mkt-indices,.mkt-sectors{flex-wrap:wrap}
+  .mkt-strip-actions{border-left:none;padding-left:4px;padding-top:4px}
+  .mkt-stage-track{overflow-x:auto}
 
   /* ── APEX TAB — Intelligence 2-col → 1-col ── */
   #intel-2col-grid{grid-template-columns:1fr !important}
@@ -817,71 +838,84 @@ canvas{display:block;width:100% !important}
   </div>
 </div>
 
-<!-- VIEW 1: LIVE — 3-column layout -->
-<div class="view active" id="view-live">
+<!-- VIEW 1: LIVE — strip + 3-column layout -->
+<div class="view active" id="view-live" style="flex-direction:column">
+
+  <!-- ── ROW 1: Indices + Sector ETFs (horizontal scrollable strip) ── -->
+  <div class="mkt-strip">
+    <div id="on-tone-row" class="mkt-indices">
+      <span style="color:var(--muted2);font-size:10px">Loading…</span>
+    </div>
+    <div id="on-sector-row" class="mkt-sectors"></div>
+    <div class="mkt-strip-actions">
+      <span id="on-prev-close-date" style="font-size:10px;color:var(--muted2)"></span>
+      <span id="overnight-meta" style="font-size:10px;color:var(--muted2)"></span>
+      <button id="on-movers-refresh-btn" onclick="refreshMovers()" style="background:transparent;border:1px solid var(--border);color:var(--muted2);font-size:10px;padding:2px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
+    </div>
+  </div>
+
+  <!-- ── ROW 2: Market Stage Spectrum (horizontal pills, active highlighted) ── -->
+  <div class="mkt-stage-bar">
+    <div id="market-stages-list" class="mkt-stage-track"></div>
+  </div>
+
+  <!-- ── ROW 3: 3-column grid ── -->
   <div class="live-grid">
 
-    <!-- COL 1: Market Overview -->
-    <div class="col" style="display:flex;flex-direction:column;overflow-y:auto">
+    <!-- COL 1: Top movers + events this week + yesterday -->
+    <div class="col" style="overflow-y:auto">
 
-      <div style="flex-shrink:0">
-        <div class="col-title" style="position:sticky;top:0;z-index:1;background:var(--bg)">
-          <span>Market Overview</span>
-          <span id="overnight-meta" style="color:var(--muted2);font-size:10px"></span>
+      <!-- Gainers -->
+      <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:10px 14px">
+        <div class="section-label" style="color:var(--green);margin-bottom:8px">Top gainers</div>
+        <div class="mover-hdr">
+          <span>Symbol</span><span>Prev close</span><span>Live</span><span style="text-align:right">Change</span>
         </div>
-        <!-- Market tone -->
-        <div id="on-tone-row" style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px">
-          <span style="color:var(--muted2);font-size:11px">Loading…</span>
-        </div>
-        <!-- Sector ETFs -->
-        <div id="on-sector-row" style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px"></div>
-        <!-- Gainers -->
-        <div style="border-bottom:1px solid var(--border);padding:10px 14px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span class="section-label" style="color:var(--green)">Gainers</span>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span id="on-prev-close-date" style="font-size:10px;color:var(--muted2)"></span>
-              <button id="on-movers-refresh-btn" onclick="refreshMovers()" style="background:transparent;border:1px solid var(--border);color:var(--muted2);font-size:9px;padding:2px 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻ Refresh</button>
-            </div>
-          </div>
-          <div id="on-gainers"></div>
-        </div>
-        <!-- Losers + Calendar -->
-        <div id="on-movers-grid" style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
-          <div style="border-right:1px solid var(--border);padding:10px 14px">
-            <div class="section-label" style="color:var(--red);margin-bottom:8px">Losers</div>
-            <div id="on-losers"></div>
-          </div>
-          <div style="padding:10px 14px">
-            <div class="section-label" style="margin-bottom:8px">This Week</div>
-            <div id="on-calendar"></div>
-          </div>
-        </div>
-        <!-- Yesterday -->
-        <div id="on-perf-section" style="padding:10px 14px;border-bottom:1px solid var(--border)">
-          <div class="section-label" style="margin-bottom:8px">Yesterday</div>
-          <div id="on-perf"></div>
-        </div>
-        <!-- News -->
-        <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
-          <div class="section-label" style="margin-bottom:8px" id="on-news-label">News</div>
-          <div id="on-news"></div>
-          <div id="on-bias" style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap"></div>
-        </div>
+        <div id="on-gainers"></div>
       </div>
 
-      <!-- market-stages-list kept hidden for JS compat -->
-      <div style="display:none"><div id="market-stages-list"></div><div id="opus-view-ts"></div></div>
+      <!-- Losers -->
+      <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:10px 14px">
+        <div class="section-label" style="color:var(--red);margin-bottom:8px">Top losers</div>
+        <div class="mover-hdr">
+          <span>Symbol</span><span>Prev close</span><span>Live</span><span style="text-align:right">Change</span>
+        </div>
+        <div id="on-losers"></div>
+      </div>
+
+      <!-- Events this week -->
+      <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:10px 14px">
+        <div class="section-label" style="margin-bottom:8px">Events this week</div>
+        <div id="on-calendar"></div>
+      </div>
+
+      <!-- Yesterday -->
+      <div id="on-perf-section" style="padding:10px 14px;border-bottom:1px solid var(--border)">
+        <div class="section-label" style="margin-bottom:8px">Yesterday</div>
+        <div id="on-perf"></div>
+      </div>
+
+      <!-- compat: on-movers-grid kept hidden so mobile CSS rule resolves -->
+      <div id="on-movers-grid" style="display:none"></div>
 
     </div>
 
-    <!-- COL 2: Bot activity — New Entries, Scan progress, Activity log preview -->
+    <!-- COL 2: News feed -->
     <div class="col" style="display:flex;flex-direction:column;overflow-y:auto">
 
-      <!-- NEW ENTRIES THIS SCAN -->
+      <!-- News header with bias chips -->
+      <div style="flex-shrink:0;padding:10px 14px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+          <span class="section-label" id="on-news-label">News</span>
+          <div id="on-bias" style="display:flex;gap:10px;flex-wrap:wrap;font-size:10px"></div>
+        </div>
+        <div id="on-news"></div>
+      </div>
+
+      <!-- New entries this scan -->
       <div style="flex-shrink:0;border-bottom:1px solid var(--border)">
-        <div class="col-title" style="flex-shrink:0">
-          <span>New Entries This Scan</span>
+        <div class="col-title">
+          <span>New entries this scan</span>
           <span id="apex-entries-count" style="font-size:10px;color:var(--muted2)"></span>
         </div>
         <div id="apex-entries-body" style="padding:8px 12px">
@@ -889,7 +923,7 @@ canvas{display:block;width:100% !important}
         </div>
       </div>
 
-      <!-- SCAN PROGRESS -->
+      <!-- Scan progress -->
       <div class="scan-wrap" style="flex-shrink:0">
         <div class="scan-bg"><div class="scan-fill" id="scan-fill" style="width:0%"></div></div>
         <div class="scan-meta"><span id="scan-status">Waiting for first scan...</span><span id="scan-eta">—</span></div>
@@ -897,19 +931,27 @@ canvas{display:block;width:100% !important}
 
     </div>
 
-    <!-- COL 3: Positions + Today's Results (right rail, fixed width) -->
+    <!-- COL 3: Portfolio + Today's results (right rail) -->
     <div class="col">
-      <div class="col-title">Open Positions <span style="margin-left:auto;display:flex;gap:6px"><button class="pos-sort-btn" id="pos-sort-recency" onclick="sortPositions('recency')" style="background:none;border:none;color:var(--orange);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">Recent</button><button class="pos-sort-btn" id="pos-sort-size" onclick="sortPositions('size')" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">Size</button><button class="pos-sort-btn" id="pos-sort-pnl" onclick="sortPositions('pnl')" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">P&amp;L</button></span></div>
+      <div class="col-title">Open positions <span style="margin-left:auto;display:flex;gap:6px">
+        <button class="pos-sort-btn" id="pos-sort-recency" onclick="sortPositions('recency')" style="background:none;border:none;color:var(--orange);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">Recent</button>
+        <button class="pos-sort-btn" id="pos-sort-size"    onclick="sortPositions('size')"    style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">Size</button>
+        <button class="pos-sort-btn" id="pos-sort-pnl"     onclick="sortPositions('pnl')"     style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">P&amp;L</button>
+      </span></div>
       <div style="flex:0 0 auto;overflow-y:auto;max-height:50%;border-bottom:1px solid var(--border)" id="pos-list">
         <div class="empty">No open positions</div>
       </div>
-      <div class="col-title" style="flex-shrink:0">Today's Results</div>
+      <div class="col-title" style="flex-shrink:0">Today's results</div>
       <div class="col-body" id="trades-list">
         <div class="empty">No closed trades today</div>
       </div>
     </div>
 
   </div>
+
+  <!-- compat: opus-view-ts -->
+  <div style="display:none"><div id="opus-view-ts"></div></div>
+
 </div>
 
 <!-- VIEW 1B: LOG (Activity Log — moved out of LIVE) -->
@@ -2018,17 +2060,17 @@ async function loadOvernightNotes() {
     }
 
     function _moverRow(m, liveSnaps) {
-      const col = m.pct > 0 ? 'var(--green)' : 'var(--red)';
+      const col  = m.pct > 0 ? 'var(--green)' : 'var(--red)';
       const sign = m.pct > 0 ? '+' : '';
       const live = liveSnaps && liveSnaps[m.sym];
-      const liveTag = live && live.price != null
-        ? `<span style="color:var(--orange);font-size:9px" title="Live price">$${live.price.toFixed(2)}</span>`
-        : '';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:11px;font-family:'JetBrains Mono',monospace">
-        <span style="color:#fff;font-weight:600">${esc(m.sym)}</span>
-        <span style="color:var(--muted2)">$${m.price.toFixed(2)}</span>
-        ${liveTag}
-        <span style="color:${col};font-weight:700">${sign}${m.pct.toFixed(2)}%</span>
+      const liveStr = live && live.price != null
+        ? `<span style="color:var(--orange)">${live.price.toFixed(2)}</span>`
+        : `<span style="color:var(--muted)">—</span>`;
+      return `<div class="mover-row">
+        <span style="color:#fff;font-weight:700">${esc(m.sym)}</span>
+        <span style="color:var(--muted2)">${m.price.toFixed(2)}</span>
+        ${liveStr}
+        <span style="color:${col};font-weight:700;text-align:right">${sign}${m.pct.toFixed(2)}%</span>
       </div>`;
     }
 
@@ -5697,7 +5739,7 @@ function updateRegime(regime) {
       : (stageDescs[tapeLabel] || `VIX: ${regime.vix || '—'} · SPY: $${regime.spy_price || '—'}`);
   }
 
-  // ── Market Stages vertical list ──────────────────────────────
+  // ── Market Stage horizontal spectrum bar ─────────────────────
   const stagesEl = document.getElementById('market-stages-list');
   if (stagesEl) {
     const _STAGES = [
@@ -5715,18 +5757,35 @@ function updateRegime(regime) {
       { key: 'TRENDING BEAR', col: '#ff1744', desc: 'Sustained downtrend'         },
       { key: 'CAPITULATION',  col: '#ff1744', desc: 'Panic — extreme caution'     },
     ];
-    stagesEl.innerHTML = _STAGES.map(s => {
+    stagesEl.innerHTML = _STAGES.map((s, i) => {
       const active = s.key === tapeLabel;
-      const bg     = active ? s.col + '22' : 'transparent';
-      const border = active ? `1px solid ${s.col}` : '1px solid transparent';
-      const txtCol = active ? s.col : 'var(--muted2)';
-      const dot    = active ? '●' : '○';
-      return `<div style="display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:4px;background:${bg};border:${border};transition:background .2s">
-        <span style="color:${active ? s.col : 'var(--muted)'};font-size:9px;flex-shrink:0">${dot}</span>
-        <span style="font-size:11px;font-weight:${active?'700':'400'};color:${txtCol};flex:1">${s.key}</span>
-        ${active ? `<span style="font-size:8.5px;color:${s.col};opacity:0.8">${s.desc}</span>` : ''}
-      </div>`;
+      // Active pill: colored background + label + description below
+      // Inactive pill: just a colored top bar + muted label
+      if (active) {
+        return `<div style="
+          flex:1.6;display:flex;flex-direction:column;align-items:center;justify-content:center;
+          padding:3px 6px;background:${s.col}18;border-left:1px solid ${s.col}55;border-right:1px solid ${s.col}55;
+          border-top:3px solid ${s.col};position:relative;cursor:default;min-width:80px">
+          <span style="font-size:9px;font-weight:800;color:${s.col};letter-spacing:.3px;text-align:center;line-height:1.2">${s.key}</span>
+          <span style="font-size:8px;color:${s.col};opacity:.75;text-align:center;margin-top:1px;white-space:nowrap">${s.desc}</span>
+        </div>`;
+      } else {
+        // Determine opacity by distance from active: closer stages slightly brighter
+        const activeIdx = _STAGES.findIndex(x => x.key === tapeLabel);
+        const dist = Math.abs(i - (activeIdx >= 0 ? activeIdx : 6));
+        const op = dist <= 1 ? 0.6 : dist <= 3 ? 0.4 : 0.25;
+        return `<div style="
+          flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+          padding:3px 4px;border-left:1px solid var(--border);
+          border-top:2px solid ${s.col}${Math.round(op * 255).toString(16).padStart(2,'0')};
+          cursor:default;min-width:56px">
+          <span style="font-size:8.5px;font-weight:400;color:var(--muted2);opacity:${op};text-align:center;line-height:1.2;white-space:nowrap">${s.key}</span>
+        </div>`;
+      }
     }).join('');
+    // Scroll active stage into view
+    const activeEl = stagesEl.querySelector('[style*="flex:1.6"]');
+    if (activeEl) activeEl.scrollIntoView({ block:'nearest', inline:'center', behavior:'smooth' });
   }
 }
 
@@ -6250,17 +6309,17 @@ async function refreshMovers() {
       const gainers = moversData.filter(m => m.pct > 0).sort((a,b) => b.pct - a.pct);
       const losers  = moversData.filter(m => m.pct < 0).sort((a,b) => a.pct - b.pct);
       const row = (m) => {
-        const col = m.pct > 0 ? 'var(--green)' : 'var(--red)';
+        const col  = m.pct > 0 ? 'var(--green)' : 'var(--red)';
         const sign = m.pct > 0 ? '+' : '';
         const live = snaps[m.sym];
-        const liveTag = live && live.price != null
-          ? `<span style="color:var(--orange);font-size:9px" title="Live price">$${Number(live.price).toFixed(2)}</span>`
-          : '';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:11px;font-family:'JetBrains Mono',monospace">
-          <span style="color:#fff;font-weight:600">${m.sym}</span>
-          <span style="color:var(--muted2)">$${m.price.toFixed(2)}</span>
-          ${liveTag}
-          <span style="color:${col};font-weight:700">${sign}${m.pct.toFixed(2)}%</span>
+        const liveStr = live && live.price != null
+          ? `<span style="color:var(--orange)">${Number(live.price).toFixed(2)}</span>`
+          : `<span style="color:var(--muted)">—</span>`;
+        return `<div class="mover-row">
+          <span style="color:#fff;font-weight:700">${m.sym}</span>
+          <span style="color:var(--muted2)">${m.price.toFixed(2)}</span>
+          ${liveStr}
+          <span style="color:${col};font-weight:700;text-align:right">${sign}${m.pct.toFixed(2)}%</span>
         </div>`;
       };
       const gEl = document.getElementById('on-gainers');
@@ -6272,7 +6331,7 @@ async function refreshMovers() {
   } catch(e) {
     if (btn) btn.textContent = '✗';
   } finally {
-    if (btn) { btn.disabled = false; setTimeout(() => { if(btn) btn.textContent = '↻ Live'; }, 4000); }
+    if (btn) { btn.disabled = false; setTimeout(() => { if(btn) btn.textContent = '↻'; }, 3000); }
   }
 }
 setInterval(() => {               // auto-refresh Catalyst 4× per trading day (~97 min)
