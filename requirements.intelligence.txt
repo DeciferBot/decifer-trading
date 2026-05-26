@@ -14,7 +14,7 @@
 #   - pyarrow            — parquet ML storage (Mac execution node)
 #   - scikit-learn       — ML model training (Mac execution node)
 #   - joblib             — ML model loading (Mac execution node)
-#   - yfinance           — REMOVED in v4.31.1; must not be re-introduced
+#   - yfinance           — approved exception for live_driver_resolver fallback (2026-05-26, Amit)
 #
 # System prerequisite (required for TA-Lib Python wheel):
 #   Ubuntu/Debian: apt-get install -y libta-lib-dev
@@ -32,6 +32,7 @@ anthropic>=0.25.0        # Claude API for Apex synthesis calls (market_intellige
 
 # ── Market data providers ────────────────────────────────────────────────────
 alpaca-py>=0.13.0        # Real-time price data for live_driver_resolver.py (read-only, no order placement)
+yfinance>=0.2.50         # Fallback for live_driver_resolver when Alpaca unavailable (cloud/weekend)
 requests>=2.31.0         # HTTP client for FMP and FRED API calls (fmp_client.py, fred_client.py)
 
 # ── Data processing ──────────────────────────────────────────────────────────
