@@ -6,7 +6,7 @@ import {
   fmtMoney, fmtPct, pnlColor, holdDuration,
   translateDirection, translateTradeType, translateSetupType,
   translateSignalDim, translateThesisStatus, translateRegime, translateConviction,
-  cleanThesis,
+  cleanThesis, fmtNYTime, fmtLocalTime,
 } from "@/lib/translate";
 
 interface Props {
@@ -21,11 +21,14 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Row({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+function Row({ label, value, sub, valueClass }: { label: string; value: string; sub?: string; valueClass?: string }) {
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-[#1e2a3a] last:border-0">
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className={`text-sm font-semibold ${valueClass ?? "text-white"}`}>{value}</p>
+    <div className="flex items-start justify-between py-1.5 border-b border-[#1e2a3a] last:border-0">
+      <p className="text-sm text-slate-400 shrink-0 mr-4">{label}</p>
+      <div className="text-right">
+        <p className={`text-sm font-semibold ${valueClass ?? "text-white"}`}>{value}</p>
+        {sub && <p className="text-[10px] text-slate-600 mt-0.5">{sub}</p>}
+      </div>
     </div>
   );
 }
@@ -116,10 +119,10 @@ export default function PositionSheet({ position, pmDecisions, onClose }: Props)
 
         <div className="px-5 space-y-5">
 
-          {/* Why we bought this */}
+          {/* Why we entered this trade */}
           {position.entry_thesis && (
             <div>
-              <SectionHeader>Why we bought this</SectionHeader>
+              <SectionHeader>{isLong ? "Why we bought this" : "Why we shorted this"}</SectionHeader>
               <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] p-4">
                 <p className="text-sm text-slate-200 leading-relaxed">{cleanThesis(position.entry_thesis)}</p>
               </div>
@@ -141,6 +144,13 @@ export default function PositionSheet({ position, pmDecisions, onClose }: Props)
           <div>
             <SectionHeader>Trade details</SectionHeader>
             <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] p-4">
+              {position.open_time && (
+                <Row
+                  label="Opened"
+                  value={`${fmtNYTime(position.open_time)}${duration ? `  ·  ${duration} ago` : ""}`}
+                  sub={fmtLocalTime(position.open_time)}
+                />
+              )}
               <Row label="Conviction" value={conviction} />
               {position.setup_type && <Row label="Setup type" value={translateSetupType(position.setup_type)} />}
               {position.entry_regime && <Row label="Market when bought" value={translateRegime(position.entry_regime)} />}

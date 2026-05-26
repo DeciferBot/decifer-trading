@@ -1,44 +1,76 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArrowRight, CircleDot } from "lucide-react";
+import { ArrowRight, CircleDot, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type BotState, type Regime, type Position } from "@/lib/api";
 import {
   fmtMoney, fmtPct, pnlColor,
-  translateRegime, translateVix, translateSession,
+  translateRegime, translateVix, translateSession, cleanThesis, fmtNYTime, fmtLocalTime,
 } from "@/lib/translate";
 import type { Tab } from "@/components/BottomNav";
 
 interface Props { onTabChange: (t: Tab) => void }
 
-function PositionMini({ pos }: { pos: Position }) {
-  const isLong  = pos.direction === "LONG";
-  const pnl     = pos.pnl ?? ((pos.current - pos.entry) * (isLong ? 1 : -1) * Math.abs(pos.qty ?? 0));
-  const pnlPct  = pos.entry ? ((pos.current - pos.entry) / pos.entry) * 100 * (isLong ? 1 : -1) : 0;
+function calcPnl(pos: Position): number {
+  if (pos.pnl != null) return pos.pnl;
+  const diff = (pos.current ?? 0) - (pos.entry ?? 0);
+  return diff * (pos.direction === "SHORT" ? -1 : 1) * Math.abs(pos.qty ?? 0);
+}
+
+// How far current price is from the stop loss, as % of current price.
+// Returns null if stop is unknown. Positive = safe buffer.
+function stopProximityPct(pos: Position): number | null {
+  if (!pos.sl || !pos.current) return null;
+  const dist = pos.direction === "SHORT"
+    ? (pos.sl - pos.current) / pos.current * 100
+    : (pos.current - pos.sl)  / pos.current * 100;
+  return Math.max(0, dist);
+}
+
+function PositionRow({ pos, onTap }: { pos: Position; onTap: () => void }) {
+  const isLong  = pos.direction !== "SHORT";
+  const pnl     = calcPnl(pos);
+  const pct     = pos.entry ? ((pos.current - pos.entry) / pos.entry) * 100 * (isLong ? 1 : -1) : 0;
+  const prox    = stopProximityPct(pos);
+  const isNear  = prox !== null && prox < 3;
+
+  // Buffer bar: 0–20% proximity maps to 0–100% width
+  const barW    = prox !== null ? Math.min(prox / 20 * 100, 100) : null;
+  const barColor = prox === null ? "" : prox < 3 ? "bg-rose-500" : prox < 8 ? "bg-amber-400" : "bg-emerald-500";
 
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-[#1e2a3a] last:border-0">
-      <div className="flex items-center gap-2.5">
-        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${
-          isLong ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"
-        }`}>
-          {isLong ? "↑" : "↓"}
+    <button
+      onClick={onTap}
+      className="w-full text-left py-3 border-b border-[#1e2a3a] last:border-0 active:opacity-70"
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5">
+          {isNear && <AlertTriangle size={11} className="text-rose-400 shrink-0" />}
+          <span className="text-sm font-bold text-white">{pos.symbol}</span>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+            isLong ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"
+          }`}>
+            {isLong ? "↑ Long" : "↓ Short"}
+          </span>
         </div>
-        <div>
-          <p className="text-sm font-bold text-white">{pos.symbol}</p>
-          <p className="text-[10px] text-slate-500">{isLong ? "Long" : "Short"} · {Math.abs(pos.qty ?? 0)} shares</p>
+        <div className="text-right">
+          <span className={`text-sm font-bold ${pnlColor(pnl)}`}>
+            {pnl >= 0 ? "+" : ""}{fmtMoney(pnl, true)}
+          </span>
+          <span className={`text-[10px] ml-1 ${pnlColor(pct)}`}>
+            ({fmtPct(pct)})
+          </span>
         </div>
       </div>
-      <div className="text-right">
-        <p className={`text-sm font-bold ${pnlColor(pnl)}`}>
-          {pnl >= 0 ? "+" : ""}{fmtMoney(pnl)}
-        </p>
-        <p className={`text-[10px] font-semibold ${pnlColor(pnlPct)}`}>
-          {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(1)}%
-        </p>
-      </div>
-    </div>
+
+      {/* Stop proximity buffer bar — full = safe, empty = at stop */}
+      {barW !== null && (
+        <div className="h-[3px] w-full rounded-full bg-[#1e2a3a] overflow-hidden">
+          <div className={`h-full rounded-full ${barColor}`} style={{ width: `${barW}%` }} />
+        </div>
+      )}
+    </button>
   );
 }
 
@@ -67,156 +99,206 @@ export default function TodayView({ onTabChange }: Props) {
 
   if (loading) return (
     <div className="px-5 pt-6 space-y-4">
-      <Skeleton className="h-10 w-36 bg-[#161e2e]" />
-      <Skeleton className="h-32 w-full rounded-2xl bg-[#161e2e]" />
-      <Skeleton className="h-40 w-full rounded-2xl bg-[#161e2e]" />
-      <Skeleton className="h-24 w-full rounded-2xl bg-[#161e2e]" />
+      <Skeleton className="h-6 w-28 bg-[#161e2e]" />
+      <Skeleton className="h-20 w-full bg-[#161e2e]" />
+      <Skeleton className="h-10 w-full rounded-xl bg-[#161e2e]" />
+      <Skeleton className="h-36 w-full rounded-2xl bg-[#161e2e]" />
     </div>
   );
 
   if (error || !state) return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-3 p-6">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 p-6">
       <p className="text-slate-400 text-center text-sm">{error ?? "No data"}</p>
       <button
         onClick={() => { setLoading(true); load(); }}
-        className="mt-1 px-4 py-2 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 active:bg-slate-700"
+        className="px-4 py-2 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 active:bg-slate-700"
       >
         Retry
       </button>
     </div>
   );
 
-  const regime      = state.regime as Regime | undefined;
-  const vixValue    = regime?.vix ?? 0;
-  const vix         = translateVix(vixValue);
-  const prose       = regime?.tape_context?.prose ?? null;
-  const regimeName  = regime?.regime ?? "UNKNOWN";
-  const positions   = state.positions ?? [];
-  const dayPnl      = state.daily_pnl ?? 0;
-  const portValue   = state.portfolio_value ?? 0;
-  const dayPct      = portValue > 0 ? (dayPnl / portValue) * 100 : 0;
-  const isRunning   = !state.paused && state.session !== "CLOSED" && state.session !== "WEEKEND";
+  const regime     = state.regime as Regime | undefined;
+  const vixValue   = regime?.vix ?? 0;
+  const vix        = translateVix(vixValue);
+  const regimeName = regime?.regime ?? "UNKNOWN";
+  const positions  = state.positions ?? [];
+  const dayPnl     = state.daily_pnl ?? 0;
+  const portValue  = state.portfolio_value ?? 0;
+  const dayPct     = portValue > 0 ? (dayPnl / portValue) * 100 : 0;
+  const isRunning  = !state.paused && state.session !== "CLOSED" && state.session !== "WEEKEND";
 
   const isPanic = regimeName === "PANIC" || vixValue >= 30;
   const isBull  = (regimeName.includes("BULL") || regimeName.includes("TRENDING_UP")) && vixValue < 22;
-  const regimeBg   = isPanic ? "bg-rose-500/10 border-rose-500/20"
-                   : isBull  ? "bg-emerald-500/8 border-emerald-500/20"
-                   :           "bg-amber-500/8  border-amber-500/20";
-  const regimeText = isPanic ? "text-rose-400" : isBull ? "text-emerald-400" : "text-amber-300";
+
+  const unrealized = positions.reduce((sum, p) => sum + calcPnl(p), 0);
+
+  // Sort by urgency: positions nearest stop first
+  const sorted = [...positions].sort((a, b) => (stopProximityPct(a) ?? 100) - (stopProximityPct(b) ?? 100));
+  const alerts = sorted.filter(p => { const pr = stopProximityPct(p); return pr !== null && pr < 3; });
+
+  const spyChg = regime?.spy_chg_1d;
+  const qqqChg = regime?.qqq_chg_1d;
 
   return (
-    <div className="px-5 pt-6 pb-4 space-y-4">
+    <div className="px-5 pt-5 pb-4 space-y-4">
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* ── Status row ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[10px] font-bold tracking-[0.22em] text-slate-600 uppercase mb-0.5">
-            Amit Chopra
-          </p>
-          <h1 className="text-xl font-bold text-white">Portfolio</h1>
-        </div>
         <span className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full ${
           isRunning ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-700/50 text-slate-500"
         }`}>
           <CircleDot size={9} />
-          {isRunning ? "Bot running" : state.paused ? "Paused" : translateSession(state.session ?? "")}
+          {isRunning ? "Running" : state.paused ? "Paused" : translateSession(state.session ?? "")}
+        </span>
+        <span className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-full ${
+          isPanic ? "bg-rose-500/15 text-rose-400"
+          : isBull ? "bg-emerald-500/15 text-emerald-400"
+          : "bg-amber-500/15 text-amber-300"
+        }`}>
+          {translateRegime(regimeName)}
         </span>
       </div>
 
-      {/* ── Portfolio value ─────────────────────────────────────────────────── */}
-      <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] p-5">
-        <p className="text-xs text-slate-500 mb-1">Total portfolio value</p>
-        <p className="text-3xl font-bold text-white mb-1">{fmtMoney(portValue)}</p>
-        <div className="flex items-baseline gap-2">
-          <p className={`text-lg font-bold ${pnlColor(dayPnl)}`}>{fmtPct(dayPct)}</p>
-          <p className={`text-sm ${pnlColor(dayPnl)}`}>
-            {dayPnl >= 0 ? "+" : ""}{fmtMoney(dayPnl)} today
-          </p>
-        </div>
+      {/* ── Portfolio hero ──────────────────────────────────────────────── */}
+      <div>
+        <p className="text-[10px] text-slate-600 uppercase tracking-widest mb-1">Portfolio value</p>
+        <p className="text-[2.6rem] font-bold text-white leading-none tracking-tight">
+          {fmtMoney(portValue)}
+        </p>
+        <p className={`text-sm font-semibold mt-2 ${pnlColor(dayPnl)}`}>
+          {dayPnl >= 0 ? "+" : ""}{fmtMoney(dayPnl)} today
+          <span className="font-normal opacity-60 ml-1.5">({fmtPct(dayPct)})</span>
+        </p>
       </div>
 
-      {/* ── Open positions ──────────────────────────────────────────────────── */}
-      <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] p-4">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-            Open Positions
+      {/* ── Attention banner (only when near stop) ──────────────────────── */}
+      {alerts.length > 0 && (
+        <button
+          onClick={() => onTabChange("holdings")}
+          className="w-full flex items-center gap-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 px-4 py-3 active:bg-rose-500/15"
+        >
+          <AlertTriangle size={14} className="text-rose-400 shrink-0" />
+          <p className="text-sm text-rose-300 font-semibold text-left flex-1">
+            {alerts.length === 1
+              ? `${alerts[0].symbol} is near its stop`
+              : `${alerts.length} positions near stop loss`}
           </p>
-          <span className="text-[11px] font-semibold text-slate-500">
-            {positions.length} {positions.length === 1 ? "position" : "positions"}
-          </span>
-        </div>
+          <ArrowRight size={13} className="text-rose-400 shrink-0" />
+        </button>
+      )}
 
-        {positions.length > 0 ? (
-          <>
-            <div className="mt-2">
-              {positions.slice(0, 5).map(p => (
-                <PositionMini key={p.symbol + (p.open_time ?? "")} pos={p} />
-              ))}
-            </div>
+      {/* ── Quick stats strip ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl bg-[#101622] border border-[#1e2a3a] p-3 text-center">
+          <p className="text-[9px] text-slate-600 uppercase tracking-wider mb-1">Open P&amp;L</p>
+          <p className={`text-sm font-bold ${pnlColor(unrealized)}`}>
+            {unrealized >= 0 ? "+" : ""}{fmtMoney(unrealized, true)}
+          </p>
+        </div>
+        <div className="rounded-xl bg-[#101622] border border-[#1e2a3a] p-3 text-center">
+          <p className="text-[9px] text-slate-600 uppercase tracking-wider mb-1">Positions</p>
+          <p className="text-sm font-bold text-white">{positions.length}</p>
+        </div>
+        <div className="rounded-xl bg-[#101622] border border-[#1e2a3a] p-3 text-center">
+          <p className="text-[9px] text-slate-600 uppercase tracking-wider mb-1">Scans</p>
+          <p className="text-sm font-bold text-white">{state.scan_count ?? "—"}</p>
+        </div>
+      </div>
+      {state.last_scan && (
+        <p className="text-[10px] text-slate-700 text-center -mt-2">
+          Last scanned at {fmtNYTime(state.last_scan)}
+          <span className="text-slate-800"> · {fmtLocalTime(state.last_scan)}</span>
+        </p>
+      )}
+
+      {/* ── Market context (tap → Apex) ──────────────────────────────────── */}
+      <button
+        onClick={() => onTabChange("apex")}
+        className="w-full flex items-center gap-3 rounded-xl bg-[#101622] border border-[#1e2a3a] px-4 py-3 active:bg-[#131c2e]"
+      >
+        <div className={`w-2 h-2 rounded-full shrink-0 ${
+          isPanic ? "bg-rose-400" : isBull ? "bg-emerald-400" : "bg-amber-400"
+        }`} />
+        <p className="text-sm text-slate-300 flex-1 text-left">
+          <span className="font-semibold text-white">{translateRegime(regimeName)}</span>
+          <span className="text-slate-600 mx-1.5">·</span>
+          <span className={vix.color}>{vix.label}</span>
+          {spyChg != null && (
+            <>
+              <span className="text-slate-600 mx-1.5">·</span>
+              <span className={pnlColor(spyChg)}>SPY {spyChg >= 0 ? "+" : ""}{spyChg.toFixed(1)}%</span>
+            </>
+          )}
+          {qqqChg != null && spyChg == null && (
+            <>
+              <span className="text-slate-600 mx-1.5">·</span>
+              <span className={pnlColor(qqqChg)}>QQQ {qqqChg >= 0 ? "+" : ""}{qqqChg.toFixed(1)}%</span>
+            </>
+          )}
+        </p>
+        <ArrowRight size={13} className="text-slate-600 shrink-0" />
+      </button>
+
+      {/* ── Positions ───────────────────────────────────────────────────── */}
+      {positions.length > 0 ? (
+        <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] px-4 pt-3 pb-1">
+          <div className="flex items-center justify-between mb-0.5">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Positions</p>
+            <span className="text-[10px] text-slate-600">{positions.length} open</span>
+          </div>
+          {sorted.slice(0, 4).map(p => (
+            <PositionRow
+              key={p.symbol + (p.open_time ?? "")}
+              pos={p}
+              onTap={() => onTabChange("holdings")}
+            />
+          ))}
+          {positions.length > 4 && (
             <button
               onClick={() => onTabChange("holdings")}
-              className="flex items-center gap-1 text-xs text-blue-400 font-semibold mt-3 active:opacity-70"
+              className="flex items-center gap-1 text-xs text-blue-400 font-semibold py-3 active:opacity-70"
             >
-              Full detail, entry thesis &amp; stops <ArrowRight size={11} />
+              +{positions.length - 4} more · entries, stops &amp; thesis <ArrowRight size={11} />
             </button>
-          </>
-        ) : (
-          <p className="text-sm text-slate-600 mt-3 italic">No open positions — bot is scanning</p>
-        )}
-      </div>
-
-      {/* ── Market today ────────────────────────────────────────────────────── */}
-      <div className={`rounded-2xl border p-4 ${regimeBg}`}>
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-          Market Today
-        </p>
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <p className={`text-base font-bold ${regimeText}`}>{translateRegime(regimeName)}</p>
-          <div className="text-right shrink-0">
-            <p className="text-[9px] text-slate-500 uppercase tracking-wider">Fear index</p>
-            <p className={`text-xl font-bold ${vix.color}`}>{vixValue.toFixed(0)}</p>
-            <p className={`text-[9px] font-semibold ${vix.color}`}>{vix.label}</p>
-          </div>
-        </div>
-        {prose && (
-          <p className="text-sm text-slate-300 leading-relaxed line-clamp-4">{prose}</p>
-        )}
-        <button
-          onClick={() => onTabChange("apex")}
-          className="flex items-center gap-1 text-xs text-blue-400 font-semibold mt-3 active:opacity-70"
-        >
-          Full market intelligence <ArrowRight size={11} />
-        </button>
-      </div>
-
-      {/* ── Last decision ───────────────────────────────────────────────────── */}
-      {state.last_decision && (
-        <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] p-4">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-            Bot&apos;s last trade
-          </p>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-base font-bold text-white">{state.last_decision.symbol}</span>
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-              state.last_decision.direction === "SHORT"
-                ? "text-rose-400 bg-rose-400/10"
-                : "text-emerald-400 bg-emerald-400/10"
-            }`}>
-              {state.last_decision.direction === "SHORT" ? "Short ↓" : "Bought ↑"}
-            </span>
-          </div>
-          {state.last_decision.thesis && (
-            <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">
-              {state.last_decision.thesis}
-            </p>
           )}
-          <button
-            onClick={() => onTabChange("activity")}
-            className="flex items-center gap-1 text-xs text-blue-400 font-semibold mt-3 active:opacity-70"
-          >
-            See all trades &amp; reasons <ArrowRight size={11} />
-          </button>
         </div>
+      ) : (
+        <div className="rounded-2xl bg-[#101622] border border-[#1e2a3a] px-4 py-5 text-center">
+          <p className="text-sm text-slate-600">No open positions — scanning the market</p>
+        </div>
+      )}
+
+      {/* ── Last bot action ──────────────────────────────────────────────── */}
+      {state.last_decision && (
+        <button
+          onClick={() => onTabChange("activity")}
+          className="w-full flex items-center gap-3 rounded-xl bg-[#101622] border border-[#1e2a3a] px-4 py-3 active:bg-[#131c2e]"
+        >
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+            state.last_decision.direction === "SHORT"
+              ? "bg-rose-500/15 text-rose-400"
+              : "bg-emerald-500/15 text-emerald-400"
+          }`}>
+            {state.last_decision.direction === "SHORT" ? "↓" : "↑"}
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-0.5">Last action</p>
+            <p className="text-sm font-semibold text-white">
+              {state.last_decision.direction === "SHORT" ? "Shorted" : "Bought"}{" "}
+              {state.last_decision.symbol}
+              {state.last_decision.price != null && (
+                <span className="text-slate-500 font-normal ml-1">@ {fmtMoney(state.last_decision.price)}</span>
+              )}
+            </p>
+            {state.last_decision.thesis && (
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                {cleanThesis(state.last_decision.thesis)}
+              </p>
+            )}
+          </div>
+          <ArrowRight size={13} className="text-slate-600 shrink-0" />
+        </button>
       )}
 
     </div>

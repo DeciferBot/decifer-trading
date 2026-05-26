@@ -137,9 +137,10 @@ export default function ResultsView() {
             {monthly.map((m, i) => {
               const pct = m.return ?? 0;
               const barW = Math.min(100, Math.abs(pct) * 8);
+              const monthLabel = `${MONTH_NAMES[(m.month ?? 1) - 1]}${m.year ? ` '${m.year.toString().slice(-2)}` : ""}`;
               return (
                 <div key={i} className="flex items-center gap-3">
-                  <p className="text-xs text-slate-500 w-8 shrink-0">{MONTH_NAMES[(m.month ?? 1) - 1]}</p>
+                  <p className="text-xs text-slate-500 w-14 shrink-0 truncate">{monthLabel}</p>
                   <div className="flex-1 h-6 rounded-lg bg-[#161e2e] overflow-hidden">
                     <div
                       className={`h-full rounded-lg transition-all ${pct >= 0 ? "bg-emerald-500/40" : "bg-rose-500/40"}`}

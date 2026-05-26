@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Wallet, TrendingUp, TrendingDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type BotState, type Position, type PMDecision } from "@/lib/api";
-import { fmtMoney, fmtPct, pnlColor, translateDirection, translateTradeType, translateConviction, holdDuration, translateThesisStatus } from "@/lib/translate";
+import { fmtMoney, fmtPct, pnlColor, translateDirection, translateTradeType, translateConviction, holdDuration, translateThesisStatus, fmtNYTime } from "@/lib/translate";
 import PositionSheet from "@/components/PositionSheet";
 
 interface PMResponse { decisions?: PMDecision[] }
@@ -68,13 +68,25 @@ function PositionCard({ p, pmDecisions, onTap }: { p: Position; pmDecisions: PMD
         }
       </div>
 
-      {/* Entry → Current + tap hint */}
-      <div className="mt-3 pt-3 border-t border-[#1e2a3a] flex items-center justify-between text-xs text-slate-500">
-        <span>Entered at <span className="text-slate-300 font-semibold">{fmtMoney(p.entry ?? 0)}</span></span>
-        <div className="flex items-center gap-2">
-          <span>Now <span className="text-slate-300 font-semibold">{fmtMoney(p.current ?? 0)}</span></span>
-          {p.entry_thesis && <span className="text-blue-400/50 font-semibold">tap for why →</span>}
+      {/* Entry / Current / Opened — labelled columns */}
+      <div className="mt-3 pt-3 border-t border-[#1e2a3a]">
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-wider mb-0.5">Entry</p>
+            <p className="text-sm font-semibold text-slate-300">{fmtMoney(p.entry ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-wider mb-0.5">Current</p>
+            <p className="text-sm font-semibold text-white">{fmtMoney(p.current ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-wider mb-0.5">Opened</p>
+            <p className="text-[10px] text-slate-500 leading-tight">{p.open_time ? fmtNYTime(p.open_time) : "—"}</p>
+          </div>
         </div>
+        {p.entry_thesis && (
+          <p className="text-[10px] text-blue-400/50 font-semibold mt-2 text-right">tap for why →</p>
+        )}
       </div>
     </button>
   );
@@ -126,7 +138,7 @@ export default function HoldingsView() {
               <p className={`text-lg font-bold ${pnlColor(totalOpenPnl)}`}>
                 {totalOpenPnl >= 0 ? "+" : ""}{fmtMoney(totalOpenPnl)}
               </p>
-              <p className="text-xs text-slate-500">open gain/loss</p>
+              <p className="text-xs text-slate-500">Unrealised gain/loss</p>
             </div>
           )}
         </div>

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ArrowUpRight, Minus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type BotState, type Position, type PMDecision } from "@/lib/api";
-import { fmtMoney, pnlColor, holdDuration, translateTradeType, translateConviction, cleanThesis } from "@/lib/translate";
+import { fmtMoney, pnlColor, holdDuration, translateTradeType, translateConviction, cleanThesis, fmtNYTime } from "@/lib/translate";
 import PositionSheet from "@/components/PositionSheet";
 
 interface PMResponse { decisions?: PMDecision[] }
@@ -84,9 +84,10 @@ export default function ActivityView() {
 
                   {/* Main content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                       <p className="text-sm font-bold text-white">{isLong ? "Bought" : "Shorted"} {pos.symbol}</p>
-                      {duration && <p className="text-xs text-slate-500">{duration} ago</p>}
+                      {duration && <p className="text-xs text-slate-600">{duration} ago</p>}
+                      {pos.open_time && <p className="text-xs text-slate-700">· {fmtNYTime(pos.open_time)}</p>}
                     </div>
                     <p className="text-xs text-slate-500 mb-1.5">
                       {translateTradeType(pos.trade_type ?? "")}
@@ -96,7 +97,16 @@ export default function ActivityView() {
                     {hasThesis ? (
                       <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">{cleanThesis(pos.entry_thesis!)}</p>
                     ) : (
-                      <p className="text-xs text-slate-600 italic">entered at {fmtMoney(pos.entry)}</p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <div>
+                          <p className="text-[9px] font-bold text-slate-700 uppercase tracking-wider mb-0.5">Entry price</p>
+                          <p className="text-xs text-slate-400">{fmtMoney(pos.entry)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold text-slate-700 uppercase tracking-wider mb-0.5">Current price</p>
+                          <p className="text-xs text-slate-300">{fmtMoney(pos.current)}</p>
+                        </div>
+                      </div>
                     )}
                   </div>
 

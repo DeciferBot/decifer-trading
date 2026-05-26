@@ -347,3 +347,47 @@ export function resolveSignalStatus(state?: string, signal?: string): SignalStat
     return { label: "Quiet",                    color: "#475569", dotColor: "#334155" };
   return   { label: "Waiting for confirmation", color: "#64748b", dotColor: "#475569" };
 }
+
+/** Format a timestamp as New York time — e.g. "2:15 PM New York Time" */
+export function fmtNYTime(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }) + " New York Time";
+}
+
+/** Format a timestamp as the device's local time — e.g. "10:15 PM Local Time" */
+export function fmtLocalTime(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }) + " Local Time";
+}
+
+/** Format the current date + both clocks for page headers */
+export function fmtHeaderDate(): { date: string; nyTime: string; localTime: string } {
+  const now = new Date();
+  return {
+    date: now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
+    nyTime: now.toLocaleTimeString("en-US", {
+      timeZone: "America/New_York",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }) + " New York Time",
+    localTime: now.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }) + " Local Time",
+  };
+}

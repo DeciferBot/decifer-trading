@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type BotState } from "@/lib/api";
-import { translateTheme, translateThemeState, themeDescription } from "@/lib/translate";
+import { translateTheme, translateThemeState, themeDescription, fmtHeaderDate } from "@/lib/translate";
 import {
   type IntelResponse, type IntelTheme, type IntelCandidate, type IntelEvidence,
   DRIVER_DICTIONARY, RISK_FLAG_DICTIONARY, ROLE_DICTIONARY, ALL_DRIVER_IDS,
@@ -35,11 +35,6 @@ function timeAgo(mins: number): string {
   return `${Math.floor(mins / 1440)}d ago`;
 }
 
-function formatDate(): string {
-  return new Date().toLocaleDateString("en-GB", {
-    weekday: "long", day: "numeric", month: "long",
-  });
-}
 
 function sentimentColors(s: string) {
   if (s === "risk-on")  return { border: "border-emerald-500/40", dot: "bg-emerald-400", text: "text-emerald-400", badge: "bg-emerald-500/10 text-emerald-400" };
@@ -695,6 +690,8 @@ export default function ApexView() {
     return () => clearInterval(t);
   }, [load]);
 
+  const { date: headerDate, nyTime: headerNyTime, localTime: headerLocalTime } = fmtHeaderDate();
+
   const session     = state?.session ?? "UNKNOWN";
   const isOpen      = session === "OPEN";
   const themes      = intel?.themes ?? [];
@@ -751,7 +748,12 @@ export default function ApexView() {
             Amit Chopra
           </p>
           <h1 className="text-xl font-bold text-white">Market Intelligence</h1>
-          <p className="text-xs text-slate-500 mt-0.5">{formatDate()}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{headerDate}</p>
+          <p className="text-[10px] text-slate-600 mt-0.5">
+            {headerNyTime}
+            <span className="text-slate-700 mx-1.5">·</span>
+            <span className="text-slate-700">{headerLocalTime}</span>
+          </p>
         </div>
         <span className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full shrink-0 mt-1 ${
           isOpen ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-700/50 text-slate-500"
