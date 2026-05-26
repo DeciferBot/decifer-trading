@@ -3,9 +3,13 @@
 // Groups: Active Now | Building | Weakening | Not Currently Signalling
 // Theme detail includes: why it matters, drivers, connected sectors/names, what would weaken it.
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ChevronRight, X } from "lucide-react";
-import type { MarketNowPayload, ThemeItem, SectorItem, RadarItem, UniverseItem } from "@/lib/customerApi";
+import type {
+  MarketNowPayload, ThemeItem, SectorItem, RadarItem, UniverseItem,
+  TtgSymbolCard,
+} from "@/lib/customerApi";
+import { fetchTtgThemeDetail } from "@/lib/customerApi";
 import { translateTheme, themeDescription, themeInvalidation } from "@/lib/translate";
 
 // ── State badge ───────────────────────────────────────────────────────────────
@@ -108,6 +112,7 @@ function ThemeDetail({
   sectors,
   names,
   universeNames,
+  ttgSymbols,
   onClose,
   onNameSelect,
 }: {
@@ -115,6 +120,7 @@ function ThemeDetail({
   sectors: SectorItem[];
   names: RadarItem[];
   universeNames: UniverseItem[];
+  ttgSymbols: TtgSymbolCard[];
   onClose: () => void;
   onNameSelect: (name: RadarItem) => void;
 }) {
@@ -240,8 +246,35 @@ function ThemeDetail({
           </div>
         )}
 
-        {/* Universe snapshot names (fallback when no live radar) */}
-        {names.length === 0 && universeNames.length > 0 && (
+        {/* TTG evidence-gated names (preferred over universe snapshot) */}
+        {names.length === 0 && ttgSymbols.length > 0 && (
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+              Theme-Connected Names
+            </p>
+            <p className="text-[9px] text-slate-600 mb-2">Evidence-gated structural intelligence.</p>
+            <div className="space-y-1.5">
+              {ttgSymbols.slice(0, 6).map((s, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl px-3.5 py-2.5"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-[13px] font-black text-slate-100">{s.symbol}</p>
+                    {s.label && <p className="text-[10px] text-slate-500 truncate">{s.label}</p>}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                    {s.reason_to_care}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Universe snapshot names (fallback when no live radar and no TTG match) */}
+        {names.length === 0 && ttgSymbols.length === 0 && universeNames.length > 0 && (
           <div>
             <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-2">
               Theme-Connected Names
@@ -275,7 +308,7 @@ function ThemeDetail({
           <p className="text-xs text-slate-400 leading-relaxed">{invalidation}</p>
         </div>
 
-        {names.length === 0 && universeNames.length === 0 && sectors.length === 0 && (
+        {names.length === 0 && ttgSymbols.length === 0 && universeNames.length === 0 && sectors.length === 0 && (
           <p className="text-xs text-slate-500 text-center py-1">
             Monitoring this theme — connected names will appear as markets activate.
           </p>
@@ -295,6 +328,18 @@ interface Props {
 }
 
 export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onNameSelect }: Props) {
+  const [ttgSymbols, setTtgSymbols] = useState<TtgSymbolCard[]>([]);
+
+  // Fetch TTG data when user drills into a theme detail.
+  // TTG theme IDs differ from market_now IDs for most themes; fetchTtgThemeDetail
+  // returns null for non-matching IDs and gracefully degrades to universe_snapshot.
+  useEffect(() => {
+    if (!selectedTheme) { setTtgSymbols([]); return; }
+    fetchTtgThemeDetail(selectedTheme)
+      .then(d => setTtgSymbols(d?.symbols ?? []))
+      .catch(() => setTtgSymbols([]));
+  }, [selectedTheme]);
+
   const themes: ThemeItem[] = data.themes?.length
     ? data.themes
     : (data.active_themes ?? []).map(t => ({ theme: t, state: "active" }));
@@ -404,6 +449,7 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
           sectors={relatedSectors}
           names={relatedNames}
           universeNames={relatedUniverseNames}
+          ttgSymbols={ttgSymbols}
           onClose={() => onThemeSelect(null)}
           onNameSelect={onNameSelect}
         />

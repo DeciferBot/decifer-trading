@@ -93,6 +93,63 @@ export interface MarketNowPayload {
   universe_snapshot?: UniverseItem[];
 }
 
+// ── Theme Transmission Graph (TTG) — M12A addendum ────────────────────────────
+// Evidence-gated structural intelligence. Suppressed symbols (needs_review /
+// proposed) never reach these endpoints — the evidence gate lives in Python.
+
+export interface TtgTheme {
+  theme_id: string;
+  label: string;
+  plain_english_description: string;
+  status: string;           // "active" | "reference" | "proposed"
+  driver_ids: string[];
+  driver_active: boolean;
+  risk_note: string | null;
+}
+
+export interface TtgSymbolCard {
+  symbol: string;
+  label: string;
+  theme_id: string;
+  theme_label: string;
+  bucket_id: string;
+  bucket_label: string;
+  exposure_type: string;    // "direct_beneficiary" | "supply_chain_beneficiary" | etc.
+  confidence: number | null;
+  reason_to_care: string;
+  reason_path: string[];
+  evidence_basis_label: string;
+  route_hint: string;       // "In focus" | "On the radar" | "ETF route" | "Monitor only"
+  status: string;           // "active" | "monitor_only"
+  risk_note: string | null;
+  driver_active: boolean;
+  theme_risk_note?: string | null;
+}
+
+export interface TtgThemeDetail extends TtgTheme {
+  symbols: TtgSymbolCard[];
+  symbol_count: number;
+}
+
+export async function fetchTtgThemes(): Promise<TtgTheme[]> {
+  const base = getIntelligenceApiBase().replace(/\/$/, "");
+  const res = await fetch(`${base}/api/intelligence/themes`);
+  if (!res.ok) throw new Error(`/api/intelligence/themes → ${res.status}`);
+  const data = await res.json();
+  return data.theme_graph_themes ?? [];
+}
+
+export async function fetchTtgThemeDetail(themeId: string): Promise<TtgThemeDetail | null> {
+  const base = getIntelligenceApiBase().replace(/\/$/, "");
+  const res = await fetch(`${base}/api/intelligence/themes/${encodeURIComponent(themeId)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`/api/intelligence/themes/${themeId} → ${res.status}`);
+  const data = await res.json();
+  const meta: TtgTheme | undefined = data.theme_graph_themes?.[0];
+  if (!meta) return null;
+  return { ...meta, symbols: data.symbols ?? [], symbol_count: data.symbol_count ?? 0 };
+}
+
 export async function fetchMarketNow(): Promise<MarketNowPayload> {
   const base = getIntelligenceApiBase().replace(/\/$/, "");
   // Plain fetch — no cache: "no-store" to avoid triggering CORS preflight.
