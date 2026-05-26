@@ -1,7 +1,28 @@
 import type { NextConfig } from "next";
+import fs from "fs";
+import path from "path";
+
+// Read the system version from the monorepo root version.py.
+// Injected at build time so the UI always shows the deployed version.
+function getSystemVersion(): string {
+  try {
+    const file = fs.readFileSync(path.join(__dirname, "../version.py"), "utf8");
+    const match = file.match(/__version__ = "([^"]+)"/);
+    return match ? match[1] : "dev";
+  } catch {
+    return "dev";
+  }
+}
 
 const nextConfig: NextConfig = {
   output: "standalone",
+
+  // Inject system version as a public build-time constant.
+  // Consumed by CustomerApp.tsx as process.env.NEXT_PUBLIC_APP_VERSION.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: getSystemVersion(),
+  },
+
   async redirects() {
     return [
       {
@@ -11,16 +32,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
   async headers() {
     return [
       {
-        // HTML shells for app routes must never be cached by Cloudflare.
-        // CF's free plan enforces a 7200s edge_cache_ttl floor that overrides
-        // Vercel's own max-age=0, causing stale pages after every deploy.
-        // "no-store" is the one directive Cloudflare cannot override — it
-        // will always fetch fresh HTML from Vercel on each browser request.
-        // Hashed static assets (/_next/static/*) are unaffected and remain
-        // immutably cached at the edge as normal.
+        // HTML shells must never be cached by Cloudflare.
+        // CF free plan enforces edge_cache_ttl >= 7200s which overrides
+        // Vercel's Cache-Control: max-age=0. "no-store" is the one directive
+        // Cloudflare cannot override — always fetches fresh HTML from Vercel.
+        // Hashed /_next/static/* assets remain immutably cached as normal.
         source: "/(.*)",
         headers: [
           {

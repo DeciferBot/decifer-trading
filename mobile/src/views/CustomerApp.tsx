@@ -234,7 +234,7 @@ export default function CustomerApp() {
         : "#475569";
 
   return (
-    <div className="flex flex-col min-h-screen" style={{ background: "#0c1117" }}>
+    <div className="flex flex-col h-[100dvh]" style={{ background: "#0c1117" }}>
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <header
@@ -249,26 +249,28 @@ export default function CustomerApp() {
 
           {/* Branding + greeting */}
           <div>
-            <div className="flex items-baseline gap-2 mb-0.5">
+            <div className="flex items-baseline gap-2 mb-1">
               <span className="text-sm font-black tracking-[0.15em] uppercase" style={{ color: "#f97316" }}>
                 DECIFER
               </span>
-              <span className="text-[9px] font-semibold tracking-wider uppercase text-slate-600">
+              <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400">
                 Market Intelligence
               </span>
-              <span className="text-[8px] text-slate-700">v4.61.1</span>
+              <span className="text-[9px] text-slate-500">
+                v{process.env.NEXT_PUBLIC_APP_VERSION}
+              </span>
             </div>
-            <p className="text-[12px] font-medium text-slate-300 leading-snug">
+            <p className="text-[13px] font-medium text-slate-200 leading-snug">
               {clock.greeting}. Here is your market briefing.
             </p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className="text-[10px] text-slate-500">{clock.localTime}</span>
-              <span className="text-[9px] text-slate-700">·</span>
-              <span className="text-[10px] text-slate-500">
-                {clock.newYorkTime} <span className="text-slate-700">ET</span>
+              <span className="text-[11px] text-slate-400">{clock.localTime}</span>
+              <span className="text-[10px] text-slate-600">·</span>
+              <span className="text-[11px] text-slate-400">
+                {clock.newYorkTime} <span className="text-slate-500">ET</span>
               </span>
-              <span className="text-[9px] text-slate-700">·</span>
-              <span className="text-[10px] font-semibold" style={{ color: sessionColor }}>
+              <span className="text-[10px] text-slate-600">·</span>
+              <span className="text-[11px] font-semibold" style={{ color: sessionColor }}>
                 {clock.sessionLabel}
               </span>
             </div>

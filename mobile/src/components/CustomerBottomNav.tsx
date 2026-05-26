@@ -60,8 +60,8 @@ export default function CustomerBottomNav({ activeTab, onTabChange }: Props) {
                 <Icon size={15} style={{ color: active ? "#fff" : "#f97316" }} />
               </span>
               <span
-                className="text-[9px] font-semibold tracking-wide"
-                style={{ color: "#f97316", opacity: active ? 1 : 0.6 }}
+                className="text-[10px] font-semibold tracking-wide"
+                style={{ color: "#f97316", opacity: active ? 1 : 0.7 }}
               >
                 {item.label}
               </span>
@@ -76,10 +76,10 @@ export default function CustomerBottomNav({ activeTab, onTabChange }: Props) {
             className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1 transition-all active:scale-90"
             aria-label={item.label}
           >
-            <Icon size={18} style={{ color: active ? "#f97316" : "#475569" }} />
+            <Icon size={20} style={{ color: active ? "#f97316" : "#94a3b8" }} />
             <span
-              className="text-[9px] font-medium tracking-wide"
-              style={{ color: active ? "#f97316" : "#475569" }}
+              className="text-[10px] font-medium tracking-wide"
+              style={{ color: active ? "#f97316" : "#94a3b8" }}
             >
               {item.label}
             </span>
