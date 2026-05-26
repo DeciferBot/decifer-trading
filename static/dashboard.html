@@ -668,9 +668,11 @@ canvas{display:block;width:100% !important}
 
   /* ── PORTFOLIO TAB ── */
   #view-portfolio{padding:10px !important;gap:10px !important}
-  /* mkt-strip: wrap instead of scroll on mobile */
-  .mkt-indices,.mkt-sectors{flex-wrap:wrap}
-  .mkt-strip-actions{border-left:none;padding-left:4px;padding-top:4px}
+  /* mkt-strip: stack indices above sectors, each row scrolls horizontally */
+  .mkt-strip{flex-direction:column;overflow-x:hidden;min-height:unset;align-items:stretch}
+  .mkt-indices{border-right:none;border-bottom:1px solid var(--border2);overflow-x:auto;flex-wrap:nowrap;width:100%;scrollbar-width:none}
+  .mkt-sectors{flex:none;width:100%;flex-wrap:nowrap}
+  .mkt-strip-actions{display:none}
   .mkt-stage-track{overflow-x:auto}
 
   /* ── APEX TAB — Intelligence 2-col → 1-col ── */
