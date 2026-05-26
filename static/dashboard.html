@@ -28,14 +28,46 @@
 body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;height:100vh;overflow:hidden}
 body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,var(--scanline) 2px,var(--scanline) 4px);pointer-events:none;z-index:9999}
 
-/* HEADER */
-.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:46px;border-bottom:1px solid var(--border);background:var(--bg2);overflow:hidden}
+/* ── HEADER — 3-zone grid ──────────────────────────────────────────────────── */
+.hdr{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:56px;padding:0 16px;background:var(--bg2);border-bottom:2px solid transparent;border-image:linear-gradient(to right,transparent 0%,var(--orange) 40%,var(--orange) 60%,transparent 100%) 1}
+.hdr-left{display:flex;align-items:center}
+.hdr-centre{display:flex;justify-content:center;align-items:center}
+.hdr-right{display:flex;align-items:center;justify-content:flex-end;gap:8px;overflow:hidden;flex-shrink:0}
 .logo{display:flex;align-items:center;gap:8px}
 .logo-sym{font-family:'Syne',sans-serif;font-size:20px;font-weight:900;color:var(--orange);letter-spacing:-2px}
 .logo-name{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--logo-name)}
-.logo-sub{font-size:10px;color:var(--muted2);margin-left:2px}
-.hdr-right{display:flex;align-items:center;gap:8px;overflow:hidden;flex-shrink:1;min-width:0}
-.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid;white-space:nowrap;flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.logo-sub{font-size:10px;color:var(--muted2)}
+.upd-label{font-size:9px;color:var(--muted);letter-spacing:.5px;white-space:nowrap}
+.upd-val{font-size:10px;color:var(--muted2);white-space:nowrap}
+/* Regime hero card — centre of header */
+.regime-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 20px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);min-width:200px;cursor:default;transition:border-color .3s}
+.regime-hero-label{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;line-height:1.2;color:var(--text)}
+.regime-hero-sub{font-size:9px;color:var(--muted2);margin-top:2px;letter-spacing:.3px}
+/* Regime colour variants */
+.regime-hero.rh-bull{border-color:rgba(0,200,83,.5);background:rgba(0,200,83,.06)}
+.regime-hero.rh-bull .regime-hero-label{color:var(--green)}
+.regime-hero.rh-bear{border-color:rgba(255,109,0,.5);background:rgba(255,109,0,.08)}
+.regime-hero.rh-bear .regime-hero-label{color:var(--orange2)}
+.regime-hero.rh-panic{border-color:rgba(255,23,68,.6);background:rgba(255,23,68,.12);animation:flash 1.5s infinite}
+.regime-hero.rh-panic .regime-hero-label{color:var(--red)}
+.regime-hero.rh-choppy{border-color:var(--border2);background:var(--bg3)}
+.regime-hero.rh-choppy .regime-hero-label{color:var(--yellow)}
+
+/* ── STATS STRIPS — card grid ───────────────────────────────────────────────── */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);height:70px;border-bottom:1px solid var(--border);overflow:hidden}
+.stats2{display:grid;grid-template-columns:repeat(6,1fr);height:60px;border-bottom:1px solid var(--border);overflow:hidden;background:var(--bg2)}
+.stats2 .stat{padding:7px 14px}
+.stats2 .sv{font-size:16px}
+.stat{padding:10px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-width:0;transition:background .15s}
+.stat:last-child{border-right:none}
+.stat:hover{background:var(--bg3)}
+.sl{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:3px}
+.sv{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss{font-size:10px;color:var(--muted2);margin-top:2px}
+.co{color:var(--orange)}.cg{color:var(--green)}.cr{color:var(--red)}.cw{color:#fff}
+
+/* ── PILLS ──────────────────────────────────────────────────────────────────── */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid;white-space:nowrap;flex-shrink:0}
 .pg{border-color:var(--green);color:var(--green);background:rgba(0,200,83,.08)}
 .pr{border-color:var(--red);color:var(--red);background:rgba(255,23,68,.08)}
 .po{border-color:var(--orange);color:var(--orange);background:var(--orange_dim)}
@@ -43,40 +75,36 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .pulse{animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
 
-/* STATS */
-.stats{display:grid;grid-template-columns:repeat(6,1fr);height:66px;border-bottom:1px solid var(--border);overflow:hidden}
-.stats2{display:grid;grid-template-columns:repeat(6,1fr);height:58px;border-bottom:1px solid var(--border);overflow:hidden;background:var(--bg2)}
-.stats2 .stat{padding:6px 14px}
-.stats2 .sv{font-size:15px}
-.stat{padding:8px 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-width:0}
-.stat:last-child{border-right:none}
-.sl{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:3px}
-.sv{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ss{font-size:10px;color:var(--muted2);margin-top:2px}
-.co{color:var(--orange)}.cg{color:var(--green)}.cr{color:var(--red)}.cw{color:#fff}
-
-/* TABS */
-.tabs{display:flex;align-items:center;background:var(--bg2);border-bottom:1px solid var(--border);height:42px;overflow-x:auto;scrollbar-width:none;padding:0 12px;gap:1px;-webkit-mask-image:linear-gradient(to right,black 92%,transparent 100%);mask-image:linear-gradient(to right,black 92%,transparent 100%)}
+/* ── TABS ───────────────────────────────────────────────────────────────────── */
+.tabs{display:flex;align-items:center;background:var(--bg2);border-bottom:1px solid var(--border);height:38px;overflow-x:auto;scrollbar-width:none;padding:0 12px;gap:1px;-webkit-mask-image:linear-gradient(to right,black 92%,transparent 100%);mask-image:linear-gradient(to right,black 92%,transparent 100%)}
 .tabs::-webkit-scrollbar{display:none}
-.tab{display:flex;align-items:center;padding:6px 14px;font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;color:var(--muted2);border-radius:5px;white-space:nowrap;transition:color .15s,background .15s,box-shadow .15s;font-family:'JetBrains Mono',monospace;flex-shrink:0;position:relative}
+.tab{display:flex;align-items:center;padding:5px 12px;font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;color:var(--muted2);border-radius:5px;white-space:nowrap;transition:color .15s,background .15s,box-shadow .15s;font-family:'JetBrains Mono',monospace;flex-shrink:0;position:relative}
 .tab:hover{color:var(--text);background:var(--orange_dim)}
 .tab.active{color:var(--orange);background:var(--orange_dim);box-shadow:inset 0 2px 0 var(--orange)}
 .tab-sep{width:1px;height:18px;background:var(--border2);margin:0 6px;flex-shrink:0;opacity:.6}
 .tabs-mobile{display:none}
 .tabs-drawer{display:none}
 
-/* DECISION BAR */
-
-/* VIEWS */
-.view{display:none;height:calc(100vh - 46px - 66px - 58px - 32px - 34px);overflow:hidden}
-.view.active{display:flex}
-#view-portfolio{height:calc(100vh - 46px - 66px - 58px - 32px - 34px);overflow-y:auto !important;overflow-x:hidden}
-#view-portfolio > *{flex-shrink:0}
-
-/* ── VIEW 1: LIVE ── */
-.live-grid{display:grid;grid-template-columns:1fr 360px;width:100%;height:100%;overflow:hidden}
+/* ── LIVE VIEW — 3-column grid ──────────────────────────────────────────────── */
+.live-grid{display:grid;grid-template-columns:1fr 1fr 340px;width:100%;height:100%;overflow:hidden}
 .col{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
 .col:last-child{border-right:none}
+
+/* Tablet: 2-column (merge left+mid, keep right rail) */
+@media(max-width:1024px) and (min-width:769px){
+  .live-grid{grid-template-columns:1fr 300px}
+  .col-activity-mid{display:none}
+  .stats{grid-template-columns:repeat(3,1fr);height:auto;overflow:visible}
+  .stats2{grid-template-columns:repeat(3,1fr);height:auto;overflow:visible}
+}
+
+/* DECISION BAR */
+
+/* VIEWS — header:56px + stats1:70px + stats2:60px + tabs:38px + footer:34px */
+.view{display:none;height:calc(100vh - 56px - 70px - 60px - 38px - 34px);overflow:hidden}
+.view.active{display:flex}
+#view-portfolio{height:calc(100vh - 56px - 70px - 60px - 38px - 34px);overflow-y:auto !important;overflow-x:hidden}
+#view-portfolio > *{flex-shrink:0}
 .col-title{padding:7px 12px;font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;display:flex;justify-content:space-between}
 .col-body{overflow-y:auto;flex:1}
 
@@ -160,7 +188,15 @@ body.remote-mode #remote-badge{display:block}
 .f-btn{padding:3px 10px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted2);font-family:'JetBrains Mono',monospace;transition:.15s}
 .f-btn.active,.f-btn:hover{border-color:var(--orange);color:var(--orange);background:var(--orange_dim)}
 .hist-table{overflow-y:auto;flex:1}
-.th{display:grid;grid-template-columns:90px 70px 55px 55px 85px 85px 80px 60px 1fr 40px;padding:6px 14px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;position:sticky;top:0}
+.th{
+  display:grid;grid-template-columns:90px 70px 55px 55px 85px 85px 80px 60px 1fr 40px;
+  padding:7px 14px;
+  background:var(--bg3);
+  border-bottom:2px solid var(--orange);
+  font-size:9px;letter-spacing:1.2px;color:var(--muted2);text-transform:uppercase;
+  position:sticky;top:0;z-index:2;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
 .tr{display:grid;grid-template-columns:90px 70px 55px 55px 85px 85px 80px 60px 1fr 40px;padding:6px 14px;border-bottom:1px solid rgba(34,34,34,.5);font-size:11px}
 .tr:hover{background:var(--bg3)}
 .tr.tr-clickable{cursor:pointer}
@@ -175,14 +211,32 @@ body.remote-mode #remote-badge{display:block}
 .pp{color:var(--green)}.pn{color:var(--red)}
 
 /* ── VIEW 3: GROWTH ── */
-.growth-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px;height:calc(100vh - 46px - 66px - 32px - 34px)}
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px}
-.card-title{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:10px}
+.growth-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px;height:calc(100vh - 56px - 70px - 38px - 34px)}
+
+/* Card component — consistent section panel */
+.card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-left:3px solid var(--orange);
+  border-radius:6px;
+  padding:16px;
+}
+.card-title{
+  font-size:9px;letter-spacing:1.5px;color:var(--muted2);
+  text-transform:uppercase;margin-bottom:10px;font-weight:600;
+}
+
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px}
 .tf-btn{padding:3px 10px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted2);font-family:'JetBrains Mono',monospace;transition:.15s}
 .tf-btn.active,.tf-btn:hover{border-color:var(--orange);color:var(--orange);background:var(--orange_dim)}
-.metric{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:10px 12px}
-.metric-label{font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:4px}
+.metric{
+  background:var(--bg2);border:1px solid var(--border);
+  border-top:2px solid var(--orange);
+  border-radius:5px;padding:12px 14px;
+  transition:border-color .15s;
+}
+.metric:hover{border-color:var(--orange2)}
+.metric-label{font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:5px;font-weight:500}
 .metric-val{font-family:'Syne',sans-serif;font-size:20px;font-weight:800}
 canvas{display:block;width:100% !important}
 
@@ -210,7 +264,7 @@ canvas{display:block;width:100% !important}
 .vt-item.vt-sel{background:var(--orange_dim)}
 
 /* ── VIEW 5: RISK ── */
-.risk-view{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:14px;gap:12px;height:calc(100vh - 46px - 66px - 58px - 32px - 34px)}
+.risk-view{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:14px;gap:12px;height:calc(100vh - 56px - 70px - 60px - 38px - 34px)}
 .risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .risk-meter{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px}
 .rm-label{font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:8px}
@@ -224,7 +278,7 @@ canvas{display:block;width:100% !important}
 .r-pos-total{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0 0;border-top:1px solid var(--border);font-size:11px;font-weight:600}
 
 /* ── VIEW: CATALYST ── */
-.catalyst-view{flex-direction:column;height:calc(100vh - 46px - 66px - 32px - 34px);overflow:hidden}
+.catalyst-view{flex-direction:column;height:calc(100vh - 56px - 70px - 38px - 34px);overflow:hidden}
 .cat-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
 .cat-body{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
 .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -309,7 +363,7 @@ canvas{display:block;width:100% !important}
 .cat-detail-action-btn.primary:hover{background:rgba(255,107,0,.22)}
 
 /* ── VIEW 7: NEWS ── */
-.news-view{flex-direction:column;height:calc(100vh - 46px - 66px - 32px - 34px);overflow:hidden}
+.news-view{flex-direction:column;height:calc(100vh - 56px - 70px - 38px - 34px);overflow:hidden}
 .news-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
 .news-body{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
 .news-badge{flex-shrink:0;padding:3px 8px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.5px;text-align:center}
@@ -450,19 +504,26 @@ canvas{display:block;width:100% !important}
   html{overflow-x:hidden;max-width:100vw}
   body{overflow-y:auto;overflow-x:hidden;height:auto;min-height:100vh;max-width:100vw}
 
-  /* Header */
-  .hdr{height:auto;flex-wrap:wrap;padding:8px 12px;gap:6px}
+  /* Header — stack to column on narrow screens */
+  .hdr{
+    display:flex;flex-direction:column;align-items:stretch;
+    height:auto;padding:8px 12px;gap:6px;
+  }
+  .hdr-left{justify-content:center}
+  .hdr-centre{margin:0}
+  .regime-hero{width:100%;max-width:100%}
+  .hdr-right{justify-content:center;flex-wrap:wrap;gap:4px}
   .logo-name{display:none}
-  .hdr-right{flex-wrap:wrap;gap:4px}
+  .upd-label{display:none}
   .pill{font-size:9px}
 
-  /* Stats — 3 cols */
-  .stats{grid-template-columns:repeat(3,1fr);height:auto;overflow:visible}
-  .stats2{grid-template-columns:repeat(3,1fr);height:auto;overflow:visible}
-  .stat{padding:3px 2px}
-  .sv{font-size:9px}
-  .stats2 .sv{font-size:9px}
-  .sl{font-size:7px;letter-spacing:.3px}
+  /* Stats — 2 cols on mobile */
+  .stats{grid-template-columns:repeat(2,1fr);height:auto;overflow:visible}
+  .stats2{grid-template-columns:repeat(2,1fr);height:auto;overflow:visible}
+  .stat{padding:6px 10px}
+  .sv{font-size:14px}
+  .stats2 .sv{font-size:12px}
+  .sl{font-size:8px;letter-spacing:.5px}
   .ss{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   /* Tab bar — remove fade mask so nothing is hidden */
@@ -651,50 +712,63 @@ canvas{display:block;width:100% !important}
   <button id="tws-reconnect-btn" onclick="twsReconnect()" style="margin-left:auto;background:var(--orange);color:#000;border:none;padding:5px 14px;border-radius:4px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;cursor:pointer">↺ Reconnect</button>
 </div>
 
-<!-- HEADER -->
+<!-- HEADER — 3-zone: left=logo, centre=regime, right=status+time+toggle -->
 <div class="hdr">
-  <div class="logo">
-    <span class="logo-sym">&lt;&gt;</span>
-    <span class="logo-name">Decifer <span style="color:var(--orange);font-size:13px">__DECIFER_VERSION__</span></span>
-    <span class="logo-sub">Autonomous AI Trading</span>
-    <span style="font-size:10px;color:var(--orange);font-weight:700;margin-left:6px;opacity:0.85;">by AMIT CHOPRA</span>
+  <!-- Zone left: logo + version -->
+  <div class="hdr-left">
+    <div class="logo">
+      <span class="logo-sym">&lt;&gt;</span>
+      <span class="logo-name">Decifer <span style="color:var(--orange);font-size:12px">__DECIFER_VERSION__</span></span>
+      <span class="logo-sub">by AMIT CHOPRA</span>
+    </div>
   </div>
+
+  <!-- Zone centre: prominent regime card (JS writes regime-hero-label / regime-hero-sub) -->
+  <div class="hdr-centre">
+    <div class="regime-hero" id="regime-hero-card">
+      <div class="regime-hero-label" id="regime-hero-label">READING MARKET…</div>
+      <div class="regime-hero-sub" id="regime-hero-sub">Waiting for first scan</div>
+    </div>
+  </div>
+
+  <!-- Zone right: bot status, updated time (ET), theme toggle -->
   <div class="hdr-right">
     <div class="pill" id="bot-pill"><div class="dot pulse"></div><span id="bot-status">Connecting...</span></div>
-    <div class="pill po" id="regime-pill">TAPE: —</div>
-    <span style="font-size:10px;color:var(--muted2)" id="upd-time">—</span>
+    <!-- Legacy regime-pill kept hidden — JS still writes to it; display is via regime-hero -->
+    <div class="pill po" id="regime-pill" style="display:none">TAPE: —</div>
+    <span class="upd-label">Updated&nbsp;(ET)</span>
+    <span class="upd-val" id="upd-time">—</span>
     <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" style="background:transparent;border:1px solid var(--border2);border-radius:5px;color:var(--muted2);font-size:13px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s;flex-shrink:0" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted2)'">☀</button>
   </div>
 </div>
 
-<!-- STATS -->
+<!-- STATS ROW 1: primary KPIs -->
 <div class="stats">
-  <div class="stat"><div class="sl">Portfolio Value</div><div class="sv co" id="s-val">—</div><div class="ss" id="s-acc">Paper</div></div>
-  <div class="stat"><div class="sl">Day P&amp;L</div><div class="sv" id="s-pnl">—</div><div class="ss" id="s-pnlp">—</div></div>
-  <div class="stat"><div class="sl">Session</div><div class="sv co" id="s-session">—</div><div class="ss" id="s-next">—</div></div>
-  <div class="stat"><div class="sl">Scans Run</div><div class="sv co" id="s-scans">0</div><div class="ss" id="s-last">Never</div></div>
+  <div class="stat"><div class="sl">Portfolio</div><div class="sv co" id="s-val">—</div><div class="ss" id="s-acc">Paper account</div></div>
+  <div class="stat"><div class="sl">Today's P&amp;L</div><div class="sv" id="s-pnl">—</div><div class="ss" id="s-pnlp">—</div></div>
+  <div class="stat"><div class="sl">Market Session</div><div class="sv co" id="s-session">—</div><div class="ss" id="s-next">—</div></div>
+  <div class="stat"><div class="sl">Scans Today</div><div class="sv co" id="s-scans">0</div><div class="ss" id="s-last">—</div></div>
   <div class="stat"><div class="sl">Open Positions</div><div class="sv co" id="s-pos">0</div><div class="ss">active positions</div></div>
-  <div class="stat"><div class="sl">Trades</div><div class="sv co"><span id="s-trades">0</span></div><div class="ss" id="s-wr">—</div></div>
+  <div class="stat"><div class="sl">All Trades</div><div class="sv co"><span id="s-trades">0</span></div><div class="ss" id="s-wr">—</div></div>
 </div>
 
-<!-- STATS ROW 2: KPIs -->
+<!-- STATS ROW 2: account KPIs -->
 <div class="stats2">
-  <div class="stat"><div class="sl">Available Cash</div><div class="sv cg" id="s-cash">—</div><div class="ss" id="s-cash-pct">—</div></div>
+  <div class="stat"><div class="sl">Cash Available</div><div class="sv cg" id="s-cash">—</div><div class="ss" id="s-cash-pct">—</div></div>
   <div class="stat"><div class="sl">Buying Power</div><div class="sv cw" id="s-bp">—</div><div class="ss">IBKR margin</div></div>
   <div class="stat"><div class="sl">Unrealized P&amp;L</div><div class="sv" id="s-upnl">—</div><div class="ss" id="s-upnl-sub">open positions</div></div>
-  <div class="stat"><div class="sl">Realized P&amp;L</div><div class="sv" id="s-rpnl">—</div><div class="ss">closed today</div></div>
+  <div class="stat"><div class="sl">Closed P&amp;L Today</div><div class="sv" id="s-rpnl">—</div><div class="ss">realized today</div></div>
   <div class="stat"><div class="sl">Margin Used</div><div class="sv cw" id="s-margin">—</div><div class="ss" id="s-margin-pct">—</div></div>
-  <div class="stat"><div class="sl">Excess Liquidity</div><div class="sv cw" id="s-excess">—</div><div class="ss">safety buffer</div></div>
+  <div class="stat"><div class="sl">Safety Buffer</div><div class="sv cw" id="s-excess">—</div><div class="ss">excess liquidity</div></div>
 </div>
 
-<!-- DECISION BAR -->
 <!-- TABS -->
 <div class="tabs">
   <div class="tab active" onclick="switchTab('live',this)">Live</div>
-  <div class="tab" onclick="switchTab('agents',this)">Apex</div>
+  <div class="tab" onclick="switchTab('agents',this)">AI Brain</div>
   <div class="tab" onclick="switchTab('activity',this)">Activity</div>
   <div class="tab" onclick="switchTab('news',this)">News</div>
-  <div class="tab" onclick="switchTab('catalyst',this)">Catalyst</div>
+  <div class="tab" onclick="switchTab('catalyst',this)">Catalysts</div>
   <div class="tab" onclick="switchTab('portfolio',this)">Portfolio</div>
   <div class="tab-sep"></div>
   <div class="tab" onclick="switchTab('log',this)">Log</div>
@@ -702,7 +776,7 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('growth',this)">Growth</div>
   <div class="tab" onclick="switchTab('orders',this)">Orders</div>
   <div class="tab" onclick="switchTab('history',this)">Trades</div>
-  <div class="tab" onclick="switchTab('alpha',this)">Decay</div>
+  <div class="tab" onclick="switchTab('alpha',this)">Alpha Decay</div>
   <div class="tab" onclick="switchTab('analytics',this)">Analytics</div>
   <div class="tab" onclick="switchTab('health',this)">Health</div>
   <div class="tab-sep"></div>
@@ -723,10 +797,10 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="tabs-drawer-grid">
     <div class="tabs-drawer-item active" id="dm-live"      onclick="mobileNav('live')">Live</div>
-    <div class="tabs-drawer-item"        id="dm-agents"    onclick="mobileNav('agents')">Apex</div>
+    <div class="tabs-drawer-item"        id="dm-agents"    onclick="mobileNav('agents')">AI Brain</div>
     <div class="tabs-drawer-item"        id="dm-activity"  onclick="mobileNav('activity')">Activity</div>
     <div class="tabs-drawer-item"        id="dm-news"      onclick="mobileNav('news')">News</div>
-    <div class="tabs-drawer-item"        id="dm-catalyst"  onclick="mobileNav('catalyst')">Catalyst</div>
+    <div class="tabs-drawer-item"        id="dm-catalyst"  onclick="mobileNav('catalyst')">Catalysts</div>
     <div class="tabs-drawer-item"        id="dm-portfolio" onclick="mobileNav('portfolio')">Portfolio</div>
     <div class="tabs-drawer-sep"></div>
     <div class="tabs-drawer-item"        id="dm-log"       onclick="mobileNav('log')">Log</div>
@@ -734,7 +808,7 @@ canvas{display:block;width:100% !important}
     <div class="tabs-drawer-item"        id="dm-growth"    onclick="mobileNav('growth')">Growth</div>
     <div class="tabs-drawer-item"        id="dm-orders"    onclick="mobileNav('orders')">Orders</div>
     <div class="tabs-drawer-item"        id="dm-history"   onclick="mobileNav('history')">Trades</div>
-    <div class="tabs-drawer-item"        id="dm-alpha"     onclick="mobileNav('alpha')">Decay</div>
+    <div class="tabs-drawer-item"        id="dm-alpha"     onclick="mobileNav('alpha')">Alpha Decay</div>
     <div class="tabs-drawer-item"        id="dm-analytics" onclick="mobileNav('analytics')">Analytics</div>
     <div class="tabs-drawer-item"        id="dm-health"    onclick="mobileNav('health')">Health</div>
     <div class="tabs-drawer-sep"></div>
@@ -742,12 +816,12 @@ canvas{display:block;width:100% !important}
   </div>
 </div>
 
-<!-- VIEW 1: LIVE -->
+<!-- VIEW 1: LIVE — 3-column layout -->
 <div class="view active" id="view-live">
   <div class="live-grid">
 
-    <!-- LEFT: Market Map + Apex Synthesis -->
-    <div class="col" style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto">
+    <!-- COL 1: Market context — Market Map + Market Stage thermometer -->
+    <div class="col" style="display:flex;flex-direction:column;overflow-y:auto">
 
       <!-- MARKET MAP (Morning Brief) -->
       <div style="flex-shrink:0">
@@ -807,8 +881,13 @@ canvas{display:block;width:100% !important}
         </div>
       </div>
 
+    </div>
+
+    <!-- COL 2: Bot activity — New Entries, Scan progress, Activity log preview -->
+    <div class="col" style="display:flex;flex-direction:column;overflow-y:auto">
+
       <!-- NEW ENTRIES THIS SCAN -->
-      <div style="flex-shrink:0;border-top:1px solid var(--border)">
+      <div style="flex-shrink:0;border-bottom:1px solid var(--border)">
         <div class="col-title" style="flex-shrink:0">
           <span>New Entries This Scan</span>
           <span id="apex-entries-count" style="font-size:10px;color:var(--muted2)"></span>
@@ -824,9 +903,16 @@ canvas{display:block;width:100% !important}
         <div class="scan-meta"><span id="scan-status">Waiting for first scan...</span><span id="scan-eta">—</span></div>
       </div>
 
+      <!-- ACTIVITY PREVIEW -->
+      <div class="col-title" style="flex-shrink:0">
+        <span>Activity Log</span>
+        <span id="log-count-live" style="color:var(--muted2);font-size:9px"></span>
+      </div>
+      <div class="col-body" id="log-area-live" style="flex:1;min-height:0;overflow-y:auto;padding:0"></div>
+
     </div>
 
-    <!-- RIGHT: Positions + Trades -->
+    <!-- COL 3: Positions + Today's Results (right rail, fixed width) -->
     <div class="col">
       <div class="col-title">Open Positions <span style="margin-left:auto;display:flex;gap:6px"><button class="pos-sort-btn" id="pos-sort-recency" onclick="sortPositions('recency')" style="background:none;border:none;color:var(--orange);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">Recent</button><button class="pos-sort-btn" id="pos-sort-size" onclick="sortPositions('size')" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">Size</button><button class="pos-sort-btn" id="pos-sort-pnl" onclick="sortPositions('pnl')" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">P&amp;L</button></span></div>
       <div style="flex:0 0 auto;overflow-y:auto;max-height:50%;border-bottom:1px solid var(--border)" id="pos-list">
@@ -5584,6 +5670,48 @@ function updateRegime(regime) {
   }
   pill.textContent = 'TAPE: ' + tapeLabel;
 
+  // ── Update header regime hero card ──────────────────────────────────────
+  const heroCard  = document.getElementById('regime-hero-card');
+  const heroLabel = document.getElementById('regime-hero-label');
+  const heroSub   = document.getElementById('regime-hero-sub');
+  if (heroCard && heroLabel && heroSub) {
+    // Map tape class → hero class
+    const classMap = {
+      'tape-panic':   'rh-panic',
+      'tape-selloff': 'rh-bear',
+      'tape-bear':    'rh-bear',
+      'tape-riskoff': 'rh-choppy',
+      'tape-mixed':   '',
+      'tape-bull':    'rh-bull',
+      'tape-strong':  'rh-bull',
+      'unknown':      '',
+    };
+    heroCard.className = 'regime-hero ' + (classMap[tapeClass] || '');
+    heroLabel.textContent = tapeLabel;
+    // Sub-line: use tape_context prose if available, else stage description
+    const stageDescs = {
+      'MOMENTUM BULL': 'Strong conviction uptrend',
+      'STRONG RALLY':  'Broad-based buying surge',
+      'BULLISH':       'Trend intact, risk-on',
+      'RELIEF RALLY':  'Recovering from oversold',
+      'RANGE BOUND':   'No clear direction',
+      'RISK-OFF':      'Rotation to safety',
+      'FEAR ELEVATED': 'High volatility — size down',
+      'DISTRIBUTION':  'Selling into strength',
+      'BEARISH':       'Downward pressure',
+      'TECH SELLOFF':  'Growth / tech under fire',
+      'SELLOFF':       'Broad decline accelerating',
+      'TRENDING BEAR': 'Sustained downtrend',
+      'CAPITULATION':  'Panic — extreme caution',
+    };
+    const tapeCtxHero = (regime.tape_context && regime.tape_context.prose)
+      ? regime.tape_context.prose
+      : (typeof regime.tape_context === 'string' ? regime.tape_context : '');
+    heroSub.textContent = (tapeCtxHero && tapeCtxHero !== 'tape data unavailable')
+      ? tapeCtxHero
+      : (stageDescs[tapeLabel] || `VIX: ${regime.vix || '—'} · SPY: $${regime.spy_price || '—'}`);
+  }
+
   // ── Market Stages vertical list ──────────────────────────────
   const stagesEl = document.getElementById('market-stages-list');
   if (stagesEl) {
@@ -5626,7 +5754,7 @@ async function poll() {
     const twsBanner = document.getElementById('tws-banner');
     if (d.ibkr_disconnected) {
       twsBanner.style.display = 'flex';
-      document.body.style.paddingTop = '46px';
+      document.body.style.paddingTop = '56px';
     } else {
       twsBanner.style.display = 'none';
       document.body.style.paddingTop = '';
@@ -5651,9 +5779,19 @@ async function poll() {
     const pnlPctEl = document.getElementById('s-pnlp');
     pnlPctEl.textContent = (pnl >= 0 ? '+' : '') + pnlPct + '% today';
     pnlPctEl.style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
-    document.getElementById('s-session').textContent = d.session || '—';
+    // Decode session name to human-readable label
+    const _SESSION_LABELS = {
+      'PRIME_AM':    'Prime Morning',
+      'PRIME':       'Trading Hours',
+      'AFTER_HOURS': 'After Hours',
+      'CLOSED':      'Market Closed',
+      'WEEKEND':     'Weekend',
+    };
+    const rawSession = d.session || '—';
+    document.getElementById('s-session').textContent = _SESSION_LABELS[rawSession] || rawSession;
     document.getElementById('s-scans').textContent   = d.scan_count || 0;
-    document.getElementById('s-last').textContent    = d.last_scan ? 'Last: ' + d.last_scan : 'Never';
+    // Show last scan time with ET hint
+    document.getElementById('s-last').textContent    = d.last_scan ? 'Last scan (ET): ' + d.last_scan : '—';
     document.getElementById('s-pos').textContent     = (d.positions || []).length;
     document.getElementById('s-trades').textContent  = (d.all_trades || []).length;
     if (d.performance) {
@@ -5749,12 +5887,23 @@ async function poll() {
 
     // Logs — only rebuild DOM when count changes (preserves scroll position)
     const logArea = document.getElementById('log-area');
+    const logAreaLive = document.getElementById('log-area-live');
     if (d.logs && d.logs.length && d.logs.length !== _lastLogCount) {
       _lastLogCount = d.logs.length;
-      logArea.innerHTML = d.logs.map(l =>
+      const logHtml = d.logs.map(l =>
         `<div class="log-row"><span class="lt">${esc(l.time)}</span><span class="lk lk-${esc(l.type)}">${esc(l.type)}</span><span class="lm">${esc(l.msg)}</span></div>`
       ).join('');
+      logArea.innerHTML = logHtml;
       document.getElementById('log-count').textContent = d.logs.length + ' events';
+      // Mirror top 20 entries into the Live tab activity preview
+      if (logAreaLive) {
+        const preview = d.logs.slice(0, 20);
+        logAreaLive.innerHTML = preview.map(l =>
+          `<div class="log-row"><span class="lt">${esc(l.time)}</span><span class="lk lk-${esc(l.type)}">${esc(l.type)}</span><span class="lm">${esc(l.msg)}</span></div>`
+        ).join('');
+        const liveCountEl = document.getElementById('log-count-live');
+        if (liveCountEl) liveCountEl.textContent = d.logs.length + ' events';
+      }
     }
 
     // AI box (element removed from LIVE view — no-op)
