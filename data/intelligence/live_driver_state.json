@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-26T20:21:43Z",
+  "generated_at": "2026-05-26T22:22:37Z",
   "mode": "live_market_data",
   "active_drivers": [
     "ai_capex_growth",
@@ -37,10 +37,10 @@
     "gold_reason": "GLD 5d=-1.06% \u2014 no safe-haven signal",
     "credit_easing_reason": "HYG-LQD=-0.24% \u2014 credit not easing",
     "small_cap_risk_on_reason": "IWM vs SPY=3.65% > +1.5%",
-    "es_5d_ret": 0.015048984951015143,
-    "nq_5d_ret": 0.03325199340115481,
-    "futures_risk_on_reason": "ES 5d=1.50% > +0.75%, NQ=3.33% \u2014 futures bullish",
-    "futures_risk_off_reason": "ES 5d=1.50% \u2014 futures not bearish"
+    "es_5d_ret": 0.014341985658014256,
+    "nq_5d_ret": 0.032641943909815785,
+    "futures_risk_on_reason": "ES 5d=1.43% > +0.75%, NQ=3.26% \u2014 futures bullish",
+    "futures_risk_off_reason": "ES 5d=1.43% \u2014 futures not bearish"
   },
   "warnings": [],
   "live_output_changed": false,
