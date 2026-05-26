@@ -9,6 +9,7 @@ import type { MarketNowPayload, ThemeItem, KeyEvent } from "@/lib/customerApi";
 import { translateTheme, themeDescription } from "@/lib/translate";
 import { buildCustomerStory } from "@/lib/customerStory";
 import { getTtgIdForMarketNow } from "@/lib/themeCrosswalk";
+import { getCauseMarketImpact } from "@/lib/marketCauseStory";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -269,46 +270,56 @@ export default function TodayTab({ data, onThemeSelect, onGoToUniverse, onGoToTh
         </section>
       )}
 
-      {/* ── Dominant Drivers ────────────────────────────────────────────── */}
+      {/* ── What is Moving Markets ───────────────────────────────────────── */}
       {story.primary_drivers.length > 0 && (
         <section>
-          <SectionLabel>Dominant Drivers</SectionLabel>
+          <SectionLabel>What is Moving Markets</SectionLabel>
           <div className="space-y-2">
-            {story.primary_drivers.map((driver, i) => (
-              <div
-                key={i}
-                className="rounded-xl px-4 py-3"
-                style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.07)" }}
-              >
-                <div className="flex items-start gap-3">
-                  <TrendingUp size={13} style={{ color: "#f97316", marginTop: "2px", flexShrink: 0 }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-slate-100">{driver.label}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                      {driver.explanation}
-                    </p>
-                    {driver.linked_ttg_id && (
-                      <button
-                        onClick={() => {
-                          const firstMarketNow = driver.linked_market_now_ids[0];
-                          if (firstMarketNow) onThemeSelect(firstMarketNow);
-                        }}
-                        className="mt-2 flex items-center gap-1 text-[10px] font-semibold"
-                        style={{ color: "#fb923c" }}
-                      >
-                        <span
-                          className="px-1.5 py-0.5 rounded"
-                          style={{ background: "rgba(249,115,22,0.1)" }}
+            {story.primary_drivers.map((driver, i) => {
+              // primary_drivers is built from keyDrivers in order — index aligns
+              const driverId = keyDrivers[i] ?? "";
+              const impact = getCauseMarketImpact(driverId);
+              return (
+                <div
+                  key={i}
+                  className="rounded-xl px-4 py-3"
+                  style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.07)" }}
+                >
+                  <div className="flex items-start gap-3">
+                    <TrendingUp size={13} style={{ color: "#f97316", marginTop: "2px", flexShrink: 0 }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-100">{driver.label}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                        {driver.explanation}
+                      </p>
+                      {impact && (
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          {impact}
+                        </p>
+                      )}
+                      {driver.linked_ttg_id && (
+                        <button
+                          onClick={() => {
+                            const firstMarketNow = driver.linked_market_now_ids[0];
+                            if (firstMarketNow) onThemeSelect(firstMarketNow);
+                          }}
+                          className="mt-2 flex items-center gap-1 text-[10px] font-semibold"
+                          style={{ color: "#fb923c" }}
                         >
-                          {driver.linked_ttg_label}
-                        </span>
-                        <ArrowRight size={9} />
-                      </button>
-                    )}
+                          <span
+                            className="px-1.5 py-0.5 rounded"
+                            style={{ background: "rgba(249,115,22,0.1)" }}
+                          >
+                            {driver.linked_ttg_label}
+                          </span>
+                          <ArrowRight size={9} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

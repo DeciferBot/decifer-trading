@@ -1,10 +1,11 @@
 "use client";
-// Theme Map tab — visual map of active themes with drill-down into detail.
-// Groups: Active Now | Building | Weakening | Not Currently Signalling
-// Theme detail includes: why it matters, drivers, connected sectors/names, what would weaken it.
+// Theme Map tab — cause-first market intelligence.
+// Opens with "What is moving markets today" (real-world driver cards),
+// then the structural theme grid below.
+// No buy/sell/hold/order/broker language. No execution logic.
 
 import { useMemo, useState, useEffect } from "react";
-import { ChevronRight, X, ArrowRight } from "lucide-react";
+import { ChevronRight, X, ArrowRight, Layers } from "lucide-react";
 import type {
   MarketNowPayload, ThemeItem, SectorItem, RadarItem, UniverseItem,
   TtgSymbolCard,
@@ -12,6 +13,27 @@ import type {
 import { fetchTtgThemeDetail } from "@/lib/customerApi";
 import { translateTheme, themeDescription, themeInvalidation } from "@/lib/translate";
 import { getTtgIdForMarketNow, getCrosswalkByMarketNow, type CrosswalkEntry } from "@/lib/themeCrosswalk";
+import {
+  buildMarketCauseCards,
+  getTtgCauseContext,
+  type MarketCauseCard,
+} from "@/lib/marketCauseStory";
+
+// ── Cause subtext helper ───────────────────────────────────────────────────────
+// Returns the first clause of the crosswalk relationship as a cause context sentence.
+// Falls back to themeDescription when no crosswalk entry exists.
+
+function getCauseSubtext(themeId: string, fromEvents?: string[]): string {
+  if (fromEvents?.[0]) return fromEvents[0];
+  const entry = getCrosswalkByMarketNow(themeId);
+  if (entry) {
+    const rel = entry.relationship;
+    const dashIdx = rel.indexOf(" —");
+    const firstClause = dashIdx > 0 ? rel.slice(0, dashIdx).trim() : rel.split(".")[0].trim();
+    return firstClause.endsWith(".") ? firstClause : firstClause + ".";
+  }
+  return themeDescription(themeId);
+}
 
 // ── State badge ───────────────────────────────────────────────────────────────
 
@@ -43,6 +65,165 @@ function StateBadge({ state, signal }: { state?: string; signal?: string }) {
   );
 }
 
+// ── Market cause card ─────────────────────────────────────────────────────────
+
+function MarketCauseCardDisplay({
+  card,
+  onExploreTheme,
+  onSeeNames,
+}: {
+  card: MarketCauseCard;
+  onExploreTheme?: () => void;
+  onSeeNames?: () => void;
+}) {
+  const evidenceColor =
+    card.evidence_basis === "Fresh event evidence" ? { bg: "rgba(16,185,129,0.1)",  text: "#34d399" } :
+    card.evidence_basis === "Futures signal"       ? { bg: "rgba(99,102,241,0.1)",  text: "#818cf8" } :
+                                                     { bg: "rgba(249,115,22,0.08)", text: "#fb923c" };
+
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.08)" }}
+    >
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-2 mb-2.5">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <span
+            className="w-2 h-2 rounded-full shrink-0 mt-1"
+            style={{
+              background: card.has_fresh_evidence ? "#10b981" : "#f97316",
+              boxShadow: card.has_fresh_evidence
+                ? "0 0 5px rgba(16,185,129,0.5)"
+                : "0 0 5px rgba(249,115,22,0.4)",
+            }}
+          />
+          <p className="text-[13px] font-bold text-slate-100 leading-snug">
+            {card.cause_label}
+          </p>
+        </div>
+        <span
+          className="text-[9px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+          style={{ background: evidenceColor.bg, color: evidenceColor.text }}
+        >
+          {card.evidence_basis}
+        </span>
+      </div>
+
+      {/* What happened */}
+      <p className="text-[12px] text-slate-300 leading-relaxed mb-1.5">
+        {card.what_happened}
+      </p>
+
+      {/* Market impact */}
+      <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
+        {card.market_impact}
+      </p>
+
+      {/* Connected structural themes */}
+      {card.connected_themes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {card.connected_themes.map((t) => (
+            <span
+              key={t.ttgId}
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+            >
+              {t.ttgLabel}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* CTAs */}
+      <div className="flex gap-2 flex-wrap">
+        {card.connected_themes.length > 0 && onExploreTheme && (
+          <button
+            onClick={onExploreTheme}
+            className="flex items-center gap-1 text-[10px] font-semibold px-3 py-1.5 rounded-full transition-all active:scale-95"
+            style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}
+          >
+            Explore connected themes
+            <ArrowRight size={9} />
+          </button>
+        )}
+        {card.primary_ttg_id && card.connected_names_count > 0 && onSeeNames && (
+          <button
+            onClick={onSeeNames}
+            className="flex items-center gap-1 text-[10px] font-semibold px-3 py-1.5 rounded-full transition-all active:scale-95"
+            style={{ background: "rgba(255,255,255,0.06)", color: "#94a3b8" }}
+          >
+            {card.connected_names_count} connected name{card.connected_names_count !== 1 ? "s" : ""}
+            <ArrowRight size={9} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Market cause section ──────────────────────────────────────────────────────
+
+function MarketCauseSection({
+  cards,
+  onThemeSelect,
+  onGoToUniverseTheme,
+}: {
+  cards: MarketCauseCard[];
+  onThemeSelect: (id: string | null) => void;
+  onGoToUniverseTheme?: (ttgId: string) => void;
+}) {
+  if (cards.length === 0) {
+    return (
+      <section>
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style={{ color: "#f97316" }}>
+          What is moving markets today
+        </p>
+        <div
+          className="rounded-2xl px-4 py-4 text-center"
+          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <p className="text-[13px] text-slate-400 leading-relaxed">
+            Markets are quiet right now.
+          </p>
+          <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed max-w-xs mx-auto">
+            Structural themes remain available below, and fresh market drivers will appear here when evidence strengthens.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-1" style={{ color: "#f97316" }}>
+        What is moving markets today
+      </p>
+      <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+        Real-world drivers translated into structural themes and connected company exposure.
+      </p>
+      <div className="space-y-3">
+        {cards.map((card, i) => (
+          <MarketCauseCardDisplay
+            key={i}
+            card={card}
+            onExploreTheme={
+              card.primary_market_now_id
+                ? () => onThemeSelect(card.primary_market_now_id)
+                : undefined
+            }
+            onSeeNames={
+              card.primary_ttg_id && onGoToUniverseTheme
+                ? () => onGoToUniverseTheme(card.primary_ttg_id!)
+                : undefined
+            }
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ── Theme card ─────────────────────────────────────────────────────────────────
 
 function ThemeCard({
@@ -58,7 +239,7 @@ function ThemeCard({
   connectedSectors: number;
   connectedNames: number;
 }) {
-  const sub = theme.from_events?.[0] || themeDescription(theme.theme);
+  const sub = getCauseSubtext(theme.theme, theme.from_events);
 
   return (
     <button
@@ -197,14 +378,14 @@ function ThemeDetail({
           )}
         </div>
 
-        {/* Structural theme crosswalk */}
+        {/* Structural theme crosswalk (cause connection) */}
         {crosswalkEntry && (
           <div
             className="rounded-xl px-3.5 py-3"
             style={{ background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.15)" }}
           >
             <p className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#f97316" }}>
-              Structural Theme Connection
+              What is driving this theme
             </p>
             <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
               <span className="text-[11px] text-slate-300">{crosswalkEntry.marketNowLabel}</span>
@@ -370,8 +551,6 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
   const [ttgSymbols, setTtgSymbols] = useState<TtgSymbolCard[]>([]);
 
   // Fetch TTG data when user drills into a theme detail.
-  // Use crosswalk to map market_now ID → TTG structural ID before fetching,
-  // since most market_now IDs don't match TTG IDs directly.
   useEffect(() => {
     if (!selectedTheme) { setTtgSymbols([]); return; }
     const ttgId = getTtgIdForMarketNow(selectedTheme) ?? selectedTheme;
@@ -388,6 +567,8 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
   const radar          = data.radar ?? [];
   const universeSnap   = data.universe_snapshot ?? [];
 
+  const causeCards = useMemo(() => buildMarketCauseCards(data), [data]);
+
   const sorted = useMemo(() => {
     const order: Record<string, number> = {
       activated: 0, active: 0, strengthening: 1, crowded: 2, watch: 3,
@@ -403,7 +584,6 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
     [themes, selectedTheme],
   );
 
-  // Connected sectors for selected theme (use all sectors as approximation)
   const relatedSectors = useMemo(() => {
     if (!selectedTheme) return [];
     return sectors.filter(s => s.mood === "tailwind" || s.mood === "headwind").slice(0, 8);
@@ -419,7 +599,6 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
     return universeSnap.filter(u => u.theme_id === selectedTheme);
   }, [selectedTheme, universeSnap]);
 
-  // Connected counts for each theme card
   const sectorsByTheme = useMemo(() => {
     return sectors.filter(s => s.mood === "tailwind" || s.mood === "headwind").length;
   }, [sectors]);
@@ -431,7 +610,6 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
     }
     for (const u of universeSnap) {
       if (!map.has(u.theme_id)) map.set(u.theme_id, 0);
-      // Only count universe names if no live radar for this theme
       const hasRadar = radar.some(r => r.theme_link === u.theme_id);
       if (!hasRadar) map.set(u.theme_id, (map.get(u.theme_id) ?? 0) + 1);
     }
@@ -453,13 +631,17 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
     </p>
   );
 
-  if (themes.length === 0) {
+  // ── Empty state ──────────────────────────────────────────────────────────────
+  if (themes.length === 0 && causeCards.length === 0) {
     return (
-      <div className="px-4 pt-12 flex flex-col items-center gap-3 text-center">
-        <p className="text-slate-400 text-sm">No active themes right now.</p>
-        <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
-          Structural themes appear when market forces and supporting evidence align —
-          typically during market hours.
+      <div className="px-4 pt-4 pb-8 space-y-5">
+        <MarketCauseSection
+          cards={[]}
+          onThemeSelect={onThemeSelect}
+          onGoToUniverseTheme={onGoToUniverseTheme}
+        />
+        <p className="text-[10px] text-slate-600 text-center pt-2">
+          Structural themes will appear here during market hours.
         </p>
       </div>
     );
@@ -468,7 +650,16 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
   return (
     <div className="px-4 pt-2 pb-8 space-y-5">
 
-      {/* Breadcrumb */}
+      {/* ── Cause-first section (only when no theme is selected) ─────────────── */}
+      {!selectedTheme && (
+        <MarketCauseSection
+          cards={causeCards}
+          onThemeSelect={onThemeSelect}
+          onGoToUniverseTheme={onGoToUniverseTheme}
+        />
+      )}
+
+      {/* ── Breadcrumb (when a theme is selected) ────────────────────────────── */}
       {selectedTheme && (
         <div className="flex items-center gap-1.5 text-[10px]">
           <button
@@ -482,7 +673,7 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
         </div>
       )}
 
-      {/* Theme detail panel */}
+      {/* ── Theme detail panel ────────────────────────────────────────────────── */}
       {selectedThemeObj && (
         <ThemeDetail
           theme={selectedThemeObj}
@@ -501,7 +692,21 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
         />
       )}
 
-      {/* Active themes */}
+      {/* ── Structural themes divider (only when cause section is visible) ───── */}
+      {!selectedTheme && themes.length > 0 && (
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+          <div className="flex items-center gap-1.5">
+            <Layers size={10} className="text-slate-600" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-600">
+              Structural Themes
+            </span>
+          </div>
+          <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+        </div>
+      )}
+
+      {/* ── Active themes ─────────────────────────────────────────────────────── */}
       {grouped.active.length > 0 && (
         <section>
           <SectionLabel>Active Now</SectionLabel>
@@ -520,7 +725,7 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
         </section>
       )}
 
-      {/* Building */}
+      {/* ── Building ──────────────────────────────────────────────────────────── */}
       {grouped.building.length > 0 && (
         <section>
           <SectionLabel>Building Momentum</SectionLabel>
@@ -539,7 +744,7 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
         </section>
       )}
 
-      {/* Weakening */}
+      {/* ── Weakening ─────────────────────────────────────────────────────────── */}
       {grouped.weakening.length > 0 && (
         <section>
           <SectionLabel>Weakening / Headwinds</SectionLabel>
@@ -558,29 +763,33 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
         </section>
       )}
 
-      {/* Not Currently Signalling */}
+      {/* ── Not currently signalling ──────────────────────────────────────────── */}
       {grouped.quiet.length > 0 && (
         <section>
           <SectionLabel>Not Currently Signalling</SectionLabel>
           <div className="grid grid-cols-2 gap-2">
-            {grouped.quiet.map((t, i) => (
-              <button
-                key={i}
-                onClick={() => onThemeSelect(selectedTheme === t.theme ? null : t.theme)}
-                className="rounded-xl p-3 text-left transition-all active:scale-[0.98]"
-                style={{
-                  background: selectedTheme === t.theme ? "rgba(249,115,22,0.1)" : "#131f35",
-                  border: `1px solid ${selectedTheme === t.theme ? "#f97316" : "rgba(255,255,255,0.07)"}`,
-                }}
-              >
-                <p className="text-[11px] font-semibold text-slate-300 leading-snug">
-                  {translateTheme(t.theme)}
-                </p>
-                <p className="text-[9px] text-slate-500 mt-1">
-                  {namesByTheme.get(t.theme) ? `${namesByTheme.get(t.theme)} names` : "Not signalling"}
-                </p>
-              </button>
-            ))}
+            {grouped.quiet.map((t, i) => {
+              const ttgId = getTtgIdForMarketNow(t.theme);
+              const causeCtx = ttgId ? getTtgCauseContext(ttgId) : "";
+              return (
+                <button
+                  key={i}
+                  onClick={() => onThemeSelect(selectedTheme === t.theme ? null : t.theme)}
+                  className="rounded-xl p-3 text-left transition-all active:scale-[0.98]"
+                  style={{
+                    background: selectedTheme === t.theme ? "rgba(249,115,22,0.1)" : "#131f35",
+                    border: `1px solid ${selectedTheme === t.theme ? "#f97316" : "rgba(255,255,255,0.07)"}`,
+                  }}
+                >
+                  <p className="text-[11px] font-semibold text-slate-300 leading-snug">
+                    {translateTheme(t.theme)}
+                  </p>
+                  <p className="text-[9px] text-slate-500 mt-1 leading-relaxed line-clamp-2">
+                    {causeCtx || (namesByTheme.get(t.theme) ? `${namesByTheme.get(t.theme)} names` : "Structural context available")}
+                  </p>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
