@@ -141,6 +141,8 @@ _INTELLIGENCE_MODULES: frozenset[str] = frozenset({
     "alpaca_stream",
     "worker_evidence",
     "hmm_regime",
+    # ── Sprint M12A — Theme Transmission Graph ──
+    "theme_graph",
 })
 
 _SAAS_OUTPUT_MODULES: frozenset[str] = frozenset({
@@ -152,6 +154,8 @@ _SAAS_OUTPUT_MODULES: frozenset[str] = frozenset({
     "customer_event_classifier",  # pure deterministic event classifier
     "customer_event_tape",        # customer-only tape writer/reader
     "market_now_reconciler",      # helper for market_now_builder only
+    # ── Sprint M12A — Theme Transmission Graph API ──
+    "theme_graph_api",            # Flask blueprint for TTG customer routes
 })
 
 _DASHBOARD_ADMIN_MODULES: frozenset[str] = frozenset({

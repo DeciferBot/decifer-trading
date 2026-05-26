@@ -82,6 +82,14 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset({
     "watch_next",
     "market_mood",
     "source_notes",
+    # ── Sprint M12A — Theme Transmission Graph (approved by Amit) ──
+    "theme_graph_themes",
+    "theme_graph_buckets",
+    "theme_graph_symbol_card",
+    "theme_graph_reason_path",
+    "theme_graph_search_results",
+    # ── Sprint M11C — Customer universe snapshot (approved by Amit) ──
+    "universe_snapshot",
 })
 
 # Field-name substrings that are forbidden anywhere in the payload — even
@@ -212,6 +220,11 @@ class SaaSIntelligencePayload:
 
     # Plain-English provenance notes — never includes file paths or APIs.
     source_notes: list[str] = field(default_factory=list)
+
+    # Sprint M11C — customer-safe universe snapshot.
+    # Projected from active_opportunity_universe; execution fields stripped.
+    # Each item: {symbol, company_name, theme_id, why_connected, transmission}.
+    universe_snapshot: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

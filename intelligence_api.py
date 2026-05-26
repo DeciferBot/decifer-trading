@@ -57,11 +57,13 @@ from mobile_api import (
     build_why_payload,
 )
 from saas_intelligence_output import SaaSPayloadValidationError, validate_customer_payload
+from theme_graph_api import bp as theme_graph_bp
 
 log = logging.getLogger("decifer.intelligence_api")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = Flask(__name__)
+app.register_blueprint(theme_graph_bp)
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
