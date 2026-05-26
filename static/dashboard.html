@@ -56,11 +56,11 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .regime-hero.rh-choppy .regime-hero-label{color:var(--yellow)}
 
 /* ── STATS STRIPS — card grid ───────────────────────────────────────────────── */
-.stats{display:grid;grid-template-columns:1.35fr 1.35fr 1fr 1fr 1fr 1fr;height:74px;border-bottom:1px solid var(--border);overflow:hidden}
-.stats2{display:grid;grid-template-columns:repeat(6,1fr);height:62px;border-bottom:1px solid var(--border);overflow:hidden;background:var(--bg2)}
-.stats2 .stat{padding:7px 14px}
+.stats{display:grid;grid-template-columns:1.35fr 1.35fr 1fr 1fr 1fr 1fr;height:90px;border-bottom:1px solid var(--border);overflow:hidden}
+.stats2{display:grid;grid-template-columns:repeat(6,1fr);height:76px;border-bottom:1px solid var(--border);overflow:hidden;background:var(--bg2)}
+.stats2 .stat{padding:10px 16px}
 .stats2 .sv{font-size:16px}
-.stat{padding:10px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-width:0;transition:background .15s}
+.stat{padding:13px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-width:0;transition:background .15s}
 .stat:last-child{border-right:none}
 .stat:hover{background:var(--bg3)}
 /* First two stats (Portfolio + Today P&L) get larger value display — scoped to row 1 only */
@@ -102,7 +102,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .mkt-strip-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;padding:0 10px;border-left:1px solid var(--border)}
 
 /* Market stage spectrum bar */
-.mkt-stage-bar{display:flex;align-items:stretch;border-bottom:2px solid var(--border);background:var(--bg);flex-shrink:0;overflow-x:auto;scrollbar-width:none;min-height:40px}
+.mkt-stage-bar{display:flex;align-items:stretch;border-bottom:2px solid var(--border);background:var(--bg);flex-shrink:0;overflow-x:auto;scrollbar-width:none;min-height:48px}
 .mkt-stage-bar::-webkit-scrollbar{display:none}
 .mkt-stage-track{display:flex;align-items:stretch;flex:1;min-width:max-content}
 
@@ -121,8 +121,8 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .bias-reason{font-size:11px;color:var(--muted2);max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none}
 
 /* Mover table column headers */
-.mover-hdr{display:grid;grid-template-columns:56px 72px 72px 1fr;gap:4px;padding:4px 0 6px;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.15px;color:var(--muted2);margin-bottom:3px}
-.mover-row{display:grid;grid-template-columns:56px 72px 72px 1fr;gap:4px;padding:3px 0;font-size:11px;font-family:'JetBrains Mono',monospace;align-items:center;border-bottom:1px solid var(--border)}
+.mover-hdr{display:grid;grid-template-columns:56px 72px 72px 1fr;gap:4px;padding:6px 0 8px;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.15px;color:var(--muted2);margin-bottom:4px}
+.mover-row{display:grid;grid-template-columns:56px 72px 72px 1fr;gap:4px;padding:6px 0;font-size:11px;font-family:'JetBrains Mono',monospace;align-items:center;border-bottom:1px solid var(--border)}
 
 /* 3-column grid */
 .live-grid{display:grid;grid-template-columns:1fr 1fr 340px;width:100%;flex:1;min-height:0;overflow:hidden}
@@ -139,12 +139,12 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 
 /* DECISION BAR */
 
-/* VIEWS — header:56px + stats1:70px + stats2:60px + tabs:38px + footer:34px */
-.view{display:none;height:calc(100vh - 56px - 70px - 60px - 38px - 34px);overflow:hidden}
+/* VIEWS — header:56px + stats1:90px + stats2:76px + tabs:38px + footer:34px */
+.view{display:none;height:calc(100vh - 56px - 90px - 76px - 38px - 34px);overflow:hidden}
 .view.active{display:flex}
-#view-portfolio{height:calc(100vh - 56px - 70px - 60px - 38px - 34px);overflow-y:auto !important;overflow-x:hidden}
+#view-portfolio{height:calc(100vh - 56px - 90px - 76px - 38px - 34px);overflow-y:auto !important;overflow-x:hidden}
 #view-portfolio > *{flex-shrink:0}
-.col-title{padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:.2px;color:var(--text);text-transform:none;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;display:flex;justify-content:space-between;align-items:center;border-left:3px solid var(--orange)}
+.col-title{padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:.2px;color:var(--text);text-transform:none;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;display:flex;justify-content:space-between;align-items:center;border-left:3px solid var(--orange)}
 .col-body{overflow-y:auto;flex:1}
 
 /* Tape */
@@ -250,7 +250,7 @@ body.remote-mode #remote-badge{display:block}
 .pp{color:var(--green)}.pn{color:var(--red)}
 
 /* ── VIEW 3: GROWTH ── */
-.growth-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px;height:calc(100vh - 56px - 70px - 38px - 34px)}
+.growth-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px;height:calc(100vh - 56px - 90px - 38px - 34px)}
 
 /* Card component — consistent section panel */
 .card{
@@ -303,7 +303,7 @@ canvas{display:block;width:100% !important}
 .vt-item.vt-sel{background:var(--orange_dim)}
 
 /* ── VIEW 5: RISK ── */
-.risk-view{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:14px;gap:12px;height:calc(100vh - 56px - 70px - 60px - 38px - 34px)}
+.risk-view{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:14px;gap:12px;height:calc(100vh - 56px - 90px - 76px - 38px - 34px)}
 .risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .risk-meter{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px}
 .rm-label{font-size:11px;letter-spacing:.2px;color:var(--muted2);margin-bottom:8px}
@@ -317,7 +317,7 @@ canvas{display:block;width:100% !important}
 .r-pos-total{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0 0;border-top:1px solid var(--border);font-size:11px;font-weight:600}
 
 /* ── VIEW: CATALYST ── */
-.catalyst-view{flex-direction:column;height:calc(100vh - 56px - 70px - 38px - 34px);overflow:hidden}
+.catalyst-view{flex-direction:column;height:calc(100vh - 56px - 90px - 38px - 34px);overflow:hidden}
 .cat-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
 .cat-body{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
 .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -402,7 +402,7 @@ canvas{display:block;width:100% !important}
 .cat-detail-action-btn.primary:hover{background:rgba(255,107,0,.22)}
 
 /* ── VIEW 7: NEWS ── */
-.news-view{flex-direction:column;height:calc(100vh - 56px - 70px - 38px - 34px);overflow:hidden}
+.news-view{flex-direction:column;height:calc(100vh - 56px - 90px - 38px - 34px);overflow:hidden}
 .news-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
 .news-body{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
 .news-badge{flex-shrink:0;padding:3px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.5px;text-align:center}
@@ -737,7 +737,7 @@ canvas{display:block;width:100% !important}
 .pos-modal-section{margin-top:14px;padding-top:10px;border-top:1px solid var(--border2)}
 .pos-modal-section h4{font-size:11px;letter-spacing:.2px;color:var(--orange);margin-bottom:8px;font-family:'Syne',sans-serif;font-weight:700}
 .pos-modal-reasoning{font-size:11px;color:var(--text);line-height:1.7;white-space:pre-wrap;background:var(--bg3);border:1px solid var(--border2);border-left:2px solid var(--orange);border-radius:4px;padding:10px 12px;max-height:200px;overflow-y:auto}
-.pos-card{padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s,border-left-color .15s;border-left:2px solid transparent}
+.pos-card{padding:13px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s,border-left-color .15s;border-left:2px solid transparent}
 .pos-card:hover{background:rgba(255,107,0,.07);border-left-color:var(--orange)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -886,8 +886,8 @@ canvas{display:block;width:100% !important}
     <div class="col" style="overflow-y:auto">
 
       <!-- Gainers -->
-      <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:10px 14px">
-        <div class="section-label" style="color:var(--green);margin-bottom:8px">Top gainers</div>
+      <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:14px 16px">
+        <div class="section-label" style="color:var(--green);margin-bottom:10px">Top gainers</div>
         <div class="mover-hdr">
           <span>Symbol</span><span>Prev close</span><span>Live</span><span style="text-align:right">Change</span>
         </div>
@@ -895,8 +895,8 @@ canvas{display:block;width:100% !important}
       </div>
 
       <!-- Losers -->
-      <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:10px 14px">
-        <div class="section-label" style="color:var(--red);margin-bottom:8px">Top losers</div>
+      <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:14px 16px">
+        <div class="section-label" style="color:var(--red);margin-bottom:10px">Top losers</div>
         <div class="mover-hdr">
           <span>Symbol</span><span>Prev close</span><span>Live</span><span style="text-align:right">Change</span>
         </div>
@@ -904,14 +904,14 @@ canvas{display:block;width:100% !important}
       </div>
 
       <!-- Events this week -->
-      <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:10px 14px">
-        <div class="section-label" style="margin-bottom:8px">Events this week</div>
+      <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:14px 16px">
+        <div class="section-label" style="margin-bottom:10px">Events this week</div>
         <div id="on-calendar"></div>
       </div>
 
       <!-- Yesterday -->
-      <div id="on-perf-section" style="padding:10px 14px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
+      <div id="on-perf-section" style="padding:14px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
           <div class="section-label">Yesterday</div>
           <span id="overnight-meta" style="font-size:11px;color:var(--muted2)"></span>
         </div>
@@ -927,8 +927,8 @@ canvas{display:block;width:100% !important}
     <div class="col" style="display:flex;flex-direction:column;overflow-y:auto">
 
       <!-- News header with bias chips -->
-      <div style="flex-shrink:0;padding:10px 14px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+      <div style="flex-shrink:0;padding:14px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap">
           <span class="section-label" id="on-news-label">News</span>
         </div>
         <div id="on-news"></div>
@@ -5856,13 +5856,15 @@ function updateRegime(regime) {
         </div>`;
       } else {
         const dist = Math.abs(i - (activeIdx >= 0 ? activeIdx : 6));
-        const op = dist <= 1 ? 0.5 : dist <= 3 ? 0.3 : 0.16;
+        // Use explicit colors — never opacity (opacity makes text blend into background)
+        const txtColor = dist <= 1 ? '#ABABC0' : dist <= 3 ? '#7E7E96' : '#5A5A72';
+        const topAlpha = dist <= 1 ? '60' : dist <= 3 ? '40' : '22';
         return `<div style="
           flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-          padding:3px 4px;border-left:1px solid var(--border);
-          border-top:2px solid ${s.col}${Math.round(op * 255).toString(16).padStart(2,'0')};
-          cursor:default;min-width:52px">
-          <span style="font-size:11px;font-weight:500;color:var(--muted2);opacity:${op};text-align:center;line-height:1.2;white-space:nowrap">${s.key}</span>
+          padding:3px 6px;border-left:1px solid var(--border);
+          border-top:2px solid ${s.col}${topAlpha};
+          cursor:default;min-width:60px">
+          <span style="font-size:11px;font-weight:500;color:${txtColor};text-align:center;line-height:1.2;white-space:nowrap">${s.key}</span>
         </div>`;
       }
     }).join('');
