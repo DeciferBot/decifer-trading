@@ -23,7 +23,13 @@ import type {
   FreshnessState,
   SinceAwaySummary,
 } from "@/lib/useCustomerBriefing";
-import { buildCustomerMarketStory } from "@/lib/customerBriefingModel";
+import {
+  buildCustomerMarketStory,
+  buildNarrativeParagraph,
+  buildWhereLooking,
+  buildWhatCouldChange,
+  type TapeSnapshot,
+} from "@/lib/customerBriefingModel";
 import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory";
 import type { TapeEntry } from "@/app/api/market-tape/route";
 
@@ -57,13 +63,28 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
+// ── Tape → TapeSnapshot ───────────────────────────────────────────────────────
+
+function deriveTapeSnapshot(tape: TapeEntry[]): TapeSnapshot {
+  const by: Record<string, TapeEntry> = {};
+  for (const t of tape) by[t.sym] = t;
+  return {
+    spy_pct:   by["SPY"]?.changePct ?? null,
+    qqq_pct:   by["QQQ"]?.changePct ?? null,
+    tlt_pct:   by["TLT"]?.changePct ?? null,
+    gld_pct:   by["GLD"]?.changePct ?? null,
+    uso_pct:   by["USO"]?.changePct ?? null,
+    vix_level: by["VIX"]?.level     ?? null,
+  };
+}
+
 // ── Market Tape ───────────────────────────────────────────────────────────────
 
 function TapeItem({ entry }: { entry: TapeEntry }) {
   if (entry.type === "vol") {
     const level = entry.level;
     const vixColor =
-      level == null   ? "#475569" :
+      level == null   ? "#64748b" :
       level >= 25     ? "#f87171" :
       level >= 20     ? "#fbbf24" :
                         "#34d399";
@@ -75,7 +96,7 @@ function TapeItem({ entry }: { entry: TapeEntry }) {
         <span className="text-[11px] font-black" style={{ color: vixColor }}>
           {level != null ? level.toFixed(1) : "—"}
         </span>
-        <span className="text-[9px] font-medium text-slate-600">VIX</span>
+        <span className="text-[10px] font-medium text-slate-400">VIX</span>
       </div>
     );
   }
@@ -83,7 +104,7 @@ function TapeItem({ entry }: { entry: TapeEntry }) {
   const pct = entry.changePct;
   const isPos = pct != null && pct > 0;
   const isNeg = pct != null && pct < 0;
-  const color = isPos ? "#34d399" : isNeg ? "#f87171" : "#475569";
+  const color = isPos ? "#34d399" : isNeg ? "#f87171" : "#64748b";
 
   return (
     <div
@@ -93,7 +114,7 @@ function TapeItem({ entry }: { entry: TapeEntry }) {
       <span className="text-[11px] font-black" style={{ color }}>
         {pct != null ? `${isPos ? "+" : ""}${pct.toFixed(1)}%` : "—"}
       </span>
-      <span className="text-[9px] font-medium text-slate-600">{entry.label}</span>
+      <span className="text-[10px] font-medium text-slate-400">{entry.label}</span>
     </div>
   );
 }
@@ -127,7 +148,7 @@ function EventCard({ ev }: { ev: KeyEvent }) {
             </p>
             {ev.materiality === "high" && (
               <span
-                className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
                 style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
               >
                 High impact
@@ -183,6 +204,7 @@ function EventCard({ ev }: { ev: KeyEvent }) {
 interface MarketStoryHeroProps {
   data: MarketNowPayload;
   story: CustomerStory;
+  tapeSnapshot: TapeSnapshot;
   isRefreshing: boolean;
   freshnessState: FreshnessState;
   freshnessLabel: string;
@@ -194,6 +216,7 @@ interface MarketStoryHeroProps {
 function MarketStoryHero({
   data,
   story,
+  tapeSnapshot,
   isRefreshing,
   freshnessState,
   freshnessLabel,
@@ -203,6 +226,8 @@ function MarketStoryHero({
 }: MarketStoryHeroProps) {
   const ms = buildCustomerMarketStory(data, story);
   const c  = regimeColors(ms.regime.state);
+
+  const narrativeParagraph = buildNarrativeParagraph(data, ms, tapeSnapshot);
 
   const freshnessTimeCopy =
     freshnessState === "fresh" && data.freshness_timestamp
@@ -235,7 +260,7 @@ function MarketStoryHero({
           </span>
           {ms.has_live_events && (
             <span
-              className="text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
               style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}
             >
               <Zap size={8} />
@@ -247,7 +272,7 @@ function MarketStoryHero({
           onClick={onRefresh}
           disabled={isRefreshing}
           className="text-[10px] font-semibold flex items-center gap-1 transition-all active:scale-95"
-          style={{ color: "#475569" }}
+          style={{ color: "#94a3b8" }}
           aria-label="Refresh"
         >
           <RefreshCw size={9} className={isRefreshing ? "animate-spin" : ""} />
@@ -262,17 +287,10 @@ function MarketStoryHero({
         </p>
       </div>
 
-      {/* Headline */}
+      {/* Narrative paragraph — replaces mechanical headline + summary */}
       <div className="px-4 pb-3">
-        <p className="text-[15px] font-bold text-slate-100 leading-snug">
-          {ms.headline}
-        </p>
-      </div>
-
-      {/* Summary */}
-      <div className="px-4 pb-3">
-        <p className="text-[12px] text-slate-300 leading-relaxed">
-          {ms.summary}
+        <p className="text-[13px] text-slate-200 leading-relaxed">
+          {narrativeParagraph}
         </p>
       </div>
 
@@ -374,15 +392,15 @@ function CauseGroupCard({
         <div className="flex items-center gap-1.5 shrink-0">
           {group.is_cluster && (
             <span
-              className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+              className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
               style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
             >
               {group.driver_count} drivers
             </span>
           )}
           <span
-            className="text-[9px] font-medium px-1.5 py-0.5 rounded"
-            style={{ background: "rgba(255,255,255,0.05)", color: "#6b7280" }}
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+            style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8" }}
           >
             {card.evidence_basis}
           </span>
@@ -408,7 +426,7 @@ function CauseGroupCard({
             </button>
           ))}
           {card.connected_names_count > 0 && (
-            <span className="text-[10px] text-slate-600 self-center ml-1">
+            <span className="text-[10px] text-slate-400 self-center ml-1">
               {card.connected_names_count}{" "}
               {card.connected_names_count !== 1 ? "names" : "name"}
             </span>
@@ -428,6 +446,76 @@ function CauseGroupCard({
         </button>
       )}
     </div>
+  );
+}
+
+// ── Where Decifer Is Looking ──────────────────────────────────────────────────
+
+function WhereLookingSection({
+  data,
+  onAskAbout,
+}: {
+  data: MarketNowPayload;
+  onAskAbout?: (ctx: string) => void;
+}) {
+  const { stories, names, empty } = buildWhereLooking(data);
+  if (empty) return null;
+
+  return (
+    <section>
+      <SectionLabel>Where Decifer is looking</SectionLabel>
+      <div
+        className="rounded-2xl p-4"
+        style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+      >
+        {/* Story / sector chips */}
+        {stories.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {stories.map((s, i) => (
+              <span
+                key={i}
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Names list */}
+        {names.length > 0 && (
+          <div className="space-y-2.5">
+            {names.map((n, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <span
+                  className="text-[11px] font-bold text-slate-200 shrink-0 w-11"
+                >
+                  {n.symbol}
+                </span>
+                <p className="text-[11px] text-slate-400 leading-relaxed">{n.reason}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Ask CTA */}
+        {onAskAbout && (stories.length > 0 || names.length > 0) && (
+          <button
+            onClick={() =>
+              onAskAbout(
+                `Which names are connected to ${stories[0] ?? "these themes"} today?`,
+              )
+            }
+            className="mt-3 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
+            style={{ color: "#94a3b8" }}
+          >
+            Ask Decifer about these names
+            <ArrowRight size={9} />
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -462,7 +550,8 @@ export default function TodayTab({
   onGoToForces,
 }: Props) {
   const keyEvents  = data.key_events ?? [];
-  const watchNext  = data.watch_next?.length ? data.watch_next : (data.what_to_watch ?? []);
+  const apiWatch   = data.watch_next?.length ? data.watch_next : (data.what_to_watch ?? []);
+  const watchNext  = apiWatch.length > 0 ? apiWatch : buildWhatCouldChange(data);
   const groups     = buildCauseGroups(data);
 
   const [tape, setTape] = useState<TapeEntry[]>([]);
@@ -473,6 +562,8 @@ export default function TodayTab({
       .catch(() => {});
   }, []);
 
+  const tapeSnapshot = deriveTapeSnapshot(tape);
+
   return (
     <div className="px-4 pb-8 space-y-5 pt-3">
 
@@ -482,6 +573,7 @@ export default function TodayTab({
           <MarketStoryHero
             data={data}
             story={story}
+            tapeSnapshot={tapeSnapshot}
             isRefreshing={isRefreshing}
             freshnessState={freshnessState}
             freshnessLabel={freshnessLabel}
@@ -531,7 +623,7 @@ export default function TodayTab({
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] text-slate-200 leading-snug">{item.title}</p>
                     {item.detail && (
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed line-clamp-2">
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
                         {item.detail}
                       </p>
                     )}
@@ -601,10 +693,13 @@ export default function TodayTab({
         </section>
       )}
 
-      {/* ── F: Worth watching ─────────────────────────────────────────────── */}
+      {/* ── F: Where Decifer is looking ───────────────────────────────────── */}
+      <WhereLookingSection data={data} onAskAbout={onAskAbout} />
+
+      {/* ── G: What could change the picture ─────────────────────────────── */}
       {watchNext.length > 0 && (
         <section>
-          <SectionLabel>Worth watching</SectionLabel>
+          <SectionLabel>What could change the picture</SectionLabel>
           <Card>
             <ul className="space-y-2.5">
               {watchNext.map((item, i) => (
@@ -626,11 +721,11 @@ export default function TodayTab({
           border: "1px solid rgba(255,255,255,0.04)",
         }}
       >
-        <p className="text-[11px] text-slate-600 leading-relaxed">
+        <p className="text-[11px] text-slate-500 leading-relaxed">
           Market intelligence only. Not financial advice. No trade execution.
         </p>
         {data.data_entitlement_note && (
-          <p className="text-[10px] text-slate-700 mt-1">{data.data_entitlement_note}</p>
+          <p className="text-[10px] text-slate-500 mt-1">{data.data_entitlement_note}</p>
         )}
       </div>
     </div>

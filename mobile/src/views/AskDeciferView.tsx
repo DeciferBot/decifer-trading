@@ -85,7 +85,7 @@ export default function AskDeciferView({ onAskContext, data }: Props) {
               setSubmitted(false);
             }}
             placeholder="Ask anything about markets..."
-            className="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-600 outline-none"
+            className="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 outline-none"
             onKeyDown={(e) => {
               if (e.key === "Enter" && input.trim()) handleAsk(input.trim());
             }}
@@ -119,7 +119,7 @@ export default function AskDeciferView({ onAskContext, data }: Props) {
                 Ask Decifer is being connected to the approved intelligence layer.
                 Use the suggested questions below to explore your briefing sections.
               </p>
-              <p className="text-[10px] text-slate-600 mt-2">
+              <p className="text-[11px] text-slate-500 mt-2">
                 Market intelligence only. Not financial advice.
               </p>
             </div>
@@ -138,10 +138,10 @@ export default function AskDeciferView({ onAskContext, data }: Props) {
           </p>
           {isContextual && (
             <span
-              className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1"
+              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1"
               style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
             >
-              <Zap size={7} />
+              <Zap size={9} />
               Live context
             </span>
           )}
@@ -155,7 +155,7 @@ export default function AskDeciferView({ onAskContext, data }: Props) {
               style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
             >
               <span className="flex-1 text-[13px] text-slate-200 leading-snug">{q}</span>
-              <ChevronRight size={13} className="text-slate-600 shrink-0" />
+              <ChevronRight size={13} className="text-slate-400 shrink-0" />
             </button>
           ))}
         </div>
@@ -166,7 +166,7 @@ export default function AskDeciferView({ onAskContext, data }: Props) {
         className="rounded-xl p-3 text-center"
         style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
       >
-        <p className="text-[10px] text-slate-600 leading-relaxed">
+        <p className="text-[11px] text-slate-500 leading-relaxed">
           Decifer provides market intelligence only.
           Not financial advice. No trade recommendations.
         </p>

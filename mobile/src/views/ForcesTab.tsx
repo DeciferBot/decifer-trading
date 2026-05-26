@@ -28,7 +28,7 @@ function EvidenceChip({ basis }: { basis: string }) {
   if (basis === "Quiet")           { bg = "rgba(255,255,255,0.05)"; color = "#475569"; }
   return (
     <span
-      className="text-[9px] font-semibold px-2 py-0.5 rounded-full"
+      className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
       style={{ background: bg, color }}
     >
       {basis}
@@ -53,7 +53,7 @@ function ConnectionTree({
       className="rounded-xl p-3 space-y-1.5"
       style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
     >
-      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-600 mb-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
         Connection path
       </p>
       {/* Force node */}
@@ -64,7 +64,7 @@ function ConnectionTree({
       {/* Theme nodes */}
       {node.themes.slice(0, 4).map((theme, i) => (
         <div key={i} className="flex items-center gap-2 pl-4">
-          <ChevronRight size={10} className="text-slate-700 shrink-0" />
+          <ChevronRight size={10} className="text-slate-500 shrink-0" />
           <button
             onClick={() => onThemeSelect(theme.theme_id)}
             className="text-[11px] font-semibold transition-all active:scale-95 text-left"
@@ -72,7 +72,7 @@ function ConnectionTree({
           >
             {theme.theme_label}
             {theme.driver_active && (
-              <span className="text-[8px] ml-1.5 text-emerald-600">● Active</span>
+              <span className="text-[10px] ml-1.5 text-emerald-400">● Active</span>
             )}
           </button>
         </div>
@@ -82,10 +82,10 @@ function ConnectionTree({
         <div className="pl-4 pt-0.5">
           <button
             onClick={onGoToNames}
-            className="flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
-            style={{ color: "#64748b" }}
+            className="flex items-center gap-1 text-[11px] font-semibold transition-all active:scale-95"
+            style={{ color: "#94a3b8" }}
           >
-            <Search size={9} />
+            <Search size={10} />
             See connected names
           </button>
         </div>
@@ -134,7 +134,7 @@ function ActiveForceCard({
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <span
-              className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
               style={{ background: "rgba(16,185,129,0.15)", color: "#34d399" }}
             >
               Active
@@ -193,13 +193,13 @@ function ActiveForceCard({
           onClick={() => setExpanded(o => !o)}
           className="w-full flex items-center justify-between gap-2 text-left mb-2"
         >
-          <span className="text-[10px] font-semibold text-slate-500">
+          <span className="text-[11px] font-semibold text-slate-400">
             Risk to monitor
           </span>
           {expanded ? (
-            <ChevronUp size={12} className="text-slate-600" />
+            <ChevronUp size={12} className="text-slate-500" />
           ) : (
-            <ChevronDown size={12} className="text-slate-600" />
+            <ChevronDown size={12} className="text-slate-500" />
           )}
         </button>
         {expanded && (
@@ -240,11 +240,11 @@ function DormantForceRow({ force }: { force: CustomerMarketForce }) {
           <span className="text-[12px] font-semibold text-slate-400 truncate">{force.label}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[9px] text-slate-600">Quiet</span>
+          <span className="text-[10px] text-slate-400">Quiet</span>
           {expanded ? (
-            <ChevronUp size={12} className="text-slate-600" />
+            <ChevronUp size={12} className="text-slate-500" />
           ) : (
-            <ChevronDown size={12} className="text-slate-600" />
+            <ChevronDown size={12} className="text-slate-500" />
           )}
         </div>
       </button>
@@ -253,11 +253,11 @@ function DormantForceRow({ force }: { force: CustomerMarketForce }) {
           className="px-4 pb-3 pt-2 space-y-2"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
-          <p className="text-[11px] text-slate-500 leading-relaxed">
+          <p className="text-[11px] text-slate-300 leading-relaxed">
             {force.why_it_matters}
           </p>
-          <p className="text-[10px] text-slate-600 leading-relaxed">
-            <span className="font-semibold text-slate-500">If activated: </span>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            <span className="font-semibold text-slate-300">If activated: </span>
             {force.market_impact}
           </p>
         </div>
@@ -351,7 +351,7 @@ export default function ForcesTab({
               <p className="text-[12px] font-semibold text-slate-400">
                 {dormantForces.length} quiet force{dormantForces.length !== 1 ? "s" : ""}
               </p>
-              <p className="text-[10px] text-slate-600 mt-0.5">
+              <p className="text-[11px] text-slate-400 mt-0.5">
                 Not active today — tap to expand
               </p>
             </div>
@@ -389,7 +389,7 @@ export default function ForcesTab({
       )}
 
       {/* ── Disclaimer ─────────────────────────────────────────────────────── */}
-      <p className="text-[10px] text-slate-700 text-center">
+      <p className="text-[11px] text-slate-500 text-center">
         Market intelligence only. Not financial advice. No trade execution.
       </p>
     </div>
