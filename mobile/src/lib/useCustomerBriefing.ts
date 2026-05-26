@@ -149,7 +149,7 @@ export function formatDuration(ms: number): string {
 export function buildSinceAwaySummary(
   data: MarketNowPayload | null,
 ): SinceAwaySummary {
-  if (typeof window === "undefined") {
+  if (typeof localStorage === "undefined") {
     return { hasChanges: false, items: [], lastSeenAt: null, awayDuration: null };
   }
 
@@ -212,7 +212,7 @@ export function buildSinceAwaySummary(
 }
 
 export function updateLastSeenAt(): void {
-  if (typeof window !== "undefined") {
+  if (typeof localStorage !== "undefined") {
     localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
   }
 }
