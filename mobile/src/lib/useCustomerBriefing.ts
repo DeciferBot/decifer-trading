@@ -4,9 +4,15 @@
 // Used by CustomerApp; individual views receive derived state as props.
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { fetchMarketNow, type MarketNowPayload } from "@/lib/customerApi";
+import { fetchMarketNow, fetchTtgThemes, type MarketNowPayload, type TtgTheme } from "@/lib/customerApi";
 import { buildCustomerStory, type CustomerStory } from "@/lib/customerStory";
 import { buildMarketCauseCards, type MarketCauseCard } from "@/lib/marketCauseStory";
+import {
+  buildCustomerForces,
+  buildConnectionTree,
+  type CustomerMarketForce,
+  type CustomerConnectionNode,
+} from "@/lib/customerBriefingModel";
 
 // ── Market clock ──────────────────────────────────────────────────────────────
 
@@ -230,6 +236,10 @@ export interface CustomerBriefingState {
   freshnessState: FreshnessState;
   freshnessLabel: string;
   sinceAway: SinceAwaySummary;
+  ttgThemes: TtgTheme[];
+  activeForces: CustomerMarketForce[];
+  dormantForces: CustomerMarketForce[];
+  connectionTree: CustomerConnectionNode[];
   refresh: () => Promise<void>;
 }
 
@@ -239,6 +249,7 @@ export function useCustomerBriefing(): CustomerBriefingState {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [clock, setClock] = useState<MarketClockState>(computeMarketClock);
+  const [ttgThemes, setTtgThemes] = useState<TtgTheme[]>([]);
   const sinceAwayRef = useRef<SinceAwaySummary>({
     hasChanges: false,
     items: [],
@@ -279,12 +290,22 @@ export function useCustomerBriefing(): CustomerBriefingState {
     return () => clearInterval(t);
   }, [load]);
 
+  // TTG themes fetch — separate from the main data interval; once on mount
+  useEffect(() => {
+    fetchTtgThemes()
+      .then(setTtgThemes)
+      .catch(() => setTtgThemes([]));
+  }, []);
+
   const refresh = useCallback((): Promise<void> => load(true), [load]);
 
   const story = data ? buildCustomerStory(data) : null;
   const causeCards = data ? buildMarketCauseCards(data) : [];
   const freshnessState = computeFreshnessState(data, loading, clock.session);
   const freshnessLabel = FRESHNESS_LABELS[freshnessState];
+
+  const forcesResult = data ? buildCustomerForces(data) : { active: [], dormant: [] };
+  const connectionTree = data ? buildConnectionTree(data, ttgThemes) : [];
 
   return {
     data,
@@ -297,6 +318,10 @@ export function useCustomerBriefing(): CustomerBriefingState {
     freshnessState,
     freshnessLabel,
     sinceAway: sinceAwayRef.current,
+    ttgThemes,
+    activeForces: forcesResult.active,
+    dormantForces: forcesResult.dormant,
+    connectionTree,
     refresh,
   };
 }

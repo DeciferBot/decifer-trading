@@ -1,6 +1,6 @@
 "use client";
-// M13A — Customer journey refactor.
-// 5-tab experience: Today | Discover | Ask Decifer | Signals | Universe
+// M13B — Customer journey refactor.
+// 5-tab experience: Today | Forces | Ask Decifer | Themes | Names
 // Hamburger menu for secondary areas.
 // Uses shared useCustomerBriefing hook.
 // No operator views. No execution, broker, or account logic.
@@ -15,7 +15,7 @@ import {
 import CustomerBottomNav, { type CustomerTab } from "@/components/CustomerBottomNav";
 import TodayTab from "./TodayTab";
 import ThemeMapTab from "./ThemeMapTab";
-import SignalsTab from "./SignalsTab";
+import ForcesTab from "./ForcesTab";
 import UniverseTab from "./UniverseTab";
 import AskDeciferView from "./AskDeciferView";
 import NameDetailPanel from "./NameDetailPanel";
@@ -72,14 +72,19 @@ const MENU_ITEMS: {
   tab?: CustomerTab;
 }[] = [
   {
+    label: "Market Forces",
+    sublabel: "Active and dormant forces moving market attention today",
+    tab: "forces",
+  },
+  {
     label: "Theme Map",
     sublabel: "Full structural theme map and driver connections",
-    tab: "discover",
+    tab: "themes",
   },
   {
     label: "Full Universe",
     sublabel: "Complete connected names catalogue",
-    tab: "universe",
+    tab: "names",
   },
   {
     label: "Methodology",
@@ -118,19 +123,13 @@ function HamburgerMenu({
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1">
-          <div
-            className="w-10 h-1 rounded-full"
-            style={{ background: "rgba(255,255,255,0.1)" }}
-          />
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.1)" }} />
         </div>
 
         {/* Header row */}
         <div className="px-5 pt-2 pb-3 flex items-center justify-between">
           <div>
-            <span
-              className="text-[11px] font-black tracking-[0.15em] uppercase"
-              style={{ color: "#f97316" }}
-            >
+            <span className="text-[11px] font-black tracking-[0.15em] uppercase" style={{ color: "#f97316" }}>
               DECIFER
             </span>
             <span className="text-[10px] text-slate-500 ml-2">Menu</span>
@@ -159,13 +158,9 @@ function HamburgerMenu({
             >
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-slate-200">{item.label}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                  {item.sublabel}
-                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{item.sublabel}</p>
               </div>
-              {item.tab && (
-                <ChevronRight size={13} className="text-slate-600 shrink-0" />
-              )}
+              {item.tab && <ChevronRight size={13} className="text-slate-600 shrink-0" />}
             </button>
           ))}
         </div>
@@ -202,6 +197,10 @@ export default function CustomerApp() {
     freshnessState,
     freshnessLabel,
     sinceAway,
+    ttgThemes,
+    activeForces,
+    dormantForces,
+    connectionTree,
     refresh,
   } = useCustomerBriefing();
 
@@ -214,12 +213,12 @@ export default function CustomerApp() {
 
   const goToTheme = useCallback((themeId: string) => {
     setSelectedTheme(themeId);
-    setActiveTab("discover");
+    setActiveTab("themes");
   }, []);
 
   const handleTabChange = useCallback((tab: CustomerTab) => {
     setActiveTab(tab);
-    if (tab !== "discover") setSelectedTheme(null);
+    if (tab !== "themes") setSelectedTheme(null);
     if (tab !== "ask") setAskContext(null);
   }, []);
 
@@ -252,10 +251,7 @@ export default function CustomerApp() {
           {/* Branding + greeting */}
           <div>
             <div className="flex items-baseline gap-2 mb-0.5">
-              <span
-                className="text-sm font-black tracking-[0.15em] uppercase"
-                style={{ color: "#f97316" }}
-              >
+              <span className="text-sm font-black tracking-[0.15em] uppercase" style={{ color: "#f97316" }}>
                 DECIFER
               </span>
               <span className="text-[9px] font-semibold tracking-wider uppercase text-slate-600">
@@ -269,14 +265,10 @@ export default function CustomerApp() {
               <span className="text-[10px] text-slate-500">{clock.localTime}</span>
               <span className="text-[9px] text-slate-700">·</span>
               <span className="text-[10px] text-slate-500">
-                {clock.newYorkTime}{" "}
-                <span className="text-slate-700">ET</span>
+                {clock.newYorkTime} <span className="text-slate-700">ET</span>
               </span>
               <span className="text-[9px] text-slate-700">·</span>
-              <span
-                className="text-[10px] font-semibold"
-                style={{ color: sessionColor }}
-              >
+              <span className="text-[10px] font-semibold" style={{ color: sessionColor }}>
                 {clock.sessionLabel}
               </span>
             </div>
@@ -368,7 +360,7 @@ export default function CustomerApp() {
 
         {/* Ask Decifer — available without data */}
         {activeTab === "ask" && (
-          <AskDeciferView onAskContext={askContext} />
+          <AskDeciferView onAskContext={askContext} data={data} />
         )}
 
         {/* Data-dependent tabs */}
@@ -385,12 +377,25 @@ export default function CustomerApp() {
             onRefresh={refresh}
             onThemeSelect={goToTheme}
             onAskAbout={handleAskAbout}
-            onGoToDiscover={() => handleTabChange("discover")}
-            onGoToUniverse={() => handleTabChange("universe")}
+            onGoToDiscover={() => handleTabChange("themes")}
+            onGoToUniverse={() => handleTabChange("names")}
+            onGoToForces={() => handleTabChange("forces")}
           />
         )}
 
-        {data && !loading && activeTab === "discover" && (
+        {data && !loading && activeTab === "forces" && (
+          <ForcesTab
+            data={data}
+            activeForces={activeForces}
+            dormantForces={dormantForces}
+            connectionTree={connectionTree}
+            onThemeSelect={goToTheme}
+            onAskAbout={handleAskAbout}
+            onGoToNames={() => handleTabChange("names")}
+          />
+        )}
+
+        {data && !loading && activeTab === "themes" && (
           <ThemeMapTab
             data={data}
             selectedTheme={selectedTheme}
@@ -398,16 +403,12 @@ export default function CustomerApp() {
             onNameSelect={setSelectedName}
             onGoToUniverseTheme={(ttgId) => {
               setSelectedTheme(ttgId);
-              handleTabChange("universe");
+              handleTabChange("names");
             }}
           />
         )}
 
-        {data && !loading && activeTab === "signals" && (
-          <SignalsTab data={data} onThemeSelect={goToTheme} />
-        )}
-
-        {data && !loading && activeTab === "universe" && (
+        {data && !loading && activeTab === "names" && (
           <UniverseTab
             data={data}
             onNameSelect={setSelectedName}

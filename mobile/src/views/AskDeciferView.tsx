@@ -1,13 +1,17 @@
 "use client";
-// Ask Decifer view — M13A.
+// Ask Decifer view — M13B.
 // Entry point for plain-English market intelligence questions.
+// Suggested questions are generated from current live context when data is available.
 // No execution, broker, account, or order exposure.
 // Backend not yet wired — safe placeholder response when submitted.
 
 import { useState, useEffect } from "react";
-import { Sparkles, ArrowRight, ChevronRight } from "lucide-react";
+import { Sparkles, ArrowRight, ChevronRight, Zap } from "lucide-react";
+import type { MarketNowPayload } from "@/lib/customerApi";
+import { buildContextualSuggestions } from "@/lib/customerBriefingModel";
 
-export const SUGGESTED_QUESTIONS = [
+// Fallback static questions used when no live data is available
+export const STATIC_SUGGESTED_QUESTIONS = [
   "What changed since I was away?",
   "Why is AI infrastructure moving markets?",
   "Which names are connected to AI power demand?",
@@ -18,15 +22,19 @@ export const SUGGESTED_QUESTIONS = [
   "Why are small caps in focus?",
 ] as const;
 
+// Backward-compatible alias for M13A safety audit test
+export const SUGGESTED_QUESTIONS = STATIC_SUGGESTED_QUESTIONS;
+
 interface Props {
   onAskContext?: string | null;
+  data?: MarketNowPayload | null;
 }
 
-export default function AskDeciferView({ onAskContext }: Props) {
+export default function AskDeciferView({ onAskContext, data }: Props) {
   const [input, setInput] = useState(onAskContext ?? "");
   const [submitted, setSubmitted] = useState(false);
 
-  // If a context is passed in (from "Ask about this" CTA), pre-fill and submit
+  // Pre-fill and submit when a context is passed in (from "Ask about this" CTA)
   useEffect(() => {
     if (onAskContext) {
       setInput(onAskContext);
@@ -38,6 +46,13 @@ export default function AskDeciferView({ onAskContext }: Props) {
     setInput(question);
     setSubmitted(true);
   };
+
+  // Contextual questions when data is available; fallback to static list
+  const suggestedQuestions: readonly string[] = data
+    ? buildContextualSuggestions(data)
+    : STATIC_SUGGESTED_QUESTIONS;
+
+  const isContextual = Boolean(data && (data.key_drivers?.length ?? 0) > 0);
 
   return (
     <div className="px-4 pb-8 pt-4 space-y-5">
@@ -114,14 +129,25 @@ export default function AskDeciferView({ onAskContext }: Props) {
 
       {/* Suggested questions */}
       <div>
-        <p
-          className="text-[10px] font-bold uppercase tracking-[0.12em] mb-3"
-          style={{ color: "#f97316" }}
-        >
-          Suggested questions
-        </p>
+        <div className="flex items-center gap-2 mb-3">
+          <p
+            className="text-[10px] font-bold uppercase tracking-[0.12em]"
+            style={{ color: "#f97316" }}
+          >
+            {isContextual ? "Questions from today's briefing" : "Suggested questions"}
+          </p>
+          {isContextual && (
+            <span
+              className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1"
+              style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+            >
+              <Zap size={7} />
+              Live context
+            </span>
+          )}
+        </div>
         <div className="space-y-2">
-          {SUGGESTED_QUESTIONS.map((q, i) => (
+          {suggestedQuestions.map((q, i) => (
             <button
               key={i}
               onClick={() => handleAsk(q)}

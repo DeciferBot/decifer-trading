@@ -1,11 +1,11 @@
 "use client";
-// Customer bottom navigation — M13A.
-// 5-tab navigation: Today | Discover | Ask Decifer (centre) | Signals | Universe
-// No operator views. No execution language.
+// Customer bottom navigation — M13B.
+// 5-tab navigation: Today | Forces | Ask Decifer (centre) | Themes | Names
+// Tab order: Today / Forces / Ask / Themes / Names
 
-import { Home, Compass, Sparkles, Activity, Layers } from "lucide-react";
+import { Home, Zap, Sparkles, Layers, Search } from "lucide-react";
 
-export type CustomerTab = "today" | "discover" | "ask" | "signals" | "universe";
+export type CustomerTab = "today" | "forces" | "ask" | "themes" | "names";
 
 interface NavItem {
   id: CustomerTab;
@@ -15,11 +15,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "today",    label: "Today",    Icon: Home     },
-  { id: "discover", label: "Discover", Icon: Compass  },
-  { id: "ask",      label: "Ask",      Icon: Sparkles, center: true },
-  { id: "signals",  label: "Signals",  Icon: Activity },
-  { id: "universe", label: "Universe", Icon: Layers   },
+  { id: "today",  label: "Today",  Icon: Home     },
+  { id: "forces", label: "Forces", Icon: Zap      },
+  { id: "ask",    label: "Ask",    Icon: Sparkles, center: true },
+  { id: "themes", label: "Themes", Icon: Layers   },
+  { id: "names",  label: "Names",  Icon: Search   },
 ];
 
 interface Props {
@@ -61,7 +61,7 @@ export default function CustomerBottomNav({ activeTab, onTabChange }: Props) {
               </span>
               <span
                 className="text-[9px] font-semibold tracking-wide"
-                style={{ color: active ? "#f97316" : "#f97316", opacity: active ? 1 : 0.6 }}
+                style={{ color: "#f97316", opacity: active ? 1 : 0.6 }}
               >
                 {item.label}
               </span>

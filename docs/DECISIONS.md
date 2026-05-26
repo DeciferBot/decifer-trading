@@ -939,3 +939,30 @@ PME is live and executing FULL_EXIT actions. Without outcome measurement, there 
 - SAFETY_BLOCKED exits: price falling → BAD (`rail_too_strict`), rising → GOOD (`rail_correct`)
 
 **What was NOT changed:** PME thresholds, execution logic, signal weights, Apex prompts, safety rails, or any trading behaviour.
+
+---
+
+### Sprint M13B — Customer Intelligence Experience (2026-05-26)
+
+**Decision (2026-05-26, Amit):**
+
+Upgrade the `/customer` mobile app from M13A's technically-complete-but-product-incomplete shell into a genuine customer fintech experience that translates the operator dashboard's real intelligence flow into plain-English customer language.
+
+**Why:**
+M13A built the structural scaffolding (5-tab nav, shared hook, safety layer) but the content was still raw operator data. The customer-facing surface needed: a Market Story Hero that leads with the "so what", a Forces tab that surfaces active market forces with connection trees, and Ask Decifer with live-context questions rather than static placeholders.
+
+**Locked decisions:**
+
+1. **`customerBriefingModel.ts` is the single translation layer** — all operator-to-customer language conversion happens in pure functions here. Views receive pre-translated structs; they never read raw `MarketNowPayload` fields directly for rendered copy.
+
+2. **PROHIBITED_RENDERED_TERMS policy**: 7 terms blocked (`trade-ready`, `entry candidate`, `position entry`, `preferred trade mode`, `scanner`, `payload`, `market_now_id`). "apex" deliberately excluded — it is a substring of "capex" and would produce false positives. "activation" excluded — too broad, matches common English compound words. Primary safety enforcement lives at the Python `saas_intelligence_output` layer.
+
+3. **Force→Theme connection tree stops at theme labels** — the tree does not drill to individual symbol names. Symbol detail lives in the Names tab (UniverseTab). Drilling to symbols would require N additional API calls per force and duplicate content the Names tab already shows.
+
+4. **TTG fetch is a separate `useEffect`** (not merged into the main `fetchMarketNow` effect) — keeps concerns separated and does not touch the 30 existing M13A tests that mock `fetchMarketNow` only.
+
+5. **`SUGGESTED_QUESTIONS` alias preserved** for backward compatibility with the M13A safety audit test that imports it by name. `STATIC_SUGGESTED_QUESTIONS` is the canonical name; `SUGGESTED_QUESTIONS` is the alias.
+
+6. **No new backend endpoints** — M13B is entirely frontend. The TTG data comes from the existing `/api/intelligence/themes` endpoint. The Market Story Hero is synthesised client-side from `MarketNowPayload` fields that are already fetched.
+
+**What was NOT changed:** Signal scoring, trading thresholds, execution pipeline, IC weights, Apex call count, any Python backend, intelligence API, TTG data, operator dashboard.
