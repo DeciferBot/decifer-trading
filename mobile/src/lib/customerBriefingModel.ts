@@ -492,6 +492,304 @@ export function buildContextualSuggestions(payload: MarketNowPayload): string[] 
   return questions.slice(0, 8);
 }
 
+// ── Tape Snapshot ─────────────────────────────────────────────────────────────
+// Simple record derived from the /api/market-tape response.
+// Passed to buildNarrativeParagraph so the opening sentence can reference
+// real price-action context (SPY direction, VIX level) when available.
+
+export interface TapeSnapshot {
+  spy_pct: number | null;
+  qqq_pct: number | null;
+  tlt_pct: number | null;
+  gld_pct: number | null;
+  uso_pct: number | null;
+  vix_level: number | null;
+}
+
+// ── Narrative Paragraph ────────────────────────────────────────────────────────
+
+const NARRATIVE_FALLBACK_PHRASES = [
+  "assessing market", "gathering", "check back",
+  "structural themes are in focus", "no dominant", "markets are being monitored",
+];
+
+function isCleanApiSummary(text: string | undefined): boolean {
+  if (!text || text.trim().length < 30) return false;
+  const lower = text.toLowerCase();
+  if (NARRATIVE_FALLBACK_PHRASES.some(f => lower.includes(f))) return false;
+  if (containsProhibitedTerm(text)) return false;
+  return true;
+}
+
+function formatSignedPct(pct: number): string {
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+function buildTapeOpener(tape: TapeSnapshot): string | null {
+  if (tape.spy_pct == null) return null;
+  const spyDir =
+    tape.spy_pct > 0.4  ? "gaining ground" :
+    tape.spy_pct < -0.4 ? "under pressure" :
+    "broadly flat";
+  let s = `Broad equities are ${spyDir} today — the S&P 500 is ${formatSignedPct(tape.spy_pct)}`;
+  if (tape.vix_level != null) {
+    if (tape.vix_level < 15)      s += `, and volatility is contained at ${tape.vix_level.toFixed(0)}`;
+    else if (tape.vix_level < 20) s += `, with volatility at moderate levels`;
+    else if (tape.vix_level < 25) s += `, while VIX at ${tape.vix_level.toFixed(0)} reflects some unease`;
+    else                          s += `, and elevated VIX at ${tape.vix_level.toFixed(0)} signals heightened uncertainty`;
+  }
+  return s + ".";
+}
+
+const REGIME_OPENERS: Record<string, string> = {
+  "risk-on":    "Risk appetite is constructive today.",
+  "risk-off":   "Caution is dominating markets today.",
+  "mixed":      "Markets are sending mixed signals today.",
+  "monitoring": "Markets are in a watchful phase today.",
+};
+
+const DRIVER_MIDDLE: Record<string, string> = {
+  ai_capex_growth:
+    "AI infrastructure spending is the dominant story, keeping data centres, semiconductors, and power names in focus.",
+  ai_compute_demand:
+    "AI compute demand is accelerating, drawing capital into chips, data centres, and cooling names.",
+  geopolitical_risk_rising:
+    "Elevated geopolitical risk is sustaining defence budget growth and safe-haven demand.",
+  futures_risk_on:
+    "Equity futures pointed higher heading into the session, adding to the constructive backdrop for growth names.",
+  futures_risk_off:
+    "Cautious equity futures are creating near-term headwinds for higher-beta names.",
+  yields_falling:
+    "Falling bond yields are supportive for rate-sensitive sectors — housing, real estate, and long-duration growth names are benefiting.",
+  yields_rising:
+    "Rising bond yields are creating headwinds for rate-sensitive areas and compressing valuations for long-duration growth names.",
+  risk_on_rotation:
+    "Capital is rotating out of defensive positions into growth and cyclical names.",
+  gold_safe_haven_bid:
+    "Safe-haven demand is elevated — gold is in focus as investors seek protection from macro uncertainty.",
+  credit_stress_easing:
+    "Easing credit conditions are reducing risk premiums, with financials and cyclicals benefiting.",
+  small_cap_risk_on:
+    "Risk appetite is broadening to smaller companies — a sign of improving credit and growth sentiment.",
+  oil_supply_shock:
+    "Oil supply disruption is elevating energy prices, adding an inflation watchpoint to today's session.",
+  smh_tactical_weakness:
+    "Semiconductor momentum is showing near-term fatigue, even as the structural AI demand story remains intact.",
+  reits_falling_yield:
+    "Rising long-term yields are compressing REIT valuations, creating near-term pressure on real estate names.",
+};
+
+const RISK_ON_SET = new Set([
+  "futures_risk_on", "risk_on_rotation", "small_cap_risk_on", "credit_stress_easing",
+]);
+const RISK_OFF_SET = new Set([
+  "yields_rising", "futures_risk_off", "oil_supply_shock", "reits_falling_yield",
+]);
+
+function buildDriverMiddleSentence(activeIds: string[]): string | null {
+  if (activeIds.length === 0) return null;
+
+  // AI cluster
+  if (activeIds.includes("ai_capex_growth") && activeIds.includes("ai_compute_demand")) {
+    return "AI infrastructure spending and compute demand are reinforcing each other — capital is flowing into data centres, semiconductors, and power infrastructure.";
+  }
+
+  // Broad risk-on cluster
+  const riskOnActive = activeIds.filter(d => RISK_ON_SET.has(d));
+  if (riskOnActive.length >= 2) {
+    return "Multiple risk-on signals are active simultaneously — growth and cyclical themes are broadly in focus.";
+  }
+
+  // Conflicting forces
+  const hasRiskOn = activeIds.some(d => RISK_ON_SET.has(d));
+  const hasRiskOff = activeIds.some(d => RISK_OFF_SET.has(d));
+  if (hasRiskOn && hasRiskOff) {
+    const onId  = activeIds.find(d => RISK_ON_SET.has(d))!;
+    const offId = activeIds.find(d => RISK_OFF_SET.has(d))!;
+    return `${FORCE_LABELS[onId]} is providing support, while ${FORCE_LABELS[offId].toLowerCase()} is acting as a counterweight.`;
+  }
+
+  return DRIVER_MIDDLE[activeIds[0]] ?? null;
+}
+
+function buildBreadthSentence(
+  activeIds: string[],
+  state: string,
+  tape?: TapeSnapshot,
+): string | null {
+  const seenLabels = new Set<string>();
+  const sectorLabels: string[] = [];
+  for (const id of activeIds.slice(0, 3)) {
+    for (const themeId of (FORCE_THEMES[id] ?? [])) {
+      const label = THEME_LABELS[themeId];
+      if (label && !seenLabels.has(label)) {
+        seenLabels.add(label);
+        sectorLabels.push(label);
+      }
+    }
+  }
+
+  if (state === "risk-on" && sectorLabels.length >= 2) {
+    const parts = sectorLabels.slice(0, 3);
+    const joined =
+      parts.length === 1 ? parts[0] :
+      parts.length === 2 ? `${parts[0]} and ${parts[1]}` :
+      `${parts[0]}, ${parts[1]}, and ${parts[2]}`;
+    return `The story extends into ${joined}.`;
+  }
+
+  if (tape?.tlt_pct != null && Math.abs(tape.tlt_pct) > 0.3) {
+    if (tape.tlt_pct > 0.3)  return "Bonds are rallying — easing yield pressure on rate-sensitive names.";
+    if (tape.tlt_pct < -0.3) return "Bond prices are falling — worth watching for how far yields move.";
+  }
+
+  return null;
+}
+
+/**
+ * Generates a 2–3 sentence natural-language market briefing paragraph.
+ * Prefers `plain_english_summary` from the API when it is clean and substantive;
+ * otherwise synthesises from active drivers and optional tape context.
+ * Safe for customer display — never exposes raw driver IDs or forbidden terms.
+ */
+export function buildNarrativeParagraph(
+  payload: MarketNowPayload,
+  story: CustomerMarketStory,
+  tape?: TapeSnapshot,
+): string {
+  if (isCleanApiSummary(payload.plain_english_summary)) {
+    const base = payload.plain_english_summary!.trim();
+    return base.endsWith(".") ? base : base + ".";
+  }
+
+  const activeIds = (payload.key_drivers ?? [])
+    .map(normalizeForceId)
+    .filter(id => Boolean(FORCE_LABELS[id]));
+
+  const parts: string[] = [];
+
+  const opener =
+    (tape ? buildTapeOpener(tape) : null) ??
+    (REGIME_OPENERS[story.regime.state] ?? "Markets are active today.");
+  parts.push(opener);
+
+  const middle = buildDriverMiddleSentence(activeIds);
+  if (middle) parts.push(middle);
+
+  const breadth = buildBreadthSentence(activeIds, story.regime.state, tape);
+  if (breadth) parts.push(breadth);
+
+  return parts.join(" ");
+}
+
+// ── Where Decifer Is Looking ───────────────────────────────────────────────────
+
+export interface WhereLookingName {
+  symbol: string;
+  reason: string;
+  theme_label: string;
+}
+
+export interface WhereLooking {
+  /** Deduplicated human-readable sector/theme labels from active drivers. */
+  stories: string[];
+  /** Up to 5 names from radar / universe_snapshot connected to active drivers. */
+  names: WhereLookingName[];
+  empty: boolean;
+}
+
+/**
+ * Derives the sectors and names Decifer is watching from active drivers.
+ * Pulls sector labels from FORCE_THEMES and names from payload.radar /
+ * payload.universe_snapshot.  Deduplicates both.
+ */
+export function buildWhereLooking(payload: MarketNowPayload): WhereLooking {
+  const activeIds = (payload.key_drivers ?? [])
+    .map(normalizeForceId)
+    .filter(id => Boolean(FORCE_LABELS[id]));
+
+  if (activeIds.length === 0) return { stories: [], names: [], empty: true };
+
+  // Story labels from FORCE_THEMES, deduplicated
+  const seenStories = new Set<string>();
+  const stories: string[] = [];
+  for (const id of activeIds) {
+    for (const themeId of (FORCE_THEMES[id] ?? [])) {
+      const label = THEME_LABELS[themeId];
+      if (label && !seenStories.has(label)) {
+        seenStories.add(label);
+        stories.push(label);
+      }
+    }
+  }
+
+  // Theme-id set for name matching (FORCE_THEMES values are market_now IDs)
+  const activeThemeIds = new Set(activeIds.flatMap(id => FORCE_THEMES[id] ?? []));
+
+  // Names from radar first
+  const seenSymbols = new Set<string>();
+  const names: WhereLookingName[] = [];
+  for (const r of (payload.radar ?? [])) {
+    if (names.length >= 5) break;
+    if (seenSymbols.has(r.symbol)) continue;
+    if (r.theme_link && activeThemeIds.has(r.theme_link)) {
+      seenSymbols.add(r.symbol);
+      const label = THEME_LABELS[r.theme_link] ?? r.theme_link.replace(/_/g, " ");
+      names.push({ symbol: r.symbol, reason: r.reason_to_watch, theme_label: label });
+    }
+  }
+
+  // Supplement with universe_snapshot when radar is sparse
+  if (names.length < 3) {
+    for (const u of (payload.universe_snapshot ?? [])) {
+      if (names.length >= 5) break;
+      if (seenSymbols.has(u.symbol)) continue;
+      if (activeThemeIds.has(u.theme_id)) {
+        seenSymbols.add(u.symbol);
+        const label = THEME_LABELS[u.theme_id] ?? u.theme_id.replace(/_/g, " ");
+        names.push({ symbol: u.symbol, reason: u.why_connected, theme_label: label });
+      }
+    }
+  }
+
+  return {
+    stories: stories.slice(0, 5),
+    names,
+    empty: stories.length === 0 && names.length === 0,
+  };
+}
+
+// ── What Could Change ──────────────────────────────────────────────────────────
+
+const GENERIC_RISKS = [
+  "Watch for unexpected central bank guidance changes that could shift rate expectations.",
+  "Geopolitical developments or earnings surprises can quickly alter sector leadership.",
+];
+
+/**
+ * Returns 2–3 customer-safe risk bullets based on active drivers and any known
+ * conflicts.  Falls back to generic watchpoints when no drivers are active.
+ */
+export function buildWhatCouldChange(payload: MarketNowPayload): string[] {
+  const activeIds = (payload.key_drivers ?? [])
+    .map(normalizeForceId)
+    .filter(id => Boolean(FORCE_LABELS[id]));
+
+  const risks: string[] = [];
+
+  for (const id of activeIds.slice(0, 2)) {
+    const risk = FORCE_RISK[id];
+    if (risk && !risks.includes(risk)) risks.push(risk);
+  }
+
+  const conflict = (payload.known_conflicts ?? [])[0];
+  if (conflict && !risks.includes(conflict) && risks.length < 3) {
+    risks.push(conflict);
+  }
+
+  return risks.length > 0 ? risks.slice(0, 3) : GENERIC_RISKS.slice();
+}
+
 // ── Prohibited customer-facing language check ──────────────────────────────────
 // Narrow list — only unambiguous operator/execution terms
 

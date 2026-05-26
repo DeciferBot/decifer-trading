@@ -482,3 +482,276 @@ describe("Force model safety", () => {
     }
   });
 });
+
+// ── buildNarrativeParagraph ───────────────────────────────────────────────────
+
+import {
+  buildNarrativeParagraph,
+  buildWhereLooking,
+  buildWhatCouldChange,
+  type TapeSnapshot,
+} from "./customerBriefingModel";
+
+function makeTape(overrides: Partial<TapeSnapshot> = {}): TapeSnapshot {
+  return {
+    spy_pct:   null,
+    qqq_pct:   null,
+    tlt_pct:   null,
+    gld_pct:   null,
+    uso_pct:   null,
+    vix_level: null,
+    ...overrides,
+  };
+}
+
+describe("buildNarrativeParagraph", () => {
+  it("returns a non-empty string in all cases", () => {
+    const ms = buildCustomerMarketStory(makePayload(), makeStory());
+    const para = buildNarrativeParagraph(makePayload(), ms);
+    expect(typeof para).toBe("string");
+    expect(para.length).toBeGreaterThan(20);
+  });
+
+  it("uses clean plain_english_summary from API when available", () => {
+    const payload = makePayload({ plain_english_summary: "Markets are gaining as AI spending accelerates across data centres and power names." });
+    const ms = buildCustomerMarketStory(payload, makeStory());
+    const para = buildNarrativeParagraph(payload, ms);
+    expect(para).toContain("AI spending");
+  });
+
+  it("rejects API summary containing prohibited terms", () => {
+    const payload = makePayload({
+      plain_english_summary: "Entry candidate signals are trade-ready today.",
+      key_drivers: ["ai_capex_growth"],
+    });
+    const ms = buildCustomerMarketStory(payload, makeStory());
+    const para = buildNarrativeParagraph(payload, ms);
+    expect(para).not.toMatch(/trade-ready/i);
+    expect(para).not.toMatch(/entry candidate/i);
+  });
+
+  it("rejects API summary containing fallback phrases and synthesises instead", () => {
+    const payload = makePayload({
+      plain_english_summary: "Markets are being monitored for emerging themes.",
+      key_drivers: ["ai_capex_growth"],
+    });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms);
+    // Should NOT echo the fallback phrase verbatim
+    expect(para).not.toContain("markets are being monitored");
+  });
+
+  it("graceful degradation — no drivers, no tape → returns regime opener", () => {
+    const ms = buildCustomerMarketStory(makePayload(), makeStory({ market_state: "monitoring" }));
+    const para = buildNarrativeParagraph(makePayload(), ms);
+    expect(para.length).toBeGreaterThan(10);
+    expect(containsProhibitedTerm(para)).toBe(false);
+  });
+
+  it("integrates tape context — SPY up and low VIX", () => {
+    const tape = makeTape({ spy_pct: 0.8, vix_level: 13 });
+    const payload = makePayload({ key_drivers: ["ai_capex_growth"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    expect(para).toMatch(/S&P 500/i);
+    expect(para).toMatch(/\+0\.8%/);
+    expect(para).toMatch(/contained/i);
+  });
+
+  it("integrates tape context — SPY down and elevated VIX", () => {
+    const tape = makeTape({ spy_pct: -1.2, vix_level: 28 });
+    const payload = makePayload({ key_drivers: ["futures_risk_off"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-off" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    expect(para).toMatch(/-1\.2%/);
+    expect(para).toMatch(/VIX/i);
+  });
+
+  it("AI cluster produces combined sentence (not two separate AI sentences)", () => {
+    const payload = makePayload({ key_drivers: ["ai_capex_growth", "ai_compute_demand"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms);
+    const lc = para.toLowerCase();
+    expect(lc).toContain("ai infrastructure spending and compute demand");
+  });
+
+  it("mixed signals produce a balanced sentence mentioning support and counterweight", () => {
+    const payload = makePayload({ key_drivers: ["risk_on_rotation", "yields_rising"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "mixed" }));
+    const para = buildNarrativeParagraph(payload, ms);
+    const lc = para.toLowerCase();
+    // Should reference both sides
+    expect(lc.includes("support") || lc.includes("rotation") || lc.includes("growth")).toBe(true);
+    expect(lc.includes("counterweight") || lc.includes("yields") || lc.includes("headwind")).toBe(true);
+  });
+
+  it("output contains no raw driver IDs (underscored machine IDs)", () => {
+    const payload = makePayload({ key_drivers: ["ai_capex_growth", "geopolitical_risk_rising", "gold_safe_haven_bid"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms);
+    // Should not contain ID-style strings like "ai_capex_growth"
+    expect(para).not.toMatch(/[a-z]+_[a-z]+_[a-z]+/);
+  });
+
+  it("output never contains prohibited terms", () => {
+    const drivers = ["ai_capex_growth", "geopolitical_risk_rising", "futures_risk_on", "yields_rising", "gold_safe_haven_bid"];
+    for (const d of drivers) {
+      const payload = makePayload({ key_drivers: [d] });
+      const ms = buildCustomerMarketStory(payload, makeStory());
+      const para = buildNarrativeParagraph(payload, ms);
+      expect(containsProhibitedTerm(para)).toBe(false);
+    }
+  });
+
+  it("ends with a full stop", () => {
+    const payload = makePayload({ key_drivers: ["ai_capex_growth"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms);
+    expect(para.trimEnd()).toMatch(/\.$/);
+  });
+});
+
+// ── buildWhereLooking ─────────────────────────────────────────────────────────
+
+describe("buildWhereLooking", () => {
+  it("returns empty when no active drivers", () => {
+    const result = buildWhereLooking(makePayload());
+    expect(result.empty).toBe(true);
+    expect(result.stories).toHaveLength(0);
+    expect(result.names).toHaveLength(0);
+  });
+
+  it("returns story labels for active drivers", () => {
+    const payload = makePayload({ key_drivers: ["ai_capex_growth"] });
+    const { stories, empty } = buildWhereLooking(payload);
+    expect(empty).toBe(false);
+    expect(stories.length).toBeGreaterThan(0);
+  });
+
+  it("deduplicates story labels when two drivers share a theme", () => {
+    // ai_capex_growth and ai_compute_demand both connect to data_centre_power
+    const payload = makePayload({ key_drivers: ["ai_capex_growth", "ai_compute_demand"] });
+    const { stories } = buildWhereLooking(payload);
+    expect(new Set(stories).size).toBe(stories.length);
+  });
+
+  it("no story label is a raw underscore ID", () => {
+    const payload = makePayload({ key_drivers: ["ai_capex_growth", "geopolitical_risk_rising"] });
+    const { stories } = buildWhereLooking(payload);
+    for (const s of stories) {
+      expect(s).not.toMatch(/[a-z]+_[a-z]+/);
+    }
+  });
+
+  it("matches radar names to active themes", () => {
+    const payload = makePayload({
+      key_drivers: ["ai_capex_growth"],
+      radar: [
+        { symbol: "NVDA", reason_to_watch: "AI compute leader", theme_link: "semiconductors" },
+        { symbol: "MSFT", reason_to_watch: "Cloud AI growth", theme_link: "ai_compute_infrastructure" },
+        { symbol: "UNRELATED", reason_to_watch: "Unrelated stock", theme_link: "unrelated_theme" },
+      ],
+    });
+    const { names } = buildWhereLooking(payload);
+    const syms = names.map(n => n.symbol);
+    expect(syms).toContain("NVDA");
+    expect(syms).toContain("MSFT");
+    expect(syms).not.toContain("UNRELATED");
+  });
+
+  it("falls back to universe_snapshot when radar has no matches", () => {
+    const payload = makePayload({
+      key_drivers: ["gold_safe_haven_bid"],
+      radar: [],
+      universe_snapshot: [
+        { symbol: "GLD", company_name: "SPDR Gold Shares", theme_id: "gold_safe_haven_bid", why_connected: "Primary gold ETF", transmission: "tailwind" },
+      ],
+    });
+    const { names } = buildWhereLooking(payload);
+    expect(names.map(n => n.symbol)).toContain("GLD");
+  });
+
+  it("limits names to 5 even with many matches", () => {
+    const radarItems = Array.from({ length: 10 }, (_, i) => ({
+      symbol: `SYM${i}`,
+      reason_to_watch: "AI infrastructure name",
+      theme_link: "semiconductors",
+    }));
+    const payload = makePayload({ key_drivers: ["ai_capex_growth"], radar: radarItems });
+    const { names } = buildWhereLooking(payload);
+    expect(names.length).toBeLessThanOrEqual(5);
+  });
+
+  it("no name reason contains prohibited terms", () => {
+    const payload = makePayload({
+      key_drivers: ["ai_capex_growth"],
+      radar: [{ symbol: "NVDA", reason_to_watch: "Market intelligence context only.", theme_link: "semiconductors" }],
+    });
+    const { names } = buildWhereLooking(payload);
+    for (const n of names) {
+      expect(containsProhibitedTerm(n.reason)).toBe(false);
+    }
+  });
+
+  it("limits stories to 5", () => {
+    const payload = makePayload({ key_drivers: ["ai_capex_growth", "geopolitical_risk_rising", "gold_safe_haven_bid", "yields_falling", "risk_on_rotation"] });
+    const { stories } = buildWhereLooking(payload);
+    expect(stories.length).toBeLessThanOrEqual(5);
+  });
+});
+
+// ── buildWhatCouldChange ──────────────────────────────────────────────────────
+
+describe("buildWhatCouldChange", () => {
+  it("returns an array", () => {
+    const result = buildWhatCouldChange(makePayload());
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("returns generic risks when no active drivers", () => {
+    const result = buildWhatCouldChange(makePayload());
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0].length).toBeGreaterThan(10);
+  });
+
+  it("includes driver-specific risk for active driver", () => {
+    const payload = makePayload({ key_drivers: ["ai_capex_growth"] });
+    const result = buildWhatCouldChange(payload);
+    expect(result.some(r => r.toLowerCase().includes("capex") || r.toLowerCase().includes("hyperscaler"))).toBe(true);
+  });
+
+  it("appends known_conflict as risk item", () => {
+    const payload = makePayload({
+      key_drivers: ["ai_capex_growth"],
+      known_conflicts: ["Price action is positive but bond markets are not confirming."],
+    });
+    const result = buildWhatCouldChange(payload);
+    expect(result.some(r => r.includes("Price action is positive"))).toBe(true);
+  });
+
+  it("returns at most 3 items", () => {
+    const payload = makePayload({
+      key_drivers: ["ai_capex_growth", "geopolitical_risk_rising", "yields_rising"],
+      known_conflicts: ["An extra conflict."],
+    });
+    const result = buildWhatCouldChange(payload);
+    expect(result.length).toBeLessThanOrEqual(3);
+  });
+
+  it("no item contains prohibited terms", () => {
+    const drivers = ["ai_capex_growth", "geopolitical_risk_rising", "yields_rising", "gold_safe_haven_bid"];
+    const payload = makePayload({ key_drivers: drivers });
+    const result = buildWhatCouldChange(payload);
+    for (const r of result) {
+      expect(containsProhibitedTerm(r)).toBe(false);
+    }
+  });
+
+  it("no item is a raw underscore ID", () => {
+    const payload = makePayload({ key_drivers: ["futures_risk_on", "credit_stress_easing"] });
+    const result = buildWhatCouldChange(payload);
+    for (const r of result) {
+      expect(r).not.toMatch(/^[a-z]+_[a-z]+/);
+    }
+  });
+});
