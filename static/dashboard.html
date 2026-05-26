@@ -102,6 +102,20 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .mkt-stage-bar::-webkit-scrollbar{display:none}
 .mkt-stage-track{display:flex;align-items:stretch;flex:1;min-width:max-content}
 
+/* News bias signal bar — AVOID / FAVOR */
+.bias-bar{display:none;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;min-height:40px;padding:0}
+.bias-bar.visible{display:flex}
+.bias-section{display:flex;align-items:center;gap:8px;padding:8px 16px;height:100%}
+.bias-section.avoid{border-right:1px solid rgba(255,23,68,.25);background:rgba(255,23,68,.06)}
+.bias-section.favor{background:rgba(0,200,83,.05)}
+.bias-label{font-size:10px;font-weight:700;letter-spacing:.5px;flex-shrink:0}
+.bias-label.avoid{color:var(--red)}
+.bias-label.favor{color:var(--green)}
+.bias-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:4px;font-size:13px;font-weight:800;font-family:'Syne',sans-serif;cursor:default;border:1px solid;letter-spacing:.3px}
+.bias-chip.avoid{color:var(--red);border-color:rgba(255,23,68,.5);background:rgba(255,23,68,.12)}
+.bias-chip.favor{color:var(--green);border-color:rgba(0,200,83,.5);background:rgba(0,200,83,.1)}
+.bias-reason{font-size:9px;color:var(--muted2);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none}
+
 /* Mover table column headers */
 .mover-hdr{display:grid;grid-template-columns:56px 72px 72px 1fr;gap:4px;padding:3px 0 5px;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:.2px;color:var(--muted2);margin-bottom:2px}
 .mover-row{display:grid;grid-template-columns:56px 72px 72px 1fr;gap:4px;padding:2.5px 0;font-size:11px;font-family:'JetBrains Mono',monospace;align-items:center;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -859,7 +873,10 @@ canvas{display:block;width:100% !important}
     <div id="market-stages-list" class="mkt-stage-track"></div>
   </div>
 
-  <!-- ── ROW 3: 3-column grid ── -->
+  <!-- ── ROW 3: News bias signal bar — AVOID / FAVOR ── -->
+  <div class="bias-bar" id="on-bias"></div>
+
+  <!-- ── ROW 4: 3-column grid ── -->
   <div class="live-grid">
 
     <!-- COL 1: Top movers + events this week + yesterday -->
@@ -907,7 +924,6 @@ canvas{display:block;width:100% !important}
       <div style="flex-shrink:0;padding:10px 14px;border-bottom:1px solid var(--border)">
         <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap">
           <span class="section-label" id="on-news-label">News</span>
-          <div id="on-bias" style="display:flex;gap:10px;flex-wrap:wrap;font-size:10px"></div>
         </div>
         <div id="on-news"></div>
       </div>
@@ -2182,16 +2198,30 @@ async function loadOvernightNotes() {
     if (biasEl) {
       const avoid = (news.avoid || []);
       const favor = (news.favor || []);
-      let biasHtml = '';
-      if (avoid.length) {
-        biasHtml += `<div><span style="font-size:9px;color:var(--red);letter-spacing:1px">AVOID </span>` +
-          avoid.map(x => `<span style="font-size:10px;color:var(--red);font-family:'JetBrains Mono',monospace;margin-right:4px" title="${esc(x.reason)}">${esc(x.sym)}</span>`).join('') + '</div>';
+      const hasSignal = avoid.length || favor.length;
+      biasEl.classList.toggle('visible', hasSignal);
+      if (hasSignal) {
+        let html = '';
+        if (avoid.length) {
+          const chips = avoid.map(x =>
+            `<span class="bias-chip avoid" title="${esc(x.reason || '')}">${esc(x.sym)}</span>`
+          ).join('');
+          html += `<div class="bias-section avoid">
+            <span class="bias-label avoid">⊗ Avoid</span>${chips}
+          </div>`;
+        }
+        if (favor.length) {
+          const chips = favor.map(x =>
+            `<span class="bias-chip favor" title="${esc(x.reason || '')}">${esc(x.sym)}</span>`
+          ).join('');
+          html += `<div class="bias-section favor">
+            <span class="bias-label favor">✓ Favor</span>${chips}
+          </div>`;
+        }
+        biasEl.innerHTML = html;
+      } else {
+        biasEl.innerHTML = '';
       }
-      if (favor.length) {
-        biasHtml += `<div><span style="font-size:9px;color:var(--green);letter-spacing:1px">FAVOR </span>` +
-          favor.map(x => `<span style="font-size:10px;color:var(--green);font-family:'JetBrains Mono',monospace;margin-right:4px" title="${esc(x.reason)}">${esc(x.sym)}</span>`).join('') + '</div>';
-      }
-      biasEl.innerHTML = biasHtml;
     }
 
   } catch (err) {
