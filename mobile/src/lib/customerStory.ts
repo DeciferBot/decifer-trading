@@ -155,9 +155,9 @@ function synthesiseHeadline(
 
   // monitoring
   if (activeThemeCount > 0) {
-    return `${activeThemeCount} structural theme${activeThemeCount !== 1 ? "s" : ""} under observation — no dominant driver`;
+    return `${activeThemeCount} structural theme${activeThemeCount !== 1 ? "s" : ""} in focus — no dominant driver confirmed yet`;
   }
-  return "Structural intelligence is gathering signal — check back during market hours";
+  return "Markets are quiet — no dominant theme has emerged today";
 }
 
 function synthesiseSummary(
@@ -200,7 +200,7 @@ function synthesiseSummary(
     return "The intelligence map shows conflicting signals — some drivers are supportive while others are cautionary. Structural themes remain valid context.";
   }
 
-  return "The intelligence pipeline is observing structural themes but no dominant driver has activated. Structural context remains valid reference material.";
+  return "Structural themes remain in focus, but no dominant market force has been confirmed today. Context is available in the Theme Map.";
 }
 
 // Pattern-match a human-readable driver label to a TTG structural theme ID.

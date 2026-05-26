@@ -137,7 +137,7 @@ function SignalCard({
               style={{ background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.15)" }}
             >
               <p className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#f97316" }}>
-                What Would Reactivate This Signal
+                What Would Bring This Signal Back
               </p>
               <p className="text-xs text-slate-400 leading-relaxed">
                 A reversal of the conditions that would weaken it: {inval.toLowerCase().replace(/\.$/, "")}.
@@ -264,7 +264,7 @@ export default function SignalsTab({ data, onThemeSelect }: Props) {
             </p>
             <p className="text-xs text-slate-500 leading-relaxed">
               {filter === "all"
-                ? "The intelligence pipeline is monitoring the market. Signals appear as themes activate — typically during market hours."
+                ? "Structural signals appear as themes strengthen — typically during market hours."
                 : `Switch to \"All\" to see all ${themes.length} monitored themes.`}
             </p>
           </div>

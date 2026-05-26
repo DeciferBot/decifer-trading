@@ -1,0 +1,102 @@
+{
+  "schema_version": "customer_event_tape_v1",
+  "generated_at": "2026-05-26T03:54:04.235687+00:00",
+  "valid_until": "2026-05-26T15:54:04.235695+00:00",
+  "freshness_status": "fresh",
+  "events": [
+    {
+      "event_id": "ed9eee25-1f52-45e0-b06b-faa4810a7866",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "JOYY Q1 Adj. EPS $1.11 Beats $1.02 Estimate, Sales $555.700M Beat $543.333M Estimate",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "alpaca_benzinga",
+      "source_published_at": "2026-05-26T03:54:03+00:00",
+      "ingested_at": "2026-05-26T03:54:04.235687+00:00",
+      "processed_at": "2026-05-26T03:54:04.235687+00:00",
+      "valid_until": "2026-05-26T15:54:04.235695+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "JOYY"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "9028a485-b464-466f-a9cd-9cad716a633c",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "JOYY Q1 Sales $555.700M Beat $543.333M Estimate",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "alpaca_benzinga",
+      "source_published_at": "2026-05-26T03:50:50+00:00",
+      "ingested_at": "2026-05-26T03:50:52.165239+00:00",
+      "processed_at": "2026-05-26T03:50:52.165239+00:00",
+      "valid_until": "2026-05-26T15:50:52.165249+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "JOYY"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    }
+  ]
+}

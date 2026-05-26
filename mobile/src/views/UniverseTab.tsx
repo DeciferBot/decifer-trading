@@ -243,9 +243,9 @@ export default function UniverseTab({ data, onNameSelect, onThemeSelect, onSymbo
   if (ttgData.length === 0 && radar.length === 0) {
     return (
       <div className="px-4 pt-12 flex flex-col items-center gap-3 text-center">
-        <p className="text-slate-400 text-sm">No intelligence data available.</p>
+        <p className="text-slate-400 text-sm">No structural context available right now.</p>
         <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
-          The intelligence pipeline is gathering data. Check back during market hours.
+          Theme context remains accessible in the Theme Map. Connected names will appear here as the intelligence layer refreshes.
         </p>
       </div>
     );
@@ -281,7 +281,7 @@ export default function UniverseTab({ data, onNameSelect, onThemeSelect, onSymbo
           </div>
 
           <p className="text-[11px] text-slate-500 -mt-3">
-            Evidence-gated names connected to structural market themes. Not a recommendation.
+            Structurally connected names. Evidence-verified. Not a recommendation.
           </p>
 
           {/* Filter chips */}

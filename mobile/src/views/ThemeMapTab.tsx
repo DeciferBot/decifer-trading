@@ -290,7 +290,7 @@ function ThemeDetail({
             <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-2">
               Theme-Connected Names
             </p>
-            <p className="text-[9px] text-slate-600 mb-2">Evidence-gated structural intelligence.</p>
+            <p className="text-[9px] text-slate-600 mb-2">Structurally verified connections.</p>
             <div className="space-y-1.5">
               {ttgSymbols.slice(0, 6).map((s, i) => (
                 <div
@@ -317,7 +317,7 @@ function ThemeDetail({
             <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-2">
               Theme-Connected Names
             </p>
-            <p className="text-[9px] text-slate-600 mb-2">Last validated — not live radar.</p>
+            <p className="text-[9px] text-slate-600 mb-2">Structural context — no fresh event evidence this cycle.</p>
             <div className="space-y-1.5">
               {universeNames.slice(0, 5).map((n, i) => (
                 <div
@@ -348,7 +348,7 @@ function ThemeDetail({
 
         {names.length === 0 && ttgSymbols.length === 0 && universeNames.length === 0 && sectors.length === 0 && (
           <p className="text-xs text-slate-500 text-center py-1">
-            Monitoring this theme — connected names will appear as markets activate.
+            Monitoring this theme — connected names will appear as conditions develop.
           </p>
         )}
       </div>
@@ -458,8 +458,8 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
       <div className="px-4 pt-12 flex flex-col items-center gap-3 text-center">
         <p className="text-slate-400 text-sm">No active themes right now.</p>
         <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
-          The intelligence pipeline is monitoring the market. Themes activate when price drivers
-          and event evidence align — typically during market hours.
+          Structural themes appear when market forces and supporting evidence align —
+          typically during market hours.
         </p>
       </div>
     );

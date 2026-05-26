@@ -1,59 +1,40 @@
-OVERNIGHT RESEARCH NOTES — 2026-05-22
-Generated: 2026-05-22 06:15 ET
+OVERNIGHT RESEARCH NOTES — 2026-05-25
+Generated: 2026-05-25 15:55 ET
 
 PRE-MARKET / AFTER-HOURS TONE:
-  SPY   $744.34  +0.42%  (gap-up)
-  QQQ   $715.56  +0.34%  (gap-up)
-  IWM   $282.81  +1.05%  (gap-up)
+  SPY   $745.64  +0.39%  (gap-up)
+  QQQ   $715.31  +0.11%  (flat)
+  IWM   $285.12  +0.93%  (gap-up)
   ---  sector ETFs  ---
-  XLF   $51.90  +0.46%  (gap-up)
-  XLK   $178.88  +0.98%  (gap-up)
-  XLE   $59.34  -0.77%  (gap-down)
-  XLV   $148.68  +1.05%  (gap-up)
-  XLI   $170.53  -0.12%  (flat)
-  XLU   $45.05  +1.21%  (gap-up)
-  XLB   $50.02  +0.60%  (gap-up)
-  XLRE  $44.50  +0.16%  (gap-up)
+  XLF   $51.94  +0.41%  (gap-up)
+  XLK   $180.39  +1.00%  (gap-up)
+  XLE   $59.49  +0.61%  (gap-up)
+  XLV   $149.89  +1.17%  (gap-up)
+  XLI   $171.77  +0.73%  (gap-up)
+  XLU   $45.35  +0.78%  (gap-up)
+  XLB   $50.29  +0.54%  (gap-up)
+  XLRE  $44.56  +0.13%  (flat)
 
 PRE-MARKET MOVERS (>1.5% gap vs yesterday's close):
-  RGTI   $   22.64  +34.12%  (gap-up)
-  BE     $  323.39  +14.55%  (gap-up)
-  NBIS   $  219.00  +14.17%  (gap-up)
-  ARM    $  293.00  +14.13%  (gap-up)
-  LITE   $  953.00  +9.78%  (gap-up)
-  SNDK   $ 1514.00  +8.72%  (gap-up)
-  IREN   $   56.83  +7.81%  (gap-up)
-  STX    $  808.10  +7.59%  (gap-up)
-  CRWV   $  108.70  +7.33%  (gap-up)
-  AAOI   $  177.18  +7.21%  (gap-up)
-  ANET   $  150.17  +6.89%  (gap-up)
-  GLW    $  192.55  +6.56%  (gap-up)
-  CRDO   $  193.51  +5.76%  (gap-up)
-  VRT    $  333.00  +5.49%  (gap-up)
-  COHR   $  377.85  +5.40%  (gap-up)
+  QCOM   $  237.19  +11.14%  (gap-up)
+  SOXL   $  190.56  +6.82%  (gap-up)
+  SOXS   $    7.73  -6.76%  (gap-down)
+  SNDK   $ 1466.97  -4.88%  (gap-down)
+  MSTR   $  158.75  -3.70%  (gap-down)
+  BE     $  297.94  -3.23%  (gap-down)
+  IREN   $   56.23  -3.15%  (gap-down)
+  CRWV   $  104.20  -3.14%  (gap-down)
+  ANET   $  153.24  +3.13%  (gap-up)
+  LITE   $  935.31  -3.03%  (gap-down)
+  NBIS   $  213.29  -3.02%  (gap-down)
+  AMD    $  462.81  +2.94%  (gap-up)
+  NVDA   $  214.28  -2.38%  (gap-down)
+  EWY    $  182.03  -2.35%  (gap-down)
+  ASML   $ 1629.00  +2.32%  (gap-up)
 
-YESTERDAY'S PERFORMANCE:
-  Trades: 2 (0W/2L)  Win rate: 0%  P&L: $-3,344.94
-  Worst: TE LONG $-1,679.23  (sl_hit / TRENDING_UP)
-  By regime:
-    TRENDING_UP: 2 trades  0% WR  $-3,344.94
-  By dimension (non-zero entry scores):
-    trend             2 trades  0% WR  $-3,345
-    flow              2 trades  0% WR  $-3,345
-    mtf               2 trades  0% WR  $-3,345
-    news              2 trades  0% WR  $-3,345
-    social            2 trades  0% WR  $-3,345
+Yesterday's performance: no closed trades on 2026-05-24
 
 ECONOMIC CALENDAR — Next 5 Days:
-  Fri May 22: CFTC Nasdaq 100 speculative net positions [MEDIUM]
-  Fri May 22: CFTC Crude Oil speculative net positions [MEDIUM]
-  Fri May 22: CFTC Gold Speculative net positions [MEDIUM]
-  Fri May 22: CFTC S&P 500 speculative net positions [MEDIUM]
-  Fri May 22: Fed Waller Speech [MEDIUM]
-  Fri May 22: Leading Index MoM (Apr) [MEDIUM]
-  Fri May 22: Leading Index MoM (May) [MEDIUM]
-  Sat May 23: No high-impact events
-  Sun May 24: No high-impact events
   Mon May 25: No high-impact events
   Tue May 26: Dallas Fed Manufacturing Index (May) [MEDIUM]
   Tue May 26: CB Consumer Confidence (May) [HIGH]
@@ -62,30 +43,91 @@ ECONOMIC CALENDAR — Next 5 Days:
   Wed May 27: API Crude Oil Stock Change (May/22) [MEDIUM]
   Wed May 27: Fed Cook Speech [MEDIUM]
   Wed May 27: MBA 30-Year Mortgage Rate (May/22) [MEDIUM]
+  Wed May 27: Fed Logan Speech [MEDIUM]
+  Thu May 28: EIA Gasoline Stocks Change (May/22) [MEDIUM]
+  Thu May 28: EIA Crude Oil Stocks Change (May/22) [MEDIUM]
+  Thu May 28: New Home Sales (Apr) [MEDIUM]
+  Thu May 28: Fed Williams Speech [MEDIUM]
+  Thu May 28: Core PCE Price Index MoM (Apr) [HIGH]
+  Thu May 28: Corporate Profits QoQ (Q1) [MEDIUM]
+  Thu May 28: Durable Goods Orders Ex Transp MoM (Apr) [MEDIUM]
+  Thu May 28: Durable Goods Orders MoM (Apr) [HIGH]
+  Thu May 28: Initial Jobless Claims (May/23) [MEDIUM]
+  Thu May 28: PCE Price Index YoY (Apr) [MEDIUM]
+  Thu May 28: Personal Income MoM (Apr) [HIGH]
+  Thu May 28: Personal Spending MoM (Apr) [HIGH]
+  Thu May 28: Fed Jefferson Speech [MEDIUM]
+  Fri May 29: CFTC Crude Oil speculative net positions [MEDIUM]
+  Fri May 29: CFTC S&P 500 speculative net positions [MEDIUM]
+  Fri May 29: CFTC Gold Speculative net positions [MEDIUM]
+  Fri May 29: CFTC Nasdaq 100 speculative net positions [MEDIUM]
+  Fri May 29: Chicago PMI (May) [MEDIUM]
+  Fri May 29: Fed Bowman Speech [MEDIUM]
+  Fri May 29: Wholesale Inventories MoM (Apr) [MEDIUM]
+  Fri May 29: Retail Inventories Ex Autos MoM (Apr) [MEDIUM]
+  Fri May 29: Goods Trade Balance Adv (Apr) [MEDIUM]
+  Fri May 29: Goods Trade Balance (Apr) [MEDIUM]
+  Sat May 30: No high-impact events
 
-Earnings calendar: unavailable (no data source connected)
+EARNINGS — Next 5 Days:  (Alpha Vantage — dates only)
+  Tue May 26: AZO  
+  Tue May 26: CCEP  
+  Tue May 26: MASI  
+  Tue May 26: MOD  
+  Tue May 26: SMTC  
+  Tue May 26: ZS  
+  Wed May 27: A  
+  Wed May 27: CRM  
+  Wed May 27: DY  
+  Wed May 27: HEI  
+  Wed May 27: HPQ  
+  Wed May 27: MRVL  
+  Wed May 27: NTNX  
+  Wed May 27: P  
+  Wed May 27: PDD  
+  Wed May 27: SNOW  
+  Wed May 27: SNPS  
+  Thu May 28: ADSK  
+  Thu May 28: BBY  
+  Thu May 28: BURL  
+  Thu May 28: COST  
+  Thu May 28: DELL  
+  Thu May 28: DLTR  
+  Thu May 28: FUTU  
+  Thu May 28: GTLS  
+  Thu May 28: MDB  
+  Thu May 28: NTAP  
+  Thu May 28: OKTA  
+  Thu May 28: PATH  
 
-Analyst changes: none in last 24h for tracked universe
+Analyst changes: none in last 24h
 
-MARKET NEWS — Last 16h (FMP, 37 articles):
-  ▲ [MSFT]   12h ago  Microsoft: The Case For A Rerating Is Getting Stronger
-  ─ [MSFT]   4h ago   Here's why Microsoft might pop the ‘AI bubble' on June 1
-  ─ [USO]    4h ago   Oil Prices and Stocks Disagree on the End of the Iran War
-  ─ [SMCI]   5h ago   TUESDAY INVESTOR DEADLINE: Super Micro Computer, Inc. (SMCI) Investors with Substantial Lo
-  ─ [MSFT]   5h ago   Microsoft's AI reboot is creating a new inner circle around Satya Nadella
-  ─ [NVDA]   6h ago   Why Nvidia and Washington are suddenly betting big on Quantum
-  ─ [SPY]    6h ago   Stock Market Today: S&P 500 Nears Longest Winning Streak Since 2023
-  ─ [USO]    6h ago   Oil Climbs on U.S.-Iran Uncertainty, Stock Market Rally Holds
-  ─ [SPY]    6h ago   UBS Global Wealth Management lifts S&P 500 target on strong consumer spending, AI demand
-  ─ [NVDA]   7h ago   Nvidia's $82bn quarter masks a company being rebuilt from within
-  ─ [NVDA]   9h ago   French quantum firm Alice & Bob wins new investment from Nvidia venture arm
-  ─ [NVDA]   10h ago  Should You Buy Nvidia Stock After the Massive Investor Update?
+MARKET NEWS — Last 16h (FMP, 60 articles):
+  ▼ [GOOGL]  6h ago   EU plans to fine Google high triple-digit million euro sum, Handelsblatt reports
+  ▼ [GOOG]   6h ago   EU plans to fine Google high triple-digit million euro sum, Handelsblatt reports
+  ▲ [GOOGL]  6h ago   Baron Opportunity Fund Q1 2026 Portfolio Activity
+  ▲ [GOOG]   6h ago   Baron Opportunity Fund Q1 2026 Portfolio Activity
+  ▼ [MU]     7h ago   Missed Out on the Initial AI Rally? These 3 AI Stocks Are Just Getting Started.
+  ▼ [META]   7h ago   Missed Out on the Initial AI Rally? These 3 AI Stocks Are Just Getting Started.
+  ▲ [QCOM]   7h ago   Can Qualcomm's Expanded Stellantis Tie-Up Boost Its Shares?
+  ▼ [NVDA]   8h ago   Top investor says Nvidia stock could surge another 40%: here's why
+  ▲ [GOOGL]  9h ago   Google rolls out AI-powered ad formats at Marketing Live
+  ▲ [GOOG]   9h ago   Google rolls out AI-powered ad formats at Marketing Live
+  ▲ [NVDA]   9h ago   Nvidia: ASIC Discount Applied Prematurely - Reiterate Strong Buy
+  ▲ [SNDK]   9h ago   Analysts Say This AI Stock Could Double. Is It Actually a Buy?
 
-Net bias: bullish  (1 bullish / 0 bearish / 36 neutral)
+Net bias: bullish  (9 bullish / 5 bearish / 46 neutral)
+  AVOID (bearish catalyst):
+    GOOGL  — EU plans to fine Google high triple-digit million euro sum
+    GOOG   — EU plans to fine Google high triple-digit million euro sum
+    MU     — Missed Out on the Initial AI Rally? These 3 AI Stocks Are Ju
+    META   — Missed Out on the Initial AI Rally? These 3 AI Stocks Are Ju
+    NVDA   — Top investor says Nvidia stock could surge another 40%: here
   FAVOR (bullish catalyst):
-    MSFT   — Microsoft: The Case For A Rerating Is Getting Stronger
+    QCOM   — Can Qualcomm's Expanded Stellantis Tie-Up Boost Its Shares?
+    SNDK   — Analysts Say This AI Stock Could Double. Is It Actually a Bu
 
 MACRO (daily):
-  10Y-2Y Spread: 0.49%  (as of 2026-05-21)  prior: 0.53
-  10Y Treasury: 4.57%  (as of 2026-05-20)  prior: 4.67
+  10Y-2Y Spread: 0.43%  (as of 2026-05-22)  prior: 0.49
+  10Y Treasury: 4.57%  (as of 2026-05-21)  prior: 4.57
   WTI Crude: 112.25$/bbl  (as of 2026-05-18)  prior: 108.99

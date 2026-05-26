@@ -159,13 +159,6 @@ export default function TodayTab({ data, onThemeSelect, onGoToUniverse, onGoToTh
     .filter(t => ["activated", "active", "strengthening"].includes(t.state ?? "") || t.event_signal === "strengthening")
     .sort((a, b) => themeStateSort(a) - themeStateSort(b));
 
-  const themeCounts = {
-    active:      themes.filter(t => ["activated", "active"].includes(t.state ?? "")).length,
-    building:    themes.filter(t => t.state === "strengthening").length,
-    weakening:   themes.filter(t => t.state === "weakening" || t.state === "headwind").length,
-    dormant:     themes.filter(t => t.state === "dormant").length,
-  };
-
   const storyMoodColor =
     story.market_state === "risk-on"  ? { border: "#10b981", tag: "Risk-On",       text: "#34d399", bg: "rgba(16,185,129,0.08)" } :
     story.market_state === "risk-off" ? { border: "#ef4444", tag: "Risk-Off",      text: "#f87171", bg: "rgba(239,68,68,0.08)" } :
@@ -272,33 +265,6 @@ export default function TodayTab({ data, onThemeSelect, onGoToUniverse, onGoToTh
             <p className="text-sm font-semibold leading-relaxed" style={{ color: ms.text }}>
               {mood}
             </p>
-            {/* Theme count summary */}
-            <div className="flex gap-3 mt-3 pt-3" style={{ borderTop: `1px solid ${ms.border}25` }}>
-              {themeCounts.active > 0 && (
-                <div className="text-center">
-                  <p className="text-base font-black" style={{ color: "#10b981" }}>{themeCounts.active}</p>
-                  <p className="text-[9px] text-slate-500">Active</p>
-                </div>
-              )}
-              {themeCounts.building > 0 && (
-                <div className="text-center">
-                  <p className="text-base font-black" style={{ color: "#3b82f6" }}>{themeCounts.building}</p>
-                  <p className="text-[9px] text-slate-500">Building</p>
-                </div>
-              )}
-              {themeCounts.weakening > 0 && (
-                <div className="text-center">
-                  <p className="text-base font-black" style={{ color: "#f87171" }}>{themeCounts.weakening}</p>
-                  <p className="text-[9px] text-slate-500">Weakening</p>
-                </div>
-              )}
-              {themeCounts.dormant > 0 && (
-                <div className="text-center">
-                  <p className="text-base font-black text-slate-500">{themeCounts.dormant}</p>
-                  <p className="text-[9px] text-slate-600">Quiet</p>
-                </div>
-              )}
-            </div>
           </div>
         </section>
       )}

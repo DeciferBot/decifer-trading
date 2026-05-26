@@ -218,4 +218,27 @@ describe("buildCustomerStory", () => {
     expect(text).not.toContain("execute");
     expect(text).not.toContain("trade execution");
   });
+
+  it("monitoring fallback headline does not contain operator language", () => {
+    const story = buildCustomerStory(makePayload({ key_drivers: [], themes: [] }));
+    expect(story.market_state).toBe("monitoring");
+    expect(story.headline.toLowerCase()).not.toContain("pipeline");
+    expect(story.headline.toLowerCase()).not.toContain("gathering signal");
+    expect(story.headline.toLowerCase()).not.toContain("intelligence");
+  });
+
+  it("monitoring fallback summary does not contain pipeline language", () => {
+    const story = buildCustomerStory(makePayload({ key_drivers: [], themes: [] }));
+    expect(story.market_state).toBe("monitoring");
+    expect(story.summary.toLowerCase()).not.toContain("pipeline");
+    expect(story.summary.toLowerCase()).not.toContain("activated");
+  });
+
+  it("monitoring fallback with themes does not use 'under observation' wording", () => {
+    const story = buildCustomerStory(makePayload({
+      themes: [{ theme: "gold_safe_haven_bid", state: "dormant" }],
+    }));
+    expect(story.headline.toLowerCase()).not.toContain("under observation");
+    expect(story.headline.toLowerCase()).not.toContain("pipeline");
+  });
 });
