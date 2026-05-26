@@ -257,6 +257,7 @@ export default function CustomerApp() {
               <span className="text-[9px] font-semibold tracking-wider uppercase text-slate-600">
                 Market Intelligence
               </span>
+              <span className="text-[8px] text-slate-700">v4.61.1</span>
             </div>
             <p className="text-[12px] font-medium text-slate-300 leading-snug">
               {clock.greeting}. Here is your market briefing.
