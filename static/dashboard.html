@@ -668,12 +668,13 @@ canvas{display:block;width:100% !important}
 
   /* ── PORTFOLIO TAB ── */
   #view-portfolio{padding:10px !important;gap:10px !important}
-  /* mkt-strip: stack indices above sectors, each row scrolls horizontally */
+  /* mkt-strip: stack indices above sectors, chips wrap — no horizontal scroll */
   .mkt-strip{flex-direction:column;overflow-x:hidden;min-height:unset;align-items:stretch}
-  .mkt-indices{border-right:none;border-bottom:1px solid var(--border2);overflow-x:auto;flex-wrap:nowrap;width:100%;scrollbar-width:none}
-  .mkt-sectors{flex:none;width:100%;flex-wrap:nowrap}
+  .mkt-indices{border-right:none;border-bottom:1px solid var(--border2);overflow-x:hidden;flex-wrap:wrap;width:100%;align-items:center}
+  .mkt-sectors{flex:none;width:100%;flex-wrap:wrap;overflow-x:hidden}
   .mkt-strip-actions{display:none}
-  .mkt-stage-track{overflow-x:auto}
+  /* stage spectrum bar is 13-wide — hide on mobile; active regime shown in header */
+  .mkt-stage-bar{display:none}
 
   /* ── APEX TAB — Intelligence 2-col → 1-col ── */
   #intel-2col-grid{grid-template-columns:1fr !important}
@@ -710,8 +711,8 @@ canvas{display:block;width:100% !important}
   .cat-card{padding:8px 10px}
   .cat-spotlight-grid{grid-template-columns:1fr}
   .cat-spotlight-card{padding:10px 12px}
-  .cat-radar-strip{overflow-x:auto}
-  .cat-radar-step{padding:8px 4px;min-width:52px}
+  .cat-radar-strip{overflow-x:hidden;flex-wrap:wrap}
+  .cat-radar-step{padding:8px 4px;flex:1 1 30%;min-width:0}
   .cat-radar-step-val{font-size:14px}
   .cat-radar-step-lbl{font-size:6.5px}
   .cat-detail-drawer{width:100%;right:-100%}
