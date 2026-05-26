@@ -25,7 +25,9 @@
   --logo-name:#1A1A1A;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;height:100vh;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;height:100vh;overflow:hidden}
+/* Reusable section label — title case, no shouting */
+.section-label{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--muted2);text-transform:none}
 body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,var(--scanline) 2px,var(--scanline) 4px);pointer-events:none;z-index:9999}
 
 /* ── HEADER — 3-zone grid ──────────────────────────────────────────────────── */
@@ -38,7 +40,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .logo-name{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--logo-name)}
 .logo-sub{font-size:10px;color:var(--muted2)}
 .upd-label{font-size:9px;color:var(--muted);letter-spacing:.5px;white-space:nowrap}
-.upd-val{font-size:10px;color:var(--muted2);white-space:nowrap}
+.upd-val{font-size:11px;color:var(--muted2);white-space:nowrap;letter-spacing:.1px}
 /* Regime hero card — centre of header */
 .regime-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 20px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);min-width:200px;cursor:default;transition:border-color .3s}
 .regime-hero-label{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;line-height:1.2;color:var(--text)}
@@ -61,7 +63,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .stat{padding:10px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-width:0;transition:background .15s}
 .stat:last-child{border-right:none}
 .stat:hover{background:var(--bg3)}
-.sl{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:3px}
+.sl{font-size:10px;letter-spacing:.2px;color:var(--muted2);text-transform:none;margin-bottom:3px}
 .sv{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ss{font-size:10px;color:var(--muted2);margin-top:2px}
 .co{color:var(--orange)}.cg{color:var(--green)}.cr{color:var(--red)}.cw{color:#fff}
@@ -78,7 +80,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 /* ── TABS ───────────────────────────────────────────────────────────────────── */
 .tabs{display:flex;align-items:center;background:var(--bg2);border-bottom:1px solid var(--border);height:38px;overflow-x:auto;scrollbar-width:none;padding:0 12px;gap:1px;-webkit-mask-image:linear-gradient(to right,black 92%,transparent 100%);mask-image:linear-gradient(to right,black 92%,transparent 100%)}
 .tabs::-webkit-scrollbar{display:none}
-.tab{display:flex;align-items:center;padding:5px 12px;font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;color:var(--muted2);border-radius:5px;white-space:nowrap;transition:color .15s,background .15s,box-shadow .15s;font-family:'JetBrains Mono',monospace;flex-shrink:0;position:relative}
+.tab{display:flex;align-items:center;padding:5px 14px;font-size:11px;font-weight:600;letter-spacing:.2px;text-transform:none;cursor:pointer;color:var(--muted2);border-radius:5px;white-space:nowrap;transition:color .15s,background .15s,box-shadow .15s;font-family:'JetBrains Mono',monospace;flex-shrink:0;position:relative}
 .tab:hover{color:var(--text);background:var(--orange_dim)}
 .tab.active{color:var(--orange);background:var(--orange_dim);box-shadow:inset 0 2px 0 var(--orange)}
 .tab-sep{width:1px;height:18px;background:var(--border2);margin:0 6px;flex-shrink:0;opacity:.6}
@@ -105,7 +107,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .view.active{display:flex}
 #view-portfolio{height:calc(100vh - 56px - 70px - 60px - 38px - 34px);overflow-y:auto !important;overflow-x:hidden}
 #view-portfolio > *{flex-shrink:0}
-.col-title{padding:7px 12px;font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;display:flex;justify-content:space-between}
+.col-title{padding:9px 14px;font-size:11px;font-weight:700;letter-spacing:.2px;color:var(--text);text-transform:none;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;display:flex;justify-content:space-between;align-items:center}
 .col-body{overflow-y:auto;flex:1}
 
 /* Tape */
@@ -148,10 +150,10 @@ body.remote-mode #remote-badge{display:block}
 .scan-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-top:3px}
 
 /* Logs */
-.log-row{display:grid;grid-template-columns:58px 72px 1fr;gap:6px;padding:5px 12px;border-bottom:1px solid rgba(34,34,34,.5);animation:fi .2s}
+.log-row{display:grid;grid-template-columns:58px 72px 1fr;gap:6px;padding:6px 14px;border-bottom:1px solid rgba(34,34,34,.5);animation:fi .2s}
 @keyframes fi{from{opacity:0;transform:translateY(-2px)}to{opacity:1}}
-.lt{color:var(--muted2);font-size:10px}
-.lk{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;text-align:center}
+.lt{color:var(--muted2);font-size:11px}
+.lk{font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;text-align:center}
 .lk-TRADE{background:rgba(255,107,0,.15);color:var(--orange)}
 .lk-SIGNAL{background:rgba(0,200,83,.12);color:var(--green)}
 .lk-ANALYSIS{background:rgba(255,214,0,.1);color:var(--yellow)}
@@ -163,7 +165,7 @@ body.remote-mode #remote-badge{display:block}
 
 /* AI panel */
 .ai-panel{border-top:1px solid var(--border);padding:6px 12px;background:var(--bg2);flex:0 1 auto;min-height:60px}
-.ai-label{font-size:9px;color:var(--orange);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:5px}
+.ai-label{font-size:10px;color:var(--orange);letter-spacing:.2px;margin-bottom:4px;display:flex;align-items:center;gap:5px}
 .ai-d{width:5px;height:5px;background:var(--orange);border-radius:50%;animation:pulse 2s infinite}
 .ai-box{background:var(--bg3);border:1px solid var(--border2);border-left:2px solid var(--orange);border-radius:4px;padding:6px 10px;font-size:11px;color:var(--text);line-height:1.65;max-height:200px;overflow-y:auto;white-space:pre-wrap;resize:vertical}
 
@@ -193,7 +195,7 @@ body.remote-mode #remote-badge{display:block}
   padding:7px 14px;
   background:var(--bg3);
   border-bottom:2px solid var(--orange);
-  font-size:9px;letter-spacing:1.2px;color:var(--muted2);text-transform:uppercase;
+  font-size:10px;letter-spacing:.2px;color:var(--muted2);
   position:sticky;top:0;z-index:2;
   box-shadow:0 2px 8px rgba(0,0,0,.3);
 }
@@ -205,7 +207,7 @@ body.remote-mode #remote-badge{display:block}
 .expand-arrow.open{transform:rotate(90deg)}
 .trade-explain{display:none;padding:10px 14px 12px 14px;background:rgba(255,107,0,.03);border-bottom:1px solid rgba(34,34,34,.5);border-left:3px solid var(--orange);margin:0;font-size:11px;line-height:1.6;color:var(--muted2)}
 .trade-explain.open{display:block}
-.trade-explain .explain-title{color:var(--orange);font-size:10px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;font-weight:600}
+.trade-explain .explain-title{color:var(--orange);font-size:11px;letter-spacing:.2px;margin-bottom:6px;font-weight:600}
 .trade-explain .explain-body{color:var(--text);opacity:.85}
 .trade-explain .explain-outcome{margin-top:8px;padding-top:8px;border-top:1px solid rgba(34,34,34,.5);font-size:10px;color:var(--muted2)}
 .pp{color:var(--green)}.pn{color:var(--red)}
@@ -222,8 +224,8 @@ body.remote-mode #remote-badge{display:block}
   padding:16px;
 }
 .card-title{
-  font-size:9px;letter-spacing:1.5px;color:var(--muted2);
-  text-transform:uppercase;margin-bottom:10px;font-weight:600;
+  font-size:11px;letter-spacing:.2px;color:var(--text);
+  margin-bottom:10px;font-weight:600;
 }
 
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px}
@@ -236,7 +238,7 @@ body.remote-mode #remote-badge{display:block}
   transition:border-color .15s;
 }
 .metric:hover{border-color:var(--orange2)}
-.metric-label{font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:5px;font-weight:500}
+.metric-label{font-size:10px;letter-spacing:.2px;color:var(--muted2);margin-bottom:5px;font-weight:500}
 .metric-val{font-family:'Syne',sans-serif;font-size:20px;font-weight:800}
 canvas{display:block;width:100% !important}
 
@@ -248,7 +250,7 @@ canvas{display:block;width:100% !important}
 .agent-accuracy{font-size:11px;font-weight:700}
 .agent-last{font-size:11px;color:var(--muted2);line-height:1.6;max-height:80px;overflow-y:auto;white-space:pre-wrap}
 /* ── Apex sub-tabs ── */
-.atab{padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;color:var(--muted2);background:transparent;border:none;border-bottom:2px solid transparent;white-space:nowrap;font-family:'JetBrains Mono',monospace;transition:color .15s,border-color .15s;flex-shrink:0}
+.atab{padding:8px 18px;font-size:11px;font-weight:600;letter-spacing:.2px;cursor:pointer;color:var(--muted2);background:transparent;border:none;border-bottom:2px solid transparent;white-space:nowrap;font-family:'JetBrains Mono',monospace;transition:color .15s,border-color .15s;flex-shrink:0}
 .atab:hover{color:var(--text)}
 .atab.atab-act{color:var(--orange);border-bottom-color:var(--orange)}
 .atab-panel{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden}
@@ -267,14 +269,14 @@ canvas{display:block;width:100% !important}
 .risk-view{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:14px;gap:12px;height:calc(100vh - 56px - 70px - 60px - 38px - 34px)}
 .risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .risk-meter{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px}
-.rm-label{font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:8px}
+.rm-label{font-size:10px;letter-spacing:.2px;color:var(--muted2);margin-bottom:8px}
 .rm-bar-bg{height:8px;background:var(--border2);border-radius:4px;overflow:hidden;margin-bottom:4px}
 .rm-bar{height:100%;border-radius:4px;transition:width .5s}
 .rm-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2)}
 .risk-mode-banner{border-radius:6px;padding:10px 14px;font-size:11px;font-weight:600;display:none;align-items:center;justify-content:space-between;gap:8px;border:1px solid;flex-shrink:0}
 .risk-mode-banner.defensive{background:rgba(255,179,0,.08);border-color:var(--yellow);color:var(--yellow)}
 .risk-mode-banner.recovery{background:rgba(255,23,68,.08);border-color:var(--red);color:var(--red)}
-.r-pos-table-hdr{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:0 0 6px;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2)}
+.r-pos-table-hdr{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:0 0 6px;border-bottom:1px solid var(--border);font-size:10px;letter-spacing:.2px;color:var(--muted2)}
 .r-pos-total{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0 0;border-top:1px solid var(--border);font-size:11px;font-weight:600}
 
 /* ── VIEW: CATALYST ── */
@@ -307,7 +309,7 @@ canvas{display:block;width:100% !important}
 .cat-pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red);margin-right:5px;animation:pulse 1.5s infinite}
 /* EDGAR table */
 .edgar-tbl{width:100%;border-collapse:collapse;font-size:10px}
-.edgar-tbl th{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);padding:4px 6px;border-bottom:1px solid var(--border);text-align:left}
+.edgar-tbl th{font-size:10px;letter-spacing:.2px;color:var(--muted2);padding:4px 6px;border-bottom:1px solid var(--border);text-align:left}
 .edgar-tbl td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
 .edgar-tbl tr.wl{background:rgba(255,23,68,.04)}
 /* ── Catalyst Radar additions ── */
@@ -315,9 +317,9 @@ canvas{display:block;width:100% !important}
 .cat-radar-step{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 6px;border-right:1px solid var(--border);position:relative;min-width:0}
 .cat-radar-step:last-child{border-right:none}
 .cat-radar-step-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;line-height:1}
-.cat-radar-step-lbl{font-size:7.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted2);margin-top:3px;text-align:center;white-space:nowrap}
+.cat-radar-step-lbl{font-size:9px;letter-spacing:.2px;color:var(--muted2);margin-top:3px;text-align:center;white-space:nowrap}
 .cat-radar-arrow{position:absolute;right:-5px;top:50%;transform:translateY(-50%);color:var(--border2);font-size:10px;z-index:1;pointer-events:none}
-.cat-section-hdr{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);padding:14px 0 8px;border-bottom:1px solid var(--border);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.cat-section-hdr{font-size:11px;font-weight:600;letter-spacing:.2px;color:var(--text);padding:14px 0 8px;border-bottom:1px solid var(--border);margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .cat-section-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block}
 .cat-spotlight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:10px}
 .cat-spotlight-card{border-radius:8px;border:1px solid var(--border);background:var(--bg2);padding:14px 16px;display:flex;flex-direction:column;gap:5px;cursor:pointer;transition:border-color .15s,transform .15s}
@@ -353,7 +355,7 @@ canvas{display:block;width:100% !important}
 .cat-detail-close{font-size:20px;cursor:pointer;margin-left:auto;border:none;background:none;line-height:1;padding:2px 8px;color:var(--muted2);font-family:'JetBrains Mono',monospace}
 .cat-detail-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column}
 .cat-detail-section{margin-bottom:14px}
-.cat-detail-section-lbl{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:5px;display:block}
+.cat-detail-section-lbl{font-size:10px;letter-spacing:.2px;color:var(--muted2);margin-bottom:5px;display:block}
 .cat-detail-section-val{font-size:11px;color:var(--text);line-height:1.55}
 .cat-detail-divider{height:1px;background:var(--border);margin:14px 0}
 .cat-detail-action{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;background:var(--bg2)}
@@ -378,7 +380,7 @@ canvas{display:block;width:100% !important}
 .news-hero-bg.bear{background:linear-gradient(135deg,#2e0a0a 0%,#3b0d0d 50%,#1a0505 100%)}
 .news-hero-bg.neut{background:linear-gradient(135deg,#141414 0%,#1c1c1c 50%,#0e0e0e 100%)}
 .news-hero-inner{width:100%}
-.news-hero-tag{font-size:9px;letter-spacing:2px;font-weight:700;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.news-hero-tag{font-size:10px;letter-spacing:.2px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .news-hero-macro{color:var(--orange)}
 .news-hero-hl{font-family:'Syne',sans-serif;font-size:16px;font-weight:900;color:#fff;line-height:1.3;margin-bottom:8px}
 .news-hero-cat{font-size:11px;color:rgba(255,255,255,.7);line-height:1.5;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -398,7 +400,7 @@ canvas{display:block;width:100% !important}
 .news-card-hero .news-card-img-ph{font-size:36px}
 .news-card-top{padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}
 .news-card-hero .news-card-top{padding:16px 18px;justify-content:space-between}
-.news-card-hero-label{font-size:9px;font-weight:700;letter-spacing:1.2px;color:var(--orange);text-transform:uppercase;margin-bottom:4px}
+.news-card-hero-label{font-size:10px;font-weight:700;letter-spacing:.2px;color:var(--orange);margin-bottom:4px}
 .news-card-tag{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .news-card-sym{font-size:10px;color:var(--orange);font-weight:700}
 .news-card-hl{font-size:11px;color:var(--text);line-height:1.45;flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -428,13 +430,13 @@ canvas{display:block;width:100% !important}
 .news-drawer-hl{font-family:'Syne',sans-serif;font-size:18px;font-weight:900;color:var(--text);line-height:1.3;margin-bottom:12px}
 .news-drawer-meta{font-size:10px;color:var(--muted2);margin-bottom:14px;display:flex;gap:14px}
 .news-drawer-catalyst{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:4px;padding:10px 14px;margin-bottom:14px}
-.news-drawer-catalyst-lbl{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);margin-bottom:5px}
+.news-drawer-catalyst-lbl{font-size:10px;letter-spacing:.2px;color:var(--orange);margin-bottom:5px;font-weight:600}
 .news-drawer-catalyst-txt{font-size:12px;color:var(--text);line-height:1.6}
 
 /* ── AGENT CONVERSATION ── */
 .convo-panel{border-top:1px solid var(--border);background:var(--bg2);flex:1;min-height:120px;overflow:hidden;display:flex;flex-direction:column}
 .convo-panel.collapsed{flex:0 0 auto;min-height:auto;display:block}
-.convo-toggle{padding:5px 12px;font-size:9px;letter-spacing:1.5px;color:var(--orange);text-transform:uppercase;cursor:pointer;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+.convo-toggle{padding:5px 12px;font-size:11px;letter-spacing:.2px;color:var(--orange);cursor:pointer;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
 .convo-toggle:hover{background:var(--bg3)}
 
 /* ── TRADE CARD ── */
@@ -691,10 +693,10 @@ canvas{display:block;width:100% !important}
 .pos-modal-body{padding:16px 18px}
 .pos-modal-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}
 .pos-modal-row:last-child{border-bottom:none}
-.pos-modal-label{color:var(--muted2);text-transform:uppercase;letter-spacing:1px;font-size:9px}
+.pos-modal-label{color:var(--muted2);letter-spacing:.2px;font-size:10px}
 .pos-modal-val{font-weight:600;color:var(--text)}
 .pos-modal-section{margin-top:14px;padding-top:10px;border-top:1px solid var(--border2)}
-.pos-modal-section h4{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--orange);margin-bottom:8px;font-family:'Syne',sans-serif}
+.pos-modal-section h4{font-size:11px;letter-spacing:.2px;color:var(--orange);margin-bottom:8px;font-family:'Syne',sans-serif;font-weight:700}
 .pos-modal-reasoning{font-size:11px;color:var(--text);line-height:1.7;white-space:pre-wrap;background:var(--bg3);border:1px solid var(--border2);border-left:2px solid var(--orange);border-radius:4px;padding:10px 12px;max-height:200px;overflow-y:auto}
 .pos-card{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
 .pos-card:hover{background:rgba(255,107,0,.04)}
@@ -736,7 +738,6 @@ canvas{display:block;width:100% !important}
     <div class="pill" id="bot-pill"><div class="dot pulse"></div><span id="bot-status">Connecting...</span></div>
     <!-- Legacy regime-pill kept hidden — JS still writes to it; display is via regime-hero -->
     <div class="pill po" id="regime-pill" style="display:none">TAPE: —</div>
-    <span class="upd-label">Updated&nbsp;(ET)</span>
     <span class="upd-val" id="upd-time">—</span>
     <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" style="background:transparent;border:1px solid var(--border2);border-radius:5px;color:var(--muted2);font-size:13px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s;flex-shrink:0" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted2)'">☀</button>
   </div>
@@ -820,66 +821,57 @@ canvas{display:block;width:100% !important}
 <div class="view active" id="view-live">
   <div class="live-grid">
 
-    <!-- COL 1: Market context — Market Map + Market Stage thermometer -->
+    <!-- COL 1: Market Overview -->
     <div class="col" style="display:flex;flex-direction:column;overflow-y:auto">
 
-      <!-- MARKET MAP (Morning Brief) -->
       <div style="flex-shrink:0">
         <div class="col-title" style="position:sticky;top:0;z-index:1;background:var(--bg)">
-          <span>Market Map</span>
-          <span id="overnight-meta" style="color:var(--muted2);font-size:9px"></span>
+          <span>Market Overview</span>
+          <span id="overnight-meta" style="color:var(--muted2);font-size:10px"></span>
         </div>
-        <!-- Market tone + regime -->
-        <div id="on-tone-row" style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px">
-          <span style="color:var(--muted2);font-size:10px">Loading…</span>
+        <!-- Market tone -->
+        <div id="on-tone-row" style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px">
+          <span style="color:var(--muted2);font-size:11px">Loading…</span>
         </div>
         <!-- Sector ETFs -->
-        <div id="on-sector-row" style="padding:6px 12px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px"></div>
-        <!-- Top Gainers -->
-        <div style="border-bottom:1px solid var(--border);padding:8px 12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div id="on-sector-row" style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px"></div>
+        <!-- Gainers -->
+        <div style="border-bottom:1px solid var(--border);padding:10px 14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span class="section-label" style="color:var(--green)">Gainers</span>
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:9px;letter-spacing:1.5px;font-weight:700;color:var(--green)">TOP GAINERS</span>
-              <span id="on-prev-close-date" style="font-size:8px;color:var(--muted2)"></span>
+              <span id="on-prev-close-date" style="font-size:10px;color:var(--muted2)"></span>
+              <button id="on-movers-refresh-btn" onclick="refreshMovers()" style="background:transparent;border:1px solid var(--border);color:var(--muted2);font-size:9px;padding:2px 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻ Refresh</button>
             </div>
-            <button id="on-movers-refresh-btn" onclick="refreshMovers()" style="background:transparent;border:1px solid var(--border);color:var(--muted2);font-size:8px;padding:2px 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻ Live</button>
           </div>
           <div id="on-gainers"></div>
         </div>
-        <!-- Top Losers + Calendar side-by-side -->
+        <!-- Losers + Calendar -->
         <div id="on-movers-grid" style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
-          <div style="border-right:1px solid var(--border);padding:8px 12px">
-            <div style="font-size:9px;letter-spacing:1.5px;font-weight:700;color:var(--red);margin-bottom:6px">TOP LOSERS</div>
+          <div style="border-right:1px solid var(--border);padding:10px 14px">
+            <div class="section-label" style="color:var(--red);margin-bottom:8px">Losers</div>
             <div id="on-losers"></div>
           </div>
-          <div style="padding:8px 12px">
-            <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">UPCOMING EVENTS</div>
+          <div style="padding:10px 14px">
+            <div class="section-label" style="margin-bottom:8px">This Week</div>
             <div id="on-calendar"></div>
           </div>
         </div>
         <!-- Yesterday -->
-        <div id="on-perf-section" style="padding:8px 12px;border-bottom:1px solid var(--border)">
-          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">YESTERDAY</div>
+        <div id="on-perf-section" style="padding:10px 14px;border-bottom:1px solid var(--border)">
+          <div class="section-label" style="margin-bottom:8px">Yesterday</div>
           <div id="on-perf"></div>
         </div>
         <!-- News -->
-        <div style="padding:8px 12px;border-bottom:1px solid var(--border)">
-          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px" id="on-news-label">NEWS</div>
+        <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+          <div class="section-label" style="margin-bottom:8px" id="on-news-label">News</div>
           <div id="on-news"></div>
-          <div id="on-bias" style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap"></div>
+          <div id="on-bias" style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap"></div>
         </div>
       </div>
 
-      <!-- MARKET STAGES — vertical thermometer -->
-      <div style="flex-shrink:0;border-top:1px solid var(--border)">
-        <div class="col-title" style="flex-shrink:0">
-          <span>Market Stage</span>
-          <span id="opus-view-ts" style="color:var(--muted2);font-size:9px;display:none">—</span>
-        </div>
-        <div id="market-stages-list" style="padding:8px 12px;display:flex;flex-direction:column;gap:2px">
-          <span style="color:var(--muted2);font-size:10px">Waiting for market data…</span>
-        </div>
-      </div>
+      <!-- market-stages-list kept hidden for JS compat -->
+      <div style="display:none"><div id="market-stages-list"></div><div id="opus-view-ts"></div></div>
 
     </div>
 
@@ -1018,7 +1010,7 @@ canvas{display:block;width:100% !important}
   <div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px;flex-shrink:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono',monospace">Apex Live Conversation</span>
+        <span style="font-size:11px;letter-spacing:.2px;color:var(--muted2);font-family:'JetBrains Mono',monospace">Apex conversation</span>
         <div style="display:none;align-items:center;gap:4px" id="agents-nav">
           <button onclick="apexConvoNav(-1)" style="font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer">&#8592;</button>
           <span id="agents-nav-counter" style="font-size:9px;color:var(--muted2);min-width:40px;text-align:center">—</span>
@@ -1203,7 +1195,7 @@ canvas{display:block;width:100% !important}
 <!-- VIEW: CATALYST -->
 <div class="view catalyst-view" id="view-catalyst">
   <div class="cat-hdr">
-    <span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange)">CATALYST RADAR</span>
+    <span style="font-size:12px;font-weight:700;letter-spacing:.2px;color:var(--orange)">Catalyst Radar</span>
     <span id="cat-date" style="font-size:10px;color:var(--muted2);margin-left:auto"></span>
     <button id="cat-refresh-btn" onclick="loadCatalyst()" style="background:none;border:1px solid var(--border);color:var(--muted2);padding:3px 10px;border-radius:3px;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer">⟳ Refresh</button>
   </div>
@@ -1394,14 +1386,14 @@ canvas{display:block;width:100% !important}
     </div>
 
     <!-- Outcome tracking panel -->
-    <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Action outcome tracking</div>
+    <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2);margin-bottom:6px">Action outcomes</div>
     <div id="pm-outcomes-banner" style="margin-bottom:14px;padding:10px 14px;border-radius:5px;border:1px solid var(--muted);background:var(--bg2);font-size:11px;color:var(--muted2)">
       Loading action outcome tracking…
     </div>
     <div id="pm-outcomes-table-wrap" style="margin-bottom:14px;display:none;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:'JetBrains Mono',monospace">
         <thead>
-          <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:9px;letter-spacing:.5px;text-transform:uppercase">
+          <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:10px;letter-spacing:.2px">
             <th style="text-align:left;padding:3px 8px;white-space:nowrap">Resolved</th>
             <th style="text-align:left;padding:3px 8px">Symbol</th>
             <th style="text-align:left;padding:3px 8px">Action</th>
@@ -1410,7 +1402,7 @@ canvas{display:block;width:100% !important}
             <th style="text-align:left;padding:3px 8px">Quality</th>
             <th style="text-align:left;padding:3px 8px">Label</th>
             <th style="text-align:left;padding:3px 8px">Thesis</th>
-            <th style="text-align:right;padding:3px 8px">Δscore</th>
+            <th style="text-align:right;padding:3px 8px">Δ score</th>
           </tr>
         </thead>
         <tbody id="pm-outcomes-tbody"></tbody>
@@ -1418,11 +1410,11 @@ canvas{display:block;width:100% !important}
     </div>
 
     <!-- Decisions table -->
-    <div style="font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px">Recent decisions (newest first)</div>
+    <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2);margin-bottom:6px">Recent decisions</div>
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:'JetBrains Mono',monospace">
         <thead>
-          <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:9px;letter-spacing:.5px;text-transform:uppercase">
+          <tr style="border-bottom:1px solid var(--border);color:var(--muted2);font-size:10px;letter-spacing:.2px">
             <th style="text-align:left;padding:4px 8px;white-space:nowrap">Time</th>
             <th style="text-align:left;padding:4px 8px">Symbol</th>
             <th style="text-align:left;padding:4px 8px">Action</th>
@@ -1560,10 +1552,10 @@ canvas{display:block;width:100% !important}
       Negative IC dimensions receive zero weight. Updated weekly.
     </div>
     <div id="ic-bars" style="display:grid;grid-template-columns:80px 1fr 52px 52px;gap:5px 8px;align-items:center;font-size:11px">
-      <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase">Dim</div>
-      <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase">Weight</div>
-      <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;text-align:right">IC</div>
-      <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;text-align:right">4w</div>
+      <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2)">Dimension</div>
+      <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2)">Weight</div>
+      <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2);text-align:right">IC</div>
+      <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2);text-align:right">4-week</div>
     </div>
     <div style="font-size:10px;color:var(--muted2);margin-top:8px" id="ic-updated">—</div>
   </div>
@@ -1596,7 +1588,7 @@ canvas{display:block;width:100% !important}
   <div class="card">
     <div class="card-title">Segment Breakdown</div>
     <div id="ad-segment-table" style="font-size:11px">
-      <div style="display:grid;grid-template-columns:120px repeat(5,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:1.2px;color:var(--muted2);text-transform:uppercase">
+      <div style="display:grid;grid-template-columns:120px repeat(5,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border);font-size:10px;letter-spacing:.2px;color:var(--muted2)">
         <div>Segment</div><div>n (coh/tot)</div><div>T+1</div><div>T+3</div><div>T+5</div><div>T+10</div>
       </div>
       <div id="ad-seg-rows" style="color:var(--muted2);padding:12px 0">Loading…</div>
@@ -1738,7 +1730,7 @@ canvas{display:block;width:100% !important}
 
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-    <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase">Pipeline Health</div>
+    <div style="font-size:13px;font-weight:700;letter-spacing:.2px;color:var(--text)">Pipeline Health</div>
     <div style="display:flex;align-items:center;gap:10px">
       <span id="hlth-ts" style="font-size:10px;color:var(--muted2)">—</span>
       <button onclick="loadHealth()" style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻</button>
@@ -1879,8 +1871,8 @@ async function loadPortfolio() {
 
     // Column header (prepend)
     tableEl.insertAdjacentHTML('afterbegin',
-      `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1.5fr;gap:8px;padding:6px 14px;font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;border-bottom:1px solid var(--border)">
-        <div>Symbol</div><div>Dir</div><div>Qty</div><div>Mkt Val</div><div>Unreal P&L</div><div>Accounts</div>
+      `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1.5fr;gap:8px;padding:6px 14px;font-size:10px;letter-spacing:.2px;color:var(--muted2);border-bottom:1px solid var(--border)">
+        <div>Symbol</div><div>Dir</div><div>Qty</div><div>Mkt val</div><div>Unrealized P&L</div><div>Accounts</div>
       </div>`
     );
 
@@ -2020,7 +2012,7 @@ async function loadOvernightNotes() {
           // Skip back over weekends
           while (genDate.getDay() === 0 || genDate.getDay() === 6) genDate.setDate(genDate.getDate() - 1);
           const prevStr = genDate.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-          prevCloseDateEl.textContent = `Move from prev close · ${prevStr} at 4:00 PM ET`;
+          prevCloseDateEl.textContent = `vs ${prevStr} close`;
         }
       } catch(e) { prevCloseDateEl.textContent = ''; }
     }
@@ -2225,10 +2217,10 @@ function renderICWeights(d) {
 
   // Header row already in HTML; clear and re-render data rows
   barsEl.innerHTML =
-    `<div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase">Dim</div>
-     <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase">Weight (${isEqual?'equal':'IC-weighted'})</div>
-     <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;text-align:right">IC</div>
-     <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;text-align:right">4w trend</div>`;
+    `<div style="font-size:10px;letter-spacing:.2px;color:var(--muted2)">Dimension</div>
+     <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2)">Weight (${isEqual?'equal':'IC-weighted'})</div>
+     <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2);text-align:right">IC</div>
+     <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2);text-align:right">4-week</div>`;
 
   for (const dim of _IC_DIMS) {
     const w    = weights[dim] || 0;
@@ -2555,7 +2547,7 @@ function renderAlphaDecay(d) {
   };
   const dimKeys = Object.keys(DIM_LABELS).filter(k => groups[k] && groups[k].n > 0);
   const dimHtml = dimKeys.length === 0 ? '' :
-    `<div style="padding:6px 0 2px;font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase">— by dominant dimension —</div>` +
+    `<div style="padding:6px 0 2px;font-size:10px;letter-spacing:.2px;color:var(--muted)">By dominant dimension</div>` +
     dimKeys.map(k => _segRow(DIM_LABELS[k], groups[k], true)).join('');
 
   document.getElementById('ad-seg-rows').innerHTML = (rowsHtml + dimHtml) ||
@@ -2623,14 +2615,14 @@ function renderAnalyticsExplain(d) {
 
   // Wins column
   html += '<div style="flex:1;min-width:260px">';
-  html += '<div style="font-size:10px;letter-spacing:1.5px;color:var(--green);margin-bottom:6px;font-weight:600">✓ WHAT\'S WORKING</div>';
+  html += '<div style="font-size:11px;letter-spacing:.2px;color:var(--green);margin-bottom:6px;font-weight:600">✓ What\'s working</div>';
   html += wins.length ? wins.map(w => bullet(w, 'var(--green)')).join('')
                       : '<div style="color:var(--muted2);font-size:11px">—</div>';
   html += '</div>';
 
   // Concerns column
   html += '<div style="flex:1;min-width:260px">';
-  html += '<div style="font-size:10px;letter-spacing:1.5px;color:var(--red);margin-bottom:6px;font-weight:600">⚠ WHAT NEEDS WORK</div>';
+  html += '<div style="font-size:11px;letter-spacing:.2px;color:var(--red);margin-bottom:6px;font-weight:600">⚠ Needs attention</div>';
   html += concerns.length ? concerns.map(c => bullet(c, 'var(--red)')).join('')
                           : '<div style="color:var(--muted2);font-size:11px">—</div>';
   html += '</div>';
@@ -2641,7 +2633,7 @@ function renderAnalyticsExplain(d) {
   if (bottom) {
     html += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--muted);' +
             'font-size:12px;color:var(--text);font-style:italic">' +
-            '<span style="color:var(--orange);font-style:normal;font-weight:600;font-size:10px;letter-spacing:1.5px;margin-right:8px">BOTTOM LINE</span>' +
+            '<span style="color:var(--orange);font-style:normal;font-weight:700;font-size:11px;letter-spacing:.2px;margin-right:8px">Bottom line</span>' +
             bottom + '</div>';
   }
 
@@ -3244,7 +3236,7 @@ function _stageDetail(s) {
     const dimKeys = Object.keys(rawIc);
     if (dimKeys.length) {
       rows += `<div style="margin-top:8px">
-        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:5px">IC BY DIMENSION</div>
+        <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2);margin-bottom:5px">IC by dimension</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px">
           ${dimKeys.map(dim => {
             const v = rawIc[dim];
@@ -3268,7 +3260,7 @@ function _stageDetail(s) {
     const blocked = mm.blocked_conditions || [];
     if (drivers.length) {
       rows += `<div style="margin-top:6px">
-        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:4px">ACTIVE DRIVERS</div>
+        <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2);margin-bottom:4px">Active drivers</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px">${drivers.map(d =>
           `<span style="padding:2px 6px;border-radius:3px;background:var(--orange)22;border:1px solid var(--orange)44;font-size:10px;color:var(--orange);font-family:'JetBrains Mono',monospace">${d}</span>`
         ).join('')}</div>
@@ -3521,13 +3513,13 @@ function _buildUniDetail(c, rowId) {
 
   const confirmList = confs.length
     ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05)">
-         <div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">What confirms the thesis</div>
+         <div style="font-size:10px;letter-spacing:.2px;color:var(--muted);margin-bottom:5px">What confirms the thesis</div>
          <ul style="margin:0;padding-left:14px">${confs.map(cc => `<li style="font-size:9px;color:var(--muted2);padding:1.5px 0;line-height:1.5">${esc(cc.replace(/_/g,' '))}</li>`).join('')}</ul>
        </div>` : '';
 
   const weakensList = risks.length
     ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05)">
-         <div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">What weakens the thesis</div>
+         <div style="font-size:10px;letter-spacing:.2px;color:var(--muted);margin-bottom:5px">What weakens the thesis</div>
          <ul style="margin:0;padding-left:14px">${risks.slice(0,3).map(r => {
            const info = _RISK_DETAIL[r];
            return `<li style="font-size:9px;color:var(--muted2);padding:1.5px 0;line-height:1.5">${esc(info ? info.whatHelps ? `If ${info.whatHelps.toLowerCase()} fails` : info.meaning : _riskLabel(r))}</li>`;
@@ -3541,7 +3533,7 @@ function _buildUniDetail(c, rowId) {
 
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px 0 4px">
     <div>
-      <div style="font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Why selected</div>
+      <div style="font-size:10px;letter-spacing:.2px;color:var(--muted);margin-bottom:6px">Why selected</div>
       <div style="font-size:10px;color:var(--text);line-height:1.55">${esc(fullNote)}</div>
       ${driver ? `<div style="font-size:9px;color:var(--muted2);margin-top:6px">↳ Activated by: <span style="color:var(--green)">${esc(driver)}</span></div>` : ''}
       ${scoreExplain}
@@ -3550,7 +3542,7 @@ function _buildUniDetail(c, rowId) {
     </div>
     <div>
       ${risks.length
-        ? `<div style="font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Risks explained</div>${riskRows}`
+        ? `<div style="font-size:10px;letter-spacing:.2px;color:var(--muted);margin-bottom:6px">Risks explained</div>${riskRows}`
         : `<div style="font-size:10px;color:var(--muted2)">No significant risk flags.</div>`}
     </div>
   </div>`;
@@ -3869,7 +3861,7 @@ function _renderMarketStory(drivers, themes) {
 
   const block = (label, content, accent) =>
     `<div style="padding:12px 14px;background:rgba(0,0,0,0.18);border-radius:5px;border-left:2px solid ${accent||'rgba(255,255,255,0.12)'}">
-       <div style="font-size:8px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;font-family:'JetBrains Mono',monospace">${label}</div>
+       <div style="font-size:10px;letter-spacing:.2px;color:var(--muted);margin-bottom:4px;font-family:'JetBrains Mono',monospace">${label}</div>
        <div style="font-size:11px;color:var(--text);line-height:1.5">${content}</div>
      </div>`;
 
@@ -4049,8 +4041,8 @@ function _renderMarketForcesCards(drivers, evidence, blocked, themes, candidates
         : dormantWatch}
       ${themeChips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">${themeChips}</div>` : ''}
       <div id="${cardId}-exp" style="display:none;border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;margin-top:8px">
-        ${detail.invalidation ? `<div style="margin-bottom:8px"><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px">Invalidation triggers</div><div style="font-size:10px;color:var(--muted2);line-height:1.4">${esc(detail.invalidation)}</div></div>` : ''}
-        ${forceCands.length ? `<div style="margin-top:4px"><div style="font-size:8px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Symbols in this force (${forceCands.length})</div><div style="display:flex;flex-wrap:wrap;gap:4px">${forceCands.slice(0,12).map(c=>`<span style="font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--text)">${esc(c.symbol)}</span>`).join('')}${forceCands.length>12?`<span style="font-size:9px;color:var(--muted2)">+${forceCands.length-12}</span>`:''}</div></div>` : ''}
+        ${detail.invalidation ? `<div style="margin-bottom:8px"><div style="font-size:10px;letter-spacing:.2px;color:var(--muted);margin-bottom:3px">Invalidation triggers</div><div style="font-size:10px;color:var(--muted2);line-height:1.4">${esc(detail.invalidation)}</div></div>` : ''}
+        ${forceCands.length ? `<div style="margin-top:4px"><div style="font-size:10px;letter-spacing:.2px;color:var(--muted);margin-bottom:4px">Symbols in this force (${forceCands.length})</div><div style="display:flex;flex-wrap:wrap;gap:4px">${forceCands.slice(0,12).map(c=>`<span style="font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--text)">${esc(c.symbol)}</span>`).join('')}${forceCands.length>12?`<span style="font-size:9px;color:var(--muted2)">+${forceCands.length-12}</span>`:''}</div></div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -4086,7 +4078,7 @@ function _renderThemeMapCards(themes, candidates) {
   const section = (title, color, items, dim) => {
     if (!items.length) return '';
     return `<div style="margin-bottom:20px">
-      <div style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:${color};margin-bottom:8px;font-family:'JetBrains Mono',monospace;font-weight:700;padding-bottom:4px;border-bottom:1px solid ${color}22">${esc(title)} <span style="opacity:0.6">(${items.length})</span></div>
+      <div style="font-size:11px;letter-spacing:.2px;color:${color};margin-bottom:8px;font-family:'JetBrains Mono',monospace;font-weight:700;padding-bottom:4px;border-bottom:1px solid ${color}22">${esc(title)} <span style="opacity:0.6">(${items.length})</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
         ${items.map(t => _buildThemeCard(t, candidates, dim)).join('')}
       </div>
@@ -4156,9 +4148,9 @@ function _buildThemeCard(t, candidates, dim) {
     </div>
     ${confBar}
     ${cands != null && cands > 0 ? `<div style="font-size:9px;color:var(--muted2);margin-bottom:5px">${cands} candidate${cands!==1?'s':''} in universe</div>` : ''}
-    ${byChips ? `<div style="margin-bottom:5px"><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Activated by</div><div style="display:flex;flex-wrap:wrap;gap:3px">${byChips}</div></div>` : ''}
-    ${symChips ? `<div style="margin-bottom:5px"><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Symbols</div><div style="display:flex;flex-wrap:wrap;gap:3px">${symChips}</div></div>` : ''}
-    ${riskChips ? `<div style="margin-bottom:${dormantBlock?'0':'4px'}"><div style="font-size:7px;color:var(--muted);margin-bottom:2px;letter-spacing:0.06em;text-transform:uppercase">Risks</div><div style="display:flex;flex-wrap:wrap;gap:3px">${riskChips}</div></div>` : ''}
+    ${byChips ? `<div style="margin-bottom:5px"><div style="font-size:9px;color:var(--muted);margin-bottom:2px;letter-spacing:.2px">Activated by</div><div style="display:flex;flex-wrap:wrap;gap:3px">${byChips}</div></div>` : ''}
+    ${symChips ? `<div style="margin-bottom:5px"><div style="font-size:9px;color:var(--muted);margin-bottom:2px;letter-spacing:.2px">Symbols</div><div style="display:flex;flex-wrap:wrap;gap:3px">${symChips}</div></div>` : ''}
+    ${riskChips ? `<div style="margin-bottom:${dormantBlock?'0':'4px'}"><div style="font-size:9px;color:var(--muted);margin-bottom:2px;letter-spacing:.2px">Risks</div><div style="display:flex;flex-wrap:wrap;gap:3px">${riskChips}</div></div>` : ''}
     ${dormantBlock}
   </div>`;
 }
@@ -4633,7 +4625,7 @@ function loadHealth() {
         const severityColor = sev => sev === 'error' ? 'var(--red)' : sev === 'warn' ? 'var(--orange)' : 'var(--muted2)';
         const severityIcon = sev => sev === 'error' ? '✗' : sev === 'warn' ? '▲' : 'ℹ';
         issuesEl.innerHTML = `
-          <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase;margin-bottom:8px">Active Issues</div>
+          <div style="font-size:12px;font-weight:700;letter-spacing:.2px;color:var(--text);margin-bottom:8px">Active issues</div>
           <div style="display:flex;flex-direction:column;gap:6px">
             ${issues.map(iss => {
               const sc = severityColor(iss.severity);
@@ -5211,12 +5203,12 @@ function buildTradeExplanation(t) {
     const dims = Object.entries(t.score_breakdown);
     const maxVal = Math.max(...dims.map(([,v]) => Math.abs(v || 0)), 1);
     story += `<div style="margin-bottom:10px">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:4px">SIGNAL DIMENSIONS</div>
+      <div style="font-size:10px;letter-spacing:.2px;color:var(--muted2);margin-bottom:4px">Signal breakdown</div>
       ${dims.map(([dim, val]) => {
         const pct = Math.min(Math.abs((val || 0) / maxVal) * 100, 100);
         const barColor = (val || 0) >= 0 ? 'var(--green)' : 'var(--red)';
         return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-          <div style="width:60px;font-size:9px;color:var(--muted2);text-transform:uppercase">${dim}</div>
+          <div style="width:60px;font-size:9px;color:var(--muted2)">${dim}</div>
           <div style="flex:1;height:4px;background:var(--border2);border-radius:2px">
             <div style="width:${pct}%;height:100%;background:${barColor};border-radius:2px"></div>
           </div>
@@ -5759,7 +5751,13 @@ async function poll() {
     if (d.status === 'running') { pill.className = 'pill pg'; stat.textContent = 'Running ●'; }
     else if (d.ibkr_disconnected) { pill.className = 'pill pr'; stat.textContent = 'TWS Disconnected'; }
     else { pill.className = 'pill pr'; stat.textContent = 'Stopped'; }
-    document.getElementById('upd-time').textContent = 'Updated ' + new Date().toTimeString().slice(0, 8);
+    (function(){
+      const now = new Date();
+      const et = now.toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit',hour12:true});
+      const local = now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+      const tzAbbr = now.toLocaleDateString('en-US',{timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,timeZoneName:'short'}).split(', ').pop() || 'local';
+      document.getElementById('upd-time').textContent = et + ' ET · ' + local + ' ' + tzAbbr;
+    })();
 
     // Stats
     document.getElementById('s-val').textContent    = d.portfolio_value ? fmt$(d.portfolio_value) : '—';
@@ -5784,7 +5782,7 @@ async function poll() {
     document.getElementById('s-session').textContent = _SESSION_LABELS[rawSession] || rawSession;
     document.getElementById('s-scans').textContent   = d.scan_count || 0;
     // Show last scan time with ET hint
-    document.getElementById('s-last').textContent    = d.last_scan ? 'Last scan (ET): ' + d.last_scan : '—';
+    document.getElementById('s-last').textContent    = d.last_scan ? 'Last: ' + d.last_scan + ' ET' : '—';
     document.getElementById('s-pos').textContent     = (d.positions || []).length;
     document.getElementById('s-trades').textContent  = (d.all_trades || []).length;
     if (d.performance) {
@@ -6690,7 +6688,7 @@ async function loadCatalyst() {
       }).join('');
       edgarHtml = `
       <div style="margin-top:16px">
-        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);padding:6px 0 8px;border-bottom:1px solid var(--border)">SEC EDGAR Events — 13D / 13G / Form 4</div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.2px;color:var(--muted2);padding:6px 0 8px;border-bottom:1px solid var(--border)">SEC filings — 13D / 13G / Form 4</div>
         <table class="edgar-tbl">
           <thead><tr><th></th><th>Ticker</th><th>Form</th><th>Company</th><th>Date</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -7191,7 +7189,7 @@ function _renderApexConvoEntry(msg) {
 
   const regimeBox = regime
     ? `<div style="flex:1;min-width:180px;padding:10px 14px;border-radius:5px;background:${regime.color}11;border:1px solid ${regime.color}44">
-        <div style="font-size:9px;letter-spacing:1.2px;color:${regime.color};text-transform:uppercase;margin-bottom:4px;font-weight:700">Market Regime</div>
+        <div style="font-size:10px;letter-spacing:.2px;color:${regime.color};margin-bottom:4px;font-weight:700">Market regime</div>
         <div style="font-size:13px;font-weight:700;color:${regime.color};margin-bottom:4px">${esc(regime.label)}</div>
         <div style="font-size:11px;color:var(--muted2);line-height:1.4">${esc(regime.desc)}</div>
       </div>`
@@ -7199,7 +7197,7 @@ function _renderApexConvoEntry(msg) {
 
   const macroBox = macro
     ? `<div style="flex:1;min-width:160px;padding:10px 14px;border-radius:5px;background:${macro.color}11;border:1px solid ${macro.color}44">
-        <div style="font-size:9px;letter-spacing:1.2px;color:${macro.color};text-transform:uppercase;margin-bottom:4px;font-weight:700">Macro Picture</div>
+        <div style="font-size:10px;letter-spacing:.2px;color:${macro.color};margin-bottom:4px;font-weight:700">Macro picture</div>
         <div style="font-size:13px;font-weight:700;color:${macro.color};margin-bottom:4px">${esc(macro.label)}</div>
         <div style="font-size:11px;color:var(--muted2);line-height:1.4">${esc(macro.desc)}</div>
       </div>`

@@ -273,6 +273,13 @@ export function buildFundamentalsLine(
     const direction = fundamentals.revenueGrowth >= 0 ? "growing" : "contracting";
     parts.push(`revenue ${direction} ${pct}% year over year`);
   }
+  if (fundamentals.eps != null) {
+    const epsStr =
+      fundamentals.eps >= 0
+        ? `$${fundamentals.eps.toFixed(2)}`
+        : `-$${Math.abs(fundamentals.eps).toFixed(2)}`;
+    parts.push(`trailing earnings per share ${epsStr}`);
+  }
 
   if (parts.length === 0) {
     return "Detailed financial context is not available from the current data source.";
@@ -313,15 +320,44 @@ export function buildAnalystLine(
 
 // ── Contextual Ask questions ──────────────────────────────────────────────────
 
-export function buildDetailQuestions(symbol: string, storyGroup: string): string[] {
-  // Translate raw theme IDs to customer-friendly labels defensively
+export function buildDetailQuestions(
+  symbol: string,
+  storyGroup: string,
+  companyName?: string,
+): string[] {
   const label = TTG_STORY_LABELS[storyGroup] ?? storyGroup;
+  const name = companyName && companyName !== symbol ? companyName : symbol;
   return [
-    `Why is ${symbol} connected to the ${label} story?`,
-    `What would weaken the case for ${symbol} in this market environment?`,
-    `Is ${symbol} moving because of fundamentals, market conditions, or theme momentum?`,
-    `What would need to change for ${symbol} to become more or less relevant here?`,
+    `Why is ${name} connected to the ${label} story?`,
+    `What could weaken the ${symbol} setup from here?`,
+    `Are ${symbol}'s current moves driven by fundamentals or broader market conditions?`,
+    `How does ${symbol} compare with other names in the ${label} space?`,
   ];
+}
+
+// ── Fresh price merge ─────────────────────────────────────────────────────────
+
+export function mergeFreshPrice(
+  fresh: NamePriceEntry | null,
+  existing: ResearchPriceAction,
+): ResearchPriceAction {
+  if (!fresh || fresh.changePct === null) return existing;
+  return buildPriceAction(fresh);
+}
+
+// ── Price freshness label ─────────────────────────────────────────────────────
+
+export function buildPriceFreshnessLabel(ts: string | null): string {
+  if (!ts) return "";
+  try {
+    const ms = new Date(ts).getTime();
+    if (isNaN(ms)) return "";
+    const ageMins = Math.floor((Date.now() - ms) / 60000);
+    if (ageMins < 2) return "Live";
+    return `${ageMins}m ago`;
+  } catch {
+    return "";
+  }
 }
 
 // ── Priority symbol list (for price fetch) ────────────────────────────────────

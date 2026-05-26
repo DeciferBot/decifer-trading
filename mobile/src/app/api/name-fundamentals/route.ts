@@ -29,10 +29,11 @@ export async function GET(req: NextRequest) {
   const base = "https://financialmodelingprep.com/stable";
   const key = `apikey=${FMP_KEY}`;
 
-  const [profileResult, metricsResult, analystResult] = await Promise.allSettled([
+  const [profileResult, metricsResult, analystResult, growthResult] = await Promise.allSettled([
     fetch(`${base}/profile?symbols=${symbol}&${key}`, CACHE_OPTS),
     fetch(`${base}/key-metrics-ttm?symbols=${symbol}&${key}`, CACHE_OPTS),
     fetch(`${base}/analyst-consensus?symbols=${symbol}&${key}`, CACHE_OPTS),
+    fetch(`${base}/financial-growth?symbols=${symbol}&period=annual&limit=1&${key}`, CACHE_OPTS),
   ]);
 
   // ── Profile ──────────────────────────────────────────────────────────────────
@@ -81,8 +82,12 @@ export async function GET(req: NextRequest) {
           typeof m.grossProfitMarginTTM === "number" && m.grossProfitMarginTTM > 0
             ? parseFloat(m.grossProfitMarginTTM.toFixed(4))
             : undefined;
-        if (pe !== undefined || gm !== undefined) {
-          fundamentals = { peRatio: pe, grossMargin: gm };
+        const eps =
+          typeof m.epsTTM === "number"
+            ? parseFloat(m.epsTTM.toFixed(2))
+            : undefined;
+        if (pe !== undefined || gm !== undefined || eps !== undefined) {
+          fundamentals = { peRatio: pe, grossMargin: gm, eps };
         }
       }
     } catch { /* graceful */ }
@@ -110,6 +115,20 @@ export async function GET(req: NextRequest) {
         if (consensus || ratingCount || priceTarget) {
           analyst = { consensus, ratingCount, priceTarget };
         }
+      }
+    } catch { /* graceful */ }
+  }
+
+  // ── Revenue growth (annual) ──────────────────────────────────────────────────
+  if (growthResult.status === "fulfilled" && growthResult.value.ok) {
+    try {
+      const data = await growthResult.value.json();
+      const g = Array.isArray(data) ? data[0] : data;
+      if (g && typeof g.revenueGrowth === "number") {
+        fundamentals = {
+          ...(fundamentals ?? {}),
+          revenueGrowth: parseFloat(g.revenueGrowth.toFixed(4)),
+        };
       }
     } catch { /* graceful */ }
   }

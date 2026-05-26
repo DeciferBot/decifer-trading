@@ -5,12 +5,15 @@
 
 import { useState, useEffect } from "react";
 import { X, ArrowRight } from "lucide-react";
+import type { NamePriceEntry } from "@/lib/namePriceUtils";
 import type { ResearchNameCard, NameFundamentalsResponse } from "@/lib/nameResearchModel";
 import {
   buildCompanyLine,
   buildFundamentalsLine,
   buildAnalystLine,
   buildDetailQuestions,
+  mergeFreshPrice,
+  buildPriceFreshnessLabel,
 } from "@/lib/nameResearchModel";
 
 // ── Loading skeleton ───────────────────────────────────────────────────────────
@@ -64,21 +67,38 @@ interface Props {
 export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) {
   const [fundData, setFundData] = useState<NameFundamentalsResponse | null>(null);
   const [fundLoading, setFundLoading] = useState(true);
+  const [freshPrice, setFreshPrice] = useState<NamePriceEntry | null>(null);
+  const [priceTs, setPriceTs] = useState<string | null>(null);
 
+  // Fetch fundamentals — keyed by symbol in parent so never mid-mount change
   useEffect(() => {
     let cancelled = false;
-
-    // Component is keyed by card.symbol in parent so symbol never changes mid-mount.
-    // The cancelled flag guards against unmount races during async fetch.
     const run = async () => {
       try {
         const res = await fetch(`/api/name-fundamentals?symbol=${encodeURIComponent(card.symbol)}`);
         if (!cancelled) setFundData(res.ok ? await res.json() : null);
-      } catch { /* graceful — fundData stays null */ } finally {
+      } catch { /* graceful */ } finally {
         if (!cancelled) setFundLoading(false);
       }
     };
+    run();
+    return () => { cancelled = true; };
+  }, [card.symbol]);
 
+  // Refresh latest price on sheet open — fails gracefully, card.priceAction used as fallback
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch(`/api/name-prices?symbols=${encodeURIComponent(card.symbol)}`);
+        if (!cancelled && res.ok) {
+          const json: { prices: NamePriceEntry[]; ts: string } = await res.json();
+          const entry = json.prices.find(p => p.symbol === card.symbol) ?? null;
+          setFreshPrice(entry);
+          setPriceTs(json.ts);
+        }
+      } catch { /* graceful — freshPrice stays null, card.priceAction used */ }
+    };
     run();
     return () => { cancelled = true; };
   }, [card.symbol]);
@@ -86,9 +106,15 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
   const companyLine = buildCompanyLine(card.symbol, fundData?.profile, card.storyGroup);
   const fundamentalsLine = buildFundamentalsLine(fundData?.fundamentals);
   const analystLine = buildAnalystLine(fundData?.analyst);
-  const questions = buildDetailQuestions(card.symbol, card.storyGroup);
+  const questions = buildDetailQuestions(
+    card.symbol,
+    card.storyGroup,
+    card.companyName !== card.symbol ? card.companyName : undefined,
+  );
 
-  const { tone, displayText, price } = card.priceAction;
+  const priceAction = mergeFreshPrice(freshPrice, card.priceAction);
+  const freshnessLabel = buildPriceFreshnessLabel(priceTs);
+  const { tone, displayText, price } = priceAction;
   const priceColor =
     tone === "positive" ? "#34d399" : tone === "negative" ? "#f87171" : "#94a3b8";
 
@@ -140,6 +166,11 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
                       ${price.toFixed(2)}
                     </span>
                   )}
+                  {freshnessLabel && (
+                    <span className="text-slate-600 font-normal ml-1.5 text-[9px]">
+                      {freshnessLabel}
+                    </span>
+                  )}
                 </span>
               )}
             </div>
@@ -175,7 +206,7 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
 
           {/* Why connected */}
           <section>
-            <SectionLabel>Why this name is in the story</SectionLabel>
+            <SectionLabel>Why it matters now</SectionLabel>
             <p className="text-[12px] text-slate-300 leading-relaxed">{card.reasonToCare}</p>
           </section>
 
@@ -208,7 +239,7 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
           {/* Analyst context — shown only when data loaded */}
           {!fundLoading && (fundData?.analyst || fundData?.available === false) && (
             <section>
-              <SectionLabel>Analyst context</SectionLabel>
+              <SectionLabel>Market view</SectionLabel>
               <p className="text-[12px] text-slate-400 leading-relaxed">{analystLine}</p>
             </section>
           )}
@@ -222,7 +253,7 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
                 border: "1px solid rgba(245,158,11,0.15)",
               }}
             >
-              <SectionLabel>Risk note</SectionLabel>
+              <SectionLabel>Risk to watch</SectionLabel>
               <p className="text-[11px] leading-relaxed" style={{ color: "#fbbf24" }}>
                 {card.riskNote}
               </p>
@@ -231,7 +262,7 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
 
           {/* Suggested questions */}
           <section>
-            <SectionLabel>Questions to ask Decifer</SectionLabel>
+            <SectionLabel>Ask Decifer</SectionLabel>
             <div className="space-y-1.5">
               {questions.map((q, i) => (
                 <button

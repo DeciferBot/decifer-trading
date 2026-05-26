@@ -13,6 +13,8 @@ import {
   buildFundamentalsLine,
   buildAnalystLine,
   buildDetailQuestions,
+  mergeFreshPrice,
+  buildPriceFreshnessLabel,
   type NameFundamentalsResponse,
 } from "./nameResearchModel";
 import { parseSymbols, MAX_SYMBOLS } from "./namePriceUtils";
@@ -642,6 +644,169 @@ describe("buildDetailQuestions", () => {
   it("each question is a non-empty string", () => {
     for (const q of buildDetailQuestions(SYMBOL, STORY)) {
       expect(q.trim().length).toBeGreaterThan(10);
+    }
+  });
+});
+
+// ── buildDetailQuestions — M13F extensions ────────────────────────────────────
+
+describe("buildDetailQuestions — companyName param", () => {
+  it("uses company name in first question when provided and differs from symbol", () => {
+    const qs = buildDetailQuestions("NVDA", "AI Infrastructure & Energy", "NVIDIA Corporation");
+    expect(qs[0]).toContain("NVIDIA Corporation");
+    expect(qs[0]).not.toContain("NVDA");
+  });
+
+  it("falls back to symbol when companyName equals symbol", () => {
+    const qs = buildDetailQuestions("NVDA", "AI Infrastructure & Energy", "NVDA");
+    expect(qs[0]).toContain("NVDA");
+  });
+
+  it("falls back to symbol when companyName is undefined", () => {
+    const qs = buildDetailQuestions("NVDA", "AI Infrastructure & Energy", undefined);
+    expect(qs[0]).toContain("NVDA");
+  });
+
+  it("returns 4 questions regardless of companyName", () => {
+    expect(buildDetailQuestions("NVDA", "AI Infrastructure & Energy", "NVIDIA").length).toBe(4);
+    expect(buildDetailQuestions("NVDA", "AI Infrastructure & Energy").length).toBe(4);
+  });
+
+  it("contains no forbidden execution language with company name present", () => {
+    const forbidden = ["buy", "sell", "order", "position", "entry", "exit", "broker", "stop loss"];
+    for (const q of buildDetailQuestions("NVDA", "AI Infrastructure & Energy", "NVIDIA Corporation")) {
+      for (const w of forbidden) {
+        expect(q.toLowerCase()).not.toContain(w);
+      }
+    }
+  });
+});
+
+// ── mergeFreshPrice ───────────────────────────────────────────────────────────
+
+describe("mergeFreshPrice", () => {
+  const existingPositive = buildPriceAction({ symbol: "NVDA", price: 900, changePct: 2.0 });
+  const existingUnknown  = buildPriceAction(null);
+
+  it("returns existing when fresh is null", () => {
+    const result = mergeFreshPrice(null, existingPositive);
+    expect(result).toBe(existingPositive);
+  });
+
+  it("returns existing when fresh changePct is null", () => {
+    const result = mergeFreshPrice({ symbol: "NVDA", price: 910, changePct: null }, existingPositive);
+    expect(result).toBe(existingPositive);
+  });
+
+  it("returns fresh price action when changePct is positive", () => {
+    const fresh = { symbol: "NVDA", price: 950, changePct: 3.5 };
+    const result = mergeFreshPrice(fresh, existingUnknown);
+    expect(result.tone).toBe("positive");
+    expect(result.price).toBe(950);
+    expect(result.changePct).toBe(3.5);
+    expect(result.displayText).toBe("Up 3.5% today");
+  });
+
+  it("returns fresh price action when changePct is negative", () => {
+    const fresh = { symbol: "NVDA", price: 850, changePct: -2.1 };
+    const result = mergeFreshPrice(fresh, existingPositive);
+    expect(result.tone).toBe("negative");
+    expect(result.displayText).toBe("Down 2.1% today");
+  });
+
+  it("overrides an unknown existing tone with a known fresh tone", () => {
+    const fresh = { symbol: "NVDA", price: 920, changePct: 0.1 };
+    const result = mergeFreshPrice(fresh, existingUnknown);
+    expect(result.tone).toBe("neutral");
+    expect(result.displayText).toBe("Flat today");
+  });
+});
+
+// ── buildPriceFreshnessLabel ──────────────────────────────────────────────────
+
+describe("buildPriceFreshnessLabel", () => {
+  it("returns empty string for null", () => {
+    expect(buildPriceFreshnessLabel(null)).toBe("");
+  });
+
+  it("returns 'Live' for a timestamp less than 2 minutes ago", () => {
+    const ts = new Date(Date.now() - 30_000).toISOString(); // 30 sec ago
+    expect(buildPriceFreshnessLabel(ts)).toBe("Live");
+  });
+
+  it("returns 'Live' for a timestamp 1 minute ago", () => {
+    const ts = new Date(Date.now() - 60_000).toISOString();
+    expect(buildPriceFreshnessLabel(ts)).toBe("Live");
+  });
+
+  it("returns 'Xm ago' for a timestamp 5 minutes ago", () => {
+    const ts = new Date(Date.now() - 5 * 60_000).toISOString();
+    expect(buildPriceFreshnessLabel(ts)).toBe("5m ago");
+  });
+
+  it("returns empty string for an unparseable timestamp", () => {
+    expect(buildPriceFreshnessLabel("not-a-date")).toBe("");
+  });
+
+  it("contains no forbidden execution language", () => {
+    const ts = new Date(Date.now() - 10_000).toISOString();
+    const label = buildPriceFreshnessLabel(ts);
+    const forbidden = ["buy", "sell", "order", "broker", "account"];
+    for (const w of forbidden) {
+      expect(label.toLowerCase()).not.toContain(w);
+    }
+  });
+});
+
+// ── buildFundamentalsLine — M13F extensions ───────────────────────────────────
+
+describe("buildFundamentalsLine — EPS and revenueGrowth", () => {
+  it("includes EPS when positive and available", () => {
+    const line = buildFundamentalsLine({ eps: 4.85 });
+    expect(line).toContain("$4.85");
+    expect(line).toContain("earnings per share");
+  });
+
+  it("includes EPS with negative sign when negative", () => {
+    const line = buildFundamentalsLine({ eps: -0.32 });
+    expect(line).toContain("-$0.32");
+  });
+
+  it("does not include EPS line when eps is absent", () => {
+    const line = buildFundamentalsLine({ peRatio: 30 });
+    expect(line).not.toContain("earnings per share");
+  });
+
+  it("shows growing revenue when revenueGrowth is positive", () => {
+    const line = buildFundamentalsLine({ revenueGrowth: 0.18, grossMargin: 0.6 });
+    expect(line).toContain("growing");
+    expect(line).toContain("18%");
+  });
+
+  it("does not fabricate revenue growth when absent", () => {
+    const line = buildFundamentalsLine({ peRatio: 25, grossMargin: 0.55 });
+    expect(line).not.toContain("growing");
+    expect(line).not.toContain("contracting");
+  });
+
+  it("combines PE, grossMargin, revenueGrowth, and EPS in one sentence", () => {
+    const line = buildFundamentalsLine({
+      peRatio: 35,
+      grossMargin: 0.74,
+      revenueGrowth: 0.22,
+      eps: 3.50,
+    });
+    expect(line).toContain("35");
+    expect(line).toContain("74%");
+    expect(line).toContain("22%");
+    expect(line).toContain("$3.50");
+  });
+
+  it("contains no forbidden execution language with EPS present", () => {
+    const line = buildFundamentalsLine({ eps: 5.00, revenueGrowth: 0.10 });
+    const forbidden = ["buy", "sell", "order", "broker", "account", "stop loss", "conviction"];
+    for (const w of forbidden) {
+      expect(line.toLowerCase()).not.toContain(w);
     }
   });
 });
