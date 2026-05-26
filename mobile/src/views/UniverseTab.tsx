@@ -90,9 +90,9 @@ export default function UniverseTab({ data, onNameSelect, onThemeSelect }: Props
   if (radar.length === 0) {
     return (
       <div className="px-4 pt-12 flex flex-col items-center gap-3 text-center">
-        <p className="text-slate-500 text-sm">No names on the intelligence map right now.</p>
-        <p className="text-xs text-slate-600">
-          Names appear when themes activate and evidence builds.
+        <p className="text-slate-400 text-sm">No names on the intelligence map right now.</p>
+        <p className="text-xs text-slate-600 leading-relaxed max-w-xs">
+          Names appear when active themes identify connected companies. Check the Theme Map tab as markets open.
         </p>
       </div>
     );

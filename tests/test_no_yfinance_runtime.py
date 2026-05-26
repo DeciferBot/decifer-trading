@@ -142,6 +142,7 @@ def test_factor_analysis_no_yfinance():
 # Each exception must have a documented reason in the file's module docstring.
 _YFINANCE_APPROVED = {
     "futures_data.py",                        # ES=F / NQ=F — not available via Alpaca or FMP Premium
+    "live_driver_resolver.py",                # Alpaca fallback for cloud server / weekend market closure (Amit approval 2026-05-26)
     "verify_customer_event_tape_safety.py",   # false positive — string appears in docstring only, no actual import
 }
 

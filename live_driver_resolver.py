@@ -44,6 +44,14 @@ blocked_conditions:
 Futures sensors (ES=F, NQ=F) are fetched via futures_data.py (yfinance) after
 the 11-sensor core block. They do not affect the fail-closed count or degraded
 mode, and are not wired into transmission_rules.json — evidence/narrative only.
+
+Data fetch strategy (approved yfinance exception):
+  _fetch_5d_return and _fetch_latest_close use Alpaca as the primary source.
+  When Alpaca returns None (cloud server, weekend market closure, missing creds),
+  yfinance is used as a fallback for the 9+2 ETF sensors. This mirrors the
+  futures_data.py pattern and is listed in tests/test_no_yfinance_runtime.py
+  _YFINANCE_APPROVED. The fail-closed guarantee is preserved: if both Alpaca
+  and yfinance fail, the sensor returns None and the fail-closed path fires.
 """
 from __future__ import annotations
 
@@ -65,39 +73,70 @@ _FALLBACK_ACTIVE_DRIVERS: list[str] = []
 _FALLBACK_BLOCKED: list[str] = []
 
 
+def _compute_5d_return(close_series) -> float | None:
+    """Compute 5-day return from a Close series."""
+    import pandas as pd
+    s = pd.Series(close_series).dropna()
+    if len(s) < 2:
+        return None
+    n = min(5, len(s) - 1)
+    return round(float(s.iloc[-1]) / float(s.iloc[-(n + 1)]) - 1, 6)
+
+
 def _fetch_5d_return(symbol: str) -> float | None:
-    """Fetch 5-day price return for a symbol. Returns None on failure."""
+    """Fetch 5-day price return. Primary: Alpaca. Fallback: yfinance."""
+    # Primary: Alpaca via scanner._regime_download
     try:
         from scanner import _regime_download
         df = _regime_download(symbol, period="10d", interval="1d")
-        if df is None or len(df) < 2:
-            return None
-        close = df["Close"].squeeze().dropna()
-        if len(close) < 2:
-            return None
-        # Use last 5 bars or all available if fewer
-        n = min(5, len(close) - 1)
-        ret = float(close.iloc[-1]) / float(close.iloc[-(n + 1)]) - 1
-        return round(ret, 6)
+        if df is not None and len(df) >= 2:
+            ret = _compute_5d_return(df["Close"].squeeze())
+            if ret is not None:
+                return ret
     except Exception as exc:
-        log.debug("_fetch_5d_return %s failed: %s", symbol, exc)
-        return None
+        log.debug("_fetch_5d_return %s Alpaca failed: %s", symbol, exc)
+
+    # Fallback: yfinance (cloud server / weekend market closure)
+    try:
+        import yfinance as yf
+        df = yf.download(symbol, period="10d", interval="1d", progress=False, auto_adjust=True)
+        if df is not None and len(df) >= 2:
+            ret = _compute_5d_return(df["Close"].squeeze())
+            if ret is not None:
+                log.debug("_fetch_5d_return %s: yfinance fallback used", symbol)
+                return ret
+    except Exception as exc:
+        log.debug("_fetch_5d_return %s yfinance fallback failed: %s", symbol, exc)
+
+    return None
 
 
 def _fetch_latest_close(symbol: str) -> float | None:
-    """Fetch the latest close price for a symbol."""
+    """Fetch the latest close price. Primary: Alpaca. Fallback: yfinance."""
+    # Primary: Alpaca
     try:
         from scanner import _regime_download
         df = _regime_download(symbol, period="5d", interval="1d")
-        if df is None or len(df) < 1:
-            return None
-        close = df["Close"].squeeze().dropna()
-        if len(close) < 1:
-            return None
-        return float(close.iloc[-1])
+        if df is not None and len(df) >= 1:
+            close = df["Close"].squeeze().dropna()
+            if len(close) >= 1:
+                return float(close.iloc[-1])
     except Exception as exc:
-        log.debug("_fetch_latest_close %s failed: %s", symbol, exc)
-        return None
+        log.debug("_fetch_latest_close %s Alpaca failed: %s", symbol, exc)
+
+    # Fallback: yfinance
+    try:
+        import yfinance as yf
+        df = yf.download(symbol, period="5d", interval="1d", progress=False, auto_adjust=True)
+        if df is not None and len(df) >= 1:
+            close = df["Close"].squeeze().dropna()
+            if len(close) >= 1:
+                log.debug("_fetch_latest_close %s: yfinance fallback used", symbol)
+                return float(close.iloc[-1])
+    except Exception as exc:
+        log.debug("_fetch_latest_close %s yfinance fallback failed: %s", symbol, exc)
+
+    return None
 
 
 def resolve(output_path: str = _OUTPUT_PATH) -> dict:

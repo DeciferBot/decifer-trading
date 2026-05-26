@@ -132,7 +132,7 @@ export default function CustomerApp() {
       </header>
 
       {/* ── Tab navigation ────────────────────────────────────────────────── */}
-      <nav className="shrink-0 px-4 pb-3">
+      <nav className="shrink-0 px-4 pb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <div
           className="flex gap-1 p-1 rounded-xl"
           style={{ background: "rgba(255,255,255,0.05)" }}

@@ -273,8 +273,10 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
   if (themes.length === 0) {
     return (
       <div className="px-4 pt-12 flex flex-col items-center gap-3 text-center">
-        <p className="text-slate-500 text-sm">No themes identified right now.</p>
-        <p className="text-xs text-slate-600">Check back when markets are active.</p>
+        <p className="text-slate-400 text-sm">No active themes right now.</p>
+        <p className="text-xs text-slate-600 leading-relaxed max-w-xs">
+          The intelligence pipeline is monitoring the market. Themes activate when price drivers and event evidence align — typically during market hours.
+        </p>
       </div>
     );
   }

@@ -207,10 +207,19 @@ export default function SignalsTab({ data, onThemeSelect }: Props) {
             </div>
           ) : (
             <div
-              className="rounded-xl p-8 text-center"
+              className="rounded-xl px-6 py-10 text-center space-y-2"
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
             >
-              <p className="text-sm text-slate-500">No {filter} signals right now.</p>
+              <p className="text-sm text-slate-400">
+                {filter === "all"
+                  ? "No signals right now."
+                  : `No ${filter} signals right now.`}
+              </p>
+              {filter === "all" && (
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  The intelligence pipeline is monitoring the market. Signals appear as themes activate — typically during market hours.
+                </p>
+              )}
             </div>
           )}
         </section>

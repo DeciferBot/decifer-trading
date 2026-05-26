@@ -12,12 +12,12 @@ import { translateTheme } from "@/lib/translate";
 function moodScheme(mood: string): { border: string; tag: string; text: string; bg: string } {
   const lower = mood.toLowerCase();
   if (lower.includes("risk-on") || lower.includes("de-escalat") || lower.includes("easing"))
-    return { border: "#10b981", tag: "Risk-On",        text: "#064e3b", bg: "#ecfdf5" };
+    return { border: "#10b981", tag: "Risk-On",        text: "#34d399", bg: "rgba(16,185,129,0.1)"   };
   if (lower.includes("risk-off") || lower.includes("stress") || lower.includes("panic"))
-    return { border: "#ef4444", tag: "Risk-Off",       text: "#7f1d1d", bg: "#fef2f2" };
+    return { border: "#ef4444", tag: "Risk-Off",       text: "#f87171", bg: "rgba(239,68,68,0.1)"    };
   if (lower.includes("mixed") || lower.includes("caution") || lower.includes("conflict"))
-    return { border: "#f59e0b", tag: "Mixed Signals",  text: "#78350f", bg: "#fffbeb" };
-  return   { border: "#e5e7eb", tag: "Monitoring",     text: "#1e293b", bg: "#f9fafb" };
+    return { border: "#f59e0b", tag: "Mixed Signals",  text: "#fbbf24", bg: "rgba(245,158,11,0.1)"   };
+  return   { border: "#334155", tag: "Monitoring",     text: "#94a3b8", bg: "rgba(255,255,255,0.04)" };
 }
 
 function resolveThemes(payload: MarketNowPayload): ThemeItem[] {
@@ -43,7 +43,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   return (
     <div
       className="rounded-2xl p-4"
-      style={{ background: "#ffffff", boxShadow: "0 1px 4px rgba(0,0,0,0.12)", ...style }}
+      style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.08)", ...style }}
     >
       {children}
     </div>
@@ -55,19 +55,19 @@ function EventCard({ ev }: { ev: KeyEvent }) {
   return (
     <div
       className="rounded-xl cursor-pointer transition-all"
-      style={{ background: "#fff", border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
+      style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.08)" }}
       onClick={() => setOpen(o => !o)}
     >
       <div className="p-3.5 flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-start gap-2">
-            <p className="text-[13px] font-semibold text-slate-800 leading-snug flex-1">
+            <p className="text-[13px] font-semibold text-slate-100 leading-snug flex-1">
               {ev.title}
             </p>
             {ev.materiality === "high" && (
               <span
                 className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
-                style={{ background: "#fef2f2", color: "#dc2626" }}
+                style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
               >
                 High impact
               </span>
@@ -79,9 +79,12 @@ function EventCard({ ev }: { ev: KeyEvent }) {
           : <ChevronDown size={14} className="text-slate-400 shrink-0 mt-0.5" />}
       </div>
       {open && (
-        <div className="px-3.5 pb-3.5 space-y-2.5 border-t border-slate-100 pt-3">
+        <div
+          className="px-3.5 pb-3.5 space-y-2.5 pt-3"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}
+        >
           {ev.summary_plain_english && (
-            <p className="text-xs text-slate-600 leading-relaxed">{ev.summary_plain_english}</p>
+            <p className="text-xs text-slate-300 leading-relaxed">{ev.summary_plain_english}</p>
           )}
           {((ev.likely_positive_exposures?.length ?? 0) > 0 ||
             (ev.likely_negative_exposures?.length ?? 0) > 0) && (
@@ -90,7 +93,7 @@ function EventCard({ ev }: { ev: KeyEvent }) {
                 <span
                   key={i}
                   className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: "#ecfdf5", color: "#065f46" }}
+                  style={{ background: "rgba(16,185,129,0.1)", color: "#34d399" }}
                 >
                   {s}
                 </span>
@@ -99,7 +102,7 @@ function EventCard({ ev }: { ev: KeyEvent }) {
                 <span
                   key={i}
                   className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: "#fef2f2", color: "#dc2626" }}
+                  style={{ background: "rgba(239,68,68,0.1)", color: "#f87171" }}
                 >
                   {s}
                 </span>
@@ -147,7 +150,6 @@ export default function TodayTab({ data, onThemeSelect }: Props) {
             style={{
               background: ms.bg,
               border: `1.5px solid ${ms.border}44`,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
             }}
           >
             <div className="flex items-center gap-2 mb-2">
@@ -172,12 +174,12 @@ export default function TodayTab({ data, onThemeSelect }: Props) {
               {whatChanged.map((item, i) => (
                 <li key={i} className="flex items-start gap-2.5">
                   <ArrowRight size={12} className="shrink-0 mt-0.5" style={{ color: "#f97316" }} />
-                  <p className="text-[13px] text-slate-700 leading-relaxed">{item}</p>
+                  <p className="text-[13px] text-slate-200 leading-relaxed">{item}</p>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-slate-400 text-center py-2">No significant changes detected yet.</p>
+            <p className="text-sm text-slate-500 text-center py-2">No significant changes detected yet.</p>
           )}
         </Card>
       </section>
@@ -191,10 +193,10 @@ export default function TodayTab({ data, onThemeSelect }: Props) {
               <div
                 key={i}
                 className="rounded-xl p-3.5 flex items-start gap-2.5"
-                style={{ background: "#fffbeb", border: "1px solid rgba(245,158,11,0.25)" }}
+                style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }}
               >
-                <AlertCircle size={13} className="text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-800 leading-relaxed">{conflict}</p>
+                <AlertCircle size={13} className="text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-300 leading-relaxed">{conflict}</p>
               </div>
             ))}
           </div>
@@ -225,7 +227,7 @@ export default function TodayTab({ data, onThemeSelect }: Props) {
                 className="px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all active:scale-95"
                 style={{
                   background: "rgba(249,115,22,0.12)",
-                  color: "#c2410c",
+                  color: "#fb923c",
                   border: "1px solid rgba(249,115,22,0.3)",
                 }}
               >
@@ -233,7 +235,7 @@ export default function TodayTab({ data, onThemeSelect }: Props) {
               </button>
             ))}
           </div>
-          <p className="text-[10px] text-slate-600 mt-2">
+          <p className="text-[10px] text-slate-500 mt-2">
             Tap a theme to explore it in the Theme Map.
           </p>
         </section>
@@ -248,7 +250,7 @@ export default function TodayTab({ data, onThemeSelect }: Props) {
               {watchNext.map((item, i) => (
                 <li key={i} className="flex items-start gap-2.5">
                   <Eye size={11} className="text-slate-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-600 leading-relaxed">{item}</p>
+                  <p className="text-xs text-slate-300 leading-relaxed">{item}</p>
                 </li>
               ))}
             </ul>
@@ -266,27 +268,29 @@ export default function TodayTab({ data, onThemeSelect }: Props) {
           >
             {Object.keys(sectionFreshness).length > 0 && (
               <div className="flex flex-wrap gap-2 mb-2">
-                {Object.entries(sectionFreshness).map(([section, entry]) => {
-                  const c =
-                    entry.status === "fresh"
-                      ? { bg: "rgba(16,185,129,0.1)",  text: "#10b981" }
-                      : entry.status === "stale" || entry.status === "delayed"
-                        ? { bg: "rgba(245,158,11,0.1)",  text: "#f59e0b" }
-                        : { bg: "rgba(255,255,255,0.05)", text: "#6b7280" };
-                  return (
-                    <span
-                      key={section}
-                      className="text-[9px] font-medium px-2 py-0.5 rounded"
-                      style={{ background: c.bg, color: c.text }}
-                    >
-                      {section.replace(/_/g, " ")}: {entry.status}
-                    </span>
-                  );
-                })}
+                {Object.entries(sectionFreshness)
+                  .filter(([, entry]) => entry.status !== "unknown")
+                  .map(([section, entry]) => {
+                    const c =
+                      entry.status === "fresh"
+                        ? { bg: "rgba(16,185,129,0.1)",   text: "#10b981" }
+                        : entry.status === "stale" || entry.status === "delayed"
+                          ? { bg: "rgba(245,158,11,0.1)", text: "#f59e0b" }
+                          : { bg: "rgba(255,255,255,0.05)", text: "#6b7280" };
+                    return (
+                      <span
+                        key={section}
+                        className="text-[9px] font-medium px-2 py-0.5 rounded"
+                        style={{ background: c.bg, color: c.text }}
+                      >
+                        {section.replace(/_/g, " ")}: {entry.status}
+                      </span>
+                    );
+                  })}
               </div>
             )}
             {sourceNotes.map((note, i) => (
-              <p key={i} className="text-[10px] text-slate-600">{note}</p>
+              <p key={i} className="text-[10px] text-slate-500">{note}</p>
             ))}
           </div>
         </section>
