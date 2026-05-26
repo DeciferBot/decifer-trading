@@ -192,6 +192,138 @@ export function buildRadarCards(
   }));
 }
 
+// ── Fundamentals response type (mirrors /api/name-fundamentals shape) ─────────
+
+export interface NameFundamentalsResponse {
+  symbol: string;
+  ts: string;
+  profile?: {
+    companyName?: string;
+    sector?: string;
+    industry?: string;
+    marketCap?: number;
+  };
+  fundamentals?: {
+    revenue?: number;
+    eps?: number;
+    peRatio?: number;
+    grossMargin?: number;
+    revenueGrowth?: number;
+  };
+  analyst?: {
+    consensus?: string;
+    priceTarget?: number;
+    ratingCount?: number;
+  };
+  available: boolean;
+  source: "fmp" | "none";
+}
+
+// ── Market cap formatting ─────────────────────────────────────────────────────
+
+export function formatMarketCap(marketCap?: number): string {
+  if (!marketCap || marketCap <= 0) return "Market cap not available.";
+  if (marketCap >= 1e12) return `$${(marketCap / 1e12).toFixed(1)} trillion`;
+  if (marketCap >= 1e9) return `$${Math.round(marketCap / 1e9)} billion`;
+  if (marketCap >= 1e6) return `$${Math.round(marketCap / 1e6)} million`;
+  return `$${marketCap.toLocaleString()}`;
+}
+
+// ── Company identity line ─────────────────────────────────────────────────────
+
+export function buildCompanyLine(
+  symbol: string,
+  profile?: NameFundamentalsResponse["profile"],
+  storyGroup?: string,
+): string {
+  if (!profile?.companyName) {
+    const storyPart = storyGroup ? ` in the ${storyGroup} story` : "";
+    return `${symbol} is connected${storyPart} based on structural intelligence evidence.`;
+  }
+  const industryPart =
+    profile.sector && profile.industry
+      ? ` · ${profile.industry}`
+      : profile.sector
+        ? ` · ${profile.sector}`
+        : "";
+  const capPart = profile.marketCap ? ` · ${formatMarketCap(profile.marketCap)}` : "";
+  return `${profile.companyName}${industryPart}${capPart}.`;
+}
+
+// ── Fundamentals context line ─────────────────────────────────────────────────
+
+export function buildFundamentalsLine(
+  fundamentals?: NameFundamentalsResponse["fundamentals"],
+): string {
+  if (!fundamentals) {
+    return "Fundamentals context is not available for this name.";
+  }
+
+  const parts: string[] = [];
+
+  if (fundamentals.peRatio != null && fundamentals.peRatio > 0) {
+    parts.push(`trading at approximately ${fundamentals.peRatio.toFixed(0)}× trailing earnings`);
+  }
+  if (fundamentals.grossMargin != null && fundamentals.grossMargin > 0) {
+    const marginPct = (fundamentals.grossMargin * 100).toFixed(0);
+    parts.push(`gross margin around ${marginPct}%`);
+  }
+  if (fundamentals.revenueGrowth != null) {
+    const pct = Math.abs(fundamentals.revenueGrowth * 100).toFixed(0);
+    const direction = fundamentals.revenueGrowth >= 0 ? "growing" : "contracting";
+    parts.push(`revenue ${direction} ${pct}% year over year`);
+  }
+
+  if (parts.length === 0) {
+    return "Detailed financial context is not available from the current data source.";
+  }
+  return `Recent figures show ${parts.join(", ")}. These reflect trailing reported data and should be read alongside current guidance.`;
+}
+
+// ── Analyst context line ──────────────────────────────────────────────────────
+
+function normaliseConsensus(raw?: string): string | null {
+  if (!raw) return null;
+  const r = raw.toLowerCase();
+  if (r.includes("strong buy") || r.includes("outperform")) return "broadly positive";
+  if (r.includes("buy") || r.includes("overweight")) return "generally positive";
+  if (r.includes("neutral") || r.includes("hold") || r.includes("equal weight")) return "mixed";
+  if (r.includes("underweight") || r.includes("underperform") || r.includes("sell")) return "cautious";
+  return null;
+}
+
+export function buildAnalystLine(
+  analyst?: NameFundamentalsResponse["analyst"],
+): string {
+  if (!analyst || (!analyst.consensus && !analyst.priceTarget && !analyst.ratingCount)) {
+    return "Analyst context is not available — the story here leans more on price action and theme exposure.";
+  }
+
+  const parts: string[] = [];
+  if (analyst.ratingCount) parts.push(`${analyst.ratingCount} analysts on record`);
+  const sentiment = normaliseConsensus(analyst.consensus);
+  if (sentiment) parts.push(`sentiment ${sentiment}`);
+  if (analyst.priceTarget) parts.push(`price context around $${analyst.priceTarget.toFixed(0)}`);
+
+  if (parts.length === 0) {
+    return "Some analyst context is on record, though a detailed breakdown is not available.";
+  }
+  return `Coverage shows ${parts.join(", ")}, provided here as market context only — not a recommendation.`;
+}
+
+// ── Contextual Ask questions ──────────────────────────────────────────────────
+
+export function buildDetailQuestions(symbol: string, storyGroup: string): string[] {
+  // Translate raw theme IDs to customer-friendly labels defensively
+  const label = TTG_STORY_LABELS[storyGroup] ?? storyGroup;
+  return [
+    `Why is ${symbol} connected to the ${label} story?`,
+    `What would weaken the case for ${symbol} in this market environment?`,
+    `Is ${symbol} moving because of fundamentals, market conditions, or theme momentum?`,
+    `What would need to change for ${symbol} to become more or less relevant here?`,
+  ];
+}
+
 // ── Priority symbol list (for price fetch) ────────────────────────────────────
 
 export function prioritySymbols(themes: TtgThemeDetail[], limit: number): string[] {

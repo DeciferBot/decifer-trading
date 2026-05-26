@@ -22,6 +22,7 @@ import {
   type ResearchNameCard,
   type ResearchStoryGroup,
 } from "@/lib/nameResearchModel";
+import NameResearchSheet from "./NameResearchSheet";
 
 // ── Watch type badge ───────────────────────────────────────────────────────────
 
@@ -61,20 +62,19 @@ function PriceChip({ card }: { card: ResearchNameCard }) {
 
 function ResearchCard({
   card,
+  onTap,
   onAskAbout,
 }: {
   card: ResearchNameCard;
+  onTap?: (card: ResearchNameCard) => void;
   onAskAbout?: (context: string) => void;
 }) {
   const borderColor = card.isPressure
     ? "rgba(239,68,68,0.15)"
     : "rgba(255,255,255,0.07)";
 
-  return (
-    <div
-      className="rounded-2xl p-4"
-      style={{ background: "#141b26", border: `1px solid ${borderColor}` }}
-    >
+  const inner = (
+    <>
       {/* Header row */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
@@ -111,7 +111,7 @@ function ResearchCard({
       )}
 
       {/* Ask CTA */}
-      {onAskAbout && (
+      {onAskAbout && !onTap && (
         <button
           onClick={() =>
             onAskAbout(
@@ -125,6 +125,27 @@ function ResearchCard({
           <ArrowRight size={9} />
         </button>
       )}
+    </>
+  );
+
+  if (onTap) {
+    return (
+      <button
+        onClick={() => onTap(card)}
+        className="w-full rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
+        style={{ background: "#141b26", border: `1px solid ${borderColor}` }}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{ background: "#141b26", border: `1px solid ${borderColor}` }}
+    >
+      {inner}
     </div>
   );
 }
@@ -137,10 +158,12 @@ function StoryGroupSection({
   group,
   onAskAbout,
   onThemeSelect,
+  onCardTap,
 }: {
   group: ResearchStoryGroup;
   onAskAbout?: (context: string) => void;
   onThemeSelect: (themeId: string) => void;
+  onCardTap: (card: ResearchNameCard) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? group.cards : group.cards.slice(0, CARDS_DEFAULT_VISIBLE);
@@ -182,6 +205,7 @@ function StoryGroupSection({
           <ResearchCard
             key={`${card.symbol}-${i}`}
             card={card}
+            onTap={onCardTap}
             onAskAbout={onAskAbout}
           />
         ))}
@@ -224,17 +248,15 @@ interface Props {
   onAskAbout?: (context: string) => void;
 }
 
-export default function UniverseTab({
-  data,
-  onNameSelect,
-  onThemeSelect,
-  onSymbolSelect: _onSymbolSelect,
-  onAskAbout,
-}: Props) {
+export default function UniverseTab(props: Props) {
+  const { data, onNameSelect, onThemeSelect, onAskAbout } = props;
+  // props.onSymbolSelect preserved in interface for CustomerApp compatibility
+
   const [ttgData, setTtgData] = useState<TtgThemeDetail[]>([]);
   const [priceMap, setPriceMap] = useState<Map<string, NamePriceEntry>>(new Map());
   const [loading, setLoading] = useState(true);
   const [pricesLoading, setPricesLoading] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<ResearchNameCard | null>(null);
 
   const radar = data.radar ?? [];
 
@@ -312,6 +334,7 @@ export default function UniverseTab({
   }
 
   return (
+    <>
     <div className="px-4 pt-2 pb-8 space-y-6">
 
       {/* Intro card */}
@@ -366,6 +389,7 @@ export default function UniverseTab({
           group={group}
           onAskAbout={onAskAbout}
           onThemeSelect={onThemeSelect}
+          onCardTap={setSelectedCard}
         />
       ))}
 
@@ -373,5 +397,19 @@ export default function UniverseTab({
         Market intelligence only. Not financial advice. No trade execution.
       </p>
     </div>
+
+    {/* Name research detail sheet — keyed by symbol so each card mounts fresh */}
+    {selectedCard && (
+      <NameResearchSheet
+        key={selectedCard.symbol}
+        card={selectedCard}
+        onClose={() => setSelectedCard(null)}
+        onAskAbout={(q) => {
+          setSelectedCard(null);
+          onAskAbout?.(q);
+        }}
+      />
+    )}
+    </>
   );
 }

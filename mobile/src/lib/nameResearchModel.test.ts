@@ -8,6 +8,12 @@ import {
   buildRadarCards,
   prioritySymbols,
   TTG_STORY_LABELS,
+  formatMarketCap,
+  buildCompanyLine,
+  buildFundamentalsLine,
+  buildAnalystLine,
+  buildDetailQuestions,
+  type NameFundamentalsResponse,
 } from "./nameResearchModel";
 import { parseSymbols, MAX_SYMBOLS } from "./namePriceUtils";
 import type { TtgSymbolCard, TtgThemeDetail, RadarItem } from "./customerApi";
@@ -389,6 +395,253 @@ describe("TTG_STORY_LABELS", () => {
       for (const word of forbidden) {
         expect(label.toLowerCase()).not.toContain(word);
       }
+    }
+  });
+});
+
+// ── formatMarketCap ───────────────────────────────────────────────────────────
+
+describe("formatMarketCap", () => {
+  it("formats trillions with one decimal", () => {
+    expect(formatMarketCap(3.2e12)).toBe("$3.2 trillion");
+  });
+
+  it("formats billions as rounded integer", () => {
+    expect(formatMarketCap(200e9)).toBe("$200 billion");
+  });
+
+  it("formats millions as rounded integer", () => {
+    expect(formatMarketCap(500e6)).toBe("$500 million");
+  });
+
+  it("returns unavailable message for zero", () => {
+    expect(formatMarketCap(0)).toContain("not available");
+  });
+
+  it("returns unavailable message for undefined", () => {
+    expect(formatMarketCap(undefined)).toContain("not available");
+  });
+
+  it("returns unavailable message for negative values", () => {
+    expect(formatMarketCap(-1e9)).toContain("not available");
+  });
+});
+
+// ── buildCompanyLine ──────────────────────────────────────────────────────────
+
+describe("buildCompanyLine", () => {
+  it("returns a fallback sentence when no profile provided", () => {
+    const line = buildCompanyLine("NVDA");
+    expect(line).toContain("NVDA");
+    expect(line).toMatch(/[.!?]$/);
+  });
+
+  it("includes story group in fallback when provided", () => {
+    const line = buildCompanyLine("NVDA", undefined, "AI Infrastructure & Energy");
+    expect(line).toContain("AI Infrastructure & Energy");
+  });
+
+  it("uses company name when available", () => {
+    const line = buildCompanyLine("NVDA", { companyName: "NVIDIA Corporation" });
+    expect(line).toContain("NVIDIA Corporation");
+  });
+
+  it("includes industry when both sector and industry present", () => {
+    const line = buildCompanyLine("NVDA", { companyName: "NVIDIA", sector: "Technology", industry: "Semiconductors" });
+    expect(line).toContain("Semiconductors");
+  });
+
+  it("includes sector when industry missing", () => {
+    const line = buildCompanyLine("NVDA", { companyName: "NVIDIA", sector: "Technology" });
+    expect(line).toContain("Technology");
+  });
+
+  it("includes formatted market cap when present", () => {
+    const line = buildCompanyLine("NVDA", { companyName: "NVIDIA", marketCap: 3.2e12 });
+    expect(line).toContain("trillion");
+  });
+
+  it("produces a complete sentence ending with a period", () => {
+    const line = buildCompanyLine("NVDA", { companyName: "NVIDIA" });
+    expect(line).toMatch(/\.$/);
+  });
+
+  it("contains no forbidden execution language", () => {
+    const line = buildCompanyLine("NVDA", { companyName: "NVIDIA", sector: "Technology" }, "AI Infrastructure & Energy");
+    const forbidden = ["buy", "sell", "order", "target", "stop", "broker", "account", "conviction"];
+    for (const w of forbidden) {
+      expect(line.toLowerCase()).not.toContain(w);
+    }
+  });
+
+  it("does not expose raw theme IDs in output", () => {
+    const line = buildCompanyLine("NVDA", undefined, "AI Infrastructure & Energy");
+    expect(line).not.toContain("ai_energy_nuclear");
+  });
+});
+
+// ── buildFundamentalsLine ─────────────────────────────────────────────────────
+
+describe("buildFundamentalsLine", () => {
+  it("returns unavailable fallback when no data provided", () => {
+    const line = buildFundamentalsLine();
+    expect(line).toContain("not available");
+    expect(line).toMatch(/[.!?]$/);
+  });
+
+  it("returns unavailable fallback when empty object provided", () => {
+    const line = buildFundamentalsLine({});
+    expect(line).toContain("not available");
+  });
+
+  it("includes PE ratio when positive", () => {
+    const line = buildFundamentalsLine({ peRatio: 35 });
+    expect(line).toContain("35");
+    expect(line).toContain("earnings");
+  });
+
+  it("includes gross margin when positive", () => {
+    const line = buildFundamentalsLine({ grossMargin: 0.74 });
+    expect(line).toContain("74%");
+  });
+
+  it("includes revenue growth when positive", () => {
+    const line = buildFundamentalsLine({ revenueGrowth: 0.22 });
+    expect(line).toContain("growing");
+    expect(line).toContain("22%");
+  });
+
+  it("handles negative or zero PE gracefully — does not show it", () => {
+    const line = buildFundamentalsLine({ peRatio: -5 });
+    expect(line).not.toContain("-5");
+    expect(line).toContain("not available");
+  });
+
+  it("uses 'contracting' language for negative revenue growth", () => {
+    const line = buildFundamentalsLine({ revenueGrowth: -0.15 });
+    expect(line).toContain("contracting");
+    expect(line).toContain("15%");
+  });
+
+  it("includes trailing data caveat when data is available", () => {
+    const line = buildFundamentalsLine({ peRatio: 30 });
+    expect(line.toLowerCase()).toContain("trailing");
+  });
+
+  it("returns a complete sentence", () => {
+    const line = buildFundamentalsLine({ peRatio: 30, grossMargin: 0.60 });
+    expect(line).toMatch(/[.!?]$/);
+  });
+
+  it("contains no forbidden execution language", () => {
+    const line = buildFundamentalsLine({ peRatio: 35, grossMargin: 0.7 });
+    const forbidden = ["buy", "sell", "order", "broker", "account", "conviction", "confidence score", "stop loss"];
+    for (const w of forbidden) {
+      expect(line.toLowerCase()).not.toContain(w);
+    }
+  });
+});
+
+// ── buildAnalystLine ──────────────────────────────────────────────────────────
+
+describe("buildAnalystLine", () => {
+  it("returns unavailable fallback when no analyst data", () => {
+    const line = buildAnalystLine();
+    expect(line).toContain("not available");
+    expect(line).toMatch(/[.!?]$/);
+  });
+
+  it("returns unavailable fallback when analyst object has no useful fields", () => {
+    const line = buildAnalystLine({} as NameFundamentalsResponse["analyst"]);
+    expect(line).toContain("not available");
+  });
+
+  it("includes rating count when present", () => {
+    const line = buildAnalystLine({ ratingCount: 42 });
+    expect(line).toContain("42");
+  });
+
+  it("translates strong buy consensus to customer-safe language", () => {
+    const line = buildAnalystLine({ consensus: "Strong Buy", ratingCount: 30 });
+    expect(line.toLowerCase()).not.toContain("strong buy");
+    expect(line.toLowerCase()).toContain("positive");
+  });
+
+  it("translates hold/neutral consensus without using forbidden words", () => {
+    const line = buildAnalystLine({ consensus: "Hold", ratingCount: 20 });
+    expect(line.toLowerCase()).not.toContain(" hold");
+    expect(line.toLowerCase()).not.toContain("buy");
+    expect(line.toLowerCase()).not.toContain("sell");
+  });
+
+  it("translates sell consensus to cautious language", () => {
+    const line = buildAnalystLine({ consensus: "Underweight", ratingCount: 15 });
+    expect(line.toLowerCase()).not.toContain("underweight");
+    expect(line.toLowerCase()).toContain("cautious");
+  });
+
+  it("labels price target as context, not recommendation", () => {
+    const line = buildAnalystLine({ priceTarget: 180 });
+    expect(line.toLowerCase()).not.toContain("buy");
+    expect(line.toLowerCase()).not.toContain("sell");
+    expect(line.toLowerCase()).toContain("context");
+  });
+
+  it("includes 'not a recommendation' framing", () => {
+    const line = buildAnalystLine({ ratingCount: 40, priceTarget: 200 });
+    expect(line.toLowerCase()).toContain("not a recommendation");
+  });
+
+  it("returns a complete sentence", () => {
+    const line = buildAnalystLine({ ratingCount: 42, priceTarget: 180 });
+    expect(line).toMatch(/[.!?]$/);
+  });
+});
+
+// ── buildDetailQuestions ──────────────────────────────────────────────────────
+
+describe("buildDetailQuestions", () => {
+  const SYMBOL = "NVDA";
+  const STORY = "AI Infrastructure & Energy";
+
+  it("returns at least 3 questions", () => {
+    expect(buildDetailQuestions(SYMBOL, STORY).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("all questions end with ?", () => {
+    for (const q of buildDetailQuestions(SYMBOL, STORY)) {
+      expect(q).toMatch(/\?$/);
+    }
+  });
+
+  it("includes the symbol in at least one question", () => {
+    const qs = buildDetailQuestions(SYMBOL, STORY);
+    expect(qs.some(q => q.includes(SYMBOL))).toBe(true);
+  });
+
+  it("includes the story group label in at least one question", () => {
+    const qs = buildDetailQuestions(SYMBOL, STORY);
+    expect(qs.some(q => q.includes(STORY))).toBe(true);
+  });
+
+  it("does not expose raw theme IDs", () => {
+    const qs = buildDetailQuestions(SYMBOL, "ai_energy_nuclear");
+    const text = qs.join(" ");
+    expect(text).not.toContain("ai_energy_nuclear");
+  });
+
+  it("contains no forbidden execution or trading language", () => {
+    const forbidden = ["buy", "sell", "order", "position", "entry", "exit", "broker", "stop loss"];
+    for (const q of buildDetailQuestions(SYMBOL, STORY)) {
+      for (const w of forbidden) {
+        expect(q.toLowerCase()).not.toContain(w);
+      }
+    }
+  });
+
+  it("each question is a non-empty string", () => {
+    for (const q of buildDetailQuestions(SYMBOL, STORY)) {
+      expect(q.trim().length).toBeGreaterThan(10);
     }
   });
 });
