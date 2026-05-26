@@ -496,9 +496,11 @@ function makeTape(overrides: Partial<TapeSnapshot> = {}): TapeSnapshot {
   return {
     spy_pct:   null,
     qqq_pct:   null,
+    iwm_pct:   null,
     tlt_pct:   null,
     gld_pct:   null,
     uso_pct:   null,
+    dxy_pct:   null,
     vix_level: null,
     ...overrides,
   };
@@ -567,12 +569,19 @@ describe("buildNarrativeParagraph", () => {
     expect(para).toMatch(/VIX/i);
   });
 
-  it("AI cluster produces combined sentence (not two separate AI sentences)", () => {
+  it("AI cluster produces a unified sector-focused sentence (not two separate AI sentences)", () => {
     const payload = makePayload({ key_drivers: ["ai_capex_growth", "ai_compute_demand"] });
     const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
     const para = buildNarrativeParagraph(payload, ms);
     const lc = para.toLowerCase();
-    expect(lc).toContain("ai infrastructure spending and compute demand");
+    // When macro_label already names AI infrastructure, the paragraph must pivot to concrete
+    // sector copy rather than repeating the same concept. Both variants cover data centres.
+    expect(
+      lc.includes("data centre") || lc.includes("semiconductor") || lc.includes("buildout"),
+    ).toBe(true);
+    // Must not say "AI infrastructure" twice in adjacent sections
+    const aiInfraCount = (lc.match(/ai infrastructure/g) ?? []).length;
+    expect(aiInfraCount).toBeLessThanOrEqual(1);
   });
 
   it("mixed signals produce a balanced sentence mentioning support and counterweight", () => {
@@ -753,5 +762,214 @@ describe("buildWhatCouldChange", () => {
     for (const r of result) {
       expect(r).not.toMatch(/^[a-z]+_[a-z]+/);
     }
+  });
+});
+
+// ── Sprint M14B: Multi-asset tape narrative tests ─────────────────────────────
+
+describe("buildNarrativeParagraph — M14B tape scenarios", () => {
+  it("QQQ outperforming SPY by 0.5%+ creates tech-led narrative", () => {
+    const tape = makeTape({ spy_pct: 0.5, qqq_pct: 1.2, iwm_pct: 0.3 });
+    const payload = makePayload({ key_drivers: ["ai_capex_growth"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    const lc = para.toLowerCase();
+    // Should mention tech concentration, not just "gaining ground"
+    expect(lc.includes("technology") || lc.includes("nasdaq") || lc.includes("tech")).toBe(true);
+    expect(lc.includes("s&p 500")).toBe(true);
+  });
+
+  it("QQQ up but IWM negative creates narrow rally narrative", () => {
+    const tape = makeTape({ spy_pct: 0.6, qqq_pct: 0.9, iwm_pct: -0.3 });
+    const payload = makePayload({ key_drivers: [] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    const lc = para.toLowerCase();
+    expect(lc.includes("small cap") || lc.includes("lagging") || lc.includes("narrow")).toBe(true);
+    expect(lc.includes("nasdaq") || lc.includes("technology") || lc.includes("growth")).toBe(true);
+  });
+
+  it("SPY down, TLT firm creates defensive narrative", () => {
+    const tape = makeTape({ spy_pct: -0.7, qqq_pct: -0.6, tlt_pct: 0.5 });
+    const payload = makePayload({ key_drivers: [] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-off" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    const lc = para.toLowerCase();
+    expect(lc.includes("bond") || lc.includes("safety") || lc.includes("defensive")).toBe(true);
+  });
+
+  it("SPY down, GLD firm creates defensive narrative via gold", () => {
+    const tape = makeTape({ spy_pct: -0.5, tlt_pct: 0.1, gld_pct: 0.6 });
+    const payload = makePayload({ key_drivers: [] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-off" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    const lc = para.toLowerCase();
+    expect(lc.includes("gold") || lc.includes("safety") || lc.includes("defensive")).toBe(true);
+  });
+
+  it("DXY strength appears in breadth context (non-breadth-in-opener scenario)", () => {
+    const tape = makeTape({ spy_pct: 0.2, qqq_pct: 0.3, dxy_pct: 0.6 });
+    const payload = makePayload({ key_drivers: [] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "monitoring" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    const lc = para.toLowerCase();
+    expect(lc.includes("dollar") || lc.includes("dxy") || lc.includes("uup") || lc.includes("currency")).toBe(true);
+  });
+
+  it("missing IWM and DXY (null) does not crash", () => {
+    const tape = makeTape({ spy_pct: 0.5, qqq_pct: 0.7, iwm_pct: null, dxy_pct: null });
+    const payload = makePayload({ key_drivers: ["ai_capex_growth"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    expect(() => buildNarrativeParagraph(payload, ms, tape)).not.toThrow();
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    expect(para.length).toBeGreaterThan(20);
+  });
+
+  it("all-null tape snapshot does not crash", () => {
+    const tape = makeTape();
+    const ms = buildCustomerMarketStory(makePayload(), makeStory());
+    expect(() => buildNarrativeParagraph(makePayload(), ms, tape)).not.toThrow();
+  });
+
+  it("broad risk-on (SPY + QQQ both up, low VIX) produces positive framing", () => {
+    const tape = makeTape({ spy_pct: 0.8, qqq_pct: 0.9, iwm_pct: 0.6, vix_level: 13 });
+    const payload = makePayload({ key_drivers: [] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    const lc = para.toLowerCase();
+    expect(lc.includes("broadly") || lc.includes("advancing") || lc.includes("positive")).toBe(true);
+  });
+
+  it("quiet tape (small moves) produces restrained framing", () => {
+    const tape = makeTape({ spy_pct: 0.05, qqq_pct: 0.08, vix_level: 16 });
+    const payload = makePayload({ key_drivers: [] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "monitoring" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    const lc = para.toLowerCase();
+    expect(lc.includes("quiet") || lc.includes("little changed") || lc.includes("no dominant")).toBe(true);
+  });
+});
+
+// ── Sprint M14B: AI Infrastructure deduplication tests ───────────────────────
+
+describe("buildNarrativeParagraph — AI Infrastructure deduplication", () => {
+  it("when macro_label mentions AI infrastructure, middle sentence pivots to sectors", () => {
+    const payload = makePayload({
+      key_drivers: ["ai_capex_growth"],
+      plain_english_summary: undefined,
+    });
+    const story = makeStory({ market_state: "risk-on" });
+    // Force a macro label that names AI infrastructure
+    const ms = buildCustomerMarketStory(payload, story);
+    // macro_label for ai_capex_growth = "AI infrastructure buildout is the primary driver"
+    const para = buildNarrativeParagraph(payload, ms);
+    // The word "infrastructure" should appear at most once in the result
+    const matches = (para.toLowerCase().match(/ai infrastructure/g) ?? []).length;
+    expect(matches).toBeLessThanOrEqual(1);
+  });
+
+  it("AI cluster with macro label mentioning AI uses alternative sector copy", () => {
+    const payload = makePayload({ key_drivers: ["ai_capex_growth", "ai_compute_demand"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms);
+    // Should mention sectors concretely
+    const lc = para.toLowerCase();
+    expect(lc.includes("data centre") || lc.includes("semiconductor") || lc.includes("infrastructure")).toBe(true);
+    // Should not just repeat "AI infrastructure" twice
+    const aiInfraCount = (lc.match(/ai infrastructure/g) ?? []).length;
+    expect(aiInfraCount).toBeLessThanOrEqual(1);
+  });
+
+  it("non-AI driver does not trigger AI alternative copy", () => {
+    const payload = makePayload({ key_drivers: ["geopolitical_risk_rising"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "mixed" }));
+    const para = buildNarrativeParagraph(payload, ms);
+    expect(para.toLowerCase()).not.toContain("data centres, semiconductors");
+    expect(para.toLowerCase()).toContain("geopolit");
+  });
+
+  it("no prohibited terms in any AI-driver narrative output", () => {
+    const aiDrivers = ["ai_capex_growth", "ai_compute_demand"];
+    const payload = makePayload({ key_drivers: aiDrivers });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+    const para = buildNarrativeParagraph(payload, ms);
+    expect(containsProhibitedTerm(para)).toBe(false);
+  });
+});
+
+// ── Sprint M14B: Safety constraints ──────────────────────────────────────────
+
+describe("M14B safety — no broker/execution language in narrative", () => {
+  const BROKER_TERMS = [
+    "order", "broker", "account", "portfolio", "p&l", "pnl", "profit",
+    "loss", "execute", "execution", "trade entry", "position entry",
+    "buy", "sell", "long", "short",
+  ];
+
+  it("no broker or execution language appears in any tape scenario narrative", () => {
+    const scenarios: TapeSnapshot[] = [
+      makeTape({ spy_pct: 0.8, qqq_pct: 1.2, iwm_pct: -0.3 }), // narrow_rally
+      makeTape({ spy_pct: 0.4, qqq_pct: 1.0, iwm_pct: 0.3 }),  // tech_led
+      makeTape({ spy_pct: 0.6, qqq_pct: 0.7, vix_level: 12 }),  // broad_risk_on
+      makeTape({ spy_pct: -0.6, tlt_pct: 0.5 }),                 // defensive
+      makeTape({ spy_pct: -0.9, vix_level: 26 }),                // broad_risk_off
+      makeTape({ spy_pct: 0.05, qqq_pct: 0.08 }),                // quiet
+    ];
+    for (const tape of scenarios) {
+      const payload = makePayload({ key_drivers: ["ai_capex_growth"] });
+      const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-on" }));
+      const para = buildNarrativeParagraph(payload, ms, tape);
+      const lc = para.toLowerCase();
+      for (const term of BROKER_TERMS) {
+        // Allow "long-duration" which is a bond market term, not a trade direction
+        if (term === "long") {
+          expect(lc.includes("long ") && !lc.includes("long-duration")).toBe(false);
+        } else {
+          expect(lc.includes(term)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("no prohibited rendered terms in any tape scenario narrative", () => {
+    const tape = makeTape({ spy_pct: 0.5, qqq_pct: 0.9, iwm_pct: -0.2, dxy_pct: 0.5 });
+    const payload = makePayload({ key_drivers: ["ai_capex_growth", "geopolitical_risk_rising"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "mixed" }));
+    const para = buildNarrativeParagraph(payload, ms, tape);
+    expect(containsProhibitedTerm(para)).toBe(false);
+  });
+});
+
+// ── Sprint M14B: CustomerBottomNav label safety ───────────────────────────────
+
+import { NAV_ITEMS } from "../components/CustomerBottomNav";
+
+describe("CustomerBottomNav — M14B", () => {
+  it("NAV_ITEMS contains a Today label", () => {
+    const todayItem = NAV_ITEMS.find(n => n.id === "today");
+    expect(todayItem).toBeDefined();
+    expect(todayItem?.label).toBe("Today");
+  });
+
+  it("all nav labels are non-empty strings", () => {
+    for (const item of NAV_ITEMS) {
+      expect(typeof item.label).toBe("string");
+      expect(item.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("no nav label contains prohibited terms", () => {
+    for (const item of NAV_ITEMS) {
+      expect(containsProhibitedTerm(item.label)).toBe(false);
+    }
+  });
+
+  it("has exactly 5 nav items", () => {
+    expect(NAV_ITEMS).toHaveLength(5);
+  });
+
+  it("Ask is the center item", () => {
+    const center = NAV_ITEMS.find(n => n.center);
+    expect(center?.id).toBe("ask");
   });
 });

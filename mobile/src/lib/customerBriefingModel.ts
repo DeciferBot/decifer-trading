@@ -493,16 +493,17 @@ export function buildContextualSuggestions(payload: MarketNowPayload): string[] 
 }
 
 // ── Tape Snapshot ─────────────────────────────────────────────────────────────
-// Simple record derived from the /api/market-tape response.
-// Passed to buildNarrativeParagraph so the opening sentence can reference
-// real price-action context (SPY direction, VIX level) when available.
+// Derived from /api/market-tape. Passed to buildNarrativeParagraph so the
+// opening sentence can reference real multi-asset price-action context.
 
 export interface TapeSnapshot {
-  spy_pct: number | null;
-  qqq_pct: number | null;
-  tlt_pct: number | null;
-  gld_pct: number | null;
-  uso_pct: number | null;
+  spy_pct:   number | null;
+  qqq_pct:   number | null;
+  iwm_pct:   number | null;  // IWM — small-cap breadth proxy
+  tlt_pct:   number | null;
+  gld_pct:   number | null;
+  uso_pct:   number | null;
+  dxy_pct:   number | null;  // UUP ETF — US dollar proxy
   vix_level: number | null;
 }
 
@@ -525,20 +526,117 @@ function formatSignedPct(pct: number): string {
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
 }
 
-function buildTapeOpener(tape: TapeSnapshot): string | null {
+// ── Multi-scenario tape analysis ───────────────────────────────────────────────
+
+type TapeScenario =
+  | "narrow_rally"    // QQQ up, IWM materially lagging
+  | "tech_led"        // QQQ outperforms SPY by ≥ 0.5%, both positive
+  | "broad_risk_on"   // SPY + QQQ both > 0.4%, VIX contained
+  | "defensive"       // SPY weak, bonds or gold catching a bid
+  | "broad_risk_off"  // SPY materially negative
+  | "quiet"           // All moves small
+  | "spy_basic";      // Directional but no other pattern detected
+
+function detectTapeScenario(tape: TapeSnapshot): TapeScenario {
+  const spy = tape.spy_pct;
+  const qqq = tape.qqq_pct;
+  const iwm = tape.iwm_pct;
+  const tlt = tape.tlt_pct;
+  const gld = tape.gld_pct;
+  const vix = tape.vix_level;
+
+  if (spy == null) return "spy_basic";
+
+  // Narrow rally: Nasdaq up but small caps lagging or negative
+  if (qqq != null && iwm != null && qqq > 0.4 && iwm < -0.1) return "narrow_rally";
+
+  // Tech-led: QQQ outperforms SPY by 0.5%+, both positive
+  if (qqq != null && spy > 0 && qqq - spy >= 0.5) return "tech_led";
+
+  // Broad risk-on: SPY and QQQ both positive, VIX contained
+  if (qqq != null && spy > 0.4 && qqq > 0.4 && (vix == null || vix < 18)) return "broad_risk_on";
+
+  // Defensive: SPY under pressure but bonds or gold catching a bid
+  const defensiveBid = (tlt != null && tlt > 0.3) || (gld != null && gld > 0.4);
+  if (spy < -0.3 && defensiveBid) return "defensive";
+
+  // Broad risk-off: SPY materially negative
+  if (spy < -0.4) return "broad_risk_off";
+
+  // Quiet tape: no dominant directional move
+  if (Math.abs(spy) <= 0.15 && (qqq == null || Math.abs(qqq) <= 0.2)) return "quiet";
+
+  return "spy_basic";
+}
+
+interface TapeOpenerResult {
+  sentence: string;
+  scenario: TapeScenario;
+}
+
+function buildTapeOpener(tape: TapeSnapshot): TapeOpenerResult | null {
   if (tape.spy_pct == null) return null;
-  const spyDir =
-    tape.spy_pct > 0.4  ? "gaining ground" :
-    tape.spy_pct < -0.4 ? "under pressure" :
-    "broadly flat";
-  let s = `Broad equities are ${spyDir} today — the S&P 500 is ${formatSignedPct(tape.spy_pct)}`;
-  if (tape.vix_level != null) {
-    if (tape.vix_level < 15)      s += `, and volatility is contained at ${tape.vix_level.toFixed(0)}`;
-    else if (tape.vix_level < 20) s += `, with volatility at moderate levels`;
-    else if (tape.vix_level < 25) s += `, while VIX at ${tape.vix_level.toFixed(0)} reflects some unease`;
-    else                          s += `, and elevated VIX at ${tape.vix_level.toFixed(0)} signals heightened uncertainty`;
+
+  const scenario = detectTapeScenario(tape);
+  const spy = formatSignedPct(tape.spy_pct);
+  const qqq = tape.qqq_pct != null ? formatSignedPct(tape.qqq_pct) : null;
+  const vix = tape.vix_level;
+
+  let sentence: string;
+
+  switch (scenario) {
+    case "narrow_rally": {
+      const qqqStr = qqq ?? "higher";
+      sentence = `Markets are not just moving higher today. The leadership is concentrated in growth and technology — the Nasdaq is up ${qqqStr} while small caps are lagging, making the rally narrower than the headline index suggests.`;
+      break;
+    }
+    case "tech_led": {
+      sentence = `Equities are advancing, but the move is led by technology. The Nasdaq is up ${qqq ?? "meaningfully"} versus the broader S&P 500 at ${spy} — a growth-concentrated session.`;
+      break;
+    }
+    case "broad_risk_on": {
+      let s = `Equities are advancing broadly today — the S&P 500 is ${spy} and the Nasdaq is ${qqq ?? "also higher"}`;
+      if (vix != null && vix < 15) s += `, with volatility contained at ${vix.toFixed(0)}`;
+      else if (vix != null && vix < 18) s += `, while volatility remains moderate`;
+      sentence = s + ".";
+      break;
+    }
+    case "defensive": {
+      const defensivePart =
+        tape.tlt_pct != null && tape.tlt_pct > 0.3 ? "bonds are rallying" :
+        tape.gld_pct != null && tape.gld_pct > 0.4 ? "gold is gaining" :
+        "defensive assets are holding up";
+      sentence = `Equities are under pressure — the S&P 500 is ${spy} — but ${defensivePart}, suggesting investors are rotating toward safety rather than liquidating broadly.`;
+      break;
+    }
+    case "broad_risk_off": {
+      let s = `Equities are under broad pressure today — the S&P 500 is ${spy}`;
+      if (vix != null && vix >= 25) s += `, and elevated VIX at ${vix.toFixed(0)} signals heightened uncertainty`;
+      else if (vix != null && vix >= 20) s += `, with VIX at ${vix.toFixed(0)} reflecting unease`;
+      sentence = s + ".";
+      break;
+    }
+    case "quiet": {
+      sentence = `Markets are quiet today — the S&P 500 is little changed at ${spy}, with no dominant directional move.`;
+      break;
+    }
+    default: {
+      const dir =
+        tape.spy_pct > 0.4  ? "gaining ground" :
+        tape.spy_pct < -0.4 ? "under pressure" :
+        "broadly flat";
+      let s = `Broad equities are ${dir} today — the S&P 500 is ${spy}`;
+      if (vix != null) {
+        if (vix < 15)      s += `, and volatility is contained at ${vix.toFixed(0)}`;
+        else if (vix < 20) s += `, with volatility at moderate levels`;
+        else if (vix < 25) s += `, while VIX at ${vix.toFixed(0)} reflects some unease`;
+        else               s += `, and elevated VIX at ${vix.toFixed(0)} signals heightened uncertainty`;
+      }
+      sentence = s + ".";
+    }
   }
-  return s + ".";
+
+  return { sentence, scenario };
 }
 
 const REGIME_OPENERS: Record<string, string> = {
@@ -579,6 +677,25 @@ const DRIVER_MIDDLE: Record<string, string> = {
     "Rising long-term yields are compressing REIT valuations, creating near-term pressure on real estate names.",
 };
 
+// Alternative sentences used when the macro label already names AI infrastructure,
+// to prevent the same concept appearing twice in adjacent sections.
+const AI_SECTOR_ALTERNATIVE =
+  "Data centres, semiconductors, and power infrastructure names are in sustained focus as hyperscalers commit to record capital spending.";
+const AI_CLUSTER_ALTERNATIVE =
+  "The buildout is drawing capital across data centres, power infrastructure, semiconductors, and memory — both training compute and inference capacity are in demand.";
+
+function macroLabelMentionsAI(macroLabel?: string): boolean {
+  if (!macroLabel) return false;
+  const l = macroLabel.toLowerCase();
+  return (
+    l.includes("ai infrastructure") ||
+    l.includes("ai capex") ||
+    l.includes("ai compute") ||
+    l.includes("ai spending") ||
+    l.includes("ai buildout")
+  );
+}
+
 const RISK_ON_SET = new Set([
   "futures_risk_on", "risk_on_rotation", "small_cap_risk_on", "credit_stress_easing",
 ]);
@@ -586,12 +703,21 @@ const RISK_OFF_SET = new Set([
   "yields_rising", "futures_risk_off", "oil_supply_shock", "reits_falling_yield",
 ]);
 
-function buildDriverMiddleSentence(activeIds: string[]): string | null {
+function buildDriverMiddleSentence(activeIds: string[], macroLabel?: string): string | null {
   if (activeIds.length === 0) return null;
 
-  // AI cluster
+  // AI cluster — swap to sector-focused copy if macro label already names AI
   if (activeIds.includes("ai_capex_growth") && activeIds.includes("ai_compute_demand")) {
-    return "AI infrastructure spending and compute demand are reinforcing each other — capital is flowing into data centres, semiconductors, and power infrastructure.";
+    return macroLabelMentionsAI(macroLabel)
+      ? AI_CLUSTER_ALTERNATIVE
+      : "AI infrastructure spending and compute demand are reinforcing each other — capital is flowing into data centres, semiconductors, and power infrastructure.";
+  }
+
+  // Single AI capex driver — swap to sector-focused copy if macro label already names AI
+  if (activeIds[0] === "ai_capex_growth") {
+    return macroLabelMentionsAI(macroLabel)
+      ? AI_SECTOR_ALTERNATIVE
+      : (DRIVER_MIDDLE["ai_capex_growth"] ?? null);
   }
 
   // Broad risk-on cluster
@@ -616,7 +742,38 @@ function buildBreadthSentence(
   activeIds: string[],
   state: string,
   tape?: TapeSnapshot,
+  tapeScenario?: TapeScenario,
 ): string | null {
+  // IWM/QQQ breadth already expressed in these opener scenarios — skip repeating
+  const breadthInOpener = tapeScenario === "narrow_rally" || tapeScenario === "tech_led";
+
+  // Dollar strength — add context unless breadth is already the headline
+  if (!breadthInOpener && tape?.dxy_pct != null && tape.dxy_pct > 0.4) {
+    return "The US dollar is strengthening today, adding a headwind for commodity prices and emerging-market assets.";
+  }
+
+  // Oil pressure
+  if (tape?.uso_pct != null && tape.uso_pct > 1.5) {
+    return "Oil prices are moving sharply higher today — worth monitoring as a potential inflation signal.";
+  }
+
+  // Bond move — skip if defensive scenario already covered it in the opener
+  if (tapeScenario !== "defensive" && tape?.tlt_pct != null) {
+    if (tape.tlt_pct > 0.3)  return "Bonds are rallying — easing yield pressure on rate-sensitive names.";
+    if (tape.tlt_pct < -0.4) return "Bond prices are falling — worth watching for how far yields move.";
+  }
+
+  // Small-cap outperformance not yet covered by opener
+  if (
+    !breadthInOpener &&
+    tape?.iwm_pct != null &&
+    tape?.spy_pct != null &&
+    tape.iwm_pct - tape.spy_pct > 0.6
+  ) {
+    return "Small caps are outperforming the broader market today — a sign of improving risk appetite and breadth.";
+  }
+
+  // Theme-based breadth for risk-on when tape context is limited
   const seenLabels = new Set<string>();
   const sectorLabels: string[] = [];
   for (const id of activeIds.slice(0, 3)) {
@@ -638,18 +795,13 @@ function buildBreadthSentence(
     return `The story extends into ${joined}.`;
   }
 
-  if (tape?.tlt_pct != null && Math.abs(tape.tlt_pct) > 0.3) {
-    if (tape.tlt_pct > 0.3)  return "Bonds are rallying — easing yield pressure on rate-sensitive names.";
-    if (tape.tlt_pct < -0.3) return "Bond prices are falling — worth watching for how far yields move.";
-  }
-
   return null;
 }
 
 /**
  * Generates a 2–3 sentence natural-language market briefing paragraph.
  * Prefers `plain_english_summary` from the API when it is clean and substantive;
- * otherwise synthesises from active drivers and optional tape context.
+ * otherwise synthesises from active drivers and multi-asset tape context.
  * Safe for customer display — never exposes raw driver IDs or forbidden terms.
  */
 export function buildNarrativeParagraph(
@@ -668,15 +820,15 @@ export function buildNarrativeParagraph(
 
   const parts: string[] = [];
 
-  const opener =
-    (tape ? buildTapeOpener(tape) : null) ??
-    (REGIME_OPENERS[story.regime.state] ?? "Markets are active today.");
+  const tapeResult = tape ? buildTapeOpener(tape) : null;
+  const opener = tapeResult?.sentence ?? REGIME_OPENERS[story.regime.state] ?? "Markets are active today.";
+  const tapeScenario = tapeResult?.scenario ?? undefined;
   parts.push(opener);
 
-  const middle = buildDriverMiddleSentence(activeIds);
+  const middle = buildDriverMiddleSentence(activeIds, story.macro_label);
   if (middle) parts.push(middle);
 
-  const breadth = buildBreadthSentence(activeIds, story.regime.state, tape);
+  const breadth = buildBreadthSentence(activeIds, story.regime.state, tape, tapeScenario);
   if (breadth) parts.push(breadth);
 
   return parts.join(" ");

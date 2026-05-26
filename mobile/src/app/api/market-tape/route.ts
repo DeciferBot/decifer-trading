@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 const FMP_KEY = process.env.FMP_API_KEY;
 
-export type TapeType = "equity" | "rates" | "commodity" | "safe_haven" | "vol";
+export type TapeType = "equity" | "rates" | "commodity" | "safe_haven" | "vol" | "dollar";
 
 export interface TapeEntry {
   sym: string;
@@ -13,11 +13,13 @@ export interface TapeEntry {
 }
 
 const ETF_TAPE: Array<{ sym: string; label: string; type: TapeType }> = [
-  { sym: "SPY", label: "S&P 500",  type: "equity"    },
-  { sym: "QQQ", label: "Nasdaq",   type: "equity"    },
-  { sym: "TLT", label: "Bonds",    type: "rates"     },
-  { sym: "GLD", label: "Gold",     type: "safe_haven"},
-  { sym: "USO", label: "Oil",      type: "commodity" },
+  { sym: "SPY", label: "S&P 500",    type: "equity"    },
+  { sym: "QQQ", label: "Nasdaq",     type: "equity"    },
+  { sym: "IWM", label: "Small Caps", type: "equity"    },
+  { sym: "TLT", label: "Bonds",      type: "rates"     },
+  { sym: "GLD", label: "Gold",       type: "safe_haven"},
+  { sym: "USO", label: "Oil",        type: "commodity" },
+  { sym: "UUP", label: "US Dollar",  type: "dollar"    },
 ];
 
 export async function GET() {

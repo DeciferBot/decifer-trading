@@ -14,7 +14,7 @@ interface NavItem {
   center?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
+export const NAV_ITEMS: NavItem[] = [
   { id: "today",  label: "Today",  Icon: Home     },
   { id: "forces", label: "Forces", Icon: Zap      },
   { id: "ask",    label: "Ask",    Icon: Sparkles, center: true },
@@ -78,7 +78,7 @@ export default function CustomerBottomNav({ activeTab, onTabChange }: Props) {
           >
             <Icon size={20} style={{ color: active ? "#f97316" : "#94a3b8" }} />
             <span
-              className="text-[10px] font-medium tracking-wide"
+              className="text-[10px] font-medium whitespace-nowrap"
               style={{ color: active ? "#f97316" : "#94a3b8" }}
             >
               {item.label}

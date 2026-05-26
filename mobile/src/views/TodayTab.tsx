@@ -32,6 +32,7 @@ import {
 } from "@/lib/customerBriefingModel";
 import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory";
 import type { TapeEntry } from "@/app/api/market-tape/route";
+import type { Headline } from "@/app/api/headlines/route";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -71,9 +72,11 @@ function deriveTapeSnapshot(tape: TapeEntry[]): TapeSnapshot {
   return {
     spy_pct:   by["SPY"]?.changePct ?? null,
     qqq_pct:   by["QQQ"]?.changePct ?? null,
+    iwm_pct:   by["IWM"]?.changePct ?? null,
     tlt_pct:   by["TLT"]?.changePct ?? null,
     gld_pct:   by["GLD"]?.changePct ?? null,
     uso_pct:   by["USO"]?.changePct ?? null,
+    dxy_pct:   by["UUP"]?.changePct ?? null, // UUP = US dollar proxy
     vix_level: by["VIX"]?.level     ?? null,
   };
 }
@@ -564,6 +567,17 @@ export default function TodayTab({
 
   const tapeSnapshot = deriveTapeSnapshot(tape);
 
+  // Headlines fallback: only fetch when backend key_events are absent
+  const [headlines, setHeadlines] = useState<Headline[]>([]);
+  useEffect(() => {
+    if (keyEvents.length > 0) return;
+    fetch("/api/headlines")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.headlines) setHeadlines(d.headlines.slice(0, 4)); })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyEvents.length]);
+
   return (
     <div className="px-4 pb-8 space-y-5 pt-3">
 
@@ -659,6 +673,31 @@ export default function TodayTab({
               <ArrowRight size={9} />
             </button>
           )}
+        </section>
+      )}
+
+      {/* ── D-fallback: Recent market headlines (when no backend key_events) ── */}
+      {keyEvents.length === 0 && headlines.length > 0 && (
+        <section>
+          <SectionLabel>Latest market headlines</SectionLabel>
+          <div className="space-y-2">
+            {headlines.map((h, i) => (
+              <div
+                key={i}
+                className="rounded-xl px-3.5 py-3"
+                style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+              >
+                <p className="text-[13px] font-semibold text-slate-100 leading-snug">{h.title}</p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {h.source}
+                  {" · "}
+                  {h.minutesAgo < 60
+                    ? `${h.minutesAgo}m ago`
+                    : `${Math.round(h.minutesAgo / 60)}h ago`}
+                </p>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
