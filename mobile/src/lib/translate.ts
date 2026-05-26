@@ -319,3 +319,31 @@ export function holdDuration(isoOrHms: string): string {
   const days = Math.floor(mins / 1440);
   return days === 1 ? "1 day" : `${days} days`;
 }
+
+// ── Signal status resolver for Signals tab ─────────────────────────────────────
+// Maps internal theme state/signal strings to customer-safe status labels.
+// No buy/sell/hold/activation/broker language. Used by SignalsTab and its tests.
+
+export interface SignalStatus {
+  label: string;
+  color: string;
+  dotColor: string;
+}
+
+export function resolveSignalStatus(state?: string, signal?: string): SignalStatus {
+  const s   = state  ?? "";
+  const sig = signal ?? "";
+  if (s === "activated" || s === "active" || sig === "strengthening")
+    return { label: "In Focus",                 color: "#34d399", dotColor: "#10b981" };
+  if (s === "strengthening")
+    return { label: "Building",                 color: "#60a5fa", dotColor: "#3b82f6" };
+  if (s === "crowded")
+    return { label: "Widely held",              color: "#fbbf24", dotColor: "#f59e0b" };
+  if (sig === "weakening" || s === "weakening")
+    return { label: "Fading",                   color: "#fbbf24", dotColor: "#f59e0b" };
+  if (s === "headwind")
+    return { label: "Under Pressure",           color: "#f87171", dotColor: "#ef4444" };
+  if (s === "dormant")
+    return { label: "Quiet",                    color: "#475569", dotColor: "#334155" };
+  return   { label: "Waiting for confirmation", color: "#64748b", dotColor: "#475569" };
+}

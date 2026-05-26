@@ -1,20 +1,23 @@
 "use client";
-// Signals tab — evidence behind the market view.
-// Filter chips: All | Active | Building | Weakening | Quiet
-// Signal cards expand to show evidence, why it matters, and what would reactivate.
+// Signals tab — fresh evidence patterns across structural market themes.
+// Shows what is building, fading, or quiet in the current market cycle.
+// No buy/sell/hold language. No execution or trading logic.
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 import type { MarketNowPayload, ThemeItem } from "@/lib/customerApi";
-import { translateTheme, themeDescription, themeInvalidation } from "@/lib/translate";
+import {
+  translateTheme, themeDescription, themeInvalidation, resolveSignalStatus,
+} from "@/lib/translate";
+import { getCrosswalkByMarketNow } from "@/lib/themeCrosswalk";
 
-type Filter = "all" | "active" | "building" | "weakening" | "quiet";
+type Filter = "all" | "in_focus" | "building" | "fading" | "quiet";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all",      label: "All"      },
-  { id: "active",   label: "Active"   },
+  { id: "in_focus", label: "In Focus" },
   { id: "building", label: "Building" },
-  { id: "weakening",label: "Weakening"},
+  { id: "fading",   label: "Fading"   },
   { id: "quiet",    label: "Quiet"    },
 ];
 
@@ -22,29 +25,11 @@ function matchesFilter(theme: ThemeItem, filter: Filter): boolean {
   if (filter === "all") return true;
   const s   = theme.state ?? "";
   const sig = theme.event_signal ?? "";
-  if (filter === "active")    return s === "activated" || s === "active" || sig === "strengthening";
-  if (filter === "building")  return s === "strengthening";
-  if (filter === "weakening") return s === "weakening" || s === "headwind" || sig === "weakening";
-  if (filter === "quiet")     return s === "dormant";
+  if (filter === "in_focus") return s === "activated" || s === "active" || sig === "strengthening";
+  if (filter === "building") return s === "strengthening";
+  if (filter === "fading")   return s === "weakening" || s === "headwind" || sig === "weakening";
+  if (filter === "quiet")    return s === "dormant";
   return true;
-}
-
-function confidenceInfo(state?: string, signal?: string): { label: string; color: string; dotColor: string } {
-  const s   = state ?? "";
-  const sig = signal ?? "";
-  if (s === "activated" || s === "active" || sig === "strengthening")
-    return { label: "Active",              color: "#34d399", dotColor: "#10b981" };
-  if (s === "strengthening")
-    return { label: "Building momentum",  color: "#60a5fa", dotColor: "#3b82f6" };
-  if (s === "crowded")
-    return { label: "Crowded — risk of reversal", color: "#fbbf24", dotColor: "#f59e0b" };
-  if (sig === "weakening" || s === "weakening")
-    return { label: "Weakening",          color: "#fbbf24", dotColor: "#f59e0b" };
-  if (s === "headwind")
-    return { label: "Headwind signal",   color: "#f87171", dotColor: "#ef4444" };
-  if (s === "dormant")
-    return { label: "Not currently signalling", color: "#475569", dotColor: "#334155" };
-  return   { label: "Monitoring",        color: "#64748b", dotColor: "#475569" };
 }
 
 // ── Signal card ───────────────────────────────────────────────────────────────
@@ -57,11 +42,15 @@ function SignalCard({
   onThemeSelect: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const conf  = confidenceInfo(theme.state, theme.event_signal);
-  const desc  = themeDescription(theme.theme);
-  const inval = themeInvalidation(theme.theme);
-  const isDormant = theme.state === "dormant";
+  const status      = resolveSignalStatus(theme.state, theme.event_signal);
+  const desc        = themeDescription(theme.theme);
+  const inval       = themeInvalidation(theme.theme);
+  const isDormant   = theme.state === "dormant";
   const hasEvidence = (theme.from_events?.length ?? 0) > 0;
+  const crosswalk   = getCrosswalkByMarketNow(theme.theme);
+
+  // One-liner shown in collapsed view: first event or first sentence of description
+  const oneLiner = theme.from_events?.[0] ?? desc.split(".")[0];
 
   return (
     <div
@@ -72,6 +61,7 @@ function SignalCard({
         boxShadow: expanded ? "0 2px 12px rgba(0,0,0,0.3)" : "none",
       }}
     >
+      {/* ── Collapsed header ── */}
       <button
         onClick={() => setExpanded(o => !o)}
         className="w-full px-4 py-3.5 text-left flex items-start justify-between gap-2"
@@ -80,15 +70,20 @@ function SignalCard({
           <div className="flex items-center gap-2 mb-0.5">
             <span
               className="w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ background: conf.dotColor }}
+              style={{ background: status.dotColor }}
             />
-            <p className="text-[13px] font-semibold text-slate-100">
+            <p className="text-[13px] font-semibold text-slate-100 truncate">
               {translateTheme(theme.theme)}
             </p>
           </div>
-          <p className="text-[10px] ml-3.5" style={{ color: conf.color }}>
-            {conf.label}
+          <p className="text-[10px] ml-3.5 mb-0.5" style={{ color: status.color }}>
+            {status.label}
           </p>
+          {oneLiner && (
+            <p className="text-[10px] text-slate-500 ml-3.5 line-clamp-1 leading-relaxed">
+              {oneLiner}
+            </p>
+          )}
         </div>
         <div className="shrink-0 mt-0.5">
           {expanded
@@ -97,40 +92,66 @@ function SignalCard({
         </div>
       </button>
 
+      {/* ── Expanded detail ── */}
       {expanded && (
         <div
           className="px-4 pb-4 space-y-3.5 pt-3"
           style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
         >
-          {/* Event evidence */}
-          {hasEvidence && (
+
+          {/* Why This Matters — always first */}
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+              Why This Matters
+            </p>
+            <p className="text-xs text-slate-300 leading-relaxed">{desc}</p>
+          </div>
+
+          {/* Fresh Event Evidence */}
+          {hasEvidence ? (
             <div>
               <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                Evidence
+                Fresh Event Evidence
               </p>
               <ul className="space-y-1.5">
                 {(theme.from_events ?? []).map((ev, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full mt-1 shrink-0" style={{ background: "#f97316" }} />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full mt-1 shrink-0"
+                      style={{ background: "#f97316" }}
+                    />
                     <p className="text-xs text-slate-300 leading-relaxed">{ev}</p>
                   </li>
                 ))}
               </ul>
             </div>
+          ) : (
+            <p className="text-[9px] text-slate-600">No fresh event evidence this cycle.</p>
           )}
 
-          {/* Why this matters */}
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-              {hasEvidence ? "Structural Context" : "Why This Matters"}
+          {/* Connected Structural Theme */}
+          {crosswalk ? (
+            <div
+              className="rounded-xl px-3.5 py-3"
+              style={{ background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.15)" }}
+            >
+              <p className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#f97316" }}>
+                Connected Structural Theme
+              </p>
+              <p className="text-[11px] font-semibold text-slate-200 mb-1">
+                {crosswalk.ttgPrimaryLabel}
+              </p>
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                {crosswalk.relationship}
+              </p>
+            </div>
+          ) : !isDormant && (
+            <p className="text-[9px] text-slate-600">
+              Fresh signal — structural theme connection not yet established.
             </p>
-            <p className="text-xs text-slate-300 leading-relaxed">{desc}</p>
-            {!hasEvidence && (
-              <p className="text-[9px] text-slate-600 mt-1.5">Structural context — no fresh event evidence this cycle.</p>
-            )}
-          </div>
+          )}
 
-          {/* What would reactivate (dormant) or weaken (active) */}
+          {/* Risk to Monitor / What Would Bring This Back */}
           {isDormant ? (
             <div
               className="rounded-xl px-3.5 py-3"
@@ -140,7 +161,8 @@ function SignalCard({
                 What Would Bring This Signal Back
               </p>
               <p className="text-xs text-slate-400 leading-relaxed">
-                A reversal of the conditions that would weaken it: {inval.toLowerCase().replace(/\.$/, "")}.
+                A reversal of the conditions that would weaken it:{" "}
+                {inval.toLowerCase().replace(/\.$/, "")}.
               </p>
             </div>
           ) : (
@@ -149,19 +171,23 @@ function SignalCard({
               style={{ background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.12)" }}
             >
               <p className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#ef4444" }}>
-                What Would Weaken This Signal
+                Risk to Monitor
               </p>
               <p className="text-xs text-slate-400 leading-relaxed">{inval}</p>
             </div>
           )}
 
-          {/* Explore button */}
+          {/* CTA — context-aware label when structural theme is known */}
           <button
             onClick={() => onThemeSelect(theme.theme)}
-            className="text-[10px] font-semibold px-3 py-1.5 rounded-full transition-all active:scale-95"
+            className="flex items-center gap-1.5 text-[10px] font-semibold px-3 py-1.5 rounded-full transition-all active:scale-95"
             style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
           >
-            Explore in Theme Map →
+            {crosswalk
+              ? `View ${crosswalk.ttgPrimaryLabel} in Theme Map`
+              : "View in Theme Map"
+            }
+            <ArrowRight size={10} />
           </button>
         </div>
       )}
@@ -186,13 +212,12 @@ export default function SignalsTab({ data, onThemeSelect }: Props) {
   const conflicts = data.known_conflicts ?? [];
   const filtered  = themes.filter(t => matchesFilter(t, filter));
 
-  // Count per category for filter chips
   const counts: Record<Filter, number> = {
-    all:       themes.length,
-    active:    themes.filter(t => matchesFilter(t, "active")).length,
-    building:  themes.filter(t => matchesFilter(t, "building")).length,
-    weakening: themes.filter(t => matchesFilter(t, "weakening")).length,
-    quiet:     themes.filter(t => matchesFilter(t, "quiet")).length,
+    all:      themes.length,
+    in_focus: themes.filter(t => matchesFilter(t, "in_focus")).length,
+    building: themes.filter(t => matchesFilter(t, "building")).length,
+    fading:   themes.filter(t => matchesFilter(t, "fading")).length,
+    quiet:    themes.filter(t => matchesFilter(t, "quiet")).length,
   };
 
   const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -204,30 +229,38 @@ export default function SignalsTab({ data, onThemeSelect }: Props) {
   return (
     <div className="px-4 pt-2 pb-8 space-y-5">
 
-      {/* Filter chips */}
-      <section>
-        <SectionLabel>Filter</SectionLabel>
-        <div className="flex flex-wrap gap-1.5">
-          {FILTERS.map(f => (
-            counts[f.id] > 0 || f.id === "all" ? (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                className="px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all active:scale-95"
-                style={
-                  filter === f.id
-                    ? { background: "#f97316", color: "#fff" }
-                    : { background: "rgba(255,255,255,0.06)", color: "#94a3b8" }
-                }
-              >
-                {f.label} {counts[f.id] > 0 && f.id !== "all" ? `(${counts[f.id]})` : ""}
-              </button>
-            ) : null
-          ))}
-        </div>
-      </section>
+      {/* ── Intro card ─────────────────────────────────────────────────────── */}
+      <div
+        className="rounded-2xl px-4 py-3.5"
+        style={{ background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.12)" }}
+      >
+        <p className="text-[12px] text-slate-300 leading-relaxed">
+          Fresh evidence patterns across structural market themes — what is building, fading, or quiet today.
+          Market intelligence only. Not financial advice.
+        </p>
+      </div>
 
-      {/* Conflicting evidence */}
+      {/* ── Filter chips ────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-1.5">
+        {FILTERS.map(f => (
+          counts[f.id] > 0 || f.id === "all" ? (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className="px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all active:scale-95"
+              style={
+                filter === f.id
+                  ? { background: "#f97316", color: "#fff" }
+                  : { background: "rgba(255,255,255,0.06)", color: "#94a3b8" }
+              }
+            >
+              {f.label}{f.id !== "all" && counts[f.id] > 0 ? ` (${counts[f.id]})` : ""}
+            </button>
+          ) : null
+        ))}
+      </div>
+
+      {/* ── Conflicting evidence ────────────────────────────────────────────── */}
       {conflicts.length > 0 && (
         <section>
           <SectionLabel>Conflicting Evidence</SectionLabel>
@@ -245,9 +278,11 @@ export default function SignalsTab({ data, onThemeSelect }: Props) {
         </section>
       )}
 
-      {/* Signal cards */}
+      {/* ── Signal cards ────────────────────────────────────────────────────── */}
       <section>
-        {filter !== "all" && <SectionLabel>{FILTERS.find(f => f.id === filter)?.label} Signals</SectionLabel>}
+        {filter !== "all" && (
+          <SectionLabel>{FILTERS.find(f => f.id === filter)?.label} Signals</SectionLabel>
+        )}
         {filtered.length > 0 ? (
           <div className="space-y-2">
             {filtered.map((t, i) => (
@@ -260,12 +295,14 @@ export default function SignalsTab({ data, onThemeSelect }: Props) {
             style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
           >
             <p className="text-sm text-slate-400">
-              No {filter === "all" ? "" : filter + " "}signals right now.
+              {filter === "all"
+                ? "Signals are quiet right now."
+                : `No ${FILTERS.find(f => f.id === filter)?.label.toLowerCase()} signals right now.`}
             </p>
             <p className="text-xs text-slate-500 leading-relaxed">
               {filter === "all"
-                ? "Structural signals appear as themes strengthen — typically during market hours."
-                : `Switch to \"All\" to see all ${themes.length} monitored themes.`}
+                ? "Structural themes remain available in the Theme Map. Fresh evidence will appear here when market conditions strengthen."
+                : `Switch to "All" to see all ${themes.length} monitored themes.`}
             </p>
           </div>
         )}
