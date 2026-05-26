@@ -64,11 +64,12 @@ function ThemeCard({
           <p className="text-[13px] font-semibold text-slate-100 leading-snug">
             {translateTheme(theme.theme)}
           </p>
-          {theme.from_events?.[0] && (
-            <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">
-              {theme.from_events[0]}
-            </p>
-          )}
+          {(() => {
+            const sub = theme.from_events?.[0] || themeDescription(theme.theme);
+            return sub ? (
+              <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">{sub}</p>
+            ) : null;
+          })()}
         </div>
         <div className="flex items-center gap-2 shrink-0 mt-0.5">
           <StateBadge state={theme.state} signal={theme.event_signal} />

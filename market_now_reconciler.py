@@ -45,6 +45,26 @@ _MAX_KNOWN_CONFLICTS = 5
 _BASE = os.path.dirname(os.path.abspath(__file__))
 _TAPE_REL_PATH = "data/intelligence/customer_event_tape.json"
 
+# Human-readable labels for raw driver IDs — keeps customer copy clean
+_DRIVER_LABELS: dict[str, str] = {
+    "ai_capex_growth":           "AI capital spending cycle expanding",
+    "ai_compute_demand":         "AI compute demand rising",
+    "yields_rising":             "Bond yields rising",
+    "yields_falling":            "Bond yields falling",
+    "oil_supply_shock":          "Oil supply shock",
+    "geopolitical_risk_rising":  "Geopolitical risk elevated",
+    "geopolitical_risk_falling": "Geopolitical risk easing",
+    "credit_stress_easing":      "Credit conditions easing",
+    "risk_on_rotation":          "Risk-on rotation underway",
+    "gold_safe_haven_bid":       "Safe-haven demand for gold",
+    "small_cap_risk_on":         "Small-cap stocks outperforming large-caps",
+    "futures_risk_on":           "Futures signalling risk-on",
+    "futures_risk_off":          "Futures signalling risk-off",
+}
+
+def _label_driver(key: str) -> str:
+    return _DRIVER_LABELS.get(key, key.replace("_", " ").title())
+
 
 # ---------------------------------------------------------------------------
 # Conflict matrix
@@ -212,11 +232,12 @@ def _build_what_changed(
         if title and family:
             items.append(f"[{family}] {title}")
     if not items:
-        # Nothing fresh — surface driver state instead
+        # Nothing fresh — surface driver state with human-readable labels
         if active_drivers:
+            labels = [_label_driver(d) for d in active_drivers[:3]]
             items.append(
                 "No fresh event headlines in the last 30 minutes — "
-                f"market driven by current price drivers: {', '.join(active_drivers[:3])}."
+                f"market driven by: {', '.join(labels)}."
             )
         else:
             items.append(
@@ -306,6 +327,7 @@ def _build_themes(
 
     # Surface event-driven themes that aren't in the active list yet
     for tid in event_strengthen - seen:
+        seen.add(tid)
         out.append({
             "theme": tid,
             "state": "watch",
@@ -313,11 +335,22 @@ def _build_themes(
             "from_events": _dedupe(why_strengthen.get(tid, []))[:2],
         })
     for tid in event_weaken - seen:
+        seen.add(tid)
         out.append({
             "theme": tid,
             "state": "watch",
             "event_signal": "weakening",
             "from_events": _dedupe(why_weaken.get(tid, []))[:2],
+        })
+
+    # Include all remaining themes (dormant, crowded, headwind) for Theme Map completeness
+    for tid, state in theme_states.items():
+        if tid in seen:
+            continue
+        out.append({
+            "theme": tid,
+            "state": state,
+            "from_events": [],
         })
 
     return out
