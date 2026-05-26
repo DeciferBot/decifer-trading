@@ -237,7 +237,7 @@ def _load_manifest_regime() -> tuple[str, str, str]:
     """Returns (regime_label, freshness_iso, confidence_label)."""
     try:
         manifest = _read_json("data/live/current_manifest.json")
-        regime_raw = manifest.get("market_regime", "UNKNOWN")
+        regime_raw = manifest.get("market_regime") or "UNKNOWN"
         regime_lbl = _regime_label(regime_raw)
         published = manifest.get("published_at", "")
         # Derive confidence from handoff_enabled state

@@ -215,8 +215,27 @@ def _derive_market_mood(
     if "bank_or_credit_stress" in event_types:
         return "Risk-off — credit or banking stress"
 
-    # Fall back to regime label
-    return regime_label or "Assessing market conditions"
+    # Use regime label when it contains real signal
+    _generic = {"assessing market conditions", "unknown", ""}
+    if regime_label and regime_label.lower() not in _generic:
+        return regime_label
+
+    # Regime is unknown — derive mood from active driver set
+    _RISK_ON = {"risk_on_rotation", "small_cap_risk_on", "futures_risk_on",
+                "credit_stress_easing", "yields_falling", "gold_safe_haven_bid",
+                "ai_capex_growth", "ai_compute_demand"}
+    _RISK_OFF = {"geopolitical_risk_rising", "oil_supply_shock",
+                 "yields_rising", "futures_risk_off"}
+    driver_set = set(active_drivers)
+    on_count = len(driver_set & _RISK_ON)
+    off_count = len(driver_set & _RISK_OFF)
+    if on_count > 0 and off_count == 0:
+        return "Risk-on — broad market tailwinds active"
+    if on_count > 0 and off_count > 0:
+        return "Mixed — risk-on momentum with active headwinds"
+    if off_count > 0 and on_count == 0:
+        return "Risk-off — headwinds dominating"
+    return "Assessing market conditions"
 
 
 def _build_what_changed(
