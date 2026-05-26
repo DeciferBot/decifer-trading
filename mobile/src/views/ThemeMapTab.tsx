@@ -54,20 +54,18 @@ function ThemeCard({
       onClick={onClick}
       className="w-full rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
       style={{
-        background: isSelected ? "#fff7ed" : "#ffffff",
-        border: `1.5px solid ${isSelected ? "#f97316" : "#e5e7eb"}`,
-        boxShadow: isSelected
-          ? "0 2px 8px rgba(249,115,22,0.18)"
-          : "0 1px 3px rgba(0,0,0,0.08)",
+        background: isSelected ? "rgba(249,115,22,0.1)" : "#131f35",
+        border: `1.5px solid ${isSelected ? "#f97316" : "rgba(255,255,255,0.08)"}`,
+        boxShadow: isSelected ? "0 2px 8px rgba(249,115,22,0.15)" : "none",
       }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold text-slate-800 leading-snug">
+          <p className="text-[13px] font-semibold text-slate-100 leading-snug">
             {translateTheme(theme.theme)}
           </p>
           {theme.from_events?.[0] && (
-            <p className="text-[10px] text-slate-500 mt-1 line-clamp-2">
+            <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">
               {theme.from_events[0]}
             </p>
           )}
@@ -76,7 +74,7 @@ function ThemeCard({
           <StateBadge state={theme.state} signal={theme.event_signal} />
           <ChevronRight
             size={14}
-            style={{ color: isSelected ? "#f97316" : "#d1d5db" }}
+            style={{ color: isSelected ? "#f97316" : "#475569" }}
           />
         </div>
       </div>
@@ -106,14 +104,14 @@ function ThemeDetail({
       className="rounded-2xl overflow-hidden"
       style={{
         border: "1.5px solid #f97316",
-        boxShadow: "0 4px 20px rgba(249,115,22,0.14)",
-        background: "#ffffff",
+        boxShadow: "0 4px 20px rgba(249,115,22,0.12)",
+        background: "#131f35",
       }}
     >
       {/* Header */}
       <div
         className="px-4 pt-4 pb-3 flex items-start justify-between gap-2"
-        style={{ borderBottom: "1px solid #fce7c8" }}
+        style={{ borderBottom: "1px solid rgba(249,115,22,0.2)" }}
       >
         <div className="flex-1 min-w-0">
           <p
@@ -122,42 +120,42 @@ function ThemeDetail({
           >
             Theme Detail
           </p>
-          <h3 className="text-sm font-bold text-slate-800 leading-snug">
+          <h3 className="text-sm font-bold text-slate-100 leading-snug">
             {translateTheme(theme.theme)}
           </h3>
         </div>
         <button
           onClick={onClose}
           className="p-1.5 rounded-full transition-colors"
-          style={{ background: "#f3f4f6" }}
+          style={{ background: "rgba(255,255,255,0.08)" }}
         >
-          <X size={13} className="text-slate-500" />
+          <X size={13} className="text-slate-400" />
         </button>
       </div>
 
       <div className="p-4 space-y-4">
         {/* Why it matters */}
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
             Why This Matters
           </p>
-          <p className="text-xs text-slate-600 leading-relaxed">{desc}</p>
+          <p className="text-xs text-slate-300 leading-relaxed">{desc}</p>
         </div>
 
         {/* Connected sectors */}
         {sectors.length > 0 && (
           <div>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-2">
               Connected Sectors
             </p>
             <div className="flex flex-wrap gap-1.5">
               {sectors.map((s, i) => {
                 const colors =
                   s.mood === "tailwind"
-                    ? { bg: "rgba(16,185,129,0.1)", text: "#059669" }
+                    ? { bg: "rgba(16,185,129,0.1)", text: "#34d399" }
                     : s.mood === "headwind"
-                      ? { bg: "rgba(239,68,68,0.1)", text: "#dc2626" }
-                      : { bg: "rgba(249,115,22,0.1)", text: "#c2410c" };
+                      ? { bg: "rgba(239,68,68,0.1)", text: "#f87171" }
+                      : { bg: "rgba(249,115,22,0.1)", text: "#fb923c" };
                 return (
                   <span
                     key={i}
@@ -175,7 +173,7 @@ function ThemeDetail({
         {/* Related names on the intelligence map */}
         {names.length > 0 && (
           <div>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-2">
               Connected Names on the Map
             </p>
             <div className="space-y-1.5">
@@ -184,28 +182,28 @@ function ThemeDetail({
                   key={i}
                   onClick={() => onNameSelect(n)}
                   className="w-full text-left rounded-xl px-3.5 py-3 flex items-start justify-between gap-2 transition-all active:scale-[0.98]"
-                  style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
                 >
                   <div className="min-w-0 flex-1">
-                    <span className="text-[13px] font-black text-slate-800">{n.symbol}</span>
+                    <span className="text-[13px] font-black text-slate-100">{n.symbol}</span>
                     {n.reason_to_watch && (
-                      <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2">
+                      <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2">
                         {n.reason_to_watch}
                       </p>
                     )}
                   </div>
-                  <ChevronRight size={12} className="text-slate-400 shrink-0 mt-0.5" />
+                  <ChevronRight size={12} className="text-slate-500 shrink-0 mt-0.5" />
                 </button>
               ))}
             </div>
-            <p className="text-[9px] text-slate-400 mt-2">
+            <p className="text-[9px] text-slate-500 mt-2">
               Tap a name to learn more. Not a recommendation.
             </p>
           </div>
         )}
 
         {names.length === 0 && sectors.length === 0 && (
-          <p className="text-xs text-slate-400 text-center py-2">
+          <p className="text-xs text-slate-500 text-center py-2">
             Monitoring this theme — more detail pending.
           </p>
         )}
@@ -274,7 +272,7 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
     return (
       <div className="px-4 pt-12 flex flex-col items-center gap-3 text-center">
         <p className="text-slate-400 text-sm">No active themes right now.</p>
-        <p className="text-xs text-slate-600 leading-relaxed max-w-xs">
+        <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
           The intelligence pipeline is monitoring the market. Themes activate when price drivers and event evidence align — typically during market hours.
         </p>
       </div>
@@ -371,15 +369,14 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
                 onClick={() => onThemeSelect(selectedTheme === t.theme ? null : t.theme)}
                 className="rounded-xl p-3 text-left transition-all active:scale-[0.98]"
                 style={{
-                  background: selectedTheme === t.theme ? "#fff7ed" : "#ffffff",
-                  border: `1px solid ${selectedTheme === t.theme ? "#f97316" : "#e5e7eb"}`,
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                  background: selectedTheme === t.theme ? "rgba(249,115,22,0.1)" : "#131f35",
+                  border: `1px solid ${selectedTheme === t.theme ? "#f97316" : "rgba(255,255,255,0.08)"}`,
                 }}
               >
-                <p className="text-[11px] font-semibold text-slate-600 leading-snug">
+                <p className="text-[11px] font-semibold text-slate-300 leading-snug">
                   {translateTheme(t.theme)}
                 </p>
-                <p className="text-[9px] text-slate-400 mt-1">Not signalling</p>
+                <p className="text-[9px] text-slate-500 mt-1">Not signalling</p>
               </button>
             ))}
           </div>

@@ -227,7 +227,7 @@ export default function CustomerApp() {
         }}
       >
         <p className="text-[9px] text-slate-700">
-          Market intelligence only · Not financial advice · No trade execution · M11B.4
+          Market intelligence only · Not financial advice · No trade execution
         </p>
       </footer>
     </div>

@@ -32,16 +32,16 @@ function confidenceInfo(state?: string, signal?: string): { label: string; color
   const s   = state ?? "";
   const sig = signal ?? "";
   if (s === "activated" || s === "active" || sig === "strengthening")
-    return { label: "Strengthening",            color: "#059669" };
+    return { label: "Strengthening",            color: "#34d399" };
   if (s === "crowded")
-    return { label: "Crowded — watch for shift", color: "#d97706" };
+    return { label: "Crowded — watch for shift", color: "#fbbf24" };
   if (sig === "weakening" || s === "watch")
-    return { label: "Weakening",                color: "#d97706" };
+    return { label: "Weakening",                color: "#fbbf24" };
   if (s === "headwind")
-    return { label: "Headwind signal",          color: "#dc2626" };
+    return { label: "Headwind signal",          color: "#f87171" };
   if (s === "dormant")
-    return { label: "Not currently signalling", color: "#6b7280" };
-  return { label: "Monitoring",               color: "#6b7280" };
+    return { label: "Not currently signalling", color: "#64748b" };
+  return { label: "Monitoring",               color: "#64748b" };
 }
 
 // ── Signal card ───────────────────────────────────────────────────────────────
@@ -61,9 +61,9 @@ function SignalCard({
     <div
       className="rounded-2xl overflow-hidden transition-shadow"
       style={{
-        background: "#ffffff",
-        border: "1px solid #e5e7eb",
-        boxShadow: expanded ? "0 2px 8px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.07)",
+        background: "#131f35",
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: expanded ? "0 2px 12px rgba(0,0,0,0.3)" : "none",
       }}
     >
       <button
@@ -71,7 +71,7 @@ function SignalCard({
         className="w-full px-4 py-3.5 text-left flex items-start justify-between gap-2"
       >
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold text-slate-800">
+          <p className="text-[13px] font-semibold text-slate-100">
             {translateTheme(theme.theme)}
           </p>
           <p className="text-[10px] mt-0.5" style={{ color: conf.color }}>
@@ -86,12 +86,15 @@ function SignalCard({
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-3.5 border-t border-slate-100 pt-3">
+        <div
+          className="px-4 pb-4 space-y-3.5 pt-3"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}
+        >
 
           {/* Evidence */}
           {theme.from_events && theme.from_events.length > 0 && (
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                 Evidence
               </p>
               <ul className="space-y-1.5">
@@ -101,7 +104,7 @@ function SignalCard({
                       className="w-1.5 h-1.5 rounded-full mt-1 shrink-0"
                       style={{ background: "#f97316" }}
                     />
-                    <p className="text-xs text-slate-600 leading-relaxed">{ev}</p>
+                    <p className="text-xs text-slate-300 leading-relaxed">{ev}</p>
                   </li>
                 ))}
               </ul>
@@ -110,17 +113,17 @@ function SignalCard({
 
           {/* Why this matters */}
           <div>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
               Why This Matters
             </p>
-            <p className="text-xs text-slate-600 leading-relaxed">{desc}</p>
+            <p className="text-xs text-slate-300 leading-relaxed">{desc}</p>
           </div>
 
           {/* Explore button */}
           <button
             onClick={() => onThemeSelect(theme.theme)}
             className="text-[10px] font-semibold px-3 py-1.5 rounded-full transition-all active:scale-95"
-            style={{ background: "rgba(249,115,22,0.1)", color: "#c2410c" }}
+            style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
           >
             Explore in Theme Map →
           </button>
@@ -186,9 +189,9 @@ export default function SignalsTab({ data, onThemeSelect }: Props) {
               <div
                 key={i}
                 className="rounded-xl px-3.5 py-3"
-                style={{ background: "#fffbeb", border: "1px solid rgba(245,158,11,0.25)" }}
+                style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }}
               >
-                <p className="text-xs text-amber-800 leading-relaxed">{c}</p>
+                <p className="text-xs text-amber-300 leading-relaxed">{c}</p>
               </div>
             ))}
           </div>
@@ -216,7 +219,7 @@ export default function SignalsTab({ data, onThemeSelect }: Props) {
                   : `No ${filter} signals right now.`}
               </p>
               {filter === "all" && (
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-xs text-slate-500 leading-relaxed">
                   The intelligence pipeline is monitoring the market. Signals appear as themes activate — typically during market hours.
                 </p>
               )}

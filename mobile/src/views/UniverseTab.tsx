@@ -16,23 +16,22 @@ function NameCard({ item, onSelect }: { item: RadarItem; onSelect: (item: RadarI
       onClick={() => onSelect(item)}
       className="w-full rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
       style={{
-        background: "#ffffff",
-        border: "1px solid #e5e7eb",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
+        background: "#131f35",
+        border: "1px solid rgba(255,255,255,0.08)",
       }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-base font-black text-slate-900">{item.symbol}</span>
+            <span className="text-base font-black text-slate-100">{item.symbol}</span>
           </div>
           {item.reason_to_watch && (
-            <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+            <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
               {item.reason_to_watch}
             </p>
           )}
         </div>
-        <ChevronRight size={14} className="text-slate-400 shrink-0 mt-1" />
+        <ChevronRight size={14} className="text-slate-500 shrink-0 mt-1" />
       </div>
     </button>
   );
@@ -79,7 +78,7 @@ export default function UniverseTab({ data, onNameSelect, onThemeSelect }: Props
         <button
           onClick={() => onThemeSelect(themeId)}
           className="text-[9px] font-semibold px-2 py-0.5 rounded-full"
-          style={{ background: "rgba(249,115,22,0.1)", color: "#c2410c" }}
+          style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
         >
           View theme →
         </button>
@@ -91,7 +90,7 @@ export default function UniverseTab({ data, onNameSelect, onThemeSelect }: Props
     return (
       <div className="px-4 pt-12 flex flex-col items-center gap-3 text-center">
         <p className="text-slate-400 text-sm">No names on the intelligence map right now.</p>
-        <p className="text-xs text-slate-600 leading-relaxed max-w-xs">
+        <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
           Names appear when active themes identify connected companies. Check the Theme Map tab as markets open.
         </p>
       </div>
