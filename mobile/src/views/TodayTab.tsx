@@ -1,10 +1,9 @@
 "use client";
-// Today tab — M13B refactor.
-// Leads with Market Story Hero (regime + macro + bullets + caution + watch next),
-// then: since-away | event context | market forces | worth watching.
-// Receives pre-computed story, causeCards, clock, sinceAway from CustomerApp.
+// Today tab — M13D refactor.
+// Leads with Market Story Hero, then Market Tape strip, then grouped cause
+// stories (de-duplicated), event context, and worth-watching items.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowRight,
   AlertCircle,
@@ -12,20 +11,21 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  Clock,
   TrendingUp,
   Zap,
   Shield,
+  Layers,
 } from "lucide-react";
 import type { MarketNowPayload, KeyEvent } from "@/lib/customerApi";
 import type { CustomerStory } from "@/lib/customerStory";
-import type { MarketCauseCard } from "@/lib/marketCauseStory";
 import type {
   MarketClockState,
   FreshnessState,
   SinceAwaySummary,
 } from "@/lib/useCustomerBriefing";
 import { buildCustomerMarketStory } from "@/lib/customerBriefingModel";
+import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory";
+import type { TapeEntry } from "@/app/api/market-tape/route";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +56,60 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
     </div>
   );
 }
+
+// ── Market Tape ───────────────────────────────────────────────────────────────
+
+function TapeItem({ entry }: { entry: TapeEntry }) {
+  if (entry.type === "vol") {
+    const level = entry.level;
+    const vixColor =
+      level == null   ? "#475569" :
+      level >= 25     ? "#f87171" :
+      level >= 20     ? "#fbbf24" :
+                        "#34d399";
+    return (
+      <div
+        className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl shrink-0"
+        style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+      >
+        <span className="text-[11px] font-black" style={{ color: vixColor }}>
+          {level != null ? level.toFixed(1) : "—"}
+        </span>
+        <span className="text-[9px] font-medium text-slate-600">VIX</span>
+      </div>
+    );
+  }
+
+  const pct = entry.changePct;
+  const isPos = pct != null && pct > 0;
+  const isNeg = pct != null && pct < 0;
+  const color = isPos ? "#34d399" : isNeg ? "#f87171" : "#475569";
+
+  return (
+    <div
+      className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl shrink-0"
+      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+    >
+      <span className="text-[11px] font-black" style={{ color }}>
+        {pct != null ? `${isPos ? "+" : ""}${pct.toFixed(1)}%` : "—"}
+      </span>
+      <span className="text-[9px] font-medium text-slate-600">{entry.label}</span>
+    </div>
+  );
+}
+
+function MarketTapeStrip({ tape }: { tape: TapeEntry[] }) {
+  if (tape.length === 0) return null;
+  return (
+    <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+      <div className="flex gap-2 min-w-max">
+        {tape.map(t => <TapeItem key={t.sym} entry={t} />)}
+      </div>
+    </div>
+  );
+}
+
+// ── Event card ────────────────────────────────────────────────────────────────
 
 function EventCard({ ev }: { ev: KeyEvent }) {
   const [open, setOpen] = useState(false);
@@ -292,12 +346,96 @@ function MarketStoryHero({
   );
 }
 
+// ── Cause group card ──────────────────────────────────────────────────────────
+
+function CauseGroupCard({
+  group,
+  onThemeSelect,
+  onAskAbout,
+}: {
+  group: MarketCauseGroup;
+  onThemeSelect: (id: string) => void;
+  onAskAbout?: (ctx: string) => void;
+}) {
+  const card = group.display_card;
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-2.5">
+        {group.is_cluster ? (
+          <Layers size={12} style={{ color: "#f97316", flexShrink: 0 }} />
+        ) : (
+          <TrendingUp size={12} style={{ color: "#f97316", flexShrink: 0 }} />
+        )}
+        <p className="text-[13px] font-bold text-slate-100 flex-1">{card.cause_label}</p>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {group.is_cluster && (
+            <span
+              className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+              style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+            >
+              {group.driver_count} drivers
+            </span>
+          )}
+          <span
+            className="text-[9px] font-medium px-1.5 py-0.5 rounded"
+            style={{ background: "rgba(255,255,255,0.05)", color: "#6b7280" }}
+          >
+            {card.evidence_basis}
+          </span>
+        </div>
+      </div>
+
+      <p className="text-[12px] text-slate-300 leading-relaxed mb-1">{card.what_happened}</p>
+      <p className="text-[12px] text-slate-400 leading-relaxed">{card.market_impact}</p>
+
+      {/* Connected themes */}
+      {card.connected_themes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
+          {card.connected_themes.slice(0, 3).map((t, j) => (
+            <button
+              key={j}
+              onClick={() => {
+                if (card.primary_market_now_id) onThemeSelect(card.primary_market_now_id);
+              }}
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full transition-all active:scale-95"
+              style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+            >
+              {t.ttgLabel}
+            </button>
+          ))}
+          {card.connected_names_count > 0 && (
+            <span className="text-[10px] text-slate-600 self-center ml-1">
+              {card.connected_names_count}{" "}
+              {card.connected_names_count !== 1 ? "names" : "name"}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Ask Decifer CTA */}
+      {onAskAbout && (
+        <button
+          onClick={() => onAskAbout(`Why is ${card.cause_label.toLowerCase()} affecting markets?`)}
+          className="mt-2.5 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
+          style={{ color: "#94a3b8" }}
+        >
+          Ask Decifer why
+          <ArrowRight size={9} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
   data: MarketNowPayload;
   story: CustomerStory | null;
-  causeCards: MarketCauseCard[];
   clock: MarketClockState;
   sinceAway: SinceAwaySummary;
   freshnessState: FreshnessState;
@@ -314,7 +452,6 @@ interface Props {
 export default function TodayTab({
   data,
   story,
-  causeCards,
   sinceAway,
   freshnessState,
   freshnessLabel,
@@ -326,6 +463,15 @@ export default function TodayTab({
 }: Props) {
   const keyEvents  = data.key_events ?? [];
   const watchNext  = data.watch_next?.length ? data.watch_next : (data.what_to_watch ?? []);
+  const groups     = buildCauseGroups(data);
+
+  const [tape, setTape] = useState<TapeEntry[]>([]);
+  useEffect(() => {
+    fetch("/api/market-tape")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.tape) setTape(d.tape); })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="px-4 pb-8 space-y-5 pt-3">
@@ -346,7 +492,15 @@ export default function TodayTab({
         </section>
       )}
 
-      {/* ── B: Since you were away ────────────────────────────────────────── */}
+      {/* ── B: Market tape ───────────────────────────────────────────────── */}
+      {tape.length > 0 && (
+        <section>
+          <SectionLabel>Market snapshot</SectionLabel>
+          <MarketTapeStrip tape={tape} />
+        </section>
+      )}
+
+      {/* ── C: Since you were away ────────────────────────────────────────── */}
       {sinceAway.lastSeenAt && (
         <section>
           <SectionLabel>
@@ -394,7 +548,7 @@ export default function TodayTab({
         </section>
       )}
 
-      {/* ── C: Real-world event context ───────────────────────────────────── */}
+      {/* ── D: Real-world event context ───────────────────────────────────── */}
       {keyEvents.length > 0 && (
         <section>
           <SectionLabel>Real-world events behind the move</SectionLabel>
@@ -416,69 +570,18 @@ export default function TodayTab({
         </section>
       )}
 
-      {/* ── D: What is moving markets ─────────────────────────────────────── */}
-      {causeCards.length > 0 && (
+      {/* ── E: What is moving markets (grouped) ──────────────────────────── */}
+      {groups.length > 0 && (
         <section>
           <SectionLabel>What is moving markets</SectionLabel>
           <div className="space-y-3">
-            {causeCards.map((card, i) => (
-              <div
+            {groups.map((group, i) => (
+              <CauseGroupCard
                 key={i}
-                className="rounded-2xl p-4"
-                style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-              >
-                <div className="flex items-center gap-2 mb-2.5">
-                  <TrendingUp size={12} style={{ color: "#f97316", flexShrink: 0 }} />
-                  <p className="text-[13px] font-bold text-slate-100 flex-1">{card.cause_label}</p>
-                  <span
-                    className="text-[9px] font-medium px-1.5 py-0.5 rounded shrink-0"
-                    style={{ background: "rgba(255,255,255,0.05)", color: "#6b7280" }}
-                  >
-                    {card.evidence_basis}
-                  </span>
-                </div>
-
-                <p className="text-[12px] text-slate-300 leading-relaxed mb-1">{card.what_happened}</p>
-                <p className="text-[12px] text-slate-400 leading-relaxed">{card.market_impact}</p>
-
-                {/* Connected themes */}
-                {card.connected_themes.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2.5">
-                    {card.connected_themes.slice(0, 3).map((t, j) => (
-                      <button
-                        key={j}
-                        onClick={() => {
-                          if (card.primary_market_now_id) onThemeSelect(card.primary_market_now_id);
-                        }}
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full transition-all active:scale-95"
-                        style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
-                      >
-                        {t.ttgLabel}
-                      </button>
-                    ))}
-                    {card.connected_names_count > 0 && (
-                      <span className="text-[10px] text-slate-600 self-center ml-1">
-                        {card.connected_names_count}{" "}
-                        {card.connected_names_count !== 1 ? "names" : "name"}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Ask Decifer CTA */}
-                {onAskAbout && (
-                  <button
-                    onClick={() =>
-                      onAskAbout(`Why is ${card.cause_label.toLowerCase()} moving markets?`)
-                    }
-                    className="mt-2.5 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
-                    style={{ color: "#94a3b8" }}
-                  >
-                    Ask Decifer why
-                    <ArrowRight size={9} />
-                  </button>
-                )}
-              </div>
+                group={group}
+                onThemeSelect={onThemeSelect}
+                onAskAbout={onAskAbout}
+              />
             ))}
           </div>
           {onGoToForces && (
@@ -498,7 +601,7 @@ export default function TodayTab({
         </section>
       )}
 
-      {/* ── E: Worth watching ─────────────────────────────────────────────── */}
+      {/* ── F: Worth watching ─────────────────────────────────────────────── */}
       {watchNext.length > 0 && (
         <section>
           <SectionLabel>Worth watching</SectionLabel>

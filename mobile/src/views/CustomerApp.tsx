@@ -192,7 +192,6 @@ export default function CustomerApp() {
     error,
     isRefreshing,
     story,
-    causeCards,
     clock,
     freshnessState,
     freshnessLabel,
@@ -369,7 +368,6 @@ export default function CustomerApp() {
           <TodayTab
             data={data}
             story={story}
-            causeCards={causeCards}
             clock={clock}
             sinceAway={sinceAway}
             freshnessState={freshnessState}

@@ -317,6 +317,118 @@ export function getTtgCauseContext(ttgId: string): string {
   return TTG_CAUSE_CONTEXT[ttgId] ?? "";
 }
 
+// ── Driver story clusters ─────────────────────────────────────────────────────
+// When ≥2 drivers from the same cluster are active, buildCauseGroups() merges
+// them into one display card instead of showing redundant top-level cards.
+
+const DRIVER_CLUSTERS: Array<{
+  id: string;
+  label: string;
+  drivers: string[];
+  mergedNarrative: string;
+}> = [
+  {
+    id: "ai_infrastructure",
+    label: "AI Infrastructure & Compute Demand",
+    drivers: ["ai_capex_growth", "ai_compute_demand"],
+    mergedNarrative:
+      "Both AI infrastructure spending and compute demand are accelerating simultaneously. Hyperscalers are committing to record data centre build-outs while demand for model training and inference compute is outpacing available capacity.",
+  },
+  {
+    id: "risk_on_momentum",
+    label: "Broad Risk-On Environment",
+    drivers: ["futures_risk_on", "risk_on_rotation", "small_cap_risk_on"],
+    mergedNarrative:
+      "Multiple risk-on signals are active simultaneously, pointing to improving market sentiment across equities and smaller companies. Growth and cyclical themes are in focus heading into the session.",
+  },
+];
+
+export interface MarketCauseGroup {
+  group_label: string;
+  cluster_id: string | null;
+  cards: MarketCauseCard[];
+  display_card: MarketCauseCard;
+  is_cluster: boolean;
+  driver_count: number;
+}
+
+function dedupeConnectedThemes(themes: CauseConnectedTheme[]): CauseConnectedTheme[] {
+  return [...new Map(themes.map(t => [t.ttgId, t])).values()];
+}
+
+/**
+ * Groups MarketCauseCards by story cluster.
+ * When ≥2 drivers from the same cluster are active they are merged into one
+ * display card with a combined narrative. Single-driver groups pass through
+ * unchanged. Order matches the original key_drivers order.
+ */
+export function buildCauseGroups(payload: MarketNowPayload): MarketCauseGroup[] {
+  const keyDrivers = payload.key_drivers ?? [];
+  const normalizedDrivers = keyDrivers
+    .map(normalizeDriverId)
+    .filter(d => Boolean(CAUSE_LABELS[d]));
+
+  if (normalizedDrivers.length === 0) return [];
+
+  const cards = buildMarketCauseCards(payload);
+  const cardByDriver = new Map<string, MarketCauseCard>();
+  for (const driverId of normalizedDrivers) {
+    const card = cards.find(c => c.cause_label === CAUSE_LABELS[driverId]);
+    if (card) cardByDriver.set(driverId, card);
+  }
+
+  const usedDrivers = new Set<string>();
+  const groups: MarketCauseGroup[] = [];
+
+  // Try to form clusters first
+  for (const cluster of DRIVER_CLUSTERS) {
+    const matchingDrivers = cluster.drivers.filter(
+      d => cardByDriver.has(d) && !usedDrivers.has(d),
+    );
+    if (matchingDrivers.length < 2) continue;
+
+    const clusterCards = matchingDrivers.map(d => cardByDriver.get(d)!);
+    matchingDrivers.forEach(d => usedDrivers.add(d));
+
+    const mergedCard: MarketCauseCard = {
+      ...clusterCards[0],
+      cause_label: cluster.label,
+      what_happened: cluster.mergedNarrative,
+      market_impact: [...new Set(clusterCards.map(c => c.market_impact))].join(" "),
+      connected_themes: dedupeConnectedThemes(clusterCards.flatMap(c => c.connected_themes)),
+      connected_names_count: Math.max(...clusterCards.map(c => c.connected_names_count)),
+      has_fresh_evidence: clusterCards.some(c => c.has_fresh_evidence),
+    };
+
+    groups.push({
+      group_label: cluster.label,
+      cluster_id: cluster.id,
+      cards: clusterCards,
+      display_card: mergedCard,
+      is_cluster: true,
+      driver_count: matchingDrivers.length,
+    });
+  }
+
+  // Remaining individual drivers (preserve original order)
+  for (const driverId of normalizedDrivers) {
+    if (usedDrivers.has(driverId)) continue;
+    const card = cardByDriver.get(driverId);
+    if (!card) continue;
+    usedDrivers.add(driverId);
+    groups.push({
+      group_label: card.cause_label,
+      cluster_id: null,
+      cards: [card],
+      display_card: card,
+      is_cluster: false,
+      driver_count: 1,
+    });
+  }
+
+  return groups;
+}
+
 /**
  * Converts MarketNowPayload key_drivers into a list of MarketCauseCards.
  * Returns at most 6 cards. Returns [] when no drivers are active.

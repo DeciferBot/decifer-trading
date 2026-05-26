@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   buildMarketCauseCards,
+  buildCauseGroups,
   getCauseMarketImpact,
   getTtgCauseContext,
   type MarketCauseCard,
+  type MarketCauseGroup,
 } from "./marketCauseStory";
 import type { MarketNowPayload } from "./customerApi";
 
@@ -253,6 +255,99 @@ describe("buildMarketCauseCards — human-readable label normalisation", () => {
   it("unknown human-readable labels are silently dropped", () => {
     const cards = buildMarketCauseCards(makePayload({ key_drivers: ["Something completely unrecognisable xyz"] }));
     expect(cards).toHaveLength(0);
+  });
+});
+
+describe("buildCauseGroups", () => {
+  it("returns empty array when no drivers", () => {
+    expect(buildCauseGroups(makePayload())).toHaveLength(0);
+  });
+
+  it("returns single group for a lone driver", () => {
+    const groups = buildCauseGroups(makePayload({ key_drivers: ["geopolitical_risk_rising"] }));
+    expect(groups).toHaveLength(1);
+    expect(groups[0].is_cluster).toBe(false);
+    expect(groups[0].driver_count).toBe(1);
+    expect(groups[0].cluster_id).toBeNull();
+  });
+
+  it("merges ai_capex_growth + ai_compute_demand into one AI cluster", () => {
+    const groups = buildCauseGroups(makePayload({
+      key_drivers: ["ai_capex_growth", "ai_compute_demand"],
+    }));
+    expect(groups).toHaveLength(1);
+    const g = groups[0];
+    expect(g.is_cluster).toBe(true);
+    expect(g.cluster_id).toBe("ai_infrastructure");
+    expect(g.driver_count).toBe(2);
+    expect(g.cards).toHaveLength(2);
+    expect(g.display_card.cause_label).toBe("AI Infrastructure & Compute Demand");
+  });
+
+  it("AI cluster merged narrative does not expose internal driver IDs", () => {
+    const groups = buildCauseGroups(makePayload({
+      key_drivers: ["ai_capex_growth", "ai_compute_demand"],
+    }));
+    const text = groups[0].display_card.what_happened;
+    expect(text).not.toContain("ai_capex_growth");
+    expect(text).not.toContain("ai_compute_demand");
+  });
+
+  it("single ai_capex_growth is NOT clustered (needs ≥2 cluster members)", () => {
+    const groups = buildCauseGroups(makePayload({ key_drivers: ["ai_capex_growth"] }));
+    expect(groups).toHaveLength(1);
+    expect(groups[0].is_cluster).toBe(false);
+    expect(groups[0].display_card.cause_label).toBe("AI Infrastructure Spending");
+  });
+
+  it("merges risk-on cluster when ≥2 of its drivers are active", () => {
+    const groups = buildCauseGroups(makePayload({
+      key_drivers: ["futures_risk_on", "risk_on_rotation"],
+    }));
+    expect(groups).toHaveLength(1);
+    expect(groups[0].is_cluster).toBe(true);
+    expect(groups[0].cluster_id).toBe("risk_on_momentum");
+  });
+
+  it("unclustered drivers after a cluster are still returned", () => {
+    const groups = buildCauseGroups(makePayload({
+      key_drivers: ["ai_capex_growth", "ai_compute_demand", "geopolitical_risk_rising"],
+    }));
+    expect(groups).toHaveLength(2);
+    expect(groups[0].is_cluster).toBe(true);   // AI cluster
+    expect(groups[1].is_cluster).toBe(false);  // geopolitical standalone
+    expect(groups[1].display_card.cause_label).toBe("Geopolitical Risk");
+  });
+
+  it("cluster display_card deduplicated connected_themes across member cards", () => {
+    const groups = buildCauseGroups(makePayload({
+      key_drivers: ["ai_capex_growth", "ai_compute_demand"],
+    }));
+    const themes = groups[0].display_card.connected_themes;
+    const ttgIds = themes.map(t => t.ttgId);
+    // No duplicate ttgIds
+    expect(ttgIds.length).toBe(new Set(ttgIds).size);
+  });
+
+  it("cluster display_card has no prohibited language", () => {
+    const groups = buildCauseGroups(makePayload({
+      key_drivers: ["ai_capex_growth", "ai_compute_demand"],
+    }));
+    const card = groups[0].display_card;
+    const text = [card.cause_label, card.what_happened, card.market_impact].join(" ").toLowerCase();
+    const prohibited = ["buy", "sell", "hold", "order", "scanner", "payload", "position size"];
+    for (const word of prohibited) {
+      expect(text, `cluster card must not contain "${word}"`).not.toContain(word);
+    }
+  });
+
+  it("unknown drivers are filtered — no group for unrecognised IDs", () => {
+    const groups = buildCauseGroups(makePayload({
+      key_drivers: ["unknown_xyz", "ai_capex_growth"],
+    }));
+    // Only the known driver produces a group
+    expect(groups).toHaveLength(1);
+    expect(groups[0].display_card.cause_label).toBe("AI Infrastructure Spending");
   });
 });
 

@@ -90,7 +90,7 @@ describe("buildCustomerStory", () => {
       key_drivers: ["ai_capex_growth"],
     }));
     const d = story.primary_drivers[0];
-    expect(d.label).toBe("AI Capex Growth");
+    expect(d.label).toBe("AI Infrastructure Spending");
     expect(d.linked_ttg_id).toBe("ai_energy_nuclear");
     expect(d.linked_ttg_label).toBe("AI Energy & Nuclear");
   });
@@ -98,7 +98,7 @@ describe("buildCustomerStory", () => {
   it("maps geopolitical_risk_rising driver with TTG linkage", () => {
     const story = buildCustomerStory(makePayload({ key_drivers: ["geopolitical_risk_rising"] }));
     const d = story.primary_drivers[0];
-    expect(d.label).toBe("Geopolitical Risk Rising");
+    expect(d.label).toBe("Geopolitical Risk");
     expect(d.linked_ttg_id).toBe("defence_rearmament");
   });
 
@@ -192,6 +192,35 @@ describe("buildCustomerStory", () => {
       key_drivers: ["ai_capex_growth", "geopolitical_risk_rising", "yields_falling", "gold_safe_haven_bid", "risk_on_rotation", "futures_risk_on"],
     }));
     expect(story.primary_drivers.length).toBeLessThanOrEqual(5);
+  });
+
+  it("headline does not use 'driving N active themes' pattern", () => {
+    const story = buildCustomerStory(makePayload({
+      key_drivers: ["ai_capex_growth", "ai_compute_demand"],
+      themes: [{ theme: "data_centre_power", state: "active" }],
+    }));
+    expect(story.headline.toLowerCase()).not.toMatch(/driving \d+ active theme/);
+  });
+
+  it("headline does not use 'primary driver across N themes' pattern", () => {
+    const story = buildCustomerStory(makePayload({
+      key_drivers: ["ai_capex_growth"],
+      themes: [{ theme: "data_centre_power", state: "active" }],
+    }));
+    expect(story.headline.toLowerCase()).not.toMatch(/primary driver across \d+/);
+  });
+
+  it("DRIVER_LABELS use customer-friendly names without technical jargon", () => {
+    const story = buildCustomerStory(makePayload({
+      key_drivers: ["ai_capex_growth", "futures_risk_on", "geopolitical_risk_rising"],
+    }));
+    const labels = story.primary_drivers.map(d => d.label);
+    // Should not contain internal shorthand
+    for (const label of labels) {
+      expect(label.toLowerCase()).not.toContain("capex");
+      expect(label.toLowerCase()).not.toContain("risk-on");
+      expect(label.toLowerCase()).not.toContain("risk-off");
+    }
   });
 
   it("contains no buy/sell/hold/order language in headline or summary", () => {

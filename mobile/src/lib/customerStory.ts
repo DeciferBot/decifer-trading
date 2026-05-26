@@ -46,22 +46,22 @@ export interface CustomerStory {
   has_live_events: boolean;
 }
 
-// Driver ID to display label map (matches live_driver_state.json keys)
+// Driver ID to display label map — customer-friendly language, no internal IDs
 const DRIVER_LABELS: Record<string, string> = {
-  ai_capex_growth: "AI Capex Growth",
-  ai_compute_demand: "AI Compute Demand",
-  geopolitical_risk_rising: "Geopolitical Risk Rising",
-  small_cap_risk_on: "Small Cap Risk-On",
-  futures_risk_on: "Futures Risk-On",
-  futures_risk_off: "Futures Risk-Off",
-  yields_falling: "Yields Falling",
-  yields_rising: "Yields Rising",
-  risk_on_rotation: "Risk-On Rotation",
-  gold_safe_haven_bid: "Gold Safe Haven Bid",
-  credit_stress_easing: "Credit Stress Easing",
-  oil_supply_shock: "Oil Supply Shock",
-  smh_tactical_weakness: "Semi Tactical Weakness",
-  reits_falling_yield: "REITs / Yield Compression",
+  ai_capex_growth:          "AI Infrastructure Spending",
+  ai_compute_demand:        "AI Compute Demand",
+  geopolitical_risk_rising: "Geopolitical Risk",
+  small_cap_risk_on:        "Improving Risk Appetite",
+  futures_risk_on:          "Overnight Market Optimism",
+  futures_risk_off:         "Overnight Market Caution",
+  yields_falling:           "Falling Interest Rates",
+  yields_rising:            "Rising Interest Rates",
+  risk_on_rotation:         "Growth Stock Rotation",
+  gold_safe_haven_bid:      "Gold Safe-Haven Demand",
+  credit_stress_easing:     "Easing Credit Conditions",
+  oil_supply_shock:         "Oil Supply Disruption",
+  smh_tactical_weakness:    "Semiconductor Near-Term Fatigue",
+  reits_falling_yield:      "Rising Yields Pressuring Real Estate",
 };
 
 // Maps driver IDs to which market_now theme IDs they activate
@@ -130,34 +130,34 @@ function synthesiseHeadline(
   key_drivers: string[],
   activeThemeCount: number,
 ): string {
-  const topDrivers = key_drivers.slice(0, 2).map(d => DRIVER_LABELS[d] ?? d);
+  const topDrivers = key_drivers.slice(0, 2).map(d => DRIVER_LABELS[d] ?? d).filter(Boolean);
 
   if (market_state === "risk-on") {
     if (topDrivers.length >= 2) {
-      return `${topDrivers[0]} and ${topDrivers[1]} are driving ${activeThemeCount} active theme${activeThemeCount !== 1 ? "s" : ""}`;
+      return `${topDrivers[0]} and ${topDrivers[1]} are the primary forces today.`;
     }
     if (topDrivers.length === 1) {
-      return `${topDrivers[0]} is the primary driver across ${activeThemeCount} active theme${activeThemeCount !== 1 ? "s" : ""}`;
+      return `${topDrivers[0]} is the primary force today.`;
     }
-    return `${activeThemeCount} structural theme${activeThemeCount !== 1 ? "s" : ""} are active`;
+    return `${activeThemeCount} structural theme${activeThemeCount !== 1 ? "s" : ""} are active.`;
   }
 
   if (market_state === "risk-off") {
     if (topDrivers.length >= 1) {
-      return `${topDrivers[0]} is generating defensive and caution signals`;
+      return `${topDrivers[0]} is generating caution across markets.`;
     }
-    return "Defensive signals are dominant — risk appetite is reduced";
+    return "Defensive signals are dominant — risk appetite is reduced.";
   }
 
   if (market_state === "mixed") {
-    return "Conflicting signals — risk-on and risk-off drivers are both active";
+    return "Conflicting signals — risk-on and risk-off forces are both active.";
   }
 
   // monitoring
   if (activeThemeCount > 0) {
-    return `${activeThemeCount} structural theme${activeThemeCount !== 1 ? "s" : ""} in focus — no dominant driver confirmed yet`;
+    return `${activeThemeCount} structural theme${activeThemeCount !== 1 ? "s" : ""} in focus — no dominant force confirmed yet.`;
   }
-  return "Markets are quiet — no dominant theme has emerged today";
+  return "No dominant market force has emerged today — markets are quiet.";
 }
 
 function synthesiseSummary(
@@ -174,33 +174,31 @@ function synthesiseSummary(
     return apiSummary;
   }
 
-  // Synthesise from drivers and structural themes
-  const driverNames = key_drivers
-    .slice(0, 3)
-    .map(d => DRIVER_LABELS[d] ?? d)
-    .join(", ");
-
-  const structuralLabels = [...new Set(mappedStructural.map(m => m.ttgLabel))]
-    .slice(0, 3)
-    .join(", ");
+  const driverLabels = key_drivers.slice(0, 2).map(d => DRIVER_LABELS[d] ?? d).filter(Boolean);
+  const structLabels = [...new Set(mappedStructural.map(m => m.ttgLabel))].slice(0, 3);
 
   if (market_state === "risk-on") {
-    const driverPart = driverNames ? `${driverNames} ${key_drivers.length === 1 ? "is" : "are"} the active force.` : "";
-    const structPart = structuralLabels
-      ? ` The connected structural themes are ${structuralLabels}.`
-      : "";
-    return `${activeThemeCount} theme${activeThemeCount !== 1 ? "s" : ""} are active. ${driverPart}${structPart}`.trim();
+    if (driverLabels.length > 0 && structLabels.length > 0) {
+      const dText = driverLabels.length === 1 ? driverLabels[0] : `${driverLabels[0]} and ${driverLabels[1]}`;
+      return `${dText} ${driverLabels.length === 1 ? "is" : "are"} driving activity in ${structLabels.join(", ")} names.`;
+    }
+    if (driverLabels.length > 0) {
+      const dText = driverLabels.length === 1 ? driverLabels[0] : `${driverLabels[0]} and ${driverLabels[1]}`;
+      return `${dText} ${driverLabels.length === 1 ? "is" : "are"} the active force — structural themes are building.`;
+    }
+    return `${activeThemeCount} structural theme${activeThemeCount !== 1 ? "s" : ""} are active. Check the Theme Map for details.`;
   }
 
   if (market_state === "risk-off") {
-    return `${driverNames ? driverNames + " is" : "Defensive signals are"} creating caution across the intelligence map. Structural themes remain valid but market conditions are unfavourable.`;
+    const dText = driverLabels[0] ?? "Defensive conditions";
+    return `${dText} is creating caution. Structural themes remain valid context — market conditions are challenging near-term.`;
   }
 
   if (market_state === "mixed") {
-    return "The intelligence map shows conflicting signals — some drivers are supportive while others are cautionary. Structural themes remain valid context.";
+    return "The market is showing conflicting signals — some forces are supportive while others are cautionary.";
   }
 
-  return "Structural themes remain in focus, but no dominant market force has been confirmed today. Context is available in the Theme Map.";
+  return "Structural themes are in focus. Check the Theme Map for context on active names.";
 }
 
 // Pattern-match a human-readable driver label to a TTG structural theme ID.
