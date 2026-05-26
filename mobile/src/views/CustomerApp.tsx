@@ -9,12 +9,14 @@ import {
   fetchMarketNow,
   type MarketNowPayload,
   type RadarItem,
+  type TtgSymbolCard,
 } from "@/lib/customerApi";
 import TodayTab from "./TodayTab";
 import ThemeMapTab from "./ThemeMapTab";
 import SignalsTab from "./SignalsTab";
 import UniverseTab from "./UniverseTab";
 import NameDetailPanel from "./NameDetailPanel";
+import SymbolDetailSheet from "./SymbolDetailSheet";
 
 type Tab = "today" | "themes" | "signals" | "universe";
 
@@ -68,8 +70,9 @@ export default function CustomerApp() {
   const [data, setData]               = useState<MarketNowPayload | null>(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
-  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
-  const [selectedName, setSelectedName]   = useState<RadarItem | null>(null);
+  const [selectedTheme, setSelectedTheme]   = useState<string | null>(null);
+  const [selectedName, setSelectedName]     = useState<RadarItem | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState<TtgSymbolCard | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -191,7 +194,12 @@ export default function CustomerApp() {
         )}
 
         {data && !loading && activeTab === "today" && (
-          <TodayTab data={data} onThemeSelect={goToTheme} />
+          <TodayTab
+            data={data}
+            onThemeSelect={goToTheme}
+            onGoToThemeMap={() => handleTabChange("themes")}
+            onGoToUniverse={() => handleTabChange("universe")}
+          />
         )}
         {data && !loading && activeTab === "themes" && (
           <ThemeMapTab
@@ -199,13 +207,22 @@ export default function CustomerApp() {
             selectedTheme={selectedTheme}
             onThemeSelect={setSelectedTheme}
             onNameSelect={setSelectedName}
+            onGoToUniverseTheme={(ttgId) => {
+              setSelectedTheme(ttgId);
+              handleTabChange("universe");
+            }}
           />
         )}
         {data && !loading && activeTab === "signals" && (
           <SignalsTab data={data} onThemeSelect={goToTheme} />
         )}
         {data && !loading && activeTab === "universe" && (
-          <UniverseTab data={data} onNameSelect={setSelectedName} onThemeSelect={goToTheme} />
+          <UniverseTab
+            data={data}
+            onNameSelect={setSelectedName}
+            onThemeSelect={goToTheme}
+            onSymbolSelect={setSelectedSymbol}
+          />
         )}
       </main>
 
@@ -215,6 +232,14 @@ export default function CustomerApp() {
           name={selectedName}
           data={data}
           onClose={() => setSelectedName(null)}
+        />
+      )}
+
+      {/* ── Symbol deep-dive sheet ────────────────────────────────────────── */}
+      {selectedSymbol && (
+        <SymbolDetailSheet
+          card={selectedSymbol}
+          onClose={() => setSelectedSymbol(null)}
         />
       )}
 

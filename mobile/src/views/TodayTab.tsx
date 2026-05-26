@@ -1,11 +1,14 @@
 "use client";
 // Today tab — customer market intelligence briefing.
-// Market Pulse | Dominant Drivers | What Changed | Key Events | Active Themes | Watch Next | Freshness
+// Briefing (story headline + summary) | Market Pulse | Dominant Drivers |
+// What Changed | Conflicting Signals | Key Events | Active Themes | Watch Next | Freshness
 
 import { useState } from "react";
-import { ArrowRight, AlertCircle, Eye, ChevronDown, ChevronUp, TrendingUp } from "lucide-react";
+import { ArrowRight, AlertCircle, Eye, ChevronDown, ChevronUp, TrendingUp, Map, List } from "lucide-react";
 import type { MarketNowPayload, ThemeItem, KeyEvent } from "@/lib/customerApi";
-import { translateTheme, themeDescription, driverExplanation } from "@/lib/translate";
+import { translateTheme, themeDescription } from "@/lib/translate";
+import { buildCustomerStory } from "@/lib/customerStory";
+import { getTtgIdForMarketNow } from "@/lib/themeCrosswalk";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -134,9 +137,12 @@ function EventCard({ ev }: { ev: KeyEvent }) {
 interface Props {
   data: MarketNowPayload;
   onThemeSelect: (themeId: string) => void;
+  onGoToUniverse?: () => void;
+  onGoToThemeMap?: () => void;
 }
 
-export default function TodayTab({ data, onThemeSelect }: Props) {
+export default function TodayTab({ data, onThemeSelect, onGoToUniverse, onGoToThemeMap }: Props) {
+  const story = buildCustomerStory(data);
   const mood           = data.market_mood || data.plain_english_summary || "";
   const whatChanged    = data.what_changed ?? [];
   const keyEvents      = data.key_events ?? [];
@@ -160,8 +166,86 @@ export default function TodayTab({ data, onThemeSelect }: Props) {
     dormant:     themes.filter(t => t.state === "dormant").length,
   };
 
+  const storyMoodColor =
+    story.market_state === "risk-on"  ? { border: "#10b981", tag: "Risk-On",       text: "#34d399", bg: "rgba(16,185,129,0.08)" } :
+    story.market_state === "risk-off" ? { border: "#ef4444", tag: "Risk-Off",      text: "#f87171", bg: "rgba(239,68,68,0.08)" } :
+    story.market_state === "mixed"    ? { border: "#f59e0b", tag: "Mixed Signals", text: "#fbbf24", bg: "rgba(245,158,11,0.08)" } :
+                                        { border: "#334155", tag: "Monitoring",    text: "#94a3b8", bg: "rgba(255,255,255,0.03)" };
+
   return (
     <div className="px-4 pb-8 space-y-5 pt-2">
+
+      {/* ── Intelligence Briefing ─────────────────────────────────────── */}
+      <section>
+        <div
+          className="rounded-2xl p-4"
+          style={{ background: storyMoodColor.bg, border: `1.5px solid ${storyMoodColor.border}40` }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ background: storyMoodColor.border, boxShadow: `0 0 6px ${storyMoodColor.border}88` }}
+            />
+            <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: storyMoodColor.border }}>
+              {storyMoodColor.tag}
+            </span>
+            <span className="text-[9px] text-slate-600 ml-auto">{story.freshness_label}</span>
+          </div>
+
+          <h2 className="text-[15px] font-bold leading-snug mb-2" style={{ color: storyMoodColor.text }}>
+            {story.headline}
+          </h2>
+          <p className="text-[12px] text-slate-300 leading-relaxed">{story.summary}</p>
+
+          {/* Theme count summary */}
+          {(story.active_theme_count + story.building_theme_count + story.weakening_theme_count) > 0 && (
+            <div className="flex gap-4 mt-3.5 pt-3.5" style={{ borderTop: `1px solid ${storyMoodColor.border}25` }}>
+              {story.active_theme_count > 0 && (
+                <div className="text-center">
+                  <p className="text-base font-black" style={{ color: "#10b981" }}>{story.active_theme_count}</p>
+                  <p className="text-[9px] text-slate-500">Active</p>
+                </div>
+              )}
+              {story.building_theme_count > 0 && (
+                <div className="text-center">
+                  <p className="text-base font-black" style={{ color: "#3b82f6" }}>{story.building_theme_count}</p>
+                  <p className="text-[9px] text-slate-500">Building</p>
+                </div>
+              )}
+              {story.weakening_theme_count > 0 && (
+                <div className="text-center">
+                  <p className="text-base font-black" style={{ color: "#f87171" }}>{story.weakening_theme_count}</p>
+                  <p className="text-[9px] text-slate-500">Weakening</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* CTAs */}
+          <div className="flex gap-2 mt-3.5 flex-wrap">
+            {onGoToThemeMap && (
+              <button
+                onClick={onGoToThemeMap}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all active:scale-95"
+                style={{ background: "rgba(249,115,22,0.15)", color: "#fb923c" }}
+              >
+                <Map size={10} />
+                Explore Map
+              </button>
+            )}
+            {onGoToUniverse && story.mapped_structural.length > 0 && (
+              <button
+                onClick={onGoToUniverse}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all active:scale-95"
+                style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+              >
+                <List size={10} />
+                See Connected Names
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* ── Market Pulse ────────────────────────────────────────────────── */}
       {mood && ms && (
@@ -220,22 +304,42 @@ export default function TodayTab({ data, onThemeSelect }: Props) {
       )}
 
       {/* ── Dominant Drivers ────────────────────────────────────────────── */}
-      {keyDrivers.length > 0 && (
+      {story.primary_drivers.length > 0 && (
         <section>
           <SectionLabel>Dominant Drivers</SectionLabel>
           <div className="space-y-2">
-            {keyDrivers.slice(0, 5).map((driver, i) => (
+            {story.primary_drivers.map((driver, i) => (
               <div
                 key={i}
-                className="rounded-xl px-4 py-3 flex items-start gap-3"
+                className="rounded-xl px-4 py-3"
                 style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.07)" }}
               >
-                <TrendingUp size={13} style={{ color: "#f97316", marginTop: "2px", flexShrink: 0 }} />
-                <div>
-                  <p className="text-[13px] font-semibold text-slate-100">{driver}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                    {driverExplanation(driver)}
-                  </p>
+                <div className="flex items-start gap-3">
+                  <TrendingUp size={13} style={{ color: "#f97316", marginTop: "2px", flexShrink: 0 }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-slate-100">{driver.label}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                      {driver.explanation}
+                    </p>
+                    {driver.linked_ttg_id && (
+                      <button
+                        onClick={() => {
+                          const firstMarketNow = driver.linked_market_now_ids[0];
+                          if (firstMarketNow) onThemeSelect(firstMarketNow);
+                        }}
+                        className="mt-2 flex items-center gap-1 text-[10px] font-semibold"
+                        style={{ color: "#fb923c" }}
+                      >
+                        <span
+                          className="px-1.5 py-0.5 rounded"
+                          style={{ background: "rgba(249,115,22,0.1)" }}
+                        >
+                          {driver.linked_ttg_label}
+                        </span>
+                        <ArrowRight size={9} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

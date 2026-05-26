@@ -60,7 +60,7 @@ function ExposureLabel({ type }: { type: string }) {
 
 // ── TTG symbol card ────────────────────────────────────────────────────────────
 
-function TtgCard({ card }: { card: TtgSymbolCard }) {
+function TtgCard({ card, onSelect }: { card: TtgSymbolCard; onSelect?: (card: TtgSymbolCard) => void }) {
   const isPressure = card.exposure_type === "pressure_or_negative";
   const path = card.reason_path;
   // Abbreviate long chains: first + "..." + last when > 3 items
@@ -68,14 +68,8 @@ function TtgCard({ card }: { card: TtgSymbolCard }) {
     ? `${path[0]} → ... → ${path[path.length - 1]}`
     : path.join(" → ");
 
-  return (
-    <div
-      className="rounded-2xl p-4"
-      style={{
-        background: "#131f35",
-        border: `1px solid ${isPressure ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.07)"}`,
-      }}
-    >
+  const inner = (
+    <>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2 flex-wrap">
@@ -93,7 +87,10 @@ function TtgCard({ card }: { card: TtgSymbolCard }) {
             )}
           </div>
         </div>
-        <RouteChip hint={card.route_hint} />
+        <div className="flex items-center gap-1.5 shrink-0">
+          <RouteChip hint={card.route_hint} />
+          {onSelect && <ChevronRight size={12} className="text-slate-600" />}
+        </div>
       </div>
 
       <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-3">
@@ -111,6 +108,33 @@ function TtgCard({ card }: { card: TtgSymbolCard }) {
           ⚠ {card.risk_note}
         </p>
       )}
+    </>
+  );
+
+  if (onSelect) {
+    return (
+      <button
+        onClick={() => onSelect(card)}
+        className="w-full rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
+        style={{
+          background: "#131f35",
+          border: `1px solid ${isPressure ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.07)"}`,
+        }}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{
+        background: "#131f35",
+        border: `1px solid ${isPressure ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.07)"}`,
+      }}
+    >
+      {inner}
     </div>
   );
 }
@@ -145,6 +169,7 @@ interface Props {
   data: MarketNowPayload;
   onNameSelect: (name: RadarItem) => void;
   onThemeSelect: (themeId: string) => void;
+  onSymbolSelect?: (card: TtgSymbolCard) => void;
 }
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -155,7 +180,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "monitor",  label: "Monitor" },
 ];
 
-export default function UniverseTab({ data, onNameSelect, onThemeSelect }: Props) {
+export default function UniverseTab({ data, onNameSelect, onThemeSelect, onSymbolSelect }: Props) {
   const [ttgData, setTtgData]   = useState<TtgThemeDetail[]>([]);
   const [loading, setLoading]   = useState(true);
   const [filter, setFilter]     = useState<Filter>("all");
@@ -307,7 +332,7 @@ export default function UniverseTab({ data, onNameSelect, onThemeSelect }: Props
                   </div>
                   <div className="space-y-2">
                     {symbols.map((card, i) => (
-                      <TtgCard key={i} card={card} />
+                      <TtgCard key={i} card={card} onSelect={onSymbolSelect} />
                     ))}
                   </div>
                 </section>

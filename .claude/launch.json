@@ -19,6 +19,14 @@
       "runtimeExecutable": "python3.11",
       "runtimeArgs": ["-m", "http.server", "8901", "--directory", "static"],
       "port": 8901
+    },
+    {
+      "name": "mobile-next",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "autoPort": true,
+      "cwd": "mobile"
     }
   ]
 }

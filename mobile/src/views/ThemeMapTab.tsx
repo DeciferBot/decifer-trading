@@ -4,13 +4,14 @@
 // Theme detail includes: why it matters, drivers, connected sectors/names, what would weaken it.
 
 import { useMemo, useState, useEffect } from "react";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, X, ArrowRight } from "lucide-react";
 import type {
   MarketNowPayload, ThemeItem, SectorItem, RadarItem, UniverseItem,
   TtgSymbolCard,
 } from "@/lib/customerApi";
 import { fetchTtgThemeDetail } from "@/lib/customerApi";
 import { translateTheme, themeDescription, themeInvalidation } from "@/lib/translate";
+import { getTtgIdForMarketNow, getCrosswalkByMarketNow, type CrosswalkEntry } from "@/lib/themeCrosswalk";
 
 // ── State badge ───────────────────────────────────────────────────────────────
 
@@ -113,16 +114,20 @@ function ThemeDetail({
   names,
   universeNames,
   ttgSymbols,
+  crosswalkEntry,
   onClose,
   onNameSelect,
+  onGoToUniverse,
 }: {
   theme: ThemeItem;
   sectors: SectorItem[];
   names: RadarItem[];
   universeNames: UniverseItem[];
   ttgSymbols: TtgSymbolCard[];
+  crosswalkEntry: CrosswalkEntry | null;
   onClose: () => void;
   onNameSelect: (name: RadarItem) => void;
+  onGoToUniverse?: () => void;
 }) {
   const desc = themeDescription(theme.theme);
   const invalidation = themeInvalidation(theme.theme);
@@ -191,6 +196,39 @@ function ThemeDetail({
             <p className="text-[9px] text-slate-600 mt-1.5">Structural context — no fresh event evidence this cycle.</p>
           )}
         </div>
+
+        {/* Structural theme crosswalk */}
+        {crosswalkEntry && (
+          <div
+            className="rounded-xl px-3.5 py-3"
+            style={{ background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.15)" }}
+          >
+            <p className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#f97316" }}>
+              Structural Theme Connection
+            </p>
+            <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+              <span className="text-[11px] text-slate-300">{crosswalkEntry.marketNowLabel}</span>
+              <ArrowRight size={10} className="text-slate-600 shrink-0" />
+              <span
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}
+              >
+                {crosswalkEntry.ttgPrimaryLabel}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed">{crosswalkEntry.relationship}</p>
+            {onGoToUniverse && ttgSymbols.length > 0 && (
+              <button
+                onClick={onGoToUniverse}
+                className="mt-2.5 text-[10px] font-semibold flex items-center gap-1"
+                style={{ color: "#fb923c" }}
+              >
+                See {ttgSymbols.length} connected name{ttgSymbols.length !== 1 ? "s" : ""} in Universe
+                <ArrowRight size={10} />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Connected sectors */}
         {sectors.length > 0 && (
@@ -325,17 +363,19 @@ interface Props {
   selectedTheme: string | null;
   onThemeSelect: (themeId: string | null) => void;
   onNameSelect: (name: RadarItem) => void;
+  onGoToUniverseTheme?: (ttgThemeId: string) => void;
 }
 
-export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onNameSelect }: Props) {
+export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onNameSelect, onGoToUniverseTheme }: Props) {
   const [ttgSymbols, setTtgSymbols] = useState<TtgSymbolCard[]>([]);
 
   // Fetch TTG data when user drills into a theme detail.
-  // TTG theme IDs differ from market_now IDs for most themes; fetchTtgThemeDetail
-  // returns null for non-matching IDs and gracefully degrades to universe_snapshot.
+  // Use crosswalk to map market_now ID → TTG structural ID before fetching,
+  // since most market_now IDs don't match TTG IDs directly.
   useEffect(() => {
     if (!selectedTheme) { setTtgSymbols([]); return; }
-    fetchTtgThemeDetail(selectedTheme)
+    const ttgId = getTtgIdForMarketNow(selectedTheme) ?? selectedTheme;
+    fetchTtgThemeDetail(ttgId)
       .then(d => setTtgSymbols(d?.symbols ?? []))
       .catch(() => setTtgSymbols([]));
   }, [selectedTheme]);
@@ -450,8 +490,14 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
           names={relatedNames}
           universeNames={relatedUniverseNames}
           ttgSymbols={ttgSymbols}
+          crosswalkEntry={getCrosswalkByMarketNow(selectedThemeObj.theme)}
           onClose={() => onThemeSelect(null)}
           onNameSelect={onNameSelect}
+          onGoToUniverse={
+            onGoToUniverseTheme && getTtgIdForMarketNow(selectedThemeObj.theme)
+              ? () => onGoToUniverseTheme(getTtgIdForMarketNow(selectedThemeObj.theme)!)
+              : undefined
+          }
         />
       )}
 
