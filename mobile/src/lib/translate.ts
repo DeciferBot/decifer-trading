@@ -80,6 +80,14 @@ export function translateTheme(id: string): string {
     reits:                     "Real Estate (REITs)",
     oil_supply_shock:          "Oil Supply Shock",
     reits_falling_yield:       "REITs Under Pressure",
+    quality_cash_flow:         "Quality & Cash Flow",
+    defensive_quality:         "Quality Defensives",
+    small_caps:                "Small Caps",
+    consumer_discretionary_strength: "Consumer Spending",
+    biotech_risk_on:           "Biotech",
+    gold_precious_metals:      "Gold & Precious Metals",
+    energy:                    "Energy",
+    banks:                     "Banks",
   };
   return map[id] ?? id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }
@@ -121,8 +129,84 @@ export function themeDescription(id: string): string {
     oil_supply_shock:          "Oil supply disruptions are raising energy prices. This benefits producers and energy companies but increases costs for consumers and industrials.",
     reits_falling_yield:       "Rising interest rates are making REIT dividends less attractive compared to bonds, putting pressure on real estate valuations.",
     credit_stress_easing:      "Tightening credit spreads signal that recession fears are receding and corporate borrowing conditions are improving.",
+    quality_cash_flow:         "Companies with strong balance sheets and predictable free cash flow attract capital when growth expectations are uncertain. Quality is a defensive factor that tends to outperform in late-cycle environments.",
+    defensive_quality:         "High-quality defensives — large-cap consumer staples, utilities, and healthcare — hold value when risk appetite fades. They offer steady dividends and earnings visibility when growth is scarce.",
+    small_caps:                "Small-cap stocks are sensitive to domestic economic conditions and credit availability. They tend to lead in early bull markets and lag during stress periods.",
+    consumer_discretionary_strength: "Consumer confidence is supporting spending on non-essential goods and experiences. Retail, leisure, and brand names outperform when employment is strong and real wages are positive.",
+    biotech_risk_on:           "Biotech names move on clinical trial data, FDA decisions, and earnings beats. In a risk-on environment, investors are willing to pay for optionality on binary data readouts.",
+    gold_precious_metals:      "Precious metals attract capital as a store of value during periods of currency weakness, inflation, or geopolitical stress. Gold is the classic safe haven when confidence in fiat assets declines.",
+    energy:                    "Energy stocks track oil and gas prices, which are driven by supply-demand dynamics, geopolitical disruptions, and OPEC policy. They tend to outperform during inflationary periods.",
+    banks:                     "Bank earnings benefit from a steeper yield curve and growing loan demand. Credit quality and net interest margin are the key drivers of bank stock performance.",
   };
   return map[id] ?? `This theme is active based on current market conditions.`;
+}
+
+export function themeInvalidation(id: string): string {
+  const map: Record<string, string> = {
+    data_centre_power:         "Hyperscaler capex guidance cut, utility grid capacity constraints, or an AI demand slowdown.",
+    semiconductors:            "AI hardware spending pause, inventory cycle reversal, or geopolitical supply restrictions on chip exports.",
+    ai_compute_infrastructure: "Financing stress for neocloud operators, power cost spike, or a slowdown in GPU demand.",
+    memory_storage:            "Memory oversupply, HBM pricing reversal, or a reduction in AI model training runs.",
+    defence:                   "Geopolitical de-escalation, defence budget cuts, or a significant peace agreement.",
+    software_cloud:            "Growth deceleration in cloud spend, margin compression from AI investment, or rising competition.",
+    cybersecurity:             "Budget freezes across enterprise security, or a risk-off rotation away from high-multiple tech.",
+    mega_cap_platforms:        "Antitrust action, regulatory pressure, or a meaningful slowdown in advertising or cloud revenue.",
+    consumer_discretionary_strength: "Rising unemployment, falling real wages, or consumer credit stress.",
+    travel_leisure:            "Recession fears, rising fuel costs, or a resurgence of travel restrictions.",
+    defensive_healthcare:      "Risk-on rotation into growth assets, drug pricing legislation, or clinical trial failures.",
+    biotech:                   "Risk-off rotation, FDA rejection, or a broad deterioration in clinical trial success rates.",
+    biotech_risk_on:           "Risk-off rotation, FDA rejection, or a broad deterioration in clinical trial success rates.",
+    regional_banks:            "Yield curve flattening, credit quality deterioration, or rising deposit outflows.",
+    infrastructure_reshoring:  "Policy reversal on tariffs or industrial subsidies, or a capital expenditure freeze.",
+    gold_safe_haven_bid:       "Risk-on rotation, dollar strength, or a meaningful decline in inflation expectations.",
+    gold_precious_metals:      "Risk-on rotation, dollar strength, or a meaningful decline in inflation expectations.",
+    copper_electrification:    "China demand slowdown, EV adoption deceleration, or a global growth recession.",
+    reits:                     "Interest rate reversal (yields rising again), or a deterioration in occupancy rates.",
+    small_cap_risk_on:         "Risk-off rotation, credit tightening, or a recession signal from leading indicators.",
+    risk_on_rotation:          "VIX spike, credit spread widening, or a hawkish Fed policy surprise.",
+    yields_falling:            "Inflation re-acceleration forcing the Fed to hold rates higher for longer.",
+    yields_rising:             "Inflation surprise to the downside, or a Fed pivot to rate cuts.",
+    oil_supply_shock:          "OPEC output increase, demand destruction from a global slowdown, or US shale supply response.",
+    reits_falling_yield:       "Yields stabilising or falling, making REIT dividends competitive again.",
+    credit_stress_easing:      "Credit spread widening on recession fears, corporate defaults, or a banking stress event.",
+    quality_cash_flow:         "Risk-on rotation into growth names, or a sharp improvement in macro conditions.",
+    defensive_quality:         "Broad risk-on rally where investors rotate out of defensives into cyclicals.",
+    small_caps:                "Credit tightening, dollar strength, or a domestic recession signal.",
+    energy:                    "OPEC production increase, demand slowdown, or a rapid transition away from fossil fuels.",
+    banks:                     "Yield curve flattening, rising credit losses, or a regulatory tightening cycle.",
+  };
+  return map[id] ?? "A reversal of the current macro driver, or a loss of event-driven evidence supporting this theme.";
+}
+
+export function driverExplanation(label: string): string {
+  const l = label.toLowerCase();
+  if (l.includes("ai capital") || l.includes("ai capex"))
+    return "Companies building AI infrastructure are seeing sustained investment demand from hyperscalers.";
+  if (l.includes("ai compute demand"))
+    return "Demand for GPU compute and AI processing power continues to outpace available supply.";
+  if (l.includes("geopolit"))
+    return "Elevated geopolitical risk is driving capital toward defence, energy, and safe-haven assets.";
+  if (l.includes("small-cap") || l.includes("small cap"))
+    return "Healthy risk appetite is showing up in small-cap outperformance — investors are taking on more risk.";
+  if (l.includes("futures") && l.includes("risk-on"))
+    return "US equity futures signal a positive open — institutional positioning leans constructive overnight.";
+  if (l.includes("futures") && l.includes("risk-off"))
+    return "US equity futures signal caution — institutional positioning is defensive heading into the session.";
+  if (l.includes("futures") && l.includes("risk"))
+    return "Futures markets are providing direction on overnight institutional positioning.";
+  if (l.includes("yields rising") || (l.includes("bond") && l.includes("ris")))
+    return "Rising yields tighten financial conditions and compress valuations for growth and rate-sensitive stocks.";
+  if (l.includes("yields falling") || (l.includes("bond") && l.includes("fall")))
+    return "Falling yields reduce the discount rate on future earnings, supporting growth stocks and REITs.";
+  if (l.includes("gold") || l.includes("safe-haven"))
+    return "Safe-haven demand for gold signals that investors are hedging against macro or geopolitical uncertainty.";
+  if (l.includes("credit") && l.includes("eas"))
+    return "Tightening credit spreads signal that default risk is receding and corporate borrowing conditions are improving.";
+  if (l.includes("risk-on rotation") || l.includes("rotation"))
+    return "Capital is rotating from defensive assets into growth and cyclicals as risk appetite improves.";
+  if (l.includes("oil"))
+    return "Oil supply dynamics are affecting energy prices and influencing inflation and consumer spending.";
+  return "This factor is shaping current market conditions and sector performance.";
 }
 
 export function translateSetupType(s: string): string {

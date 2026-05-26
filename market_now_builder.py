@@ -168,6 +168,53 @@ def _load_active_themes() -> tuple[list[str], list[dict[str, str]], dict[str, st
         return [], [], {}
 
 
+_UNIVERSE_BUCKET_SUFFIXES = (
+    "_direct_beneficiary", "_second_order_beneficiary", "_etf_proxy",
+    "_headwind_candidate", "_pressure_candidate",
+)
+
+
+def _bucket_to_theme(bucket_id: str) -> str:
+    """Strip bucket suffix to recover the theme ID."""
+    for s in _UNIVERSE_BUCKET_SUFFIXES:
+        if bucket_id.endswith(s):
+            return bucket_id[: -len(s)]
+    return bucket_id
+
+
+def _load_universe_snapshot() -> list[dict]:
+    """Load and project customer-safe items from active opportunity universe.
+
+    Projects only: symbol, company_name, theme_id, why_connected, transmission.
+    Strips all execution, order, risk, and broker fields before returning.
+    Returns [] if the file is absent or unreadable (fail-closed).
+    """
+    try:
+        raw = _read_json("data/live/active_opportunity_universe.json")
+        items: list[dict] = []
+        for c in raw.get("candidates", []):
+            if c.get("route") == "manual_conviction":
+                continue
+            why = c.get("why_this_symbol", "")
+            if not why:
+                continue
+            theme_id = _bucket_to_theme(c.get("bucket_id", ""))
+            # Skip entries whose bucket_id did not map to a clean theme ID
+            if not theme_id or theme_id.startswith("tier_"):
+                continue
+            items.append({
+                "symbol": c.get("symbol", ""),
+                "company_name": c.get("company_name"),
+                "theme_id": theme_id,
+                "why_connected": why,
+                "transmission": c.get("transmission_direction", "tailwind"),
+            })
+        return items[:50]
+    except Exception as exc:
+        log.debug("_load_universe_snapshot: %s", exc)
+        return []
+
+
 def _load_blocked_conditions() -> list[str]:
     """Returns the active blocked_conditions list from live_driver_state."""
     try:
@@ -326,6 +373,7 @@ def build_market_now() -> SaaSIntelligencePayload:
     active_theme_ids, opportunity_explanations, theme_states = _load_active_themes()
     regime_label, manifest_published_at, confidence = _load_manifest_regime()
     apex_read = _load_apex_market_read()
+    universe_snapshot = _load_universe_snapshot()
 
     # Reconcile price + event evidence into Market Map sections
     try:
@@ -408,6 +456,8 @@ def build_market_now() -> SaaSIntelligencePayload:
             known_conflicts=sections.get("known_conflicts", []),
             section_freshness=sections.get("section_freshness", {}),
             source_notes=sections.get("source_notes", []),
+            # Sprint M11C — customer-safe universe snapshot
+            universe_snapshot=universe_snapshot,
         )
         validate_customer_payload(payload.to_dict())
         return payload
@@ -460,6 +510,8 @@ def build_market_now() -> SaaSIntelligencePayload:
         known_conflicts=sections.get("known_conflicts", []),
         section_freshness=sections.get("section_freshness", {}),
         source_notes=sections.get("source_notes", []),
+        # Sprint M11C — customer-safe universe snapshot
+        universe_snapshot=universe_snapshot,
     )
 
     # Defensive: validate the assembled payload against the allowlist

@@ -49,6 +49,15 @@ export interface RadarItem {
   invalidation_signal?: string;
 }
 
+// M11C universe snapshot item — customer-safe projection of active opportunity universe
+export interface UniverseItem {
+  symbol: string;
+  company_name?: string | null;
+  theme_id: string;
+  why_connected: string;
+  transmission: "tailwind" | "headwind" | "none" | string;
+}
+
 export interface FreshnessEntry {
   status: string;
   age_hours?: number | null;
@@ -80,6 +89,8 @@ export interface MarketNowPayload {
   known_conflicts?: string[];
   section_freshness?: Record<string, FreshnessEntry>;
   source_notes?: string[];
+  // M11C — customer-safe universe snapshot (theme-connected names)
+  universe_snapshot?: UniverseItem[];
 }
 
 export async function fetchMarketNow(): Promise<MarketNowPayload> {
