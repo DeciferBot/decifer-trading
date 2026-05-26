@@ -7,7 +7,7 @@
 // gate and never appear in TTG API responses.
 
 import { useMemo, useState, useEffect } from "react";
-import { ChevronRight, Zap } from "lucide-react";
+import { ChevronRight, Zap, ArrowRight } from "lucide-react";
 import type {
   MarketNowPayload,
   RadarItem,
@@ -60,7 +60,15 @@ function ExposureLabel({ type }: { type: string }) {
 
 // ── TTG symbol card ────────────────────────────────────────────────────────────
 
-function TtgCard({ card, onSelect }: { card: TtgSymbolCard; onSelect?: (card: TtgSymbolCard) => void }) {
+function TtgCard({
+  card,
+  onSelect,
+  onAskAbout,
+}: {
+  card: TtgSymbolCard;
+  onSelect?: (card: TtgSymbolCard) => void;
+  onAskAbout?: (context: string) => void;
+}) {
   const isPressure = card.exposure_type === "pressure_or_negative";
   const path = card.reason_path;
   // Abbreviate long chains: first + "..." + last when > 3 items
@@ -108,18 +116,35 @@ function TtgCard({ card, onSelect }: { card: TtgSymbolCard; onSelect?: (card: Tt
           ⚠ {card.risk_note}
         </p>
       )}
+
+      <p className="text-[9px] text-slate-700 mt-1.5">
+        Price data unavailable from approved source.
+      </p>
+
+      {onAskAbout && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAskAbout(`Tell me about ${card.symbol} and why it is connected to ${card.theme_label}`);
+          }}
+          className="mt-2 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
+          style={{ color: "#94a3b8" }}
+        >
+          Ask Decifer about this
+          <ArrowRight size={9} />
+        </button>
+      )}
     </>
   );
+
+  const borderColor = isPressure ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.07)";
 
   if (onSelect) {
     return (
       <button
         onClick={() => onSelect(card)}
         className="w-full rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
-        style={{
-          background: "#131f35",
-          border: `1px solid ${isPressure ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.07)"}`,
-        }}
+        style={{ background: "#141b26", border: `1px solid ${borderColor}` }}
       >
         {inner}
       </button>
@@ -129,10 +154,7 @@ function TtgCard({ card, onSelect }: { card: TtgSymbolCard; onSelect?: (card: Tt
   return (
     <div
       className="rounded-2xl p-4"
-      style={{
-        background: "#131f35",
-        border: `1px solid ${isPressure ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.07)"}`,
-      }}
+      style={{ background: "#141b26", border: `1px solid ${borderColor}` }}
     >
       {inner}
     </div>
@@ -141,14 +163,22 @@ function TtgCard({ card, onSelect }: { card: TtgSymbolCard; onSelect?: (card: Tt
 
 // ── Live radar card ────────────────────────────────────────────────────────────
 
-function RadarCard({ item, onSelect }: { item: RadarItem; onSelect: (item: RadarItem) => void }) {
+function RadarCard({
+  item,
+  onSelect,
+  onAskAbout,
+}: {
+  item: RadarItem;
+  onSelect: (item: RadarItem) => void;
+  onAskAbout?: (context: string) => void;
+}) {
   return (
     <button
       onClick={() => onSelect(item)}
       className="w-full rounded-2xl p-4 text-left transition-all active:scale-[0.98]"
-      style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.08)" }}
+      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
           <span className="text-base font-black text-slate-100">{item.symbol}</span>
           {item.reason_to_watch && (
@@ -159,6 +189,22 @@ function RadarCard({ item, onSelect }: { item: RadarItem; onSelect: (item: Radar
         </div>
         <ChevronRight size={14} className="text-slate-500 shrink-0 mt-1" />
       </div>
+      <p className="text-[9px] text-slate-700">
+        Price data unavailable from approved source.
+      </p>
+      {onAskAbout && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAskAbout(`Tell me about ${item.symbol} and why it is on the radar`);
+          }}
+          className="mt-1.5 flex items-center gap-1 text-[10px] font-semibold"
+          style={{ color: "#94a3b8" }}
+        >
+          Ask Decifer about this
+          <ArrowRight size={9} />
+        </button>
+      )}
     </button>
   );
 }
@@ -170,6 +216,7 @@ interface Props {
   onNameSelect: (name: RadarItem) => void;
   onThemeSelect: (themeId: string) => void;
   onSymbolSelect?: (card: TtgSymbolCard) => void;
+  onAskAbout?: (context: string) => void;
 }
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -180,7 +227,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "monitor",  label: "Monitor" },
 ];
 
-export default function UniverseTab({ data, onNameSelect, onThemeSelect, onSymbolSelect }: Props) {
+export default function UniverseTab({ data, onNameSelect, onThemeSelect, onSymbolSelect, onAskAbout }: Props) {
   const [ttgData, setTtgData]   = useState<TtgThemeDetail[]>([]);
   const [loading, setLoading]   = useState(true);
   const [filter, setFilter]     = useState<Filter>("all");
@@ -264,7 +311,7 @@ export default function UniverseTab({ data, onNameSelect, onThemeSelect, onSymbo
           </p>
           <div className="space-y-2">
             {radar.map((item, i) => (
-              <RadarCard key={i} item={item} onSelect={onNameSelect} />
+              <RadarCard key={i} item={item} onSelect={onNameSelect} onAskAbout={onAskAbout} />
             ))}
           </div>
         </section>
@@ -280,8 +327,9 @@ export default function UniverseTab({ data, onNameSelect, onThemeSelect, onSymbo
             <p className="text-[9px] text-slate-600">{allSymbols.length} names</p>
           </div>
 
-          <p className="text-[11px] text-slate-500 -mt-3">
-            Structurally connected names. Evidence-verified. Not a recommendation.
+          <p className="text-[11px] text-slate-500 -mt-3 leading-relaxed">
+            Names connected to active themes and market drivers.
+            Evidence-verified. Not a recommendation.
           </p>
 
           {/* Filter chips */}
@@ -332,7 +380,7 @@ export default function UniverseTab({ data, onNameSelect, onThemeSelect, onSymbo
                   </div>
                   <div className="space-y-2">
                     {symbols.map((card, i) => (
-                      <TtgCard key={i} card={card} onSelect={onSymbolSelect} />
+                      <TtgCard key={i} card={card} onSelect={onSymbolSelect} onAskAbout={onAskAbout} />
                     ))}
                   </div>
                 </section>

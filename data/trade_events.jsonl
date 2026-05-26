@@ -1091,3 +1091,5 @@
 {"ts": "2026-05-22T17:47:48.475022+00:00", "event": "ORDER_FILLED", "trade_id": "ODFL_20260522_174742_856539", "symbol": "ODFL", "fill_price": 210.176818, "fill_qty": 286, "order_id": 20800}
 {"ts": "2026-05-22T17:48:23.576334+00:00", "event": "ORDER_FILLED", "trade_id": "AMD_20260522_174734_910268", "symbol": "AMD", "fill_price": 471.51, "fill_qty": 127, "order_id": 20795}
 {"ts": "2026-05-22T17:48:31.074851+00:00", "event": "ORDER_FILLED", "trade_id": "ODFL_20260522_174742_856539", "symbol": "ODFL", "fill_price": 210.176818, "fill_qty": 286, "order_id": 20800}
+{"ts": "2026-05-26T08:48:15.801947+00:00", "event": "POSITION_QTY_CORRECTED", "trade_id": "PANW_20260522_233929_986130", "symbol": "PANW", "corrected_qty": 450, "reason": "reconcile_ibkr"}
+{"ts": "2026-05-26T08:48:16.852303+00:00", "event": "POSITION_QTY_CORRECTED", "trade_id": "RKLB_20260520_115637_411458", "symbol": "RKLB", "corrected_qty": 297, "reason": "reconcile_ibkr"}

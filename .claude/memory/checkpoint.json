@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-05-26T06:03:47.306Z",
+  "timestamp": "2026-05-26T10:17:59.265Z",
   "branch": "master",
-  "lastCommit": "7823290 feat(mobile): Sprint M12C — Theme crosswalk, customer story, symbol deep-dive",
+  "lastCommit": "ed66a87 chore(version): bump to v4.57.0 — M12F market-cause-first customer journey",
   "roadmapPhase": null,
   "lastFilesTouched": [
     "claude/memory/checkpoint.json",
     ".claude/memory/session-history.jsonl",
-    "data/daily_promoted.json",
+    "data/audit_log.jsonl",
     "data/equity_history.json",
     "data/ic_decision_events.jsonl",
     "data/ic_validation_result.json",
     "data/ic_weights.json",
     "data/ic_weights_live.json",
     "data/ic_weights_live_history.jsonl",
-    "data/intelligence/live_driver_state.json"
+    "data/intelligence/customer_event_tape.json"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 402
+  "sessionCount": 405
 }

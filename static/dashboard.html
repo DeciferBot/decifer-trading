@@ -761,11 +761,22 @@ canvas{display:block;width:100% !important}
         </div>
         <!-- Sector ETFs -->
         <div id="on-sector-row" style="padding:6px 12px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px"></div>
-        <!-- Movers + Calendar side-by-side -->
+        <!-- Top Gainers -->
+        <div style="border-bottom:1px solid var(--border);padding:8px 12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:9px;letter-spacing:1.5px;font-weight:700;color:var(--green)">TOP GAINERS</span>
+              <span id="on-prev-close-date" style="font-size:8px;color:var(--muted2)"></span>
+            </div>
+            <button id="on-movers-refresh-btn" onclick="refreshMovers()" style="background:transparent;border:1px solid var(--border);color:var(--muted2);font-size:8px;padding:2px 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px">↻ Live</button>
+          </div>
+          <div id="on-gainers"></div>
+        </div>
+        <!-- Top Losers + Calendar side-by-side -->
         <div id="on-movers-grid" style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
           <div style="border-right:1px solid var(--border);padding:8px 12px">
-            <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">PRE-MARKET MOVERS</div>
-            <div id="on-movers"></div>
+            <div style="font-size:9px;letter-spacing:1.5px;font-weight:700;color:var(--red);margin-bottom:6px">TOP LOSERS</div>
+            <div id="on-losers"></div>
           </div>
           <div style="padding:8px 12px">
             <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:6px">UPCOMING EVENTS</div>
@@ -785,14 +796,14 @@ canvas{display:block;width:100% !important}
         </div>
       </div>
 
-      <!-- APEX SYNTHESIS VIEW -->
-      <div class="trade-card-panel" id="opus-view-panel" style="flex-shrink:0">
+      <!-- MARKET STAGES — vertical thermometer -->
+      <div style="flex-shrink:0;border-top:1px solid var(--border)">
         <div class="col-title" style="flex-shrink:0">
-          <span>Apex Synthesis View</span>
-          <span id="opus-view-ts" style="color:var(--muted2);font-size:9px">—</span>
+          <span>Market Stage</span>
+          <span id="opus-view-ts" style="color:var(--muted2);font-size:9px;display:none">—</span>
         </div>
-        <div id="opus-view-body" style="padding:8px 12px">
-          <div style="color:var(--muted2);font-size:11px">Apex will summarise the next completed scan.</div>
+        <div id="market-stages-list" style="padding:8px 12px;display:flex;flex-direction:column;gap:2px">
+          <span style="color:var(--muted2);font-size:10px">Waiting for market data…</span>
         </div>
       </div>
 
@@ -1868,6 +1879,19 @@ async function loadOvernightNotes() {
     const D = d.data || {};
     if (meta && D.generated) meta.textContent = D.generated;
 
+    // ── Common names for indices / sector ETFs ─────────────────
+    const _INDEX_NAMES = {
+      SPY:'S&P 500', QQQ:'Nasdaq 100', IWM:'Russell 2000', DIA:'Dow Jones',
+      TLT:'Long Bonds', IEF:'10Y Bonds', SHY:'2Y Bonds',
+      GLD:'Gold Index', SLV:'Silver', USO:'Oil', UNG:'Nat Gas',
+      XLF:'Financials', XLK:'Tech Index', XLE:'Energy', XLV:'Health Care',
+      XLI:'Industrials', XLU:'Utilities', XLB:'Materials',
+      XLRE:'Real Estate', XLY:'Consumer Disc', XLP:'Consumer Staples',
+      XLC:'Comm Services', XLV:'Health Care',
+      HYG:'High Yield', LQD:'IG Bonds', ITA:'Aero & Defense',
+      SMH:'Semis Index', SOXX:'Semis Index', UVXY:'VIX Short-Term',
+    };
+
     // ── Tone badge helper ──────────────────────────────────────
     function toneBadge(item) {
       if (!item) return '';
@@ -1875,9 +1899,13 @@ async function loadOvernightNotes() {
       const col = pct === null ? 'var(--muted2)' : pct > 0.15 ? 'var(--green)' : pct < -0.15 ? 'var(--red)' : 'var(--muted2)';
       const sign = pct > 0 ? '+' : '';
       const pctStr = pct != null ? `${sign}${pct.toFixed(2)}%` : 'n/a';
-      return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px;border:1px solid ${col};background:${col}18;font-size:10px;font-family:'JetBrains Mono',monospace">
-        <span style="color:#fff;font-weight:600">${esc(item.sym)}</span>
-        <span style="color:${col}">${pctStr}</span>
+      const name = _INDEX_NAMES[item.sym] || '';
+      return `<span style="display:inline-flex;flex-direction:column;align-items:flex-start;padding:3px 8px;border-radius:4px;border:1px solid ${col};background:${col}18;font-size:10px;font-family:'JetBrains Mono',monospace;gap:0">
+        <span style="display:flex;align-items:center;gap:4px">
+          <span style="color:#fff;font-weight:600">${esc(item.sym)}</span>
+          <span style="color:${col}">${pctStr}</span>
+        </span>
+        ${name ? `<span style="color:var(--muted2);font-size:7.5px;line-height:1.2">${esc(name)}</span>` : ''}
       </span>`;
     }
 
@@ -1897,24 +1925,57 @@ async function loadOvernightNotes() {
         '<span style="color:var(--muted2);font-size:9px">No sector data</span>';
     }
 
-    // ── Pre-market movers ──────────────────────────────────────
-    const moversEl = document.getElementById('on-movers');
-    if (moversEl) {
-      const movers = D.movers || [];
-      if (!movers.length) {
-        moversEl.innerHTML = '<span style="color:var(--muted2);font-size:10px">No significant gaps</span>';
-      } else {
-        moversEl.innerHTML = movers.map(m => {
-          const col = m.pct > 0 ? 'var(--green)' : 'var(--red)';
-          const sign = m.pct > 0 ? '+' : '';
-          return `<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;font-family:'JetBrains Mono',monospace">
-            <span style="color:#fff;font-weight:600">${esc(m.sym)}</span>
-            <span style="color:var(--muted2)">$${m.price.toFixed(2)}</span>
-            <span style="color:${col};font-weight:700">${sign}${m.pct.toFixed(2)}%</span>
-          </div>`;
-        }).join('');
-      }
+    // ── Gainers / Losers (split pre-market movers) ─────────────
+    window._moverSymbols = (D.movers || []).map(m => m.sym);
+    window._moverData    = D.movers || [];
+
+    // Prev-close date label: computed from generated timestamp (movers = change vs prev close)
+    const prevCloseDateEl = document.getElementById('on-prev-close-date');
+    if (prevCloseDateEl && D.generated) {
+      // generated is "YYYY-MM-DD HH:MM ET" — previous close is the prior trading day
+      try {
+        const genParts = D.generated.match(/(\d{4}-\d{2}-\d{2})/);
+        if (genParts) {
+          const genDate = new Date(genParts[1] + 'T16:00:00-04:00'); // 4 PM ET close of prior day
+          genDate.setDate(genDate.getDate() - 1);
+          // Skip back over weekends
+          while (genDate.getDay() === 0 || genDate.getDay() === 6) genDate.setDate(genDate.getDate() - 1);
+          const prevStr = genDate.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+          prevCloseDateEl.textContent = `Move from prev close · ${prevStr} at 4:00 PM ET`;
+        }
+      } catch(e) { prevCloseDateEl.textContent = ''; }
     }
+
+    function _moverRow(m, liveSnaps) {
+      const col = m.pct > 0 ? 'var(--green)' : 'var(--red)';
+      const sign = m.pct > 0 ? '+' : '';
+      const live = liveSnaps && liveSnaps[m.sym];
+      const liveTag = live && live.price != null
+        ? `<span style="color:var(--orange);font-size:9px" title="Live price">$${live.price.toFixed(2)}</span>`
+        : '';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:11px;font-family:'JetBrains Mono',monospace">
+        <span style="color:#fff;font-weight:600">${esc(m.sym)}</span>
+        <span style="color:var(--muted2)">$${m.price.toFixed(2)}</span>
+        ${liveTag}
+        <span style="color:${col};font-weight:700">${sign}${m.pct.toFixed(2)}%</span>
+      </div>`;
+    }
+
+    function _renderMoverLists(liveSnaps) {
+      const movers = D.movers || [];
+      const gainers = movers.filter(m => m.pct > 0).sort((a,b) => b.pct - a.pct);
+      const losers  = movers.filter(m => m.pct < 0).sort((a,b) => a.pct - b.pct);
+      const gainersEl = document.getElementById('on-gainers');
+      const losersEl  = document.getElementById('on-losers');
+      if (gainersEl) gainersEl.innerHTML = gainers.length
+        ? gainers.slice(0,8).map(m => _moverRow(m, liveSnaps)).join('')
+        : '<span style="color:var(--muted2);font-size:10px">No gainers</span>';
+      if (losersEl) losersEl.innerHTML = losers.length
+        ? losers.slice(0,8).map(m => _moverRow(m, liveSnaps)).join('')
+        : '<span style="color:var(--muted2);font-size:10px">No losers</span>';
+    }
+
+    _renderMoverLists(null);
 
     // ── Analyst changes ────────────────────────────────────────
     const analystChanges = D.analyst_changes || [];
@@ -4202,8 +4263,12 @@ function loadIntelligence() {
 
     const tsEl = document.getElementById('intel-ts');
     if (tsEl && d.ts) {
-      try { tsEl.textContent = 'Updated ' + new Date(d.ts).toLocaleTimeString(); }
-      catch(e) { tsEl.textContent = d.ts; }
+      try {
+        const _dt = new Date(d.ts);
+        const _local = _dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        const _et    = _dt.toLocaleTimeString('en-US', {timeZone:'America/New_York', hour:'2-digit', minute:'2-digit', hour12:true});
+        tsEl.textContent = `Updated ${_local} local · ${_et} ET`;
+      } catch(e) { tsEl.textContent = d.ts; }
     }
 
     // ── Market Story ──────────────────────────────────────────────────────────
@@ -5518,6 +5583,38 @@ function updateRegime(regime) {
     meta.textContent = `VIX: ${vixStr} | Rank: ${vixRankStr} | Kelly: ${kellyStr} | SPY: $${regime.spy_price || '—'}${routerStr}`;
   }
   pill.textContent = 'TAPE: ' + tapeLabel;
+
+  // ── Market Stages vertical list ──────────────────────────────
+  const stagesEl = document.getElementById('market-stages-list');
+  if (stagesEl) {
+    const _STAGES = [
+      { key: 'MOMENTUM BULL', col: '#00e676', desc: 'Strong conviction uptrend'   },
+      { key: 'STRONG RALLY',  col: '#00c853', desc: 'Broad-based buying surge'    },
+      { key: 'BULLISH',       col: '#69f0ae', desc: 'Trend intact, risk-on'       },
+      { key: 'RELIEF RALLY',  col: '#ffd43b', desc: 'Recovering from oversold'    },
+      { key: 'RANGE BOUND',   col: '#adb5bd', desc: 'No clear direction'          },
+      { key: 'RISK-OFF',      col: '#ff922b', desc: 'Rotation to safety'          },
+      { key: 'FEAR ELEVATED', col: '#ff922b', desc: 'High volatility, size down'  },
+      { key: 'DISTRIBUTION',  col: '#ff6d00', desc: 'Selling into strength'       },
+      { key: 'BEARISH',       col: '#ff4040', desc: 'Downward pressure'           },
+      { key: 'TECH SELLOFF',  col: '#ff4040', desc: 'Growth / tech under fire'    },
+      { key: 'SELLOFF',       col: '#ff1744', desc: 'Broad decline accelerating'  },
+      { key: 'TRENDING BEAR', col: '#ff1744', desc: 'Sustained downtrend'         },
+      { key: 'CAPITULATION',  col: '#ff1744', desc: 'Panic — extreme caution'     },
+    ];
+    stagesEl.innerHTML = _STAGES.map(s => {
+      const active = s.key === tapeLabel;
+      const bg     = active ? s.col + '22' : 'transparent';
+      const border = active ? `1px solid ${s.col}` : '1px solid transparent';
+      const txtCol = active ? s.col : 'var(--muted2)';
+      const dot    = active ? '●' : '○';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:4px;background:${bg};border:${border};transition:background .2s">
+        <span style="color:${active ? s.col : 'var(--muted)'};font-size:9px;flex-shrink:0">${dot}</span>
+        <span style="font-size:11px;font-weight:${active?'700':'400'};color:${txtCol};flex:1">${s.key}</span>
+        ${active ? `<span style="font-size:8.5px;color:${s.col};opacity:0.8">${s.desc}</span>` : ''}
+      </div>`;
+    }).join('');
+  }
 }
 
 // ── Main poll ──────────────────────────────────────────────
@@ -6007,6 +6104,47 @@ setInterval(loadNews, 90_000);   // auto-refresh news every 90 s
 setInterval(loadIntelligence, 300_000);  // auto-refresh intelligence panels every 5 min
 loadNews();                       // load immediately on page open
 loadOvernightNotes();             // morning brief lives on Live tab, load at startup
+
+async function refreshMovers() {
+  const btn = document.getElementById('on-movers-refresh-btn');
+  const syms = window._moverSymbols || [];
+  if (!syms.length) return;
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  try {
+    const r = await fetch('/api/snapshots?syms=' + syms.join(','));
+    const d = await r.json();
+    const snaps = d.snapshots || {};
+    // Re-render mover lists with live price overlay
+    const moversData = window._moverData || [];
+    if (moversData.length) {
+      const gainers = moversData.filter(m => m.pct > 0).sort((a,b) => b.pct - a.pct);
+      const losers  = moversData.filter(m => m.pct < 0).sort((a,b) => a.pct - b.pct);
+      const row = (m) => {
+        const col = m.pct > 0 ? 'var(--green)' : 'var(--red)';
+        const sign = m.pct > 0 ? '+' : '';
+        const live = snaps[m.sym];
+        const liveTag = live && live.price != null
+          ? `<span style="color:var(--orange);font-size:9px" title="Live price">$${Number(live.price).toFixed(2)}</span>`
+          : '';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:11px;font-family:'JetBrains Mono',monospace">
+          <span style="color:#fff;font-weight:600">${m.sym}</span>
+          <span style="color:var(--muted2)">$${m.price.toFixed(2)}</span>
+          ${liveTag}
+          <span style="color:${col};font-weight:700">${sign}${m.pct.toFixed(2)}%</span>
+        </div>`;
+      };
+      const gEl = document.getElementById('on-gainers');
+      const lEl = document.getElementById('on-losers');
+      if (gEl) gEl.innerHTML = gainers.slice(0,8).map(row).join('') || '<span style="color:var(--muted2);font-size:10px">No gainers</span>';
+      if (lEl) lEl.innerHTML = losers.slice(0,8).map(row).join('') || '<span style="color:var(--muted2);font-size:10px">No losers</span>';
+    }
+    if (btn) btn.textContent = '✓ Live';
+  } catch(e) {
+    if (btn) btn.textContent = '✗';
+  } finally {
+    if (btn) { btn.disabled = false; setTimeout(() => { if(btn) btn.textContent = '↻ Live'; }, 4000); }
+  }
+}
 setInterval(() => {               // auto-refresh Catalyst 4× per trading day (~97 min)
   const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const day = et.getDay(), mins = et.getHours() * 60 + et.getMinutes();
@@ -7292,11 +7430,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
     toast._timer = setTimeout(() => toast.classList.remove('show'), 12000);
   }
 
-  function restartWake() {
-    if (!busy) setTimeout(() => { try { wake.start(); } catch(e) {} }, 600);
-  }
-
-  // -- Query recognizer (one-shot, activated by button or wake word) ----------
   const rec = new SR();
   rec.lang = 'en-US';
   rec.interimResults = false;
@@ -7305,7 +7438,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
   function startQuery() {
     if (busy) return;
     busy = true;
-    try { wake.stop(); } catch(e) {}   // explicit stop before rec.start()
     try { rec.start(); } catch(e) { busy = false; }
   }
 
@@ -7318,7 +7450,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
 
   rec.onresult = (e) => {
     const question = e.results[0][0].transcript;
-    if (/^(hello|hey|hi)\s+jarvis\.?$/i.test(question.trim())) return;
     btn.classList.remove('listening');
     btn.classList.add('waiting');
     btn.title = 'Thinking…';
@@ -7334,18 +7465,13 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
       showToast(question, answer);
       btn.classList.remove('waiting');
       btn.title = 'Ask Decifer a question';
-      // Backend speaks via macOS `say -v Daniel`; estimate duration so the mic
-      // doesn't reopen while Daniel is mid-sentence.
-      const wordsPerSec = 3.0; // say -r 180 ≈ 3 words/sec
-      const waitMs = Math.min(Math.max((answer.trim().split(/\s+/).length / wordsPerSec) * 1000, 2000), 12000);
-      setTimeout(() => { busy = false; restartWake(); }, waitMs);
+      busy = false;
     })
     .catch(() => {
       showToast(question, 'Request failed.');
       btn.classList.remove('waiting');
       btn.title = 'Ask Decifer a question';
       busy = false;
-      restartWake();
     });
   };
 
@@ -7354,59 +7480,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
     btn.title = 'Ask Decifer a question';
     if (e.error !== 'no-speech') showToast('', 'Could not hear you. Try again.');
     busy = false;
-    restartWake();
   };
 
   rec.onend = () => {
     btn.classList.remove('listening');
     if (!btn.classList.contains('waiting')) {
       busy = false;
-      restartWake();
     }
   };
-
-  // -- Wake word recognizer (continuous background listener) ------------------
-  const wake = new SR();
-  wake.lang = 'en-US';
-  wake.continuous = true;
-  wake.interimResults = true;
-  wake.maxAlternatives = 1;
-
-  let wakeTriggered = false;
-
-  wake.onresult = (e) => {
-    if (busy || wakeTriggered) return;
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript.toLowerCase().trim();
-      if (/\b(hello|hey|hi)\s+jarvis\b/.test(t)) {
-        wakeTriggered = true;
-        wake.stop();
-        showToast('Jarvis', 'Hello my master. I am Jarvis, your loyal assistant.');
-        return;
-      }
-    }
-  };
-
-  // wake.stop() triggers wake.onend immediately. Wait 2s so the greeting toast
-  // is visible before the mic opens — no TTS dependency, no Chrome API bugs.
-  wake.onend = () => {
-    if (wakeTriggered) {
-      wakeTriggered = false;
-      setTimeout(startQuery, 2000);
-    } else if (!busy) {
-      setTimeout(() => { try { wake.start(); } catch(e) {} }, 500);
-    }
-  };
-
-  wake.onerror = (e) => {
-    wakeTriggered = false;
-    if (e.error !== 'no-speech' && e.error !== 'aborted') {
-      setTimeout(() => { try { wake.start(); } catch(ex) {} }, 2000);
-    }
-  };
-
-  // Start background wake word listener automatically on page load
-  try { wake.start(); } catch(e) {}
 })();
 </script>
 </body>

@@ -1499,6 +1499,32 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("prices API error: %s", exc)
                 payload = {"ts": 0, "prices": {}}
             self.wfile.write(json.dumps(payload).encode())
+        elif self.path.startswith("/api/snapshots"):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            try:
+                import time as _t
+                from urllib.parse import urlparse, parse_qs
+                from alpaca_data import fetch_snapshots as _fs
+                _qs = parse_qs(urlparse(self.path).query)
+                _syms = [s.strip().upper() for s in (_qs.get("syms", [""])[0]).split(",") if s.strip()]
+                _snaps = _fs(_syms[:25]) if _syms else {}
+                payload = {
+                    "ts": int(_t.time()),
+                    "snapshots": {
+                        sym: {
+                            "price": s.get("price"),
+                            "change_1d": s.get("change_1d"),
+                            "pct": round((s.get("change_1d") or 0) * 100, 2) if s.get("change_1d") is not None else None,
+                        }
+                        for sym, s in _snaps.items()
+                    },
+                }
+            except Exception as exc:
+                log.warning("snapshots API error: %s", exc)
+                payload = {"ts": 0, "snapshots": {}}
+            self.wfile.write(json.dumps(payload).encode())
         elif self.path == "/api/health":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

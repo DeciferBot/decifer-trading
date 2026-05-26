@@ -1,80 +1,70 @@
 "use client";
-// Today tab — customer market intelligence briefing.
-// Briefing (story headline + summary) | Market Pulse | Dominant Drivers |
-// What Changed | Conflicting Signals | Key Events | Active Themes | Watch Next | Freshness
+// Today tab — briefing home. M13A refactor.
+// Welcome card | Since you were away | What is moving markets | Market mood |
+// Conflicting signals | Key events | Worth watching
+// Receives pre-computed story, causeCards, clock, sinceAway from CustomerApp.
 
 import { useState } from "react";
-import { ArrowRight, AlertCircle, Eye, ChevronDown, ChevronUp, TrendingUp, Map, List } from "lucide-react";
-import type { MarketNowPayload, ThemeItem, KeyEvent } from "@/lib/customerApi";
-import { translateTheme, themeDescription } from "@/lib/translate";
-import { buildCustomerStory } from "@/lib/customerStory";
-import { getTtgIdForMarketNow } from "@/lib/themeCrosswalk";
-import { getCauseMarketImpact } from "@/lib/marketCauseStory";
+import {
+  ArrowRight,
+  AlertCircle,
+  Eye,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  Clock,
+  TrendingUp,
+  Compass,
+} from "lucide-react";
+import type { MarketNowPayload, KeyEvent } from "@/lib/customerApi";
+import type { CustomerStory } from "@/lib/customerStory";
+import type { MarketCauseCard } from "@/lib/marketCauseStory";
+import type {
+  MarketClockState,
+  FreshnessState,
+  SinceAwaySummary,
+} from "@/lib/useCustomerBriefing";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function moodScheme(mood: string): { border: string; tag: string; text: string; bg: string } {
-  const lower = mood.toLowerCase();
-  if (lower.includes("risk-on") || lower.includes("de-escalat") || lower.includes("easing"))
-    return { border: "#10b981", tag: "Risk-On",        text: "#34d399", bg: "rgba(16,185,129,0.08)"  };
-  if (lower.includes("risk-off") || lower.includes("stress") || lower.includes("panic"))
-    return { border: "#ef4444", tag: "Risk-Off",       text: "#f87171", bg: "rgba(239,68,68,0.08)"   };
-  if (lower.includes("mixed") || lower.includes("caution") || lower.includes("conflict"))
-    return { border: "#f59e0b", tag: "Mixed Signals",  text: "#fbbf24", bg: "rgba(245,158,11,0.08)"  };
-  return   { border: "#334155", tag: "Monitoring",     text: "#94a3b8", bg: "rgba(255,255,255,0.03)" };
-}
-
-function resolveThemes(payload: MarketNowPayload): ThemeItem[] {
-  if (payload.themes?.length) return payload.themes;
-  return (payload.active_themes ?? []).map(t => ({ theme: t, state: "active" }));
-}
-
-function resolveWatchNext(payload: MarketNowPayload): string[] {
-  return payload.watch_next?.length ? payload.watch_next : (payload.what_to_watch ?? []);
-}
-
-function themeStateSort(t: ThemeItem): number {
-  const order: Record<string, number> = {
-    activated: 0, active: 0, strengthening: 1, crowded: 2, watch: 3,
-  };
-  return order[t.state ?? ""] ?? 9;
+function moodScheme(mood: string) {
+  const l = mood.toLowerCase();
+  if (l.includes("risk-on") || l.includes("de-escalat") || l.includes("easing"))
+    return { border: "#10b981", text: "#34d399", bg: "rgba(16,185,129,0.07)" };
+  if (l.includes("risk-off") || l.includes("stress") || l.includes("panic"))
+    return { border: "#ef4444", text: "#f87171", bg: "rgba(239,68,68,0.07)" };
+  if (l.includes("mixed") || l.includes("caution") || l.includes("conflict"))
+    return { border: "#f59e0b", text: "#fbbf24", bg: "rgba(245,158,11,0.07)" };
+  return { border: "#334155", text: "#94a3b8", bg: "rgba(255,255,255,0.03)" };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style={{ color: "#f97316" }}>
+    <p
+      className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3"
+      style={{ color: "#f97316" }}
+    >
       {children}
     </p>
   );
 }
 
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+function Card({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
   return (
     <div
       className="rounded-2xl p-4"
-      style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.07)", ...style }}
+      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)", ...style }}
     >
       {children}
     </div>
-  );
-}
-
-function StatePip({ state }: { state?: string }) {
-  const s = state ?? "";
-  const color =
-    s === "activated" || s === "active"   ? "#10b981" :
-    s === "strengthening"                 ? "#3b82f6" :
-    s === "crowded" || s === "watch"      ? "#f59e0b" :
-    s === "headwind"                      ? "#ef4444" :
-    s === "weakening"                     ? "#f87171" :
-                                            "#475569";
-  return (
-    <span
-      className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-      style={{ background: color, marginTop: "3px" }}
-    />
   );
 }
 
@@ -82,9 +72,9 @@ function EventCard({ ev }: { ev: KeyEvent }) {
   const [open, setOpen] = useState(false);
   return (
     <div
-      className="rounded-xl cursor-pointer transition-all"
-      style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.07)" }}
-      onClick={() => setOpen(o => !o)}
+      className="rounded-xl cursor-pointer"
+      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+      onClick={() => setOpen((o) => !o)}
     >
       <div className="p-3.5 flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -102,28 +92,42 @@ function EventCard({ ev }: { ev: KeyEvent }) {
             )}
           </div>
         </div>
-        {open
-          ? <ChevronUp size={14} className="text-slate-500 shrink-0 mt-0.5" />
-          : <ChevronDown size={14} className="text-slate-500 shrink-0 mt-0.5" />}
+        {open ? (
+          <ChevronUp size={14} className="text-slate-500 shrink-0 mt-0.5" />
+        ) : (
+          <ChevronDown size={14} className="text-slate-500 shrink-0 mt-0.5" />
+        )}
       </div>
       {open && (
         <div
-          className="px-3.5 pb-3.5 space-y-2.5 pt-3"
+          className="px-3.5 pb-3.5 pt-3 space-y-2.5"
           style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
         >
           {ev.summary_plain_english && (
-            <p className="text-xs text-slate-300 leading-relaxed">{ev.summary_plain_english}</p>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {ev.summary_plain_english}
+            </p>
           )}
           {((ev.likely_positive_exposures?.length ?? 0) > 0 ||
             (ev.likely_negative_exposures?.length ?? 0) > 0) && (
             <div className="flex flex-wrap gap-1.5">
               {(ev.likely_positive_exposures ?? []).map((s, i) => (
-                <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(16,185,129,0.1)", color: "#34d399" }}>{s}</span>
+                <span
+                  key={i}
+                  className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(16,185,129,0.1)", color: "#34d399" }}
+                >
+                  {s}
+                </span>
               ))}
               {(ev.likely_negative_exposures ?? []).map((s, i) => (
-                <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(239,68,68,0.1)", color: "#f87171" }}>{s}</span>
+                <span
+                  key={i}
+                  className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(239,68,68,0.1)", color: "#f87171" }}
+                >
+                  {s}
+                </span>
               ))}
             </div>
           )}
@@ -133,234 +137,345 @@ function EventCard({ ev }: { ev: KeyEvent }) {
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
   data: MarketNowPayload;
+  story: CustomerStory | null;
+  causeCards: MarketCauseCard[];
+  clock: MarketClockState;
+  sinceAway: SinceAwaySummary;
+  freshnessState: FreshnessState;
+  freshnessLabel: string;
+  isRefreshing: boolean;
+  onRefresh: () => Promise<void>;
   onThemeSelect: (themeId: string) => void;
+  onAskAbout?: (context: string) => void;
+  onGoToDiscover?: () => void;
   onGoToUniverse?: () => void;
-  onGoToThemeMap?: () => void;
 }
 
-export default function TodayTab({ data, onThemeSelect, onGoToUniverse, onGoToThemeMap }: Props) {
-  const story = buildCustomerStory(data);
-  const mood           = data.market_mood || data.plain_english_summary || "";
-  const whatChanged    = data.what_changed ?? [];
-  const keyEvents      = data.key_events ?? [];
+export default function TodayTab({
+  data,
+  story,
+  causeCards,
+  clock,
+  sinceAway,
+  freshnessState,
+  freshnessLabel,
+  isRefreshing,
+  onRefresh,
+  onThemeSelect,
+  onAskAbout,
+  onGoToDiscover,
+}: Props) {
+  const mood = data.market_mood || data.plain_english_summary || "";
+  const keyEvents = data.key_events ?? [];
   const knownConflicts = data.known_conflicts ?? [];
-  const keyDrivers     = data.key_drivers ?? [];
-  const themes         = resolveThemes(data);
-  const watchNext      = resolveWatchNext(data);
-  const sourceNotes    = data.source_notes ?? [];
-  const sectionFreshness = data.section_freshness ?? {};
+  const watchNext = data.watch_next?.length ? data.watch_next : (data.what_to_watch ?? []);
 
   const ms = mood ? moodScheme(mood) : null;
 
-  const activeThemes = [...themes]
-    .filter(t => ["activated", "active", "strengthening"].includes(t.state ?? "") || t.event_signal === "strengthening")
-    .sort((a, b) => themeStateSort(a) - themeStateSort(b));
+  const storyColor =
+    story?.market_state === "risk-on"
+      ? { border: "#10b981", text: "#34d399" }
+      : story?.market_state === "risk-off"
+        ? { border: "#ef4444", text: "#f87171" }
+        : story?.market_state === "mixed"
+          ? { border: "#f59e0b", text: "#fbbf24" }
+          : { border: "#334155", text: "#94a3b8" };
 
-  const storyMoodColor =
-    story.market_state === "risk-on"  ? { border: "#10b981", tag: "Risk-On",       text: "#34d399", bg: "rgba(16,185,129,0.08)" } :
-    story.market_state === "risk-off" ? { border: "#ef4444", tag: "Risk-Off",      text: "#f87171", bg: "rgba(239,68,68,0.08)" } :
-    story.market_state === "mixed"    ? { border: "#f59e0b", tag: "Mixed Signals", text: "#fbbf24", bg: "rgba(245,158,11,0.08)" } :
-                                        { border: "#334155", tag: "Monitoring",    text: "#94a3b8", bg: "rgba(255,255,255,0.03)" };
+  const sessionDotColor =
+    clock.session === "open"
+      ? "#10b981"
+      : clock.session === "pre_market" || clock.session === "after_hours"
+        ? "#f59e0b"
+        : "#475569";
+
+  const freshnessTimeCopy =
+    freshnessState === "fresh" && data.freshness_timestamp
+      ? `Fresh as of ${new Date(data.freshness_timestamp).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZoneName: "short",
+        })}`
+      : freshnessLabel;
 
   return (
-    <div className="px-4 pb-8 space-y-5 pt-2">
+    <div className="px-4 pb-8 space-y-5 pt-3">
 
-      {/* ── Intelligence Briefing ─────────────────────────────────────── */}
+      {/* ── A: Welcome card ───────────────────────────────────────────────── */}
       <section>
-        <div
-          className="rounded-2xl p-4"
-          style={{ background: storyMoodColor.bg, border: `1.5px solid ${storyMoodColor.border}40` }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <span
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ background: storyMoodColor.border, boxShadow: `0 0 6px ${storyMoodColor.border}88` }}
-            />
-            <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: storyMoodColor.border }}>
-              {storyMoodColor.tag}
-            </span>
-            <span className="text-[9px] text-slate-600 ml-auto">{story.freshness_label}</span>
-          </div>
-
-          <h2 className="text-[15px] font-bold leading-snug mb-2" style={{ color: storyMoodColor.text }}>
-            {story.headline}
-          </h2>
-          <p className="text-[12px] text-slate-300 leading-relaxed">{story.summary}</p>
-
-          {/* Theme count summary */}
-          {(story.active_theme_count + story.building_theme_count + story.weakening_theme_count) > 0 && (
-            <div className="flex gap-4 mt-3.5 pt-3.5" style={{ borderTop: `1px solid ${storyMoodColor.border}25` }}>
-              {story.active_theme_count > 0 && (
-                <div className="text-center">
-                  <p className="text-base font-black" style={{ color: "#10b981" }}>{story.active_theme_count}</p>
-                  <p className="text-[9px] text-slate-500">Active</p>
-                </div>
-              )}
-              {story.building_theme_count > 0 && (
-                <div className="text-center">
-                  <p className="text-base font-black" style={{ color: "#3b82f6" }}>{story.building_theme_count}</p>
-                  <p className="text-[9px] text-slate-500">Building</p>
-                </div>
-              )}
-              {story.weakening_theme_count > 0 && (
-                <div className="text-center">
-                  <p className="text-base font-black" style={{ color: "#f87171" }}>{story.weakening_theme_count}</p>
-                  <p className="text-[9px] text-slate-500">Weakening</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* CTAs */}
-          <div className="flex gap-2 mt-3.5 flex-wrap">
-            {onGoToThemeMap && (
-              <button
-                onClick={onGoToThemeMap}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all active:scale-95"
-                style={{ background: "rgba(249,115,22,0.15)", color: "#fb923c" }}
-              >
-                <Map size={10} />
-                Explore Map
-              </button>
-            )}
-            {onGoToUniverse && story.mapped_structural.length > 0 && (
-              <button
-                onClick={onGoToUniverse}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all active:scale-95"
-                style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
-              >
-                <List size={10} />
-                See Connected Names
-              </button>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Market Pulse ────────────────────────────────────────────────── */}
-      {mood && ms && (
-        <section>
-          <SectionLabel>Market Pulse</SectionLabel>
-          <div
-            className="rounded-2xl p-4"
-            style={{ background: ms.bg, border: `1.5px solid ${ms.border}40` }}
-          >
-            <div className="flex items-center gap-2 mb-2.5">
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: ms.border, boxShadow: `0 0 6px ${ms.border}88` }}
-              />
-              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: ms.border }}>
-                {ms.tag}
-              </span>
-              <span className="text-[9px] text-slate-600 ml-auto">
-                {data.freshness_timestamp
-                  ? new Date(data.freshness_timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
-                  : ""}
-              </span>
-            </div>
-            <p className="text-sm font-semibold leading-relaxed" style={{ color: ms.text }}>
-              {mood}
-            </p>
-          </div>
-        </section>
-      )}
-
-      {/* ── What is Moving Markets ───────────────────────────────────────── */}
-      {story.primary_drivers.length > 0 && (
-        <section>
-          <SectionLabel>What is Moving Markets</SectionLabel>
-          <div className="space-y-2">
-            {story.primary_drivers.map((driver, i) => {
-              // primary_drivers is built from keyDrivers in order — index aligns
-              const driverId = keyDrivers[i] ?? "";
-              const impact = getCauseMarketImpact(driverId);
-              return (
-                <div
-                  key={i}
-                  className="rounded-xl px-4 py-3"
-                  style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.07)" }}
-                >
-                  <div className="flex items-start gap-3">
-                    <TrendingUp size={13} style={{ color: "#f97316", marginTop: "2px", flexShrink: 0 }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-slate-100">{driver.label}</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                        {driver.explanation}
-                      </p>
-                      {impact && (
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                          {impact}
-                        </p>
-                      )}
-                      {driver.linked_ttg_id && (
-                        <button
-                          onClick={() => {
-                            const firstMarketNow = driver.linked_market_now_ids[0];
-                            if (firstMarketNow) onThemeSelect(firstMarketNow);
-                          }}
-                          className="mt-2 flex items-center gap-1 text-[10px] font-semibold"
-                          style={{ color: "#fb923c" }}
-                        >
-                          <span
-                            className="px-1.5 py-0.5 rounded"
-                            style={{ background: "rgba(249,115,22,0.1)" }}
-                          >
-                            {driver.linked_ttg_label}
-                          </span>
-                          <ArrowRight size={9} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* ── What Changed ────────────────────────────────────────────────── */}
-      <section>
-        <SectionLabel>What Changed</SectionLabel>
         <Card>
-          {whatChanged.length > 0 ? (
-            <ul className="space-y-2.5">
-              {whatChanged.map((item, i) => (
-                <li key={i} className="flex items-start gap-2.5">
-                  <ArrowRight size={12} className="shrink-0 mt-1" style={{ color: "#f97316" }} />
-                  <p className="text-[13px] text-slate-200 leading-relaxed">{item}</p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="space-y-1.5">
-              <p className="text-sm text-slate-400">No significant intraday changes detected.</p>
-              {keyDrivers.length > 0 && (
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  The market is continuing to trade on existing macro drivers.
-                  Fresh headlines will appear here as they arrive.
-                </p>
-              )}
+          {/* Session + time row */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{
+                  background: sessionDotColor,
+                  boxShadow:
+                    clock.session === "open" ? `0 0 5px ${sessionDotColor}80` : "none",
+                }}
+              />
+              <span
+                className="text-[10px] font-semibold"
+                style={{ color: sessionDotColor }}
+              >
+                {clock.sessionLabel}
+              </span>
             </div>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+              <Clock size={9} />
+              <span>{clock.newYorkTime} ET</span>
+            </div>
+          </div>
+
+          {/* Headline */}
+          {story && (
+            <p
+              className="text-[14px] font-bold leading-snug mb-2"
+              style={{ color: storyColor.text }}
+            >
+              {story.headline}
+            </p>
           )}
+          <p className="text-[12px] text-slate-400 leading-relaxed">
+            {story?.summary ?? "Gathering market intelligence..."}
+          </p>
+
+          {/* Freshness + refresh */}
+          <div
+            className="flex items-center justify-between mt-3 pt-3"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <span
+              className="text-[10px] font-medium"
+              style={{
+                color:
+                  freshnessState === "fresh"
+                    ? "#10b981"
+                    : freshnessState === "stale"
+                      ? "#f87171"
+                      : "#6b7280",
+              }}
+            >
+              {freshnessTimeCopy}
+            </span>
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
+              style={{ color: "#f97316" }}
+            >
+              <RefreshCw size={9} className={isRefreshing ? "animate-spin" : ""} />
+              {isRefreshing ? "Refreshing..." : "Refresh view"}
+            </button>
+          </div>
         </Card>
       </section>
 
-      {/* ── Conflicting Signals ──────────────────────────────────────────── */}
+      {/* ── B: Since you were away ────────────────────────────────────────── */}
+      {sinceAway.lastSeenAt && (
+        <section>
+          <SectionLabel>
+            {sinceAway.awayDuration
+              ? `Since you were away · ${sinceAway.awayDuration} ago`
+              : "Since your last visit"}
+          </SectionLabel>
+
+          {sinceAway.hasChanges && sinceAway.items.length > 0 ? (
+            <div className="space-y-2">
+              {sinceAway.items.map((item, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl px-4 py-3 flex items-start gap-3"
+                  style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5"
+                    style={{
+                      background:
+                        item.type === "event"
+                          ? "#f59e0b"
+                          : item.type === "theme"
+                            ? "#3b82f6"
+                            : "#10b981",
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] text-slate-200 leading-snug">{item.title}</p>
+                    {item.detail && (
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed line-clamp-2">
+                        {item.detail}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <p className="text-sm text-slate-400">
+                No major new changes detected since your last visit.
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                The latest market briefing is below.
+              </p>
+            </Card>
+          )}
+        </section>
+      )}
+
+      {/* ── C: What is moving markets ─────────────────────────────────────── */}
+      {causeCards.length > 0 && (
+        <section>
+          <SectionLabel>What is moving markets</SectionLabel>
+          <div className="space-y-3">
+            {causeCards.map((card, i) => (
+              <div
+                key={i}
+                className="rounded-2xl p-4"
+                style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+              >
+                <div className="flex items-center gap-2 mb-2.5">
+                  <TrendingUp
+                    size={12}
+                    style={{ color: "#f97316", flexShrink: 0 }}
+                  />
+                  <p className="text-[13px] font-bold text-slate-100 flex-1">
+                    {card.cause_label}
+                  </p>
+                  <span
+                    className="text-[9px] font-medium px-1.5 py-0.5 rounded shrink-0"
+                    style={{ background: "rgba(255,255,255,0.05)", color: "#6b7280" }}
+                  >
+                    {card.evidence_basis}
+                  </span>
+                </div>
+
+                <p className="text-[12px] text-slate-300 leading-relaxed mb-1">
+                  {card.what_happened}
+                </p>
+                <p className="text-[12px] text-slate-400 leading-relaxed">
+                  {card.market_impact}
+                </p>
+
+                {/* Connected themes */}
+                {card.connected_themes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {card.connected_themes.slice(0, 3).map((t, j) => (
+                      <button
+                        key={j}
+                        onClick={() => {
+                          if (card.primary_market_now_id)
+                            onThemeSelect(card.primary_market_now_id);
+                        }}
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full transition-all active:scale-95"
+                        style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+                      >
+                        {t.ttgLabel}
+                      </button>
+                    ))}
+                    {card.connected_names_count > 0 && (
+                      <span className="text-[10px] text-slate-600 self-center ml-1">
+                        {card.connected_names_count}{" "}
+                        {card.connected_names_count !== 1 ? "names" : "name"}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Ask Decifer CTA */}
+                {onAskAbout && (
+                  <button
+                    onClick={() =>
+                      onAskAbout(
+                        `Why is ${card.cause_label.toLowerCase()} moving markets?`,
+                      )
+                    }
+                    className="mt-2.5 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
+                    style={{ color: "#94a3b8" }}
+                  >
+                    Ask Decifer why
+                    <ArrowRight size={9} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── D: Market mood ────────────────────────────────────────────────── */}
+      {mood && ms && (
+        <section>
+          <SectionLabel>Market mood</SectionLabel>
+          <div
+            className="rounded-2xl p-4"
+            style={{ background: ms.bg, border: `1.5px solid ${ms.border}35` }}
+          >
+            <p className="text-[13px] font-semibold leading-relaxed" style={{ color: ms.text }}>
+              {mood}
+            </p>
+            {story && (
+              <div
+                className="flex items-center gap-4 mt-3 pt-3"
+                style={{ borderTop: `1px solid ${ms.border}20` }}
+              >
+                {story.active_theme_count > 0 && (
+                  <div className="text-center">
+                    <p className="text-base font-black" style={{ color: "#10b981" }}>
+                      {story.active_theme_count}
+                    </p>
+                    <p className="text-[9px] text-slate-500">Active</p>
+                  </div>
+                )}
+                {story.building_theme_count > 0 && (
+                  <div className="text-center">
+                    <p className="text-base font-black" style={{ color: "#3b82f6" }}>
+                      {story.building_theme_count}
+                    </p>
+                    <p className="text-[9px] text-slate-500">Building</p>
+                  </div>
+                )}
+                {story.weakening_theme_count > 0 && (
+                  <div className="text-center">
+                    <p className="text-base font-black" style={{ color: "#f87171" }}>
+                      {story.weakening_theme_count}
+                    </p>
+                    <p className="text-[9px] text-slate-500">Weakening</p>
+                  </div>
+                )}
+                {onGoToDiscover && (
+                  <button
+                    onClick={onGoToDiscover}
+                    className="ml-auto flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full self-center transition-all active:scale-95"
+                    style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+                  >
+                    <Compass size={9} />
+                    Explore
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── Conflicting signals ───────────────────────────────────────────── */}
       {knownConflicts.length > 0 && (
         <section>
-          <SectionLabel>Conflicting Signals</SectionLabel>
+          <SectionLabel>Conflicting signals</SectionLabel>
           <div className="space-y-2">
             {knownConflicts.map((conflict, i) => (
               <div
                 key={i}
                 className="rounded-xl p-3.5 flex items-start gap-2.5"
-                style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)" }}
+                style={{
+                  background: "rgba(245,158,11,0.05)",
+                  border: "1px solid rgba(245,158,11,0.16)",
+                }}
               >
                 <AlertCircle size={13} className="text-amber-400 shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-300 leading-relaxed">{conflict}</p>
@@ -370,10 +485,10 @@ export default function TodayTab({ data, onThemeSelect, onGoToUniverse, onGoToTh
         </section>
       )}
 
-      {/* ── Key Events ──────────────────────────────────────────────────── */}
+      {/* ── Key events ────────────────────────────────────────────────────── */}
       {keyEvents.length > 0 && (
         <section>
-          <SectionLabel>Key Events</SectionLabel>
+          <SectionLabel>Key events</SectionLabel>
           <div className="space-y-2">
             {keyEvents.slice(0, 6).map((ev, i) => (
               <EventCard key={i} ev={ev} />
@@ -382,52 +497,10 @@ export default function TodayTab({ data, onThemeSelect, onGoToUniverse, onGoToTh
         </section>
       )}
 
-      {/* ── Active Themes ────────────────────────────────────────────────── */}
-      {activeThemes.length > 0 && (
-        <section>
-          <SectionLabel>Active Themes</SectionLabel>
-          <div className="space-y-2">
-            {activeThemes.slice(0, 7).map((t, i) => {
-              const isBuilding = t.state === "strengthening";
-              const desc = t.from_events?.[0] || themeDescription(t.theme);
-              return (
-                <button
-                  key={i}
-                  onClick={() => onThemeSelect(t.theme)}
-                  className="w-full rounded-xl px-4 py-3 text-left flex items-start gap-3 transition-all active:scale-[0.98]"
-                  style={{ background: "#131f35", border: "1px solid rgba(255,255,255,0.07)" }}
-                >
-                  <StatePip state={t.state} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-[13px] font-semibold text-slate-100 flex-1 min-w-0 truncate">
-                        {translateTheme(t.theme)}
-                      </p>
-                      {isBuilding && (
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                          style={{ background: "rgba(59,130,246,0.12)", color: "#60a5fa" }}>
-                          Building
-                        </span>
-                      )}
-                    </div>
-                    {desc && (
-                      <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{desc}</p>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[10px] text-slate-500 mt-2 px-1">
-            Tap a theme to explore in the Theme Map.
-          </p>
-        </section>
-      )}
-
-      {/* ── Watch Next ──────────────────────────────────────────────────── */}
+      {/* ── Worth watching ────────────────────────────────────────────────── */}
       {watchNext.length > 0 && (
         <section>
-          <SectionLabel>Watch Next</SectionLabel>
+          <SectionLabel>Worth watching</SectionLabel>
           <Card>
             <ul className="space-y-2.5">
               {watchNext.map((item, i) => (
@@ -441,51 +514,19 @@ export default function TodayTab({ data, onThemeSelect, onGoToUniverse, onGoToTh
         </section>
       )}
 
-      {/* ── Data Freshness ───────────────────────────────────────────────── */}
-      {(Object.keys(sectionFreshness).length > 0 || sourceNotes.length > 0) && (
-        <section>
-          <SectionLabel>Intelligence Freshness</SectionLabel>
-          <div
-            className="rounded-xl p-3.5"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
-          >
-            {Object.keys(sectionFreshness).length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-2">
-                {Object.entries(sectionFreshness)
-                  .filter(([, entry]) => entry.status !== "unknown")
-                  .map(([section, entry]) => {
-                    const c =
-                      entry.status === "fresh"
-                        ? { bg: "rgba(16,185,129,0.1)",   text: "#10b981" }
-                        : entry.status === "stale" || entry.status === "delayed"
-                          ? { bg: "rgba(245,158,11,0.1)", text: "#f59e0b" }
-                          : { bg: "rgba(255,255,255,0.05)", text: "#6b7280" };
-                    return (
-                      <span key={section} className="text-[9px] font-medium px-2 py-0.5 rounded"
-                        style={{ background: c.bg, color: c.text }}>
-                        {section.replace(/_/g, " ")}: {entry.status}
-                      </span>
-                    );
-                  })}
-              </div>
-            )}
-            {sourceNotes.map((note, i) => (
-              <p key={i} className="text-[10px] text-slate-500">{note}</p>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Disclaimer ───────────────────────────────────────────────────── */}
+      {/* ── Disclaimer ────────────────────────────────────────────────────── */}
       <div
         className="rounded-xl p-4 text-center"
-        style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+        style={{
+          background: "rgba(255,255,255,0.02)",
+          border: "1px solid rgba(255,255,255,0.04)",
+        }}
       >
-        <p className="text-[11px] text-slate-500 leading-relaxed">
+        <p className="text-[11px] text-slate-600 leading-relaxed">
           Market intelligence only. Not financial advice. No trade execution.
         </p>
         {data.data_entitlement_note && (
-          <p className="text-[10px] text-slate-600 mt-1">{data.data_entitlement_note}</p>
+          <p className="text-[10px] text-slate-700 mt-1">{data.data_entitlement_note}</p>
         )}
       </div>
     </div>
