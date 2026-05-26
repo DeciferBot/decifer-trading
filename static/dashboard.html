@@ -2001,12 +2001,28 @@ async function loadOvernightNotes() {
 
     if (!d.available) {
       document.getElementById('on-tone-row').innerHTML =
-        '<span style="color:var(--muted2);font-size:10px">No morning brief yet — generated automatically at 6:00 AM ET.</span>';
+        '<span style="color:var(--muted2);font-size:10px">No morning brief yet — generated automatically at 6:00 AM New York.</span>';
       return;
     }
 
     const D = d.data || {};
-    if (meta && D.generated) meta.textContent = D.generated;
+    if (meta && D.generated) {
+      // D.generated is like "2026-05-26 06:00 ET" — replace ET label + show staleness by day
+      const displayStr = D.generated.replace(/\bET\b/, 'New York');
+      try {
+        const datePart = D.generated.match(/(\d{4}-\d{2}-\d{2})/);
+        if (datePart) {
+          const briefDay = new Date(datePart[1] + 'T00:00:00');
+          const today = new Date(); today.setHours(0,0,0,0);
+          const daysOld = Math.round((today - briefDay) / 86400000);
+          const col = daysOld === 0 ? 'var(--green)' : daysOld === 1 ? 'var(--orange)' : 'var(--red)';
+          const ageStr = daysOld === 0 ? 'today' : daysOld === 1 ? 'yesterday' : daysOld + 'd ago';
+          meta.innerHTML = `<span style="color:${col}">${esc(displayStr)}</span><span style="color:var(--muted2);font-size:9px;margin-left:6px">${ageStr}</span>`;
+        } else {
+          meta.textContent = displayStr;
+        }
+      } catch(e) { meta.textContent = displayStr; }
+    }
 
     // ── Common names for indices / sector ETFs ─────────────────
     const _INDEX_NAMES = {
@@ -2272,9 +2288,8 @@ function renderICWeights(d) {
   }
 
   if (d.updated) {
-    const updDt = new Date(d.updated);
-    document.getElementById('ic-updated').textContent =
-      'Updated ' + updDt.toLocaleDateString() + ' ' + updDt.toTimeString().slice(0,5);
+    document.getElementById('ic-updated').innerHTML =
+      'Updated ' + _fmtTs(d.updated, 7 * 24 * 60, 14 * 24 * 60);
   }
 
   // Build per-dimension bars — derive dims from live weights, fall back to active_dimensions
@@ -2353,6 +2368,42 @@ function _fmtPct(v) {
   const pct = (v * 100).toFixed(2);
   const col  = v >= 0 ? 'var(--green)' : 'var(--red)';
   return `<span style="color:${col}">${v >= 0 ? '+' : ''}${pct}%</span>`;
+}
+
+/**
+ * _fmtTs — Format a timestamp with New York time, local time, and staleness color.
+ * Returns an HTML string (use innerHTML, not textContent).
+ * @param {string} isoStr      ISO date string or any parseable date
+ * @param {number} staleMin    Minutes after which color turns amber (default 30)
+ * @param {number} veryStaleMin Minutes after which color turns red (default 2× staleMin)
+ */
+function _fmtTs(isoStr, staleMin, veryStaleMin) {
+  if (!isoStr) return '<span style="color:var(--muted2)">—</span>';
+  try {
+    const dt = new Date(isoStr);
+    if (isNaN(dt.getTime())) return `<span style="color:var(--muted2)">${isoStr}</span>`;
+    const ageMs  = Date.now() - dt.getTime();
+    const ageMin = ageMs / 60000;
+    const _sm    = staleMin || 30;
+    const _vsm   = veryStaleMin || _sm * 2;
+    const col    = ageMin < _sm ? 'var(--green)' : ageMin < _vsm ? 'var(--orange)' : 'var(--red)';
+    const nyTime = dt.toLocaleTimeString('en-US', {timeZone:'America/New_York', hour:'numeric', minute:'2-digit', hour12:true});
+    const localTime = dt.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true});
+    const tzAbbr = (() => {
+      try {
+        const parts = new Intl.DateTimeFormat('en-US', {timeZoneName:'short'}).formatToParts(dt);
+        return (parts.find(p => p.type === 'timeZoneName') || {}).value || 'local';
+      } catch(e) { return 'local'; }
+    })();
+    let ageStr;
+    if (ageMin < 1) ageStr = 'just now';
+    else if (ageMin < 60) ageStr = Math.round(ageMin) + 'm ago';
+    else if (ageMin < 1440) ageStr = Math.round(ageMin / 60) + 'h ago';
+    else ageStr = Math.round(ageMin / 1440) + 'd ago';
+    return `<span style="color:${col}">${nyTime} New York · ${localTime} ${tzAbbr}</span><span style="color:var(--muted2);font-size:9px;margin-left:6px">${ageStr}</span>`;
+  } catch(e) {
+    return `<span style="color:var(--muted2)">${isoStr}</span>`;
+  }
 }
 
 // Inline Chart.js plugin: draws a vertical dashed line at the optimal horizon.
@@ -4406,12 +4457,7 @@ function loadIntelligence() {
 
     const tsEl = document.getElementById('intel-ts');
     if (tsEl && d.ts) {
-      try {
-        const _dt = new Date(d.ts);
-        const _local = _dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-        const _et    = _dt.toLocaleTimeString('en-US', {timeZone:'America/New_York', hour:'2-digit', minute:'2-digit', hour12:true});
-        tsEl.textContent = `Updated ${_local} local · ${_et} ET`;
-      } catch(e) { tsEl.textContent = d.ts; }
+      tsEl.innerHTML = 'Updated ' + _fmtTs(d.ts, 30, 60);
     }
 
     // ── Market Story ──────────────────────────────────────────────────────────
@@ -4652,8 +4698,7 @@ function loadHealth() {
     // Timestamp
     const tsEl = document.getElementById('hlth-ts');
     if (tsEl && d.ts) {
-      try { tsEl.textContent = 'Updated ' + new Date(d.ts).toLocaleTimeString(); }
-      catch(e) { tsEl.textContent = d.ts; }
+      tsEl.innerHTML = 'Updated ' + _fmtTs(d.ts, 5, 15);
     }
 
     // ── Connection pills ──────────────────────────────────
@@ -5845,7 +5890,7 @@ async function poll() {
       const et = now.toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit',hour12:true});
       const local = now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
       const tzAbbr = now.toLocaleDateString('en-US',{timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,timeZoneName:'short'}).split(', ').pop() || 'local';
-      document.getElementById('upd-time').textContent = et + ' ET · ' + local + ' ' + tzAbbr;
+      document.getElementById('upd-time').textContent = et + ' New York · ' + local + ' ' + tzAbbr;
     })();
 
     // Stats
@@ -5871,7 +5916,7 @@ async function poll() {
     document.getElementById('s-session').textContent = _SESSION_LABELS[rawSession] || rawSession;
     document.getElementById('s-scans').textContent   = d.scan_count || 0;
     // Show last scan time with ET hint
-    document.getElementById('s-last').textContent    = d.last_scan ? 'Last: ' + d.last_scan + ' ET' : '—';
+    document.getElementById('s-last').textContent    = d.last_scan ? 'Last: ' + d.last_scan + ' New York' : '—';
     document.getElementById('s-pos').textContent     = (d.positions || []).length;
     document.getElementById('s-trades').textContent  = (d.all_trades || []).length;
     if (d.performance) {
@@ -6018,7 +6063,7 @@ async function poll() {
         _renderApexConvoEntry(latest);
         // Update scan time from the latest apex entry's time field
         const scanTimeEl = document.getElementById('agents-scan-time');
-        if (scanTimeEl) scanTimeEl.textContent = 'Last scan: ' + (latest.time || d.last_scan || '—');
+        if (scanTimeEl) { const _t = latest.time || d.last_scan; scanTimeEl.textContent = 'Last scan: ' + (_t ? _t + ' New York' : '—'); }
       }
     }
     // News view
@@ -7309,7 +7354,7 @@ function _renderApexConvoEntry(msg) {
 }
 
 function renderAgentConvoFull(convo, lastScan) {
-  document.getElementById('agents-scan-time').textContent = 'Last scan: ' + (lastScan || '—');
+  document.getElementById('agents-scan-time').textContent = 'Last scan: ' + (lastScan ? lastScan + ' New York' : '—');
   if (!convo || !convo.length) return;
   // Only update if user is viewing the latest (not navigating history)
   if (window._apexConvoIdx < 0) {
