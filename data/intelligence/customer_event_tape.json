@@ -1,9 +1,1957 @@
 {
   "schema_version": "customer_event_tape_v1",
-  "generated_at": "2026-05-26T22:28:53.095869+00:00",
-  "valid_until": "2026-05-27T10:28:53.095889+00:00",
+  "generated_at": "2026-05-27T09:07:40.774065+00:00",
+  "valid_until": "2026-05-27T21:07:40.774092+00:00",
   "freshness_status": "fresh",
   "events": [
+    {
+      "event_id": "94ddb24c-be4e-4040-9eee-004cdad48bce",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Asia stocks see tech gains as investors weigh US-Iran deal",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T09:07:40.774065+00:00",
+      "ingested_at": "2026-05-27T09:07:40.774065+00:00",
+      "processed_at": "2026-05-27T09:07:40.774065+00:00",
+      "valid_until": "2026-05-27T21:07:40.774092+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [
+        "middle east"
+      ],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "TSM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "f9a6159b-d165-4ac1-ac48-e4b4bb4441d8",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Zscaler sees downbeat quarterly revenue as competition heats up in cybersecurity market",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T09:07:40.323354+00:00",
+      "ingested_at": "2026-05-27T09:07:40.323354+00:00",
+      "processed_at": "2026-05-27T09:07:40.323354+00:00",
+      "valid_until": "2026-05-27T21:07:40.323366+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "PANW"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "12734150-82ec-4141-a2b9-5bdee7cc59d4",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Zscaler sees downbeat quarterly revenue as competition heats up in cybersecurity market",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T08:59:58.973093+00:00",
+      "ingested_at": "2026-05-27T08:59:58.973093+00:00",
+      "processed_at": "2026-05-27T08:59:58.973093+00:00",
+      "valid_until": "2026-05-27T20:59:58.973104+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "PANW"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "21ea5dd7-94fa-4903-ba01-ed4244c38b91",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Zscaler sees downbeat quarterly revenue as competition heats up in cybersecurity market",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T08:41:25.448524+00:00",
+      "ingested_at": "2026-05-27T08:41:25.448524+00:00",
+      "processed_at": "2026-05-27T08:41:25.448524+00:00",
+      "valid_until": "2026-05-27T20:41:25.448541+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "PANW"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "3cbad257-aabb-4c67-a94d-695fd8d2710e",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Zscaler sees downbeat quarterly revenue as competition heats up in cybersecurity market",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T08:27:51.199557+00:00",
+      "ingested_at": "2026-05-27T08:27:51.199557+00:00",
+      "processed_at": "2026-05-27T08:27:51.199557+00:00",
+      "valid_until": "2026-05-27T20:27:51.199570+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "PANW"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "4f2ef85b-7ee5-4479-af2f-accc97b7a71a",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Zscaler sees downbeat quarterly revenue as competition heats up in cybersecurity market",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T08:09:42.628144+00:00",
+      "ingested_at": "2026-05-27T08:09:42.628144+00:00",
+      "processed_at": "2026-05-27T08:09:42.628144+00:00",
+      "valid_until": "2026-05-27T20:09:42.628155+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "PANW"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "c4d37a49-a5ff-4516-9456-5be509b2f342",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Hafnia Q1 EPS $0.36 Beats $0.32 Estimate, Sales $412.923M Beat $298.920M Estimate",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "alpaca_benzinga",
+      "source_published_at": "2026-05-27T06:04:13+00:00",
+      "ingested_at": "2026-05-27T06:04:14.799300+00:00",
+      "processed_at": "2026-05-27T06:04:14.799300+00:00",
+      "valid_until": "2026-05-27T18:04:14.799318+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "HAFN"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "3bb11350-f7db-421d-ac06-bfdf720149cc",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Reported Earlier, Disciplined Growth Acquisition Corporation launches $150M Initial Public Offering, Offering 15M Units At $10.00 Each",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "alpaca_benzinga",
+      "source_published_at": "2026-05-27T05:51:03+00:00",
+      "ingested_at": "2026-05-27T05:51:04.360738+00:00",
+      "processed_at": "2026-05-27T05:51:04.360738+00:00",
+      "valid_until": "2026-05-27T17:51:04.360744+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "DGAC",
+        "DGACU"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "edda971f-7452-4474-9393-500ce571f0d6",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Silvercorp Metals Q4 Adj. EPS $0.27, Inline, Sales $147.359M Beat $147.200M Estimate",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "alpaca_benzinga",
+      "source_published_at": "2026-05-27T01:49:44+00:00",
+      "ingested_at": "2026-05-27T01:49:45.571648+00:00",
+      "processed_at": "2026-05-27T01:49:45.571648+00:00",
+      "valid_until": "2026-05-27T13:49:45.571661+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "SVM",
+        "TSX:SVM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "d09d75af-44ae-415e-af89-19545d913322",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Rocket Lab Acquires Motiv Space Systems For $40M In Cash",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:53:50.218354+00:00",
+      "ingested_at": "2026-05-26T23:53:50.218354+00:00",
+      "processed_at": "2026-05-26T23:53:50.218354+00:00",
+      "valid_until": "2026-05-27T11:53:50.218367+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "RKLB"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "f08228ea-7ebc-41c2-8ac7-a46549b3d330",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:53:50.190765+00:00",
+      "ingested_at": "2026-05-26T23:53:50.190765+00:00",
+      "processed_at": "2026-05-26T23:53:50.190765+00:00",
+      "valid_until": "2026-05-27T11:53:50.190780+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "OXY"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "0bfdbeb6-b885-4b83-b47d-c8571f8ab9e0",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:53:50.106081+00:00",
+      "ingested_at": "2026-05-26T23:53:50.106081+00:00",
+      "processed_at": "2026-05-26T23:53:50.106081+00:00",
+      "valid_until": "2026-05-27T11:53:50.106107+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "XOM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "8b7c8be2-714a-4e56-bace-8cb4e7be5592",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Clinch Resources Ltd. Announces Acquisition of a Highwall Miner for ARI Project",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:53:49.216508+00:00",
+      "ingested_at": "2026-05-26T23:53:49.216508+00:00",
+      "processed_at": "2026-05-26T23:53:49.216508+00:00",
+      "valid_until": "2026-05-27T11:53:49.216522+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "1d724e67-6510-4fde-a742-b92280117413",
+      "event_family": "earnings_guidance",
+      "event_type": "negative_surprise",
+      "status": "reported",
+      "title": "A $10.2 Billion Hidden AI Revenue Stream Most Investors Are Missing",
+      "summary_plain_english": "Company missed earnings or cut guidance. Pressure on the name and possibly on sector peers.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:53:49.187363+00:00",
+      "ingested_at": "2026-05-26T23:53:49.187363+00:00",
+      "processed_at": "2026-05-26T23:53:49.187363+00:00",
+      "valid_until": "2026-05-27T11:53:49.187381+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "margins",
+        "valuation_multiple",
+        "theme_reversal"
+      ],
+      "likely_positive_exposures": [],
+      "likely_negative_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares lower",
+        "Analyst downgrades"
+      ],
+      "invalidation_signals": [
+        "Shares recover",
+        "Company reiterates outlook"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "c392bc4f-0267-40dd-bcfb-04d7c4e8acab",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Rocket Lab Acquires Motiv Space Systems For $40M In Cash",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:36:50.895498+00:00",
+      "ingested_at": "2026-05-26T23:36:50.895498+00:00",
+      "processed_at": "2026-05-26T23:36:50.895498+00:00",
+      "valid_until": "2026-05-27T11:36:50.895513+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "RKLB"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "cbae43bb-f116-448f-b166-6a0cc2c054a9",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:36:50.873468+00:00",
+      "ingested_at": "2026-05-26T23:36:50.873468+00:00",
+      "processed_at": "2026-05-26T23:36:50.873468+00:00",
+      "valid_until": "2026-05-27T11:36:50.873500+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "OXY"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "65432f2e-bd77-4e62-a5de-59477b7b1c69",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:36:50.769761+00:00",
+      "ingested_at": "2026-05-26T23:36:50.769761+00:00",
+      "processed_at": "2026-05-26T23:36:50.769761+00:00",
+      "valid_until": "2026-05-27T11:36:50.769773+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "XOM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "6c67a7a6-f62a-4544-89d8-2f8a772b377b",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Clinch Resources Ltd. Announces Acquisition of a Highwall Miner for ARI Project",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:36:50.047460+00:00",
+      "ingested_at": "2026-05-26T23:36:50.047460+00:00",
+      "processed_at": "2026-05-26T23:36:50.047460+00:00",
+      "valid_until": "2026-05-27T11:36:50.047476+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "5a13a76e-3f75-45d6-958e-f8196b82e4b8",
+      "event_family": "earnings_guidance",
+      "event_type": "negative_surprise",
+      "status": "reported",
+      "title": "A $10.2 Billion Hidden AI Revenue Stream Most Investors Are Missing",
+      "summary_plain_english": "Company missed earnings or cut guidance. Pressure on the name and possibly on sector peers.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:36:49.873827+00:00",
+      "ingested_at": "2026-05-26T23:36:49.873827+00:00",
+      "processed_at": "2026-05-26T23:36:49.873827+00:00",
+      "valid_until": "2026-05-27T11:36:49.873837+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "margins",
+        "valuation_multiple",
+        "theme_reversal"
+      ],
+      "likely_positive_exposures": [],
+      "likely_negative_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares lower",
+        "Analyst downgrades"
+      ],
+      "invalidation_signals": [
+        "Shares recover",
+        "Company reiterates outlook"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "f2360e8e-634a-4a7d-ace2-a9a94ec9afd4",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:19:40.033833+00:00",
+      "ingested_at": "2026-05-26T23:19:40.033833+00:00",
+      "processed_at": "2026-05-26T23:19:40.033833+00:00",
+      "valid_until": "2026-05-27T11:19:40.033845+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "OXY"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "86a0c8dc-16de-430b-bcb8-a6f636138a9f",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Rocket Lab Acquires Motiv Space Systems For $40M In Cash",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:19:39.995679+00:00",
+      "ingested_at": "2026-05-26T23:19:39.995679+00:00",
+      "processed_at": "2026-05-26T23:19:39.995679+00:00",
+      "valid_until": "2026-05-27T11:19:39.995701+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "RKLB"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "10c003c4-6788-4106-8aba-f4a6ffa3c599",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:19:39.964734+00:00",
+      "ingested_at": "2026-05-26T23:19:39.964734+00:00",
+      "processed_at": "2026-05-26T23:19:39.964734+00:00",
+      "valid_until": "2026-05-27T11:19:39.964751+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "XOM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "07eec7d9-c058-490a-9787-75c3b2a9e179",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Clinch Resources Ltd. Announces Acquisition of a Highwall Miner for ARI Project",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:19:39.035565+00:00",
+      "ingested_at": "2026-05-26T23:19:39.035565+00:00",
+      "processed_at": "2026-05-26T23:19:39.035565+00:00",
+      "valid_until": "2026-05-27T11:19:39.035590+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "92d26122-0aa7-4bb6-9860-316a9c754656",
+      "event_family": "earnings_guidance",
+      "event_type": "negative_surprise",
+      "status": "reported",
+      "title": "A $10.2 Billion Hidden AI Revenue Stream Most Investors Are Missing",
+      "summary_plain_english": "Company missed earnings or cut guidance. Pressure on the name and possibly on sector peers.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:19:38.981958+00:00",
+      "ingested_at": "2026-05-26T23:19:38.981958+00:00",
+      "processed_at": "2026-05-26T23:19:38.981958+00:00",
+      "valid_until": "2026-05-27T11:19:38.981970+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "margins",
+        "valuation_multiple",
+        "theme_reversal"
+      ],
+      "likely_positive_exposures": [],
+      "likely_negative_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares lower",
+        "Analyst downgrades"
+      ],
+      "invalidation_signals": [
+        "Shares recover",
+        "Company reiterates outlook"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "f63fe477-e011-4470-bca6-c6532108b594",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Rocket Lab Acquires Motiv Space Systems For $40M In Cash",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:02:53.525882+00:00",
+      "ingested_at": "2026-05-26T23:02:53.525882+00:00",
+      "processed_at": "2026-05-26T23:02:53.525882+00:00",
+      "valid_until": "2026-05-27T11:02:53.525891+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "RKLB"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "d57cfebd-2c67-4510-b3bb-a866483c73e5",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:02:53.486650+00:00",
+      "ingested_at": "2026-05-26T23:02:53.486650+00:00",
+      "processed_at": "2026-05-26T23:02:53.486650+00:00",
+      "valid_until": "2026-05-27T11:02:53.486663+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "OXY"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "7373f60c-8bb4-40c4-a3b1-4f196ab31ef8",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:02:53.366643+00:00",
+      "ingested_at": "2026-05-26T23:02:53.366643+00:00",
+      "processed_at": "2026-05-26T23:02:53.366643+00:00",
+      "valid_until": "2026-05-27T11:02:53.366652+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "XOM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "e65de812-6aae-4fbc-a422-7cadc0b0eb21",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Clinch Resources Ltd. Announces Acquisition of a Highwall Miner for ARI Project",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:02:52.368841+00:00",
+      "ingested_at": "2026-05-26T23:02:52.368841+00:00",
+      "processed_at": "2026-05-26T23:02:52.368841+00:00",
+      "valid_until": "2026-05-27T11:02:52.368855+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "4ae41c5d-e0f4-4563-8550-3b5f5ad0bdfb",
+      "event_family": "earnings_guidance",
+      "event_type": "negative_surprise",
+      "status": "reported",
+      "title": "A $10.2 Billion Hidden AI Revenue Stream Most Investors Are Missing",
+      "summary_plain_english": "Company missed earnings or cut guidance. Pressure on the name and possibly on sector peers.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T23:02:52.332941+00:00",
+      "ingested_at": "2026-05-26T23:02:52.332941+00:00",
+      "processed_at": "2026-05-26T23:02:52.332941+00:00",
+      "valid_until": "2026-05-27T11:02:52.332951+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "margins",
+        "valuation_multiple",
+        "theme_reversal"
+      ],
+      "likely_positive_exposures": [],
+      "likely_negative_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares lower",
+        "Analyst downgrades"
+      ],
+      "invalidation_signals": [
+        "Shares recover",
+        "Company reiterates outlook"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "52e5a20b-fb4e-442d-9b75-b5cb10469239",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T22:45:42.238293+00:00",
+      "ingested_at": "2026-05-26T22:45:42.238293+00:00",
+      "processed_at": "2026-05-26T22:45:42.238293+00:00",
+      "valid_until": "2026-05-27T10:45:42.238333+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "OXY"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "cdc0b008-5300-4663-a733-fbe460bcaae0",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Rocket Lab Acquires Motiv Space Systems For $40M In Cash",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T22:45:42.009438+00:00",
+      "ingested_at": "2026-05-26T22:45:42.009438+00:00",
+      "processed_at": "2026-05-26T22:45:42.009438+00:00",
+      "valid_until": "2026-05-27T10:45:42.009456+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "RKLB"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "16a14bec-17f6-4e6e-bf56-bd7ceaf354e6",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Progress on Potential Middle East Peace Agreement Drives US Equity Futures Higher Pre-Bell",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T22:45:41.863845+00:00",
+      "ingested_at": "2026-05-26T22:45:41.863845+00:00",
+      "processed_at": "2026-05-26T22:45:41.863845+00:00",
+      "valid_until": "2026-05-27T10:45:41.863867+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "XOM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "ac197e9b-e83d-49e7-9c75-28744235b835",
+      "event_family": "corporate_action",
+      "event_type": "acquisition",
+      "status": "reported",
+      "title": "Clinch Resources Ltd. Announces Acquisition of a Highwall Miner for ARI Project",
+      "summary_plain_english": "Corporate acquisition or merger announced. Typically lifts the target and pressures the acquirer near-term; peers may re-rate on M&A read-through; regulatory scrutiny is a known risk.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T22:45:40.810606+00:00",
+      "ingested_at": "2026-05-26T22:45:40.810606+00:00",
+      "processed_at": "2026-05-26T22:45:40.810606+00:00",
+      "valid_until": "2026-05-27T10:45:40.810621+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "valuation_multiple",
+        "regulation",
+        "sector_rotation"
+      ],
+      "likely_positive_exposures": [
+        "acquisition target",
+        "sector peers (M&A read-through)"
+      ],
+      "likely_negative_exposures": [
+        "acquirer near-term (deal funding, integration risk)"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Both parties confirm terms",
+        "Peer multiples re-rate higher"
+      ],
+      "invalidation_signals": [
+        "Deal breaks",
+        "Regulatory block announced"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "high",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "5fa410d8-d2bd-44ec-8749-17b73f045226",
+      "event_family": "earnings_guidance",
+      "event_type": "negative_surprise",
+      "status": "reported",
+      "title": "A $10.2 Billion Hidden AI Revenue Stream Most Investors Are Missing",
+      "summary_plain_english": "Company missed earnings or cut guidance. Pressure on the name and possibly on sector peers.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-26T22:45:40.727802+00:00",
+      "ingested_at": "2026-05-26T22:45:40.727802+00:00",
+      "processed_at": "2026-05-26T22:45:40.727802+00:00",
+      "valid_until": "2026-05-27T10:45:40.727824+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "margins",
+        "valuation_multiple",
+        "theme_reversal"
+      ],
+      "likely_positive_exposures": [],
+      "likely_negative_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "CAT"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares lower",
+        "Analyst downgrades"
+      ],
+      "invalidation_signals": [
+        "Shares recover",
+        "Company reiterates outlook"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
     {
       "event_id": "ef471567-82be-482a-ad4a-95da508b67db",
       "event_family": "geopolitics",
