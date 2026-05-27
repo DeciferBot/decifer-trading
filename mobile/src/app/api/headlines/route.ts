@@ -36,9 +36,10 @@ export async function GET() {
 
     const now = Date.now();
 
+    const MAX_AGE_MINUTES = 2880; // 48 hours — discard stale articles
+
     const headlines: Headline[] = raw
       .filter(n => n.title && !SKIP_SITES.has(n.site))
-      .slice(0, 6)
       .map(n => {
         // FMP date format: "2026-05-22 18:00:14"
         const pub = new Date(n.publishedDate.replace(" ", "T") + "Z").getTime();
@@ -55,7 +56,9 @@ export async function GET() {
           source,
           minutesAgo,
         };
-      });
+      })
+      .filter(h => h.minutesAgo <= MAX_AGE_MINUTES)
+      .slice(0, 6);
 
     return NextResponse.json({ headlines, ts: new Date().toISOString() });
   } catch (err) {

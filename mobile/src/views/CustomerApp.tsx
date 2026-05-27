@@ -265,15 +265,19 @@ export default function CustomerApp() {
             <p className="text-[13px] font-medium text-slate-200 leading-snug" suppressHydrationWarning>
               {clock.greeting}. Here is your market briefing.
             </p>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               <span className="text-[11px] text-slate-400" suppressHydrationWarning>{clock.localTime}</span>
-              <span className="text-[10px] text-slate-600">·</span>
-              <span className="text-[11px] text-slate-400" suppressHydrationWarning>
-                {clock.newYorkTime} <span className="text-slate-500">ET</span>
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-[10px] text-slate-600">·</span>
+                <span className="text-[11px] text-slate-400" suppressHydrationWarning>
+                  {clock.newYorkTime} <span className="text-slate-500">ET</span>
+                </span>
               </span>
-              <span className="text-[10px] text-slate-600">·</span>
-              <span className="text-[11px] font-semibold" style={{ color: sessionColor }} suppressHydrationWarning>
-                {clock.sessionLabel}
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-[10px] text-slate-600">·</span>
+                <span className="text-[11px] font-semibold" style={{ color: sessionColor }} suppressHydrationWarning>
+                  {clock.sessionLabel}
+                </span>
               </span>
             </div>
           </div>

@@ -496,7 +496,7 @@ function WhereLookingSection({
                 >
                   {n.symbol}
                 </span>
-                <p className="text-[11px] text-slate-400 leading-relaxed">{n.reason}</p>
+                <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{n.reason}</p>
               </div>
             ))}
           </div>
