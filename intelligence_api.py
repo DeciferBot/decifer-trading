@@ -51,6 +51,7 @@ from flask import Flask, Response, jsonify, request
 # before any route handler runs.
 import runtime_config
 from market_now_builder import get_market_now_dict
+from market_data_provider import get_movers, get_news, get_tape
 from mobile_api import (
     build_alpha_payload,
     build_now_payload,
@@ -360,6 +361,47 @@ def mobile_portfolio() -> Response:
             "positions_available": False,
         },
     })
+
+
+# ---------------------------------------------------------------------------
+# Market data endpoints — generic FMP data for customer surfaces
+# Shadow mode: these endpoints exist but mobile is not yet wired to them.
+# ---------------------------------------------------------------------------
+
+@app.route("/api/market-data/movers", methods=["GET", "OPTIONS"])
+def market_data_movers() -> Response:
+    """Top 5 gainers and losers. FMP-backed, 5-min cache. Generic market view."""
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    try:
+        return _json_response(get_movers())
+    except Exception as exc:
+        log.error("/api/market-data/movers: %s", exc)
+        return _error("Market movers temporarily unavailable.", 503)
+
+
+@app.route("/api/market-data/news", methods=["GET", "OPTIONS"])
+def market_data_news() -> Response:
+    """Up to 15 deduplicated news items. FMP-backed, 5-min cache."""
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    try:
+        return _json_response(get_news())
+    except Exception as exc:
+        log.error("/api/market-data/news: %s", exc)
+        return _error("Market news temporarily unavailable.", 503)
+
+
+@app.route("/api/market-data/tape", methods=["GET", "OPTIONS"])
+def market_data_tape() -> Response:
+    """ETF tape (SPY/QQQ/IWM/TLT/GLD/USO/UUP) + VIX. FMP-backed, 5-min cache."""
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    try:
+        return _json_response(get_tape())
+    except Exception as exc:
+        log.error("/api/market-data/tape: %s", exc)
+        return _error("Market tape temporarily unavailable.", 503)
 
 
 # ---------------------------------------------------------------------------

@@ -141,6 +141,9 @@ data/intelligence/thesis_store.json
 data/intelligence/advisory_log_review.json
 data/intelligence/advisory_report.json
 data/intelligence/advisory_runtime_log.jsonl
+data/intelligence/market_movers_cache.json
+data/intelligence/market_news_cache.json
+data/intelligence/market_tape_cache.json
 docs/intelligence_first_paper_validation_report.md
 
 # Graphify output — regenerable, not source
