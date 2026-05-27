@@ -1,20 +1,18 @@
 "use client";
-// Today tab — M13D refactor.
-// Leads with Market Story Hero, then Market Tape strip, then grouped cause
-// stories (de-duplicated), event context, and worth-watching items.
+// Today tab — Sprint M16 redesign.
+// Immersive hero header, dual clock, top movers, sector map, themed news feed.
 
 import { useState, useEffect } from "react";
 import {
   ArrowRight,
-  AlertCircle,
   Eye,
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  TrendingUp,
-  Zap,
   Shield,
+  Zap,
   Layers,
+  TrendingUp,
 } from "lucide-react";
 import type { MarketNowPayload, KeyEvent } from "@/lib/customerApi";
 import type { CustomerStory } from "@/lib/customerStory";
@@ -32,35 +30,41 @@ import {
 } from "@/lib/customerBriefingModel";
 import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory";
 import type { TapeEntry } from "@/app/api/market-tape/route";
-import type { Headline } from "@/app/api/headlines/route";
+import type { MarketMoversPayload, Mover } from "@/app/api/market-movers/route";
+import type { SectorEntry } from "@/app/api/sectors/route";
+import type { NewsItem } from "@/app/api/market-news/route";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Regime colour palette ─────────────────────────────────────────────────────
 
 function regimeColors(state: string) {
-  if (state === "risk-on")  return { border: "#10b981", text: "#34d399", bg: "rgba(16,185,129,0.06)", badge: "rgba(16,185,129,0.15)" };
-  if (state === "risk-off") return { border: "#ef4444", text: "#f87171", bg: "rgba(239,68,68,0.06)",  badge: "rgba(239,68,68,0.15)"  };
-  if (state === "mixed")    return { border: "#f59e0b", text: "#fbbf24", bg: "rgba(245,158,11,0.06)", badge: "rgba(245,158,11,0.15)"  };
-  return { border: "#334155", text: "#94a3b8", bg: "rgba(255,255,255,0.03)", badge: "rgba(255,255,255,0.08)" };
+  if (state === "risk-on")
+    return {
+      border: "#10b981", text: "#34d399", badge: "rgba(16,185,129,0.18)",
+      heroGradient: "linear-gradient(165deg, #0c2820 0%, #0d1b2a 60%, #080d15 100%)",
+    };
+  if (state === "risk-off")
+    return {
+      border: "#ef4444", text: "#f87171", badge: "rgba(239,68,68,0.18)",
+      heroGradient: "linear-gradient(165deg, #200c0c 0%, #1a0d18 60%, #080d15 100%)",
+    };
+  if (state === "mixed")
+    return {
+      border: "#f59e0b", text: "#fbbf24", badge: "rgba(245,158,11,0.18)",
+      heroGradient: "linear-gradient(165deg, #1f1508 0%, #1a180d 60%, #080d15 100%)",
+    };
+  return {
+    border: "#334155", text: "#64748b", badge: "rgba(255,255,255,0.08)",
+    heroGradient: "linear-gradient(165deg, #0d1520 0%, #0a1018 60%, #080d15 100%)",
+  };
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Shared primitives ─────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style={{ color: "#f97316" }}>
       {children}
     </p>
-  );
-}
-
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div
-      className="rounded-2xl p-4"
-      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)", ...style }}
-    >
-      {children}
-    </div>
   );
 }
 
@@ -76,277 +80,216 @@ function deriveTapeSnapshot(tape: TapeEntry[]): TapeSnapshot {
     tlt_pct:   by["TLT"]?.changePct ?? null,
     gld_pct:   by["GLD"]?.changePct ?? null,
     uso_pct:   by["USO"]?.changePct ?? null,
-    dxy_pct:   by["UUP"]?.changePct ?? null, // UUP = US dollar proxy
+    dxy_pct:   by["UUP"]?.changePct ?? null,
     vix_level: by["VIX"]?.level     ?? null,
   };
 }
 
-// ── Market Tape ───────────────────────────────────────────────────────────────
+// ── Dual clock ────────────────────────────────────────────────────────────────
+// Renders nothing on SSR; mounts client-only to avoid hydration mismatch.
 
-function TapeItem({ entry }: { entry: TapeEntry }) {
-  if (entry.type === "vol") {
-    const level = entry.level;
-    const vixColor =
-      level == null   ? "#64748b" :
-      level >= 25     ? "#f87171" :
-      level >= 20     ? "#fbbf24" :
-                        "#34d399";
-    return (
-      <div
-        className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl shrink-0"
-        style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-      >
-        <span className="text-[11px] font-black" style={{ color: vixColor }}>
-          {level != null ? level.toFixed(1) : "—"}
-        </span>
-        <span className="text-[10px] font-medium text-slate-400">VIX</span>
-      </div>
-    );
-  }
+function DualClock({ clock }: { clock: MarketClockState }) {
+  const [localTz, setLocalTz] = useState<string | null>(null);
 
-  const pct = entry.changePct;
-  const isPos = pct != null && pct > 0;
-  const isNeg = pct != null && pct < 0;
-  const color = isPos ? "#34d399" : isNeg ? "#f87171" : "#64748b";
+  useEffect(() => {
+    const tz = new Intl.DateTimeFormat("en-US", { timeZoneName: "short" })
+      .formatToParts(new Date())
+      .find(p => p.type === "timeZoneName")?.value ?? "";
+    setLocalTz(tz);
+  }, []);
+
+  if (localTz === null) return null;
+
+  const localEqNY =
+    clock.localTime === clock.newYorkTime || localTz === "ET" || localTz === "EST" || localTz === "EDT";
 
   return (
-    <div
-      className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl shrink-0"
-      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-    >
-      <span className="text-[11px] font-black" style={{ color }}>
-        {pct != null ? `${isPos ? "+" : ""}${pct.toFixed(1)}%` : "—"}
-      </span>
-      <span className="text-[10px] font-medium text-slate-400">{entry.label}</span>
-    </div>
-  );
-}
-
-function MarketTapeStrip({ tape }: { tape: TapeEntry[] }) {
-  if (tape.length === 0) return null;
-  return (
-    <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-      <div className="flex gap-2 min-w-max">
-        {tape.map(t => <TapeItem key={t.sym} entry={t} />)}
-      </div>
-    </div>
-  );
-}
-
-// ── Event card ────────────────────────────────────────────────────────────────
-
-function EventCard({ ev }: { ev: KeyEvent }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div
-      className="rounded-xl cursor-pointer"
-      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-      onClick={() => setOpen((o) => !o)}
-    >
-      <div className="p-3.5 flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-2">
-            <p className="text-[13px] font-semibold text-slate-100 leading-snug flex-1">
-              {ev.title}
-            </p>
-            {ev.materiality === "high" && (
-              <span
-                className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
-                style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
-              >
-                High impact
-              </span>
-            )}
-          </div>
-        </div>
-        {open ? (
-          <ChevronUp size={14} className="text-slate-500 shrink-0 mt-0.5" />
-        ) : (
-          <ChevronDown size={14} className="text-slate-500 shrink-0 mt-0.5" />
-        )}
-      </div>
-      {open && (
-        <div
-          className="px-3.5 pb-3.5 pt-3 space-y-2.5"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
-        >
-          {ev.summary_plain_english && (
-            <p className="text-xs text-slate-300 leading-relaxed">{ev.summary_plain_english}</p>
-          )}
-          {((ev.likely_positive_exposures?.length ?? 0) > 0 ||
-            (ev.likely_negative_exposures?.length ?? 0) > 0) && (
-            <div className="flex flex-wrap gap-1.5">
-              {(ev.likely_positive_exposures ?? []).map((s, i) => (
-                <span
-                  key={i}
-                  className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(16,185,129,0.1)", color: "#34d399" }}
-                >
-                  {s}
-                </span>
-              ))}
-              {(ev.likely_negative_exposures ?? []).map((s, i) => (
-                <span
-                  key={i}
-                  className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(239,68,68,0.1)", color: "#f87171" }}
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+    <div className="flex items-center gap-2 text-[11px]">
+      <span className="font-semibold text-slate-200">{clock.newYorkTime}</span>
+      <span className="text-slate-500 text-[10px]">ET</span>
+      {!localEqNY && (
+        <>
+          <span className="text-slate-600">·</span>
+          <span className="font-semibold text-slate-400">{clock.localTime}</span>
+          <span className="text-slate-500 text-[10px]">{localTz}</span>
+        </>
       )}
     </div>
   );
 }
 
-// ── Market Story Hero ─────────────────────────────────────────────────────────
+// ── Hero header ───────────────────────────────────────────────────────────────
 
-interface MarketStoryHeroProps {
+interface HeroHeaderProps {
   data: MarketNowPayload;
   story: CustomerStory;
   tapeSnapshot: TapeSnapshot;
+  clock: MarketClockState;
   isRefreshing: boolean;
-  freshnessState: FreshnessState;
   freshnessLabel: string;
+  freshnessState: FreshnessState;
   onRefresh: () => Promise<void>;
-  onAskAbout?: (ctx: string) => void;
-  onGoToForces?: () => void;
 }
 
-function MarketStoryHero({
+function HeroHeader({
   data,
   story,
   tapeSnapshot,
+  clock,
   isRefreshing,
-  freshnessState,
   freshnessLabel,
+  freshnessState,
   onRefresh,
-  onAskAbout,
-  onGoToForces,
-}: MarketStoryHeroProps) {
+}: HeroHeaderProps) {
   const ms = buildCustomerMarketStory(data, story);
   const c  = regimeColors(ms.regime.state);
 
-  const narrativeParagraph = buildNarrativeParagraph(data, ms, tapeSnapshot);
+  const spy = tapeSnapshot.spy_pct;
+  const vix = tapeSnapshot.vix_level;
+  const spyColor = spy == null ? "#64748b" : spy > 0 ? "#34d399" : spy < 0 ? "#f87171" : "#94a3b8";
+  const spySign  = spy != null && spy > 0 ? "+" : "";
 
   const freshnessTimeCopy =
     freshnessState === "fresh" && data.freshness_timestamp
-      ? `Fresh as of ${new Date(data.freshness_timestamp).toLocaleTimeString("en-US", {
+      ? new Date(data.freshness_timestamp).toLocaleTimeString("en-US", {
           hour: "2-digit",
           minute: "2-digit",
           timeZoneName: "short",
-        })}`
+        })
       : freshnessLabel;
+
+  const sessionDot =
+    clock.session === "open"       ? "#34d399" :
+    clock.session === "pre_market" ? "#fbbf24" :
+    clock.session === "after_hours"? "#94a3b8" :
+                                     "#475569";
+
+  return (
+    <div style={{ background: c.heroGradient }}>
+      <div className="px-5 pt-5 pb-6">
+
+        {/* Top row: session pill + refresh */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: sessionDot }}
+            />
+            <span
+              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+              style={{ background: c.badge, color: c.text }}
+            >
+              {ms.regime.label}
+            </span>
+            <span className="text-[10px] text-slate-500">{clock.sessionLabel}</span>
+          </div>
+          <button
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-1 text-[10px] text-slate-500 transition-all active:scale-95"
+          >
+            <RefreshCw size={9} className={isRefreshing ? "animate-spin" : ""} />
+            {isRefreshing ? "…" : freshnessTimeCopy}
+          </button>
+        </div>
+
+        {/* SPY hero number */}
+        <div className="mb-1">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+            S&amp;P 500
+          </p>
+          <div className="flex items-end gap-3">
+            <span
+              className="font-black leading-none"
+              style={{ color: spyColor, fontSize: "52px" }}
+            >
+              {spy != null ? `${spySign}${spy.toFixed(2)}%` : "—"}
+            </span>
+            {vix != null && (
+              <div className="mb-2">
+                <p className="text-[9px] uppercase text-slate-600 tracking-wide">VIX</p>
+                <p
+                  className="text-[16px] font-black leading-none"
+                  style={{
+                    color: vix >= 25 ? "#f87171" : vix >= 20 ? "#fbbf24" : "#64748b",
+                  }}
+                >
+                  {vix.toFixed(1)}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Macro label */}
+        <p className="text-[12px] font-medium text-slate-400 mt-1 mb-4">
+          {ms.macro_label}
+        </p>
+
+        {/* Dual clock */}
+        <DualClock clock={clock} />
+      </div>
+
+      {/* Bottom rule */}
+      <div style={{ height: "1px", background: `${c.border}25` }} />
+    </div>
+  );
+}
+
+// ── Market narrative ──────────────────────────────────────────────────────────
+
+function MarketNarrative({
+  data,
+  story,
+  tapeSnapshot,
+  onAskAbout,
+  onGoToForces,
+}: {
+  data: MarketNowPayload;
+  story: CustomerStory;
+  tapeSnapshot: TapeSnapshot;
+  onAskAbout?: (ctx: string) => void;
+  onGoToForces?: () => void;
+}) {
+  const ms = buildCustomerMarketStory(data, story);
+  const narrativeParagraph = buildNarrativeParagraph(data, ms, tapeSnapshot);
 
   return (
     <div
-      className="rounded-2xl overflow-hidden"
-      style={{
-        background: c.bg,
-        border: `1.5px solid ${c.border}30`,
-      }}
+      className="rounded-2xl p-4"
+      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
     >
-      {/* Regime strip */}
-      <div
-        className="px-4 pt-4 pb-3 flex items-center justify-between gap-2"
-        style={{ borderBottom: `1px solid ${c.border}20` }}
-      >
-        <div className="flex items-center gap-2">
-          <span
-            className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-            style={{ background: c.badge, color: c.text }}
-          >
-            {ms.regime.label}
-          </span>
-          {ms.has_live_events && (
-            <span
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
-              style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}
-            >
-              <Zap size={8} />
-              Live events
-            </span>
-          )}
-        </div>
-        <button
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className="text-[10px] font-semibold flex items-center gap-1 transition-all active:scale-95"
-          style={{ color: "#94a3b8" }}
-          aria-label="Refresh"
-        >
-          <RefreshCw size={9} className={isRefreshing ? "animate-spin" : ""} />
-          {isRefreshing ? "Updating..." : freshnessTimeCopy}
-        </button>
-      </div>
+      <p className="text-[13px] text-slate-200 leading-relaxed">{narrativeParagraph}</p>
 
-      {/* Macro label */}
-      <div className="px-4 pt-3 pb-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: c.text }}>
-          {ms.macro_label}
-        </p>
-      </div>
-
-      {/* Narrative paragraph — replaces mechanical headline + summary */}
-      <div className="px-4 pb-3">
-        <p className="text-[13px] text-slate-200 leading-relaxed">
-          {narrativeParagraph}
-        </p>
-      </div>
-
-      {/* Supporting bullets */}
-      {ms.supporting_bullets.length > 0 && (
-        <div className="px-4 pb-3 space-y-1.5">
-          {ms.supporting_bullets.map((bullet, i) => (
-            <div key={i} className="flex items-start gap-2.5">
-              <span
-                className="w-1 h-1 rounded-full shrink-0 mt-1.5"
-                style={{ background: c.text }}
-              />
-              <p className="text-[11px] text-slate-400 leading-relaxed">{bullet}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Caution */}
       {ms.caution && (
         <div
-          className="mx-4 mb-3 rounded-xl px-3 py-2.5 flex items-start gap-2"
-          style={{
-            background: "rgba(245,158,11,0.07)",
-            border: "1px solid rgba(245,158,11,0.18)",
-          }}
+          className="mt-3 rounded-xl px-3 py-2.5 flex items-start gap-2"
+          style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.18)" }}
         >
           <Shield size={11} className="text-amber-400 shrink-0 mt-0.5" />
           <p className="text-[11px] text-amber-300 leading-relaxed">{ms.caution}</p>
         </div>
       )}
 
-      {/* Watch next */}
-      {ms.watch_next && (
-        <div className="px-4 pb-3 flex items-start gap-2">
-          <Eye size={11} className="text-slate-500 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            <span className="text-slate-500 font-semibold">Worth watching: </span>
-            {ms.watch_next}
-          </p>
-        </div>
+      {(ms.supporting_bullets.length > 0) && (
+        <ul className="mt-3 space-y-1.5">
+          {ms.supporting_bullets.slice(0, 2).map((b, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className="w-1 h-1 rounded-full shrink-0 mt-1.5" style={{ background: "#f97316" }} />
+              <p className="text-[11px] text-slate-400 leading-relaxed">{b}</p>
+            </li>
+          ))}
+        </ul>
       )}
 
-      {/* CTAs */}
       <div
-        className="px-4 pt-2.5 pb-4 flex items-center gap-3 flex-wrap"
-        style={{ borderTop: `1px solid ${c.border}15` }}
+        className="mt-3 pt-3 flex items-center gap-3"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
       >
         {onAskAbout && (
           <button
             onClick={() => onAskAbout("Why is the market moving in this direction today?")}
-            className="flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
-            style={{ color: "#94a3b8" }}
+            className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
           >
             Ask why
             <ArrowRight size={9} />
@@ -367,6 +310,319 @@ function MarketStoryHero({
   );
 }
 
+// ── Mover row ─────────────────────────────────────────────────────────────────
+
+function MoverRow({ mover, direction }: { mover: Mover; direction: "up" | "down" }) {
+  const [imgErr, setImgErr] = useState(false);
+  const color = direction === "up" ? "#34d399" : "#f87171";
+  const sign  = direction === "up" ? "+" : "";
+  const monogram = mover.symbol.slice(0, 2);
+
+  return (
+    <div className="flex items-center gap-2 py-1.5">
+      {/* Logo */}
+      <div
+        className="w-7 h-7 rounded-lg overflow-hidden shrink-0 flex items-center justify-center"
+        style={{ background: "#1e293b" }}
+      >
+        {!imgErr ? (
+          <img
+            src={mover.logoUrl}
+            alt={mover.symbol}
+            className="w-full h-full object-contain p-0.5"
+            onError={() => setImgErr(true)}
+          />
+        ) : (
+          <span className="text-[9px] font-black" style={{ color: "#475569" }}>{monogram}</span>
+        )}
+      </div>
+
+      {/* Symbol */}
+      <span className="text-[12px] font-bold text-slate-200 flex-1 min-w-0 truncate">
+        {mover.symbol}
+      </span>
+
+      {/* Change */}
+      <span className="text-[13px] font-black shrink-0" style={{ color }}>
+        {sign}{mover.changePct.toFixed(1)}%
+      </span>
+    </div>
+  );
+}
+
+// ── Movers section ────────────────────────────────────────────────────────────
+
+function MoversSection() {
+  const [data, setData] = useState<MarketMoversPayload | null>(null);
+
+  useEffect(() => {
+    fetch("/api/market-movers")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setData(d); })
+      .catch(() => {});
+  }, []);
+
+  if (!data || (data.gainers.length === 0 && data.losers.length === 0)) return null;
+
+  const gainers = data.gainers.slice(0, 3);
+  const losers  = data.losers.slice(0, 3);
+
+  return (
+    <section>
+      <SectionLabel>Today&apos;s biggest moves</SectionLabel>
+      <div className="grid grid-cols-2 gap-3">
+        {/* Gainers */}
+        <div
+          className="rounded-2xl px-3 py-3"
+          style={{ background: "#141b26", border: "1px solid rgba(16,185,129,0.12)" }}
+        >
+          <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-500 mb-2">
+            ↑ Gainers
+          </p>
+          {gainers.map((m, i) => (
+            <MoverRow key={i} mover={m} direction="up" />
+          ))}
+        </div>
+        {/* Losers */}
+        <div
+          className="rounded-2xl px-3 py-3"
+          style={{ background: "#141b26", border: "1px solid rgba(239,68,68,0.12)" }}
+        >
+          <p className="text-[9px] font-bold uppercase tracking-widest text-red-400 mb-2">
+            ↓ Losers
+          </p>
+          {losers.map((m, i) => (
+            <MoverRow key={i} mover={m} direction="down" />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Sector tile ───────────────────────────────────────────────────────────────
+
+function SectorTile({ entry }: { entry: SectorEntry }) {
+  const pct = entry.changePct;
+  const isPos   = pct != null && pct > 0;
+  const isNeg   = pct != null && pct < 0;
+  const strong  = pct != null && Math.abs(pct) >= 1;
+  const textColor  = pct == null ? "#64748b" : isPos ? "#34d399" : isNeg ? "#f87171" : "#94a3b8";
+  const borderColor = pct == null
+    ? "rgba(255,255,255,0.06)"
+    : isPos
+      ? strong ? "rgba(16,185,129,0.22)" : "rgba(16,185,129,0.12)"
+      : isNeg
+        ? strong ? "rgba(239,68,68,0.22)" : "rgba(239,68,68,0.12)"
+        : "rgba(255,255,255,0.06)";
+  const bg = pct == null
+    ? "#141b26"
+    : isPos
+      ? strong ? "rgba(16,185,129,0.07)" : "rgba(16,185,129,0.04)"
+      : isNeg
+        ? strong ? "rgba(239,68,68,0.07)" : "rgba(239,68,68,0.04)"
+        : "#141b26";
+  const sign = isPos ? "+" : "";
+
+  return (
+    <div
+      className="rounded-xl px-2.5 py-2.5"
+      style={{ background: bg, border: `1px solid ${borderColor}` }}
+    >
+      <p className="text-[10px] font-semibold text-slate-400 leading-none mb-1.5 truncate">
+        {entry.shortLabel}
+      </p>
+      <p className="text-[14px] font-black leading-none" style={{ color: textColor }}>
+        {pct != null ? `${sign}${pct.toFixed(1)}%` : "—"}
+      </p>
+    </div>
+  );
+}
+
+// ── Sector grid ───────────────────────────────────────────────────────────────
+
+function SectorGrid() {
+  const [sectors, setSectors] = useState<SectorEntry[]>([]);
+
+  useEffect(() => {
+    fetch("/api/sectors")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.sectors) setSectors(d.sectors); })
+      .catch(() => {});
+  }, []);
+
+  if (sectors.length === 0) return null;
+
+  return (
+    <section>
+      <SectionLabel>Market at a glance</SectionLabel>
+      <div className="grid grid-cols-3 gap-2">
+        {sectors.map(s => (
+          <SectorTile key={s.sym} entry={s} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── Theme chip colours ────────────────────────────────────────────────────────
+
+const THEME_CHIP: Record<string, { bg: string; color: string }> = {
+  "AI Infrastructure":  { bg: "rgba(139,92,246,0.12)", color: "#a78bfa" },
+  Tech:                 { bg: "rgba(59,130,246,0.12)",  color: "#60a5fa" },
+  Defence:              { bg: "rgba(148,163,184,0.10)", color: "#94a3b8" },
+  Energy:               { bg: "rgba(249,115,22,0.12)",  color: "#fb923c" },
+  Gold:                 { bg: "rgba(234,179,8,0.12)",   color: "#facc15" },
+  Healthcare:           { bg: "rgba(16,185,129,0.10)",  color: "#34d399" },
+  "EV & Autos":         { bg: "rgba(132,204,22,0.10)",  color: "#a3e635" },
+  Autos:                { bg: "rgba(132,204,22,0.10)",  color: "#a3e635" },
+  Financials:           { bg: "rgba(14,165,233,0.10)",  color: "#38bdf8" },
+  "Digital Assets":     { bg: "rgba(99,102,241,0.12)",  color: "#818cf8" },
+};
+
+function ThemeChip({ label }: { label: string }) {
+  const style = THEME_CHIP[label] ?? { bg: "rgba(255,255,255,0.06)", color: "#64748b" };
+  return (
+    <span
+      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+      style={{ background: style.bg, color: style.color }}
+    >
+      {label}
+    </span>
+  );
+}
+
+// ── News section ──────────────────────────────────────────────────────────────
+
+function NewsSection({ onAskAbout }: { onAskAbout?: (ctx: string) => void }) {
+  const [items, setItems] = useState<NewsItem[]>([]);
+
+  useEffect(() => {
+    fetch("/api/market-news")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.news) setItems(d.news.slice(0, 8)); })
+      .catch(() => {});
+  }, []);
+
+  if (items.length === 0) return null;
+
+  const fmtAge = (mins: number) =>
+    mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
+
+  return (
+    <section>
+      <SectionLabel>What&apos;s in the news</SectionLabel>
+      <div className="space-y-2">
+        {items.map((item, i) => (
+          <div
+            key={i}
+            className="rounded-xl px-3.5 py-3"
+            style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+          >
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                {item.themeLabel && (
+                  <div className="mb-1.5">
+                    <ThemeChip label={item.themeLabel} />
+                  </div>
+                )}
+                <p className="text-[13px] font-semibold text-slate-100 leading-snug line-clamp-2">
+                  {item.title}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  {item.logoUrl && (
+                    <img
+                      src={item.logoUrl}
+                      alt=""
+                      className="w-3.5 h-3.5 rounded object-contain"
+                      style={{ background: "#1e293b" }}
+                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
+                  <p className="text-[10px] text-slate-500">
+                    {item.source}
+                    <span className="mx-1">·</span>
+                    {fmtAge(item.minutesAgo)} ago
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {onAskAbout && (
+        <button
+          onClick={() => onAskAbout("What are the most important news stories driving markets today?")}
+          className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
+        >
+          Ask Decifer about the news
+          <ArrowRight size={9} />
+        </button>
+      )}
+    </section>
+  );
+}
+
+// ── Event card ────────────────────────────────────────────────────────────────
+
+function EventCard({ ev }: { ev: KeyEvent }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      className="rounded-xl cursor-pointer"
+      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+      onClick={() => setOpen(o => !o)}
+    >
+      <div className="p-3.5 flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-2">
+            <p className="text-[13px] font-semibold text-slate-100 leading-snug flex-1">
+              {ev.title}
+            </p>
+            {ev.materiality === "high" && (
+              <span
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+                style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
+              >
+                High impact
+              </span>
+            )}
+          </div>
+        </div>
+        {open
+          ? <ChevronUp size={14} className="text-slate-500 shrink-0 mt-0.5" />
+          : <ChevronDown size={14} className="text-slate-500 shrink-0 mt-0.5" />
+        }
+      </div>
+      {open && (
+        <div className="px-3.5 pb-3.5 pt-3 space-y-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+          {ev.summary_plain_english && (
+            <p className="text-xs text-slate-300 leading-relaxed">{ev.summary_plain_english}</p>
+          )}
+          {((ev.likely_positive_exposures?.length ?? 0) > 0 ||
+            (ev.likely_negative_exposures?.length ?? 0) > 0) && (
+            <div className="flex flex-wrap gap-1.5">
+              {(ev.likely_positive_exposures ?? []).map((s, i) => (
+                <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(16,185,129,0.1)", color: "#34d399" }}>
+                  {s}
+                </span>
+              ))}
+              {(ev.likely_negative_exposures ?? []).map((s, i) => (
+                <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(239,68,68,0.1)", color: "#f87171" }}>
+                  {s}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Cause group card ──────────────────────────────────────────────────────────
 
 function CauseGroupCard({
@@ -380,69 +636,48 @@ function CauseGroupCard({
 }) {
   const card = group.display_card;
   return (
-    <div
-      className="rounded-2xl p-4"
-      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-    >
-      {/* Header */}
+    <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
       <div className="flex items-center gap-2 mb-2.5">
-        {group.is_cluster ? (
-          <Layers size={12} style={{ color: "#f97316", flexShrink: 0 }} />
-        ) : (
-          <TrendingUp size={12} style={{ color: "#f97316", flexShrink: 0 }} />
-        )}
+        {group.is_cluster
+          ? <Layers size={12} style={{ color: "#f97316", flexShrink: 0 }} />
+          : <TrendingUp size={12} style={{ color: "#f97316", flexShrink: 0 }} />}
         <p className="text-[13px] font-bold text-slate-100 flex-1">{card.cause_label}</p>
         <div className="flex items-center gap-1.5 shrink-0">
           {group.is_cluster && (
-            <span
-              className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-              style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
-            >
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+              style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}>
               {group.driver_count} drivers
             </span>
           )}
-          <span
-            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-            style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8" }}
-          >
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+            style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8" }}>
             {card.evidence_basis}
           </span>
         </div>
       </div>
-
       <p className="text-[12px] text-slate-300 leading-relaxed mb-1">{card.what_happened}</p>
       <p className="text-[12px] text-slate-400 leading-relaxed">{card.market_impact}</p>
-
-      {/* Connected themes */}
       {card.connected_themes.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2.5">
           {card.connected_themes.slice(0, 3).map((t, j) => (
-            <button
-              key={j}
-              onClick={() => {
-                if (card.primary_market_now_id) onThemeSelect(card.primary_market_now_id);
-              }}
+            <button key={j}
+              onClick={() => { if (card.primary_market_now_id) onThemeSelect(card.primary_market_now_id); }}
               className="text-[10px] font-semibold px-2 py-0.5 rounded-full transition-all active:scale-95"
-              style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
-            >
+              style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}>
               {t.ttgLabel}
             </button>
           ))}
           {card.connected_names_count > 0 && (
             <span className="text-[10px] text-slate-400 self-center ml-1">
-              {card.connected_names_count}{" "}
-              {card.connected_names_count !== 1 ? "names" : "name"}
+              {card.connected_names_count} {card.connected_names_count !== 1 ? "names" : "name"}
             </span>
           )}
         </div>
       )}
-
-      {/* Ask Decifer CTA */}
       {onAskAbout && (
         <button
           onClick={() => onAskAbout(`Why is ${card.cause_label.toLowerCase()} affecting markets?`)}
-          className="mt-2.5 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
-          style={{ color: "#94a3b8" }}
+          className="mt-2.5 flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
         >
           Ask Decifer why
           <ArrowRight size={9} />
@@ -452,7 +687,7 @@ function CauseGroupCard({
   );
 }
 
-// ── Where Decifer Is Looking ──────────────────────────────────────────────────
+// ── Where Decifer is looking ──────────────────────────────────────────────────
 
 function WhereLookingSection({
   data,
@@ -467,51 +702,31 @@ function WhereLookingSection({
   return (
     <section>
       <SectionLabel>Where Decifer is looking</SectionLabel>
-      <div
-        className="rounded-2xl p-4"
-        style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-      >
-        {/* Story / sector chips */}
+      <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
         {stories.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {stories.map((s, i) => (
-              <span
-                key={i}
-                className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
-              >
+              <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}>
                 {s}
               </span>
             ))}
           </div>
         )}
-
-        {/* Names list */}
         {names.length > 0 && (
           <div className="space-y-2.5">
             {names.map((n, i) => (
               <div key={i} className="flex items-start gap-2.5">
-                <span
-                  className="text-[11px] font-bold text-slate-200 shrink-0 w-11"
-                >
-                  {n.symbol}
-                </span>
+                <span className="text-[11px] font-bold text-slate-200 shrink-0 w-11">{n.symbol}</span>
                 <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{n.reason}</p>
               </div>
             ))}
           </div>
         )}
-
-        {/* Ask CTA */}
         {onAskAbout && (stories.length > 0 || names.length > 0) && (
           <button
-            onClick={() =>
-              onAskAbout(
-                `Which names are connected to ${stories[0] ?? "these themes"} today?`,
-              )
-            }
-            className="mt-3 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
-            style={{ color: "#94a3b8" }}
+            onClick={() => onAskAbout(`Which names are connected to ${stories[0] ?? "these themes"} today?`)}
+            className="mt-3 flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
           >
             Ask Decifer about these names
             <ArrowRight size={9} />
@@ -543,6 +758,7 @@ interface Props {
 export default function TodayTab({
   data,
   story,
+  clock,
   sinceAway,
   freshnessState,
   freshnessLabel,
@@ -552,10 +768,10 @@ export default function TodayTab({
   onAskAbout,
   onGoToForces,
 }: Props) {
-  const keyEvents  = data.key_events ?? [];
-  const apiWatch   = data.watch_next?.length ? data.watch_next : (data.what_to_watch ?? []);
-  const watchNext  = apiWatch.length > 0 ? apiWatch : buildWhatCouldChange(data);
-  const groups     = buildCauseGroups(data);
+  const keyEvents = data.key_events ?? [];
+  const apiWatch  = data.watch_next?.length ? data.watch_next : (data.what_to_watch ?? []);
+  const watchNext = apiWatch.length > 0 ? apiWatch : buildWhatCouldChange(data);
+  const groups    = buildCauseGroups(data);
 
   const [tape, setTape] = useState<TapeEntry[]>([]);
   useEffect(() => {
@@ -567,205 +783,155 @@ export default function TodayTab({
 
   const tapeSnapshot = deriveTapeSnapshot(tape);
 
-  // Headlines fallback: only fetch when backend key_events are absent
-  const [headlines, setHeadlines] = useState<Headline[]>([]);
-  useEffect(() => {
-    if (keyEvents.length > 0) return;
-    fetch("/api/headlines")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.headlines) setHeadlines(d.headlines.slice(0, 4)); })
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyEvents.length]);
-
   return (
-    <div className="px-4 pb-8 space-y-5 pt-3">
+    <div>
 
-      {/* ── A: Market Story Hero ──────────────────────────────────────────── */}
+      {/* ── HERO (full-bleed, no horizontal padding) ──────────────────────── */}
       {story && (
-        <section>
-          <MarketStoryHero
+        <HeroHeader
+          data={data}
+          story={story}
+          tapeSnapshot={tapeSnapshot}
+          clock={clock}
+          isRefreshing={isRefreshing}
+          freshnessLabel={freshnessLabel}
+          freshnessState={freshnessState}
+          onRefresh={onRefresh}
+        />
+      )}
+
+      {/* ── PADDED CONTENT ────────────────────────────────────────────────── */}
+      <div className="px-4 pb-8 space-y-5 pt-5">
+
+        {/* ── A: Human market narrative ─────────────────────────────────── */}
+        {story && (
+          <MarketNarrative
             data={data}
             story={story}
             tapeSnapshot={tapeSnapshot}
-            isRefreshing={isRefreshing}
-            freshnessState={freshnessState}
-            freshnessLabel={freshnessLabel}
-            onRefresh={onRefresh}
             onAskAbout={onAskAbout}
             onGoToForces={onGoToForces}
           />
-        </section>
-      )}
+        )}
 
-      {/* ── B: Market tape ───────────────────────────────────────────────── */}
-      {tape.length > 0 && (
-        <section>
-          <SectionLabel>Market snapshot</SectionLabel>
-          <MarketTapeStrip tape={tape} />
-        </section>
-      )}
-
-      {/* ── C: Since you were away ────────────────────────────────────────── */}
-      {sinceAway.lastSeenAt && (
-        <section>
-          <SectionLabel>
-            {sinceAway.awayDuration
-              ? `Since you were away · ${sinceAway.awayDuration} ago`
-              : "Since your last visit"}
-          </SectionLabel>
-
-          {sinceAway.hasChanges && sinceAway.items.length > 0 ? (
-            <div className="space-y-2">
-              {sinceAway.items.map((item, i) => (
-                <div
-                  key={i}
-                  className="rounded-xl px-4 py-3 flex items-start gap-3"
-                  style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-                >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5"
-                    style={{
-                      background:
-                        item.type === "event"
-                          ? "#f59e0b"
-                          : item.type === "theme"
-                            ? "#3b82f6"
-                            : "#10b981",
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-slate-200 leading-snug">{item.title}</p>
-                    {item.detail && (
-                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
-                        {item.detail}
-                      </p>
-                    )}
+        {/* ── B: Since you were away ────────────────────────────────────── */}
+        {sinceAway.lastSeenAt && (
+          <section>
+            <SectionLabel>
+              {sinceAway.awayDuration
+                ? `Since you were away · ${sinceAway.awayDuration} ago`
+                : "Since your last visit"}
+            </SectionLabel>
+            {sinceAway.hasChanges && sinceAway.items.length > 0 ? (
+              <div className="space-y-2">
+                {sinceAway.items.map((item, i) => (
+                  <div key={i} className="rounded-xl px-4 py-3 flex items-start gap-3"
+                    style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5"
+                      style={{
+                        background: item.type === "event" ? "#f59e0b" : item.type === "theme" ? "#3b82f6" : "#10b981",
+                      }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-slate-200 leading-snug">{item.title}</p>
+                      {item.detail && (
+                        <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">{item.detail}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <p className="text-sm text-slate-400">Market story looks the same since you were away.</p>
+                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">Scroll down for the full briefing.</p>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── C: Top movers ────────────────────────────────────────────── */}
+        <MoversSection />
+
+        {/* ── D: Sector map ────────────────────────────────────────────── */}
+        <SectorGrid />
+
+        {/* ── E: News feed ─────────────────────────────────────────────── */}
+        <NewsSection onAskAbout={onAskAbout} />
+
+        {/* ── F: Key events from intelligence layer ────────────────────── */}
+        {keyEvents.length > 0 && (
+          <section>
+            <SectionLabel>Events behind today&apos;s moves</SectionLabel>
+            <div className="space-y-2">
+              {keyEvents.slice(0, 5).map((ev, i) => (
+                <EventCard key={i} ev={ev} />
               ))}
             </div>
-          ) : (
-            <Card>
-              <p className="text-sm text-slate-400">Market story looks the same since you were away.</p>
-              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">Scroll down for the full briefing.</p>
-            </Card>
-          )}
-        </section>
-      )}
-
-      {/* ── D: Real-world event context ───────────────────────────────────── */}
-      {keyEvents.length > 0 && (
-        <section>
-          <SectionLabel>Real-world events behind the move</SectionLabel>
-          <div className="space-y-2">
-            {keyEvents.slice(0, 5).map((ev, i) => (
-              <EventCard key={i} ev={ev} />
-            ))}
-          </div>
-          {onAskAbout && keyEvents.length > 0 && (
-            <button
-              onClick={() => onAskAbout("What real-world events are driving markets today?")}
-              className="mt-2 flex items-center gap-1 text-[10px] font-semibold transition-all active:scale-95"
-              style={{ color: "#94a3b8" }}
-            >
-              Ask Decifer about these events
-              <ArrowRight size={9} />
-            </button>
-          )}
-        </section>
-      )}
-
-      {/* ── D-fallback: Recent market headlines (when no backend key_events) ── */}
-      {keyEvents.length === 0 && headlines.length > 0 && (
-        <section>
-          <SectionLabel>Latest market headlines</SectionLabel>
-          <div className="space-y-2">
-            {headlines.map((h, i) => (
-              <div
-                key={i}
-                className="rounded-xl px-3.5 py-3"
-                style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
+            {onAskAbout && (
+              <button
+                onClick={() => onAskAbout("What real-world events are driving markets today?")}
+                className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
               >
-                <p className="text-[13px] font-semibold text-slate-100 leading-snug">{h.title}</p>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {h.source}
-                  {" · "}
-                  {h.minutesAgo < 60
-                    ? `${h.minutesAgo}m ago`
-                    : `${Math.round(h.minutesAgo / 60)}h ago`}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── E: What is moving markets (grouped) ──────────────────────────── */}
-      {groups.length > 0 && (
-        <section>
-          <SectionLabel>What is moving markets</SectionLabel>
-          <div className="space-y-3">
-            {groups.map((group, i) => (
-              <CauseGroupCard
-                key={i}
-                group={group}
-                onThemeSelect={onThemeSelect}
-                onAskAbout={onAskAbout}
-              />
-            ))}
-          </div>
-          {onGoToForces && (
-            <button
-              onClick={onGoToForces}
-              className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[11px] font-semibold transition-all active:scale-[0.98]"
-              style={{
-                background: "rgba(249,115,22,0.06)",
-                border: "1px solid rgba(249,115,22,0.15)",
-                color: "#fb923c",
-              }}
-            >
-              <Zap size={10} />
-              See all active forces
-            </button>
-          )}
-        </section>
-      )}
-
-      {/* ── F: Where Decifer is looking ───────────────────────────────────── */}
-      <WhereLookingSection data={data} onAskAbout={onAskAbout} />
-
-      {/* ── G: What could change the picture ─────────────────────────────── */}
-      {watchNext.length > 0 && (
-        <section>
-          <SectionLabel>What could change the picture</SectionLabel>
-          <Card>
-            <ul className="space-y-2.5">
-              {watchNext.map((item, i) => (
-                <li key={i} className="flex items-start gap-2.5">
-                  <Eye size={11} className="text-slate-500 shrink-0 mt-1" />
-                  <p className="text-xs text-slate-300 leading-relaxed">{item}</p>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </section>
-      )}
-
-      {/* ── Disclaimer ─────────────────────────────────────────────────────── */}
-      <div
-        className="rounded-xl p-4 text-center"
-        style={{
-          background: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.04)",
-        }}
-      >
-        <p className="text-[11px] text-slate-500 leading-relaxed">
-          Market intelligence only. Not financial advice. No trade execution.
-        </p>
-        {data.data_entitlement_note && (
-          <p className="text-[10px] text-slate-500 mt-1">{data.data_entitlement_note}</p>
+                Ask Decifer about these events
+                <ArrowRight size={9} />
+              </button>
+            )}
+          </section>
         )}
+
+        {/* ── G: What is moving markets ─────────────────────────────────── */}
+        {groups.length > 0 && (
+          <section>
+            <SectionLabel>What is moving markets</SectionLabel>
+            <div className="space-y-3">
+              {groups.map((group, i) => (
+                <CauseGroupCard key={i} group={group} onThemeSelect={onThemeSelect} onAskAbout={onAskAbout} />
+              ))}
+            </div>
+            {onGoToForces && (
+              <button
+                onClick={onGoToForces}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[11px] font-semibold transition-all active:scale-[0.98]"
+                style={{ background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.15)", color: "#fb923c" }}
+              >
+                <Zap size={10} />
+                See all active forces
+              </button>
+            )}
+          </section>
+        )}
+
+        {/* ── H: Where Decifer is looking ───────────────────────────────── */}
+        <WhereLookingSection data={data} onAskAbout={onAskAbout} />
+
+        {/* ── I: What could change the picture ─────────────────────────── */}
+        {watchNext.length > 0 && (
+          <section>
+            <SectionLabel>What could change the picture</SectionLabel>
+            <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <ul className="space-y-2.5">
+                {watchNext.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <Eye size={11} className="text-slate-500 shrink-0 mt-1" />
+                    <p className="text-xs text-slate-300 leading-relaxed">{item}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
+
+        {/* ── Disclaimer ─────────────────────────────────────────────────── */}
+        <div className="rounded-xl p-4 text-center"
+          style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Market intelligence only. Not financial advice. No trade execution.
+          </p>
+          {data.data_entitlement_note && (
+            <p className="text-[10px] text-slate-500 mt-1">{data.data_entitlement_note}</p>
+          )}
+        </div>
+
       </div>
     </div>
   );
