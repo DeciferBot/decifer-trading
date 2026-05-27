@@ -1,5 +1,5 @@
 {
-  "updated": "2026-05-27T08:26:47.166945+00:00",
+  "updated": "2026-05-27T12:45:25.016350+00:00",
   "raw_ic": {
     "trend": 0.022544160102873554,
     "momentum": -0.05645909540183408,
@@ -34,7 +34,7 @@
     "analyst_revision": 0.0,
     "insider_buying": 0.0
   },
-  "n_records": 46218,
+  "n_records": 46751,
   "n_independent_dates": 27,
   "ic_valid_for_live_scoring": false,
   "fallback_reason": "min_active_dims_not_met:4<5",

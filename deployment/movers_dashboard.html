@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DECIFER — Market Intelligence Monitor</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #080808;
+  --surface:   #0f0f0f;
+  --panel:     #111111;
+  --border:    #1c1c1c;
+  --border2:   #242424;
+  --orange:    #E07B39;
+  --orange-dim:#7a3d18;
+  --green:     #22C55E;
+  --green-dim: #14532d;
+  --red:       #EF4444;
+  --red-dim:   #7f1d1d;
+  --amber:     #F59E0B;
+  --amber-dim: #78350f;
+  --text:      #e8e8e8;
+  --text-2:    #888;
+  --text-3:    #444;
+  --mono:      'Courier New', 'Lucida Console', monospace;
+  --sans:      'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(224,123,57,0.06), transparent),
+    repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(255,255,255,0.012) 24px),
+    repeating-linear-gradient(90deg, transparent, transparent 23px, rgba(255,255,255,0.012) 24px);
+}
+
+/* ── HEADER ─────────────────────────────────────────────────────── */
+
+header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 48px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--orange);
+  text-transform: uppercase;
+}
+
+.logo-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orange);
+  margin-right: 8px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.header-subtitle {
+  font-size: 11px;
+  color: var(--text-2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+
+.badge-source {
+  background: rgba(224,123,57,0.12);
+  border: 1px solid var(--orange-dim);
+  color: var(--orange);
+}
+
+.badge-time {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  color: var(--text-2);
+}
+
+.refresh-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.refresh-track {
+  width: 80px;
+  height: 3px;
+  background: var(--border2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.refresh-bar {
+  height: 100%;
+  background: var(--orange);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.refresh-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  min-width: 36px;
+}
+
+/* ── TAPE BAR ────────────────────────────────────────────────────── */
+
+.tape-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  height: 44px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tape-bar::-webkit-scrollbar { display: none; }
+
+.tape-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border-right: 1px solid var(--border);
+  min-width: 90px;
+  gap: 1px;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.tape-item:hover { background: rgba(255,255,255,0.03); }
+
+.tape-item::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 0;
+}
+
+.tape-item.up::before   { background: var(--green); }
+.tape-item.down::before { background: var(--red); }
+.tape-item.vol::before  { background: var(--amber); }
+
+.tape-sym {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+.tape-label {
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tape-pct {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tape-pct.up   { color: var(--green); }
+.tape-pct.down { color: var(--red); }
+.tape-pct.vol  { color: var(--amber); }
+.tape-pct.flat { color: var(--text-2); }
+
+/* ── MAIN BODY ───────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── MOVERS PANEL ────────────────────────────────────────────────── */
+
+.movers-panel {
+  width: 40%;
+  min-width: 340px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 9px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.panel-meta {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-3);
+}
+
+.movers-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+}
+
+.movers-col {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.movers-col:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.col-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+
+.col-header-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.col-header-label.up   { color: var(--green); }
+.col-header-label.down { color: var(--red); }
+
+.col-arrow { font-size: 10px; }
+.col-arrow.up   { color: var(--green); }
+.col-arrow.down { color: var(--red); }
+
+.movers-list {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+
+.mover-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+  cursor: default;
+}
+
+.mover-row:hover { background: rgba(255,255,255,0.025); }
+
+.mover-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.mover-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mover-logo-fallback {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.mover-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mover-symbol {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.mover-name {
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+.mover-pct {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.mover-pct.up   { color: var(--green); }
+.mover-pct.down { color: var(--red); }
+
+/* ── NEWS PANEL ──────────────────────────────────────────────────── */
+
+.news-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.news-list {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+
+.news-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+  cursor: default;
+  position: relative;
+}
+
+.news-item:hover { background: rgba(255,255,255,0.02); }
+
+.news-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 0 1px 1px 0;
+}
+
+.news-item.has-theme::before { background: var(--orange-dim); }
+
+.news-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.news-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.news-logo-initial {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.news-content { flex: 1; min-width: 0; }
+
+.news-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  flex-wrap: wrap;
+}
+
+.theme-chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: rgba(224,123,57,0.15);
+  border: 1px solid var(--orange-dim);
+  color: var(--orange);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.news-source {
+  font-size: 10px;
+  color: var(--text-3);
+  letter-spacing: 0.03em;
+}
+
+.news-age {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.news-title {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── SKELETON ────────────────────────────────────────────────────── */
+
+.skeleton {
+  background: var(--border);
+  border-radius: 3px;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%   { opacity: 0.5; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+/* ── EMPTY STATE ─────────────────────────────────────────────────── */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  gap: 6px;
+}
+
+.empty-state-icon {
+  font-size: 18px;
+  opacity: 0.3;
+}
+
+.empty-state-text {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: var(--mono);
+}
+
+/* ── SCROLLBARS ──────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <span class="logo"><span class="logo-dot"></span>DECIFER</span>
+    <span class="header-subtitle">Market Intelligence Monitor</span>
+  </div>
+  <div class="header-right">
+    <span class="badge badge-source">intelligence.decifertrading.com</span>
+    <span class="badge badge-time" id="last-updated">—</span>
+    <div class="refresh-wrap">
+      <div class="refresh-track"><div class="refresh-bar" id="refresh-bar" style="width:100%"></div></div>
+      <span class="refresh-label" id="refresh-label">5:00</span>
+    </div>
+  </div>
+</header>
+
+<!-- TAPE BAR -->
+<div class="tape-bar" id="tape-bar">
+  <!-- populated by JS -->
+</div>
+
+<!-- BODY -->
+<div class="body">
+
+  <!-- MOVERS PANEL -->
+  <div class="movers-panel">
+    <div class="panel-header">
+      <span class="panel-title">Today's Biggest Moves</span>
+      <span class="panel-meta" id="movers-ts">—</span>
+    </div>
+    <div class="movers-grid">
+      <div class="movers-col">
+        <div class="col-header">
+          <span class="col-arrow up">↑</span>
+          <span class="col-header-label up">Gainers</span>
+        </div>
+        <div class="movers-list" id="gainers-list"></div>
+      </div>
+      <div class="movers-col">
+        <div class="col-header">
+          <span class="col-arrow down">↓</span>
+          <span class="col-header-label down">Losers</span>
+        </div>
+        <div class="movers-list" id="losers-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEWS PANEL -->
+  <div class="news-panel">
+    <div class="panel-header">
+      <span class="panel-title">Latest Market News</span>
+      <span class="panel-meta" id="news-ts">—</span>
+    </div>
+    <div class="news-list" id="news-list"></div>
+  </div>
+
+</div>
+
+<script>
+const INTEL = 'https://intelligence.decifertrading.com';
+const REFRESH_SECS = 300;
+
+let refreshRemaining = REFRESH_SECS;
+let refreshTimer = null;
+
+// ── Fetch ──────────────────────────────────────────────────────────
+
+async function fetchAll() {
+  const [movers, tape, news] = await Promise.allSettled([
+    fetch(`${INTEL}/api/market-data/movers`).then(r => r.json()),
+    fetch(`${INTEL}/api/market-data/tape`).then(r => r.json()),
+    fetch(`${INTEL}/api/market-data/news`).then(r => r.json()),
+  ]);
+
+  renderTape(tape.status === 'fulfilled' ? tape.value : null);
+  renderMovers(movers.status === 'fulfilled' ? movers.value : null);
+  renderNews(news.status === 'fulfilled' ? news.value : null);
+
+  const now = new Date();
+  document.getElementById('last-updated').textContent =
+    now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// ── Tape ──────────────────────────────────────────────────────────
+
+function tapeClass(type, pct) {
+  if (type === 'vol') return 'vol';
+  if (pct === null) return 'flat';
+  return pct >= 0 ? 'up' : 'down';
+}
+
+function fmtPct(pct, type) {
+  if (pct === null) return '—';
+  const sign = pct >= 0 ? '+' : '';
+  if (type === 'vol') return pct !== null ? pct.toFixed(2) : '—';
+  return `${sign}${pct.toFixed(2)}%`;
+}
+
+function renderTape(data) {
+  const el = document.getElementById('tape-bar');
+  if (!data || !data.tape) {
+    el.innerHTML = '<div style="display:flex;align-items:center;padding:0 16px;color:var(--text-3);font-size:11px;">No tape data</div>';
+    return;
+  }
+
+  el.innerHTML = data.tape.map(e => {
+    const cls = tapeClass(e.type, e.changePct);
+    const display = e.sym === 'VIX' ? (e.level !== null ? e.level.toFixed(2) : '—') : fmtPct(e.changePct, e.type);
+    return `
+      <div class="tape-item ${cls}">
+        <span class="tape-sym">${e.sym}</span>
+        <span class="tape-label">${e.label}</span>
+        <span class="tape-pct ${cls}">${display}</span>
+      </div>`;
+  }).join('');
+}
+
+// ── Movers ────────────────────────────────────────────────────────
+
+function logoEl(symbol, logoUrl, size) {
+  const s = size === 'sm' ? 24 : 32;
+  const r = size === 'sm' ? 6 : 8;
+  return `
+    <div class="mover-logo" style="width:${s}px;height:${s}px;border-radius:${r}px">
+      <img src="${logoUrl}"
+           alt="${symbol}"
+           onerror="this.parentElement.innerHTML='<span class=\\'mover-logo-fallback\\'>${symbol[0]}</span>'"/>
+    </div>`;
+}
+
+function moverRow(m, dir) {
+  const pctCls = dir === 'gain' ? 'up' : 'down';
+  const sign = m.changePct >= 0 ? '+' : '';
+  return `
+    <div class="mover-row">
+      ${logoEl(m.symbol, m.logoUrl, 'lg')}
+      <div class="mover-info">
+        <div class="mover-symbol">${m.symbol}</div>
+        <div class="mover-name">${m.name || m.symbol}</div>
+      </div>
+      <div class="mover-pct ${pctCls}">${sign}${m.changePct.toFixed(1)}%</div>
+    </div>`;
+}
+
+function skeletonMoverRows(n) {
+  return Array.from({length: n}, () => `
+    <div class="mover-row">
+      <div class="skeleton" style="width:32px;height:32px;border-radius:8px;flex-shrink:0"></div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+        <div class="skeleton" style="height:11px;width:40px"></div>
+        <div class="skeleton" style="height:9px;width:70px"></div>
+      </div>
+      <div class="skeleton" style="height:16px;width:52px"></div>
+    </div>`).join('');
+}
+
+function renderMovers(data) {
+  const gainEl = document.getElementById('gainers-list');
+  const lossEl = document.getElementById('losers-list');
+  const tsEl   = document.getElementById('movers-ts');
+
+  if (!data || (!data.gainers && !data.losers)) {
+    gainEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">◌</div><div class="empty-state-text">No data — retrying</div></div>';
+    lossEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">◌</div><div class="empty-state-text">No data — retrying</div></div>';
+    return;
+  }
+
+  gainEl.innerHTML = data.gainers && data.gainers.length
+    ? data.gainers.map(m => moverRow(m, 'gain')).join('')
+    : '<div class="empty-state"><div class="empty-state-text">No gainers</div></div>';
+
+  lossEl.innerHTML = data.losers && data.losers.length
+    ? data.losers.map(m => moverRow(m, 'loss')).join('')
+    : '<div class="empty-state"><div class="empty-state-text">No losers</div></div>';
+
+  if (data.ts) tsEl.textContent = fmtTs(data.ts) + ' · ' + (data.source || '');
+}
+
+// ── News ──────────────────────────────────────────────────────────
+
+function fmtAge(mins) {
+  if (mins < 60)  return `${mins}m`;
+  if (mins < 1440) return `${Math.floor(mins/60)}h`;
+  return `${Math.floor(mins/1440)}d`;
+}
+
+function fmtTs(iso) {
+  try {
+    return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+}
+
+function newsItem(item) {
+  const hasTheme = !!item.themeLabel;
+  const hasSymbol = !!item.symbol;
+  const logoHtml = hasSymbol
+    ? `<div class="news-logo">
+         <img src="${item.logoUrl}" alt="${item.symbol}"
+              onerror="this.parentElement.innerHTML='<span class=\\'news-logo-initial\\'>${item.symbol[0]}</span>'"/>
+       </div>`
+    : `<div class="news-logo"><span class="news-logo-initial">◈</span></div>`;
+
+  const themeChip = hasTheme
+    ? `<span class="theme-chip">${item.themeLabel}</span>` : '';
+
+  return `
+    <div class="news-item ${hasTheme ? 'has-theme' : ''}">
+      ${logoHtml}
+      <div class="news-content">
+        <div class="news-meta">
+          ${themeChip}
+          <span class="news-source">${item.source || ''}</span>
+          <span class="news-age">${fmtAge(item.minutesAgo)}</span>
+        </div>
+        <div class="news-title">${item.title}</div>
+      </div>
+    </div>`;
+}
+
+function renderNews(data) {
+  const el   = document.getElementById('news-list');
+  const tsEl = document.getElementById('news-ts');
+
+  if (!data || !data.news) {
+    el.innerHTML = '<div class="empty-state" style="height:160px"><div class="empty-state-icon">◌</div><div class="empty-state-text">No data — retrying</div></div>';
+    return;
+  }
+
+  el.innerHTML = data.news.length
+    ? data.news.map(newsItem).join('')
+    : '<div class="empty-state" style="height:160px"><div class="empty-state-text">No news items</div></div>';
+
+  if (data.ts) tsEl.textContent = fmtTs(data.ts) + ' · ' + (data.source || '');
+}
+
+// ── Skeletons ─────────────────────────────────────────────────────
+
+function showSkeletons() {
+  document.getElementById('tape-bar').innerHTML =
+    Array.from({length: 8}, () =>
+      `<div class="tape-item"><div class="skeleton" style="height:32px;width:64px"></div></div>`
+    ).join('');
+
+  document.getElementById('gainers-list').innerHTML = skeletonMoverRows(5);
+  document.getElementById('losers-list').innerHTML  = skeletonMoverRows(5);
+
+  document.getElementById('news-list').innerHTML =
+    Array.from({length: 8}, () => `
+      <div class="news-item">
+        <div class="skeleton" style="width:24px;height:24px;border-radius:6px;flex-shrink:0"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+          <div class="skeleton" style="height:9px;width:120px"></div>
+          <div class="skeleton" style="height:11px;width:90%"></div>
+          <div class="skeleton" style="height:11px;width:70%"></div>
+        </div>
+      </div>`).join('');
+}
+
+// ── Refresh countdown ─────────────────────────────────────────────
+
+function startCountdown() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshRemaining = REFRESH_SECS;
+
+  refreshTimer = setInterval(() => {
+    refreshRemaining -= 1;
+    const pct = (refreshRemaining / REFRESH_SECS) * 100;
+    document.getElementById('refresh-bar').style.width = pct + '%';
+
+    const m = Math.floor(refreshRemaining / 60);
+    const s = refreshRemaining % 60;
+    document.getElementById('refresh-label').textContent =
+      `${m}:${String(s).padStart(2,'0')}`;
+
+    if (refreshRemaining <= 0) {
+      clearInterval(refreshTimer);
+      fetchAll().then(startCountdown);
+    }
+  }, 1000);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────
+
+showSkeletons();
+fetchAll().then(startCountdown);
+</script>
+</body>
+</html>

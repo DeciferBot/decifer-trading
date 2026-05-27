@@ -2,7 +2,7 @@
   "sample_gate_passed": true,
   "ic_gate_passed": false,
   "sharpe_gate_passed": true,
-  "n_valid_records": 46218,
+  "n_valid_records": 46751,
   "mean_positive_ic": 0.049171,
   "n_positive_dims": 5,
   "walkforward_sharpe": 6.69,
@@ -11,5 +11,5 @@
     "IC GATE: mean positive IC 0.0492 < threshold 0.0500. Dimensions are barely predictive."
   ],
   "ready_for_live": false,
-  "checked_at": "2026-05-27T08:27:01.988258+00:00"
+  "checked_at": "2026-05-27T12:45:40.369359+00:00"
 }
