@@ -20,6 +20,7 @@ import type {
   MarketClockState,
   FreshnessState,
   SinceAwaySummary,
+  MarketSession,
 } from "@/lib/useCustomerBriefing";
 import {
   buildCustomerMarketStory,
@@ -76,6 +77,82 @@ function AskDeciferButton({ label }: { label: string }) {
       {label}
       <ArrowRight size={9} />
     </span>
+  );
+}
+
+// ── Countdown to market open ──────────────────────────────────────────────────
+
+function msUntilNextMarketOpen(): number {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "long",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(now).reduce<Record<string, string>>(
+    (acc, p) => ({ ...acc, [p.type]: p.value }), {}
+  );
+
+  const weekday  = parts.weekday ?? "";
+  const nyH      = parseInt(parts.hour === "24" ? "0" : (parts.hour ?? "0"), 10);
+  const nyM      = parseInt(parts.minute ?? "0", 10);
+  const nyS      = parseInt(parts.second ?? "0", 10);
+  const nowNYSec = nyH * 3600 + nyM * 60 + nyS;
+  const openSec  = 9 * 3600 + 30 * 60; // 9:30 AM = 34200s
+
+  // Find how many days ahead the next market open is
+  let daysAhead = 0;
+  if (weekday === "Saturday" || weekday === "Sunday" || nowNYSec >= openSec) {
+    const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const idx = DAYS.indexOf(weekday);
+    for (let i = 1; i <= 7; i++) {
+      if (!["Saturday","Sunday"].includes(DAYS[(idx + i) % 7])) { daysAhead = i; break; }
+    }
+  }
+
+  return Math.max(0, (openSec - nowNYSec + daysAhead * 86400) * 1000);
+}
+
+function CountdownToOpen({ session }: { session: MarketSession }) {
+  const [msLeft, setMsLeft] = useState(() => msUntilNextMarketOpen());
+
+  useEffect(() => {
+    if (session === "open") return;
+    const t = setInterval(() => setMsLeft(msUntilNextMarketOpen()), 1000);
+    return () => clearInterval(t);
+  }, [session]);
+
+  if (session === "open") return null;
+
+  const totalSec = Math.floor(msLeft / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const formatted = h > 0
+    ? `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`
+    : `${m}m ${String(s).padStart(2, "0")}s`;
+
+  const tickColor = session === "pre_market" ? "#fbbf24" : "#475569";
+  const labelColor = session === "pre_market" ? "#92400e" : "#1e293b";
+
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <span
+        className="text-[10px] font-bold uppercase tracking-widest"
+        style={{ color: labelColor }}
+      >
+        Opens in
+      </span>
+      <span
+        className="text-[15px] font-black tabular-nums leading-none"
+        style={{ color: tickColor }}
+        suppressHydrationWarning
+      >
+        {formatted}
+      </span>
+    </div>
   );
 }
 
@@ -376,6 +453,7 @@ function HeroHeader({
             >
               {clock.sessionLabel}
             </p>
+            <CountdownToOpen session={clock.session} />
           </div>
 
           {/* Clocks stacked — NY always on top */}
