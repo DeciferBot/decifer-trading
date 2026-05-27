@@ -113,9 +113,17 @@ function resolveMarketState(
 
   if (market_mood) {
     const m = market_mood.toLowerCase();
-    if (m.includes("risk-on") || m.includes("risk on")) return "risk-on";
-    if (m.includes("risk-off") || m.includes("risk off")) return "risk-off";
+    // "mixed" must be checked before "risk-on" — a string like
+    // "Mixed — risk-on momentum with active headwinds" is explicitly mixed,
+    // not purely risk-on.
     if (m.includes("mixed")) return "mixed";
+    if (m.includes("risk-off") || m.includes("risk off")) return "risk-off";
+    if (m.includes("risk-on") || m.includes("risk on")) return "risk-on";
+    // Regime label passthrough from the manifest (e.g. "Trending up", "Risk-on —
+    // equities trending higher") when the driver heuristic is bypassed.
+    if (m.includes("trending up") || m.includes("uptrend")) return "risk-on";
+    if (m.includes("trending down") || m.includes("downtrend") || m.includes("bear market")) return "risk-off";
+    if (m.includes("range-bound") || m.includes("choppy") || m.includes("neutral")) return "monitoring";
   }
 
   if (hasRiskOn && hasRiskOff) return "mixed";

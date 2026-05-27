@@ -99,7 +99,7 @@ const CAUSE_MARKET_IMPACT: Record<string, string> = {
   risk_on_rotation:
     "Consumer discretionary, mega-cap technology, and travel names are attracting capital.",
   gold_safe_haven_bid:
-    "Gold and precious metals names are in demand; supporting the Gold & Real Assets structural theme.",
+    "Gold and precious metals names are in demand; supporting the Gold structural theme.",
   credit_stress_easing:
     "Reducing risk premiums for financials, cyclicals, and credit-sensitive names.",
   oil_supply_shock:

@@ -220,12 +220,16 @@ def _derive_market_mood(
     if regime_label and regime_label.lower() not in _generic:
         return regime_label
 
-    # Regime is unknown — derive mood from active driver set
+    # Regime is unknown — derive mood from active driver set.
+    # _RISK_OFF contains only signals that depress the BROAD market (rate/futures
+    # shocks, risk-off rotation).  geopolitical_risk_rising and oil_supply_shock
+    # are SECTOR catalysts (defence/energy bid) that coexist with bull markets;
+    # including them here caused spurious "mixed" labels when VIX is <18 and
+    # SPY is above its 200d MA.
     _RISK_ON = {"risk_on_rotation", "small_cap_risk_on", "futures_risk_on",
                 "credit_stress_easing", "yields_falling", "gold_safe_haven_bid",
                 "ai_capex_growth", "ai_compute_demand"}
-    _RISK_OFF = {"geopolitical_risk_rising", "oil_supply_shock",
-                 "yields_rising", "futures_risk_off"}
+    _RISK_OFF = {"yields_rising", "futures_risk_off"}
     driver_set = set(active_drivers)
     on_count = len(driver_set & _RISK_ON)
     off_count = len(driver_set & _RISK_OFF)

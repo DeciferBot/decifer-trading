@@ -51,17 +51,24 @@ export interface ResearchStoryGroup {
 // ── Story label map ────────────────────────────────────────────────────────────
 
 export const TTG_STORY_LABELS: Record<string, string> = {
-  ai_energy_nuclear:           "AI Infrastructure & Energy",
-  defence_rearmament:          "Defence & Security",
+  // Backend theme IDs (10 structural themes from the TTG)
+  ai_energy_nuclear:                "Energy & Nuclear",   // fallback for unclassified ai_energy_nuclear cards
+  defence_rearmament:               "Defence",
   cybersecurity_digital_resilience: "Cybersecurity",
-  reshoring_industrial_capex:  "Industrial Reshoring & Capex",
-  critical_minerals_copper:    "Critical Minerals",
-  gold_real_assets:            "Gold & Real Assets",
-  glp1_metabolic_health:       "Healthcare Innovation",
-  housing_rate_sensitivity:    "Rate-Sensitive Names",
-  water_infrastructure:        "Water Infrastructure",
-  digital_assets_infrastructure: "Digital Assets",
+  reshoring_industrial_capex:       "Industrial Reshoring",
+  critical_minerals_copper:         "Critical Minerals",
+  gold_real_assets:                 "Gold",
+  glp1_metabolic_health:            "Healthcare Innovation",
+  housing_rate_sensitivity:         "Rate-Sensitive Names",
+  water_infrastructure:             "Water Infrastructure",
+  digital_assets_infrastructure:    "Digital Assets",
+  // Virtual split IDs — produced when ai_energy_nuclear is split by bucket in buildStoryGroups
+  ai_energy_nuclear_ai:             "AI Infrastructure",
+  ai_energy_nuclear_energy:         "Energy & Nuclear",
 };
+
+// Buckets that belong to the AI compute side of the ai_energy_nuclear theme
+const AI_INFRA_BUCKETS = new Set(["ai_compute_accelerators_networking"]);
 
 // ── Price action ──────────────────────────────────────────────────────────────
 
@@ -156,7 +163,24 @@ export function buildStoryGroups(
   themes: TtgThemeDetail[],
   priceMap: Map<string, NamePriceEntry>,
 ): ResearchStoryGroup[] {
-  const groups: ResearchStoryGroup[] = themes
+  // Expand themes — ai_energy_nuclear is split into AI Infrastructure and Energy & Nuclear
+  const expanded: TtgThemeDetail[] = [];
+  for (const theme of themes) {
+    if (theme.theme_id === "ai_energy_nuclear") {
+      const aiSymbols = theme.symbols.filter(s => AI_INFRA_BUCKETS.has(s.bucket_id));
+      const energySymbols = theme.symbols.filter(s => !AI_INFRA_BUCKETS.has(s.bucket_id));
+      if (aiSymbols.length > 0) {
+        expanded.push({ ...theme, theme_id: "ai_energy_nuclear_ai", symbols: aiSymbols, symbol_count: aiSymbols.length });
+      }
+      if (energySymbols.length > 0) {
+        expanded.push({ ...theme, theme_id: "ai_energy_nuclear_energy", symbols: energySymbols, symbol_count: energySymbols.length });
+      }
+    } else {
+      expanded.push(theme);
+    }
+  }
+
+  const groups: ResearchStoryGroup[] = expanded
     .map(theme => {
       const storyLabel = TTG_STORY_LABELS[theme.theme_id] ?? theme.label;
       const cards = theme.symbols.map(card => buildResearchCard(card, priceMap, storyLabel));

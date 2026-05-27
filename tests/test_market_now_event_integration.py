@@ -79,7 +79,7 @@ class TestEndToEnd:
     def test_payload_validates_with_no_events(self, fake_pipeline):
         payload = mnb.get_market_now_dict()
         validate_customer_payload(payload)
-        assert payload["market_regime_label"] == "Trending up"
+        assert payload["market_regime_label"] == "Risk-on — equities trending higher"
         # M11A sections default to empty containers
         assert payload["key_events"] == []
         assert payload["known_conflicts"] == []

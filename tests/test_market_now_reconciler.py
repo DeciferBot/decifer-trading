@@ -327,3 +327,76 @@ class TestThemes:
         # risk_on_rotation should appear as event-only "watch"
         watch_themes = [t for t in themes if t.get("state") == "watch"]
         assert any(t["theme"] == "risk_on_rotation" for t in watch_themes)
+
+
+# ---------------------------------------------------------------------------
+# Fix: geopolitical_risk_rising and oil_supply_shock are sector catalysts, not
+# broad market risk-off signals.  They must NOT produce a "mixed" mood when the
+# rest of the driver set is bullish and no events or real regime signal is present.
+# ---------------------------------------------------------------------------
+
+class TestDriverRiskClassification:
+
+    def _call(self, active_drivers):
+        """reconcile_market_map with no events and an 'assessing' regime_label
+        so the driver heuristic is the only signal available."""
+        return mnr.reconcile_market_map(
+            active_drivers=active_drivers,
+            blocked_conditions=[],
+            active_theme_ids=[],
+            theme_states={},
+            regime_label="Assessing market conditions",
+            apex_read="",
+            manifest_published_at=datetime.now(UTC).isoformat(),
+            confidence_label="Low",
+        )
+
+    def test_geo_driver_with_risk_on_drivers_is_risk_on_not_mixed(self):
+        """geopolitical_risk_rising alongside risk-on drivers must NOT flip to mixed."""
+        out = self._call(["geopolitical_risk_rising", "ai_capex_growth", "small_cap_risk_on",
+                          "futures_risk_on"])
+        mood = out["market_mood"].lower()
+        assert "risk-on" in mood, f"expected risk-on mood, got: {out['market_mood']!r}"
+        assert "mixed" not in mood, f"mixed must not appear, got: {out['market_mood']!r}"
+
+    def test_oil_supply_shock_with_risk_on_drivers_is_risk_on_not_mixed(self):
+        """oil_supply_shock alongside risk-on drivers must NOT flip to mixed."""
+        out = self._call(["oil_supply_shock", "ai_capex_growth", "futures_risk_on"])
+        mood = out["market_mood"].lower()
+        assert "risk-on" in mood, f"expected risk-on mood, got: {out['market_mood']!r}"
+        assert "mixed" not in mood, f"mixed must not appear, got: {out['market_mood']!r}"
+
+    def test_both_sector_catalysts_with_bullish_drivers_is_risk_on(self):
+        """Exact live driver set that was producing spurious 'mixed'."""
+        out = self._call([
+            "ai_capex_growth", "ai_compute_demand", "yields_falling",
+            "oil_supply_shock", "geopolitical_risk_rising",
+            "small_cap_risk_on", "futures_risk_on",
+        ])
+        mood = out["market_mood"].lower()
+        assert "risk-on" in mood, f"expected risk-on, got: {out['market_mood']!r}"
+        assert "mixed" not in mood
+
+    def test_yields_rising_alone_produces_risk_off(self):
+        """yields_rising is a genuine broad-market risk-off signal."""
+        out = self._call(["yields_rising"])
+        mood = out["market_mood"].lower()
+        assert "risk-off" in mood, f"expected risk-off mood, got: {out['market_mood']!r}"
+
+    def test_futures_risk_off_alone_produces_risk_off(self):
+        """futures_risk_off is a genuine broad-market risk-off signal."""
+        out = self._call(["futures_risk_off"])
+        mood = out["market_mood"].lower()
+        assert "risk-off" in mood, f"expected risk-off mood, got: {out['market_mood']!r}"
+
+    def test_yields_rising_with_risk_on_produces_mixed(self):
+        """When a real risk-off driver (yields_rising) co-exists with risk-on → mixed."""
+        out = self._call(["yields_rising", "ai_capex_growth", "small_cap_risk_on"])
+        mood = out["market_mood"].lower()
+        assert "mixed" in mood, f"expected mixed mood, got: {out['market_mood']!r}"
+
+    def test_geo_driver_alone_is_risk_on_via_ai_capex(self):
+        """Isolated geopolitical driver with no risk-off drivers → risk-on if AI also active."""
+        out = self._call(["geopolitical_risk_rising", "ai_capex_growth"])
+        mood = out["market_mood"].lower()
+        assert "mixed" not in mood

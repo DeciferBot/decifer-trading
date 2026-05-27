@@ -101,13 +101,15 @@ _DRIVER_LABELS: dict[str, str] = {
 }
 
 _REGIME_LABELS: dict[str, str] = {
-    "TRENDING_UP":   "Trending up",
-    "TRENDING_DOWN": "Trending down",
-    "BEAR_TRENDING": "Trending down",
-    "CHOPPY":        "Choppy — no clear direction",
-    "PANIC":         "Market in panic — extreme volatility",
-    "RANGE_BOUND":   "Range-bound",
-    "UNKNOWN":       "Assessing market conditions",
+    "TRENDING_UP":    "Risk-on — equities trending higher",
+    "TRENDING_DOWN":  "Risk-off — equities declining",
+    "BEAR_TRENDING":  "Risk-off — bear market in progress",
+    "RELIEF_RALLY":   "Risk-on — bounce underway",
+    "CHOPPY":         "Neutral — choppy, no clear direction",
+    "PANIC":          "Risk-off — extreme volatility",
+    "RANGE_BOUND":    "Neutral — markets consolidating",
+    "CAPITULATION":   "Risk-off — extreme fear, capitulation",
+    "UNKNOWN":        "Assessing market conditions",
 }
 
 

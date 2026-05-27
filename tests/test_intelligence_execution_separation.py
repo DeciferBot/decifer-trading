@@ -338,7 +338,7 @@ class TestMarketNowBuilder:
         import market_now_builder
         monkeypatch.setattr(market_now_builder, "_BASE", str(tmp_path))
         payload = market_now_builder.build_market_now()
-        assert payload.market_regime_label == "Trending up"
+        assert payload.market_regime_label == "Risk-on — equities trending higher"
         assert "AI capital spending cycle expanding" in payload.key_drivers
         assert "data_centre_power" in payload.active_themes
 

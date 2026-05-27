@@ -31,8 +31,8 @@ function makeCard(overrides: Partial<TtgSymbolCard> = {}): TtgSymbolCard {
     label: "NVIDIA",
     theme_id: "ai_energy_nuclear",
     theme_label: "AI Energy & Nuclear",
-    bucket_id: "ai_compute",
-    bucket_label: "AI Compute",
+    bucket_id: "ai_compute_accelerators_networking",
+    bucket_label: "AI Compute Accelerators & Networking",
     exposure_type: "direct_beneficiary",
     confidence: 0.9,
     reason_to_care: "Dominant AI chip supplier benefiting from hyperscaler capex growth.",
@@ -165,7 +165,7 @@ describe("resolveWatchType", () => {
 
 describe("buildResearchCard", () => {
   it("includes all required fields", () => {
-    const card = buildResearchCard(makeCard(), emptyPriceMap, "AI Infrastructure & Energy");
+    const card = buildResearchCard(makeCard(), emptyPriceMap, "AI Infrastructure");
     expect(card).toHaveProperty("symbol");
     expect(card).toHaveProperty("companyName");
     expect(card).toHaveProperty("storyGroup");
@@ -197,7 +197,7 @@ describe("buildResearchCard", () => {
   });
 
   it("contains no forbidden execution language in generated fields", () => {
-    const card = buildResearchCard(makeCard(), emptyPriceMap, "AI Infrastructure & Energy");
+    const card = buildResearchCard(makeCard(), emptyPriceMap, "AI Infrastructure");
     const generatedText = [
       card.watchType,
       card.confidenceLanguage,
@@ -213,7 +213,7 @@ describe("buildResearchCard", () => {
   });
 
   it("does not expose raw theme IDs in customer-facing string fields", () => {
-    const card = buildResearchCard(makeCard(), emptyPriceMap, "AI Infrastructure & Energy");
+    const card = buildResearchCard(makeCard(), emptyPriceMap, "AI Infrastructure");
     const customerText = [card.storyGroup, card.watchType, card.confidenceLanguage].join(" ");
     expect(customerText).not.toContain("ai_energy_nuclear");
     expect(customerText).not.toContain("direct_beneficiary");
@@ -229,18 +229,18 @@ describe("buildStoryGroups", () => {
     expect(groups).toHaveLength(0);
   });
 
-  it("groups symbols under their theme story label", () => {
+  it("groups AI compute symbols under AI Infrastructure", () => {
     const theme = makeTheme({ symbols: [makeCard(), makeCard({ symbol: "AMD" })] });
     const groups = buildStoryGroups([theme], emptyPriceMap);
     expect(groups).toHaveLength(1);
-    expect(groups[0].storyLabel).toBe("AI Infrastructure & Energy");
+    expect(groups[0].storyLabel).toBe("AI Infrastructure");
     expect(groups[0].cards).toHaveLength(2);
   });
 
   it("uses TTG_STORY_LABELS for known theme IDs", () => {
     const theme = makeTheme({ theme_id: "defence_rearmament", label: "Defence" });
     const groups = buildStoryGroups([theme], emptyPriceMap);
-    expect(groups[0].storyLabel).toBe("Defence & Security");
+    expect(groups[0].storyLabel).toBe("Defence");
   });
 
   it("falls back to theme label for unknown theme IDs", () => {
@@ -441,8 +441,8 @@ describe("buildCompanyLine", () => {
   });
 
   it("includes story group in fallback when provided", () => {
-    const line = buildCompanyLine("NVDA", undefined, "AI Infrastructure & Energy");
-    expect(line).toContain("AI Infrastructure & Energy");
+    const line = buildCompanyLine("NVDA", undefined, "AI Infrastructure");
+    expect(line).toContain("AI Infrastructure");
   });
 
   it("uses company name when available", () => {
@@ -471,7 +471,7 @@ describe("buildCompanyLine", () => {
   });
 
   it("contains no forbidden execution language", () => {
-    const line = buildCompanyLine("NVDA", { companyName: "NVIDIA", sector: "Technology" }, "AI Infrastructure & Energy");
+    const line = buildCompanyLine("NVDA", { companyName: "NVIDIA", sector: "Technology" }, "AI Infrastructure");
     const forbidden = ["buy", "sell", "order", "target", "stop", "broker", "account", "conviction"];
     for (const w of forbidden) {
       expect(line.toLowerCase()).not.toContain(w);
@@ -479,7 +479,7 @@ describe("buildCompanyLine", () => {
   });
 
   it("does not expose raw theme IDs in output", () => {
-    const line = buildCompanyLine("NVDA", undefined, "AI Infrastructure & Energy");
+    const line = buildCompanyLine("NVDA", undefined, "AI Infrastructure");
     expect(line).not.toContain("ai_energy_nuclear");
   });
 });
@@ -606,7 +606,7 @@ describe("buildAnalystLine", () => {
 
 describe("buildDetailQuestions", () => {
   const SYMBOL = "NVDA";
-  const STORY = "AI Infrastructure & Energy";
+  const STORY = "AI Infrastructure";
 
   it("returns at least 3 questions", () => {
     expect(buildDetailQuestions(SYMBOL, STORY).length).toBeGreaterThanOrEqual(3);
@@ -654,29 +654,29 @@ describe("buildDetailQuestions", () => {
 
 describe("buildDetailQuestions — companyName param", () => {
   it("uses company name in first question when provided and differs from symbol", () => {
-    const qs = buildDetailQuestions("NVDA", "AI Infrastructure & Energy", "NVIDIA Corporation");
+    const qs = buildDetailQuestions("NVDA", "AI Infrastructure", "NVIDIA Corporation");
     expect(qs[0]).toContain("NVIDIA Corporation");
     expect(qs[0]).not.toContain("NVDA");
   });
 
   it("falls back to symbol when companyName equals symbol", () => {
-    const qs = buildDetailQuestions("NVDA", "AI Infrastructure & Energy", "NVDA");
+    const qs = buildDetailQuestions("NVDA", "AI Infrastructure", "NVDA");
     expect(qs[0]).toContain("NVDA");
   });
 
   it("falls back to symbol when companyName is undefined", () => {
-    const qs = buildDetailQuestions("NVDA", "AI Infrastructure & Energy", undefined);
+    const qs = buildDetailQuestions("NVDA", "AI Infrastructure", undefined);
     expect(qs[0]).toContain("NVDA");
   });
 
   it("returns 4 questions regardless of companyName", () => {
-    expect(buildDetailQuestions("NVDA", "AI Infrastructure & Energy", "NVIDIA").length).toBe(4);
-    expect(buildDetailQuestions("NVDA", "AI Infrastructure & Energy").length).toBe(4);
+    expect(buildDetailQuestions("NVDA", "AI Infrastructure", "NVIDIA").length).toBe(4);
+    expect(buildDetailQuestions("NVDA", "AI Infrastructure").length).toBe(4);
   });
 
   it("contains no forbidden execution language with company name present", () => {
     const forbidden = ["buy", "sell", "order", "position", "entry", "exit", "broker", "stop loss"];
-    for (const q of buildDetailQuestions("NVDA", "AI Infrastructure & Energy", "NVIDIA Corporation")) {
+    for (const q of buildDetailQuestions("NVDA", "AI Infrastructure", "NVIDIA Corporation")) {
       for (const w of forbidden) {
         expect(q.toLowerCase()).not.toContain(w);
       }
@@ -817,7 +817,7 @@ describe("buildFundamentalsLine — EPS and revenueGrowth", () => {
 
 describe("buildWhyItMattersNow", () => {
   const SYMBOL = "NVDA";
-  const STORY  = "AI Infrastructure & Energy";
+  const STORY  = "AI Infrastructure";
   const REASON = "Dominant AI chip supplier benefiting from hyperscaler capex growth.";
 
   it("uses company name when provided and differs from symbol", () => {
@@ -866,7 +866,7 @@ describe("buildWhyItMattersNow", () => {
   it("translates raw theme IDs via TTG_STORY_LABELS", () => {
     const line = buildWhyItMattersNow(SYMBOL, "ai_energy_nuclear", REASON);
     expect(line).not.toContain("ai_energy_nuclear");
-    expect(line).toContain("AI Infrastructure & Energy");
+    expect(line).toContain("Energy & Nuclear");
   });
 
   it("adds catalyst note for Catalyst watch type", () => {

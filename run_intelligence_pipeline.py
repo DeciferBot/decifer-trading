@@ -60,7 +60,33 @@ def _session_expiry_utc(published_at: datetime) -> datetime:
     return session_end
 
 
-def _write_manifest(universe_path: str, candidate_count: int) -> None:
+def _derive_regime_from_drivers(active_drivers: list[str]) -> str:
+    """Derive a canonical regime key from the live driver set.
+
+    Mirrors the _RISK_ON/_RISK_OFF classification in market_now_reconciler so
+    the manifest carries a meaningful regime the mobile customer layer can parse.
+    geopolitical_risk_rising and oil_supply_shock are sector catalysts, not
+    broad risk-off signals — they are excluded from _RISK_OFF intentionally.
+    """
+    _RISK_ON  = {"futures_risk_on", "small_cap_risk_on", "risk_on_rotation",
+                 "credit_stress_easing", "yields_falling", "gold_safe_haven_bid",
+                 "ai_capex_growth", "ai_compute_demand"}
+    _RISK_OFF = {"futures_risk_off", "yields_rising"}
+    driver_set = set(active_drivers)
+    on_count  = len(driver_set & _RISK_ON)
+    off_count = len(driver_set & _RISK_OFF)
+    if off_count > 0 and on_count == 0:
+        return "TRENDING_DOWN"
+    if on_count > 0:
+        return "TRENDING_UP"
+    return "RANGE_BOUND"
+
+
+def _write_manifest(
+    universe_path: str,
+    candidate_count: int,
+    market_regime: str | None = None,
+) -> None:
     """Write a minimal production manifest for handoff_reader."""
     now = datetime.now(timezone.utc)
     published_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -81,6 +107,7 @@ def _write_manifest(universe_path: str, candidate_count: int) -> None:
         "economic_context_file": os.path.join("data", "intelligence", "live_driver_state.json"),
         "source_snapshot_versions": {},
         "candidate_count": candidate_count,
+        "market_regime": market_regime,
         "no_executable_trade_instructions": True,
         "live_output_changed": False,
         "secrets_exposed": False,
@@ -160,7 +187,8 @@ def run() -> None:
     print(f"      {n_candidates} candidates → {_SHADOW_PATH}")
 
     count = _promote_to_live(_SHADOW_PATH, _LIVE_UNIVERSE)
-    _write_manifest(_LIVE_UNIVERSE, count)
+    regime_key = _derive_regime_from_drivers(driver_state["active_drivers"])
+    _write_manifest(_LIVE_UNIVERSE, count, market_regime=regime_key)
     print(f"      promoted → {_LIVE_UNIVERSE}")
     print(f"      manifest → {_MANIFEST_PATH}")
 

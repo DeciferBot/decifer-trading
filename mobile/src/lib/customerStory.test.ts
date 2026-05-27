@@ -248,6 +248,70 @@ describe("buildCustomerStory", () => {
     expect(text).not.toContain("trade execution");
   });
 
+  // ── market_mood parsing fixes ──────────────────────────────────────────────
+
+  it("resolves mixed when market_mood starts with 'Mixed' even though it contains 'risk-on'", () => {
+    // This was the production bug: "Mixed — risk-on momentum with active headwinds"
+    // was incorrectly resolved as "risk-on" because the string check hit "risk-on" first.
+    const story = buildCustomerStory(makePayload({
+      market_mood: "Mixed — risk-on momentum with active headwinds",
+    }));
+    expect(story.market_state).toBe("mixed");
+  });
+
+  it("resolves mixed when market_mood contains 'mixed' alongside risk-off language", () => {
+    const story = buildCustomerStory(makePayload({
+      market_mood: "Mixed — easing headline, hawkish guidance",
+    }));
+    expect(story.market_state).toBe("mixed");
+  });
+
+  it("resolves risk-on when market_mood is a pure risk-on string (no mixed)", () => {
+    const story = buildCustomerStory(makePayload({
+      market_mood: "Risk-on — broad market tailwinds active",
+    }));
+    expect(story.market_state).toBe("risk-on");
+  });
+
+  it("resolves risk-off when market_mood is a pure risk-off string", () => {
+    const story = buildCustomerStory(makePayload({
+      market_mood: "Risk-off — inflation surprise pressuring rates",
+    }));
+    expect(story.market_state).toBe("risk-off");
+  });
+
+  it("resolves risk-on from Trending up regime label passthrough", () => {
+    const story = buildCustomerStory(makePayload({ market_mood: "Trending up" }));
+    expect(story.market_state).toBe("risk-on");
+  });
+
+  it("resolves risk-on from Risk-on regime label with description", () => {
+    const story = buildCustomerStory(makePayload({
+      market_mood: "Risk-on — equities trending higher",
+    }));
+    expect(story.market_state).toBe("risk-on");
+  });
+
+  it("resolves risk-off from Trending down regime label passthrough", () => {
+    const story = buildCustomerStory(makePayload({ market_mood: "Trending down" }));
+    expect(story.market_state).toBe("risk-off");
+  });
+
+  it("resolves risk-off from bear market regime label", () => {
+    const story = buildCustomerStory(makePayload({ market_mood: "Risk-off — bear market in progress" }));
+    expect(story.market_state).toBe("risk-off");
+  });
+
+  it("resolves monitoring from range-bound regime label", () => {
+    const story = buildCustomerStory(makePayload({ market_mood: "Neutral — markets consolidating" }));
+    expect(story.market_state).toBe("monitoring");
+  });
+
+  it("resolves monitoring from choppy regime label", () => {
+    const story = buildCustomerStory(makePayload({ market_mood: "Neutral — choppy, no clear direction" }));
+    expect(story.market_state).toBe("monitoring");
+  });
+
   it("monitoring fallback headline does not contain operator language", () => {
     const story = buildCustomerStory(makePayload({ key_drivers: [], themes: [] }));
     expect(story.market_state).toBe("monitoring");

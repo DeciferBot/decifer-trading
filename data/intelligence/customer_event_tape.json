@@ -1,9 +1,435 @@
 {
   "schema_version": "customer_event_tape_v1",
-  "generated_at": "2026-05-27T09:07:40.774065+00:00",
-  "valid_until": "2026-05-27T21:07:40.774092+00:00",
+  "generated_at": "2026-05-27T10:02:44.832722+00:00",
+  "valid_until": "2026-05-27T22:02:44.832732+00:00",
   "freshness_status": "fresh",
   "events": [
+    {
+      "event_id": "8c5edcaf-d35d-4ddd-a772-b8c387721368",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Bank of Montreal Q2 Adj. EPS $3.67 Beats $3.45 Estimate, Sales $9.567B Beat $9.467B Estimate",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "alpaca_benzinga",
+      "source_published_at": "2026-05-27T10:02:43+00:00",
+      "ingested_at": "2026-05-27T10:02:44.832722+00:00",
+      "processed_at": "2026-05-27T10:02:44.832722+00:00",
+      "valid_until": "2026-05-27T22:02:44.832732+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "BMO",
+        "TSX:BMO"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "7e616f8b-b6df-40ab-9bb2-e711580e5265",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Asia stocks see tech gains as investors weigh US-Iran deal",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T09:59:57.256906+00:00",
+      "ingested_at": "2026-05-27T09:59:57.256906+00:00",
+      "processed_at": "2026-05-27T09:59:57.256906+00:00",
+      "valid_until": "2026-05-27T21:59:57.256917+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [
+        "middle east"
+      ],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "TSM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "6ed8ee8c-e5e4-4794-a75b-7cd212ac531e",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Zscaler sees downbeat quarterly revenue as competition heats up in cybersecurity market",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T09:59:56.838396+00:00",
+      "ingested_at": "2026-05-27T09:59:56.838396+00:00",
+      "processed_at": "2026-05-27T09:59:56.838396+00:00",
+      "valid_until": "2026-05-27T21:59:56.838408+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "PANW"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "2518bd61-eeb9-47fc-a711-78c069a9c17e",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Asia stocks see tech gains as investors weigh US-Iran deal",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T09:42:33.276253+00:00",
+      "ingested_at": "2026-05-27T09:42:33.276253+00:00",
+      "processed_at": "2026-05-27T09:42:33.276253+00:00",
+      "valid_until": "2026-05-27T21:42:33.276265+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [
+        "middle east"
+      ],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "TSM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "b0dd4cef-6c0d-4b86-8b0b-5d95f6c8a297",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Zscaler sees downbeat quarterly revenue as competition heats up in cybersecurity market",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T09:42:32.835956+00:00",
+      "ingested_at": "2026-05-27T09:42:32.835956+00:00",
+      "processed_at": "2026-05-27T09:42:32.835956+00:00",
+      "valid_until": "2026-05-27T21:42:32.835973+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "PANW"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
+    {
+      "event_id": "9a161d6d-ec99-4c91-ba89-8d61ce7e3da9",
+      "event_family": "geopolitics",
+      "event_type": "de_escalation",
+      "status": "reported",
+      "title": "Asia stocks see tech gains as investors weigh US-Iran deal",
+      "summary_plain_english": "Geopolitical de-escalation: peace, ceasefire, or sanctions relief reported. Risk premium may fade across defence, oil and volatility; risk-on assets and consumer/transport names may benefit.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T09:25:40.287832+00:00",
+      "ingested_at": "2026-05-27T09:25:40.287832+00:00",
+      "processed_at": "2026-05-27T09:25:40.287832+00:00",
+      "valid_until": "2026-05-27T21:25:40.287853+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [
+        "middle east"
+      ],
+      "affected_channels": [
+        "geopolitical_risk",
+        "risk_appetite",
+        "commodity_prices",
+        "sector_rotation",
+        "volatility"
+      ],
+      "likely_positive_exposures": [
+        "broad risk appetite",
+        "airlines and transport",
+        "consumer-sensitive sectors",
+        "small caps",
+        "growth equities"
+      ],
+      "likely_negative_exposures": [
+        "oil risk premium",
+        "energy producers",
+        "defence premium",
+        "implied volatility",
+        "gold safe-haven bid"
+      ],
+      "sectors_positive": [
+        "airlines",
+        "consumer discretionary",
+        "travel and leisure"
+      ],
+      "sectors_negative": [
+        "energy",
+        "defence",
+        "gold"
+      ],
+      "themes_strengthened": [
+        "risk_on_rotation",
+        "travel_leisure",
+        "consumer_discretionary"
+      ],
+      "themes_weakened": [
+        "defence_premium",
+        "energy",
+        "gold_safe_haven"
+      ],
+      "tickers_first_order": [
+        "TSM"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Oil prices fall and stay lower",
+        "Defence stocks weaken",
+        "VIX declines",
+        "Airline and transport shares rally"
+      ],
+      "invalidation_signals": [
+        "Headlines reverse \u2014 deal collapses or denied",
+        "Renewed strikes or military action",
+        "Oil rebounds sharply",
+        "Defence stocks rally on follow-through risk"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "high",
+      "customer_safe": true
+    },
+    {
+      "event_id": "36e0ea60-f84c-4a63-8e59-747b51aa1db7",
+      "event_family": "earnings_guidance",
+      "event_type": "positive_surprise",
+      "status": "reported",
+      "title": "Zscaler sees downbeat quarterly revenue as competition heats up in cybersecurity market",
+      "summary_plain_english": "Company reported a positive earnings or guidance surprise. Likely supportive of the underlying name and related theme exposure.",
+      "source": "yahoo_rss",
+      "source_published_at": "2026-05-27T09:25:39.787598+00:00",
+      "ingested_at": "2026-05-27T09:25:39.787598+00:00",
+      "processed_at": "2026-05-27T09:25:39.787598+00:00",
+      "valid_until": "2026-05-27T21:25:39.787609+00:00",
+      "freshness_status": "fresh",
+      "entities": [],
+      "geography": [],
+      "affected_channels": [
+        "earnings_guidance",
+        "revenue_growth",
+        "valuation_multiple",
+        "theme_acceleration"
+      ],
+      "likely_positive_exposures": [
+        "underlying name",
+        "sector peers"
+      ],
+      "likely_negative_exposures": [],
+      "sectors_positive": [],
+      "sectors_negative": [],
+      "themes_strengthened": [],
+      "themes_weakened": [],
+      "tickers_first_order": [
+        "PANW"
+      ],
+      "tickers_second_order": [],
+      "confirmation_signals": [
+        "Shares hold gains",
+        "Analyst upgrades follow"
+      ],
+      "invalidation_signals": [
+        "Shares fade",
+        "Guidance walk-back"
+      ],
+      "known_conflicts": [],
+      "source_confidence": "medium",
+      "materiality": "medium",
+      "customer_safe": true
+    },
     {
       "event_id": "94ddb24c-be4e-4040-9eee-004cdad48bce",
       "event_family": "geopolitics",
