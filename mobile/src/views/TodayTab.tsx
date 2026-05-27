@@ -193,38 +193,51 @@ function HeroHeader({
           </button>
         </div>
 
-        {/* SPY hero number */}
-        <div className="mb-1">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
-            S&amp;P 500
-          </p>
-          <div className="flex items-end gap-3">
-            <span
-              className="font-black leading-none"
-              style={{ color: spyColor, fontSize: "52px" }}
-            >
-              {spy != null ? `${spySign}${spy.toFixed(2)}%` : "—"}
-            </span>
-            {vix != null && (
-              <div className="mb-2">
-                <p className="text-[9px] uppercase text-slate-600 tracking-wide">VIX</p>
-                <p
-                  className="text-[16px] font-black leading-none"
-                  style={{
-                    color: vix >= 25 ? "#f87171" : vix >= 20 ? "#fbbf24" : "#64748b",
-                  }}
-                >
-                  {vix.toFixed(1)}
-                </p>
-              </div>
-            )}
+        {/* SPY hero number — only when live data is available */}
+        {spy != null ? (
+          <div className="mb-1">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+              S&amp;P 500
+            </p>
+            <div className="flex items-end gap-3">
+              <span
+                className="font-black leading-none"
+                style={{ color: spyColor, fontSize: "52px" }}
+              >
+                {spySign}{spy.toFixed(2)}%
+              </span>
+              {vix != null && (
+                <div className="mb-2">
+                  <p className="text-[9px] uppercase text-slate-600 tracking-wide">VIX</p>
+                  <p
+                    className="text-[16px] font-black leading-none"
+                    style={{
+                      color: vix >= 25 ? "#f87171" : vix >= 20 ? "#fbbf24" : "#64748b",
+                    }}
+                  >
+                    {vix.toFixed(1)}
+                  </p>
+                </div>
+              )}
+            </div>
+            <p className="text-[12px] font-medium text-slate-400 mt-1 mb-4">
+              {ms.macro_label}
+            </p>
           </div>
-        </div>
-
-        {/* Macro label */}
-        <p className="text-[12px] font-medium text-slate-400 mt-1 mb-4">
-          {ms.macro_label}
-        </p>
+        ) : (
+          /* No live price data — regime narrative leads instead */
+          <div className="mb-4">
+            <p
+              className="text-[28px] font-black leading-tight mb-2"
+              style={{ color: c.text }}
+            >
+              {ms.regime.label}
+            </p>
+            <p className="text-[14px] font-medium text-slate-300 leading-snug">
+              {ms.macro_label}
+            </p>
+          </div>
+        )}
 
         {/* Dual clock */}
         <DualClock clock={clock} />

@@ -24,7 +24,9 @@ const ETF_TAPE: Array<{ sym: string; label: string; type: TapeType }> = [
 
 export async function GET() {
   if (!FMP_KEY) {
-    return NextResponse.json({ error: "No FMP key configured" }, { status: 500 });
+    const empty = ETF_TAPE.map(e => ({ sym: e.sym, label: e.label, type: e.type, changePct: null, level: null }));
+    empty.push({ sym: "VIX", label: "VIX", type: "vol" as TapeType, changePct: null, level: null });
+    return NextResponse.json({ tape: empty, ts: new Date().toISOString() });
   }
 
   const symbols = ETF_TAPE.map(e => e.sym).join(",");
