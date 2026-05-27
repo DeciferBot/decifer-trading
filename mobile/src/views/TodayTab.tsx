@@ -70,6 +70,15 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AskDeciferButton({ label }: { label: string }) {
+  return (
+    <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-700 select-none cursor-not-allowed">
+      {label}
+      <ArrowRight size={9} />
+    </span>
+  );
+}
+
 // ── Tape → TapeSnapshot ───────────────────────────────────────────────────────
 
 function deriveTapeSnapshot(tape: TapeEntry[]): TapeSnapshot {
@@ -288,19 +297,13 @@ function ForceStorySheet({
             </div>
           )}
 
-          {/* Ask CTA */}
-          {onAskAbout && (
-            <button
-              onClick={() => {
-                onClose();
-                onAskAbout(`Tell me more about the ${force.label} market force and which names are connected`);
-              }}
-              className="w-full py-3.5 rounded-2xl text-[14px] font-bold transition-all active:scale-[0.98]"
-              style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c", border: "1px solid rgba(249,115,22,0.25)" }}
-            >
-              Ask Decifer about this →
-            </button>
-          )}
+          {/* Ask CTA — greyed out until Ask Decifer is wired */}
+          <div
+            className="w-full py-3.5 rounded-2xl text-[14px] font-bold text-center cursor-not-allowed select-none"
+            style={{ background: "rgba(255,255,255,0.03)", color: "#334155", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            Ask Decifer about this →
+          </div>
         </div>
       </div>
     </>
@@ -525,15 +528,7 @@ function MarketNarrative({
         className="mt-3 pt-3 flex items-center gap-3"
         style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
       >
-        {onAskAbout && (
-          <button
-            onClick={() => onAskAbout("Why is the market moving in this direction today?")}
-            className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
-          >
-            Ask why
-            <ArrowRight size={9} />
-          </button>
-        )}
+        <AskDeciferButton label="Ask why" />
         {onGoToForces && (
           <button
             onClick={onGoToForces}
@@ -549,43 +544,165 @@ function MarketNarrative({
   );
 }
 
-// ── Mover row ─────────────────────────────────────────────────────────────────
+// ── Mover detail sheet ────────────────────────────────────────────────────────
 
-function MoverRow({ mover, direction }: { mover: Mover; direction: "up" | "down" }) {
+function MoverDetailSheet({
+  mover,
+  direction,
+  onClose,
+}: {
+  mover: Mover;
+  direction: "up" | "down";
+  onClose: () => void;
+}) {
   const [imgErr, setImgErr] = useState(false);
+  const [profile, setProfile] = useState<{
+    description?: string;
+    sector?: string;
+    industry?: string;
+    mktCap?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`/api/name-fundamentals?symbol=${encodeURIComponent(mover.symbol)}`, { signal: ctrl.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.profile) setProfile(d.profile); })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [mover.symbol]);
+
   const color = direction === "up" ? "#34d399" : "#f87171";
   const sign  = direction === "up" ? "+" : "";
+
+  const fmtCap = (n?: number) => {
+    if (!n) return null;
+    if (n >= 1e12) return `$${(n / 1e12).toFixed(1)}T`;
+    if (n >= 1e9)  return `$${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6)  return `$${(n / 1e6).toFixed(0)}M`;
+    return null;
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-y-auto"
+        style={{ background: "#0d1520", border: "1px solid rgba(255,255,255,0.1)", maxHeight: "75vh" }}
+      >
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.15)" }} />
+        </div>
+        <div className="px-5 pb-10">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
+              style={{ background: "#1e293b" }}>
+              {!imgErr ? (
+                <img src={mover.logoUrl} alt={mover.symbol}
+                  className="w-full h-full object-contain p-1"
+                  onError={() => setImgErr(true)} />
+              ) : (
+                <span className="text-[13px] font-black text-slate-500">{mover.symbol.slice(0, 2)}</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[22px] font-black text-white leading-none">{mover.symbol}</p>
+              <p className="text-[13px] text-slate-300 mt-0.5 leading-tight truncate">{mover.name}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-[22px] font-black leading-none" style={{ color }}>
+                {sign}{mover.changePct.toFixed(1)}%
+              </p>
+              <p className="text-[12px] text-slate-400 mt-0.5">${mover.price.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Context chips */}
+          {(profile?.sector || fmtCap(profile?.mktCap)) && (
+            <div className="flex gap-2 flex-wrap mb-5">
+              {profile?.sector && (
+                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                  style={{ background: "rgba(255,255,255,0.07)", color: "#94a3b8" }}>
+                  {profile.sector}
+                </span>
+              )}
+              {fmtCap(profile?.mktCap) && (
+                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                  style={{ background: "rgba(255,255,255,0.07)", color: "#94a3b8" }}>
+                  {fmtCap(profile?.mktCap)} mkt cap
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Description */}
+          {profile?.description && (
+            <div className="mb-5">
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#f97316" }}>About</p>
+              <p className="text-[13px] text-slate-200 leading-relaxed line-clamp-6">{profile.description}</p>
+            </div>
+          )}
+
+          {!profile && (
+            <div className="mb-5 animate-pulse">
+              <div className="h-3 rounded mb-2" style={{ background: "rgba(255,255,255,0.06)", width: "40%" }} />
+              <div className="h-3 rounded mb-1.5" style={{ background: "rgba(255,255,255,0.04)", width: "100%" }} />
+              <div className="h-3 rounded mb-1.5" style={{ background: "rgba(255,255,255,0.04)", width: "90%" }} />
+              <div className="h-3 rounded" style={{ background: "rgba(255,255,255,0.04)", width: "70%" }} />
+            </div>
+          )}
+
+          <p className="text-[10px] text-slate-700">Market data via Financial Modeling Prep · Market intelligence only</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Mover row ─────────────────────────────────────────────────────────────────
+
+function MoverRow({
+  mover,
+  direction,
+  onTap,
+}: {
+  mover: Mover;
+  direction: "up" | "down";
+  onTap: () => void;
+}) {
+  const [imgErr, setImgErr] = useState(false);
+  const color    = direction === "up" ? "#34d399" : "#f87171";
+  const sign     = direction === "up" ? "+" : "";
   const monogram = mover.symbol.slice(0, 2);
 
   return (
-    <div className="flex items-center gap-2 py-1.5">
-      {/* Logo */}
+    <button
+      onClick={onTap}
+      className="w-full flex items-center gap-2 py-1.5 transition-all active:scale-[0.98]"
+    >
       <div
         className="w-7 h-7 rounded-lg overflow-hidden shrink-0 flex items-center justify-center"
         style={{ background: "#1e293b" }}
       >
         {!imgErr ? (
-          <img
-            src={mover.logoUrl}
-            alt={mover.symbol}
+          <img src={mover.logoUrl} alt={mover.symbol}
             className="w-full h-full object-contain p-0.5"
-            onError={() => setImgErr(true)}
-          />
+            onError={() => setImgErr(true)} />
         ) : (
           <span className="text-[9px] font-black" style={{ color: "#475569" }}>{monogram}</span>
         )}
       </div>
 
-      {/* Symbol */}
-      <span className="text-[12px] font-bold text-slate-200 flex-1 min-w-0 truncate">
-        {mover.symbol}
-      </span>
+      <div className="flex-1 min-w-0 text-left">
+        <p className="text-[12px] font-bold text-slate-200 truncate leading-none">{mover.symbol}</p>
+        <p className="text-[10px] text-slate-500 truncate mt-0.5 leading-none">{mover.name}</p>
+      </div>
 
-      {/* Change */}
       <span className="text-[13px] font-black shrink-0" style={{ color }}>
         {sign}{mover.changePct.toFixed(1)}%
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -593,6 +710,7 @@ function MoverRow({ mover, direction }: { mover: Mover; direction: "up" | "down"
 
 function MoversSection() {
   const [data, setData] = useState<MarketMoversPayload | null>(null);
+  const [selectedMover, setSelectedMover] = useState<{ mover: Mover; direction: "up" | "down" } | null>(null);
 
   useEffect(() => {
     fetch("/api/market-movers")
@@ -610,31 +728,29 @@ function MoversSection() {
     <section>
       <SectionLabel>Today&apos;s biggest moves</SectionLabel>
       <div className="grid grid-cols-2 gap-3">
-        {/* Gainers */}
-        <div
-          className="rounded-2xl px-3 py-3"
-          style={{ background: "#141b26", border: "1px solid rgba(16,185,129,0.12)" }}
-        >
-          <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-500 mb-2">
-            ↑ Gainers
-          </p>
+        <div className="rounded-2xl px-3 py-3"
+          style={{ background: "#141b26", border: "1px solid rgba(16,185,129,0.12)" }}>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-500 mb-2">↑ Gainers</p>
           {gainers.map((m, i) => (
-            <MoverRow key={i} mover={m} direction="up" />
+            <MoverRow key={i} mover={m} direction="up" onTap={() => setSelectedMover({ mover: m, direction: "up" })} />
           ))}
         </div>
-        {/* Losers */}
-        <div
-          className="rounded-2xl px-3 py-3"
-          style={{ background: "#141b26", border: "1px solid rgba(239,68,68,0.12)" }}
-        >
-          <p className="text-[9px] font-bold uppercase tracking-widest text-red-400 mb-2">
-            ↓ Losers
-          </p>
+        <div className="rounded-2xl px-3 py-3"
+          style={{ background: "#141b26", border: "1px solid rgba(239,68,68,0.12)" }}>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-red-400 mb-2">↓ Losers</p>
           {losers.map((m, i) => (
-            <MoverRow key={i} mover={m} direction="down" />
+            <MoverRow key={i} mover={m} direction="down" onTap={() => setSelectedMover({ mover: m, direction: "down" })} />
           ))}
         </div>
       </div>
+
+      {selectedMover && (
+        <MoverDetailSheet
+          mover={selectedMover.mover}
+          direction={selectedMover.direction}
+          onClose={() => setSelectedMover(null)}
+        />
+      )}
     </section>
   );
 }
@@ -753,12 +869,9 @@ function NewsSection({ onAskAbout }: { onAskAbout?: (ctx: string) => void }) {
       <SectionLabel>What&apos;s in the news</SectionLabel>
       <div className="space-y-2">
         {items.map((item, i) => (
-          <button
+          <div
             key={i}
-            onClick={() =>
-              onAskAbout?.(`Tell me about this news story and how it affects markets: "${item.title}"`)
-            }
-            className="w-full rounded-xl px-3.5 py-3 text-left transition-all active:scale-[0.99]"
+            className="rounded-xl px-3.5 py-3"
             style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
           >
             {item.themeLabel && (
@@ -786,21 +899,14 @@ function NewsSection({ onAskAbout }: { onAskAbout?: (ctx: string) => void }) {
                   {fmtAge(item.minutesAgo)} ago
                 </p>
               </div>
-              <span className="text-[10px] text-slate-600">Ask →</span>
             </div>
-          </button>
+          </div>
         ))}
       </div>
 
-      {onAskAbout && (
-        <button
-          onClick={() => onAskAbout("What are the most important news stories driving markets today?")}
-          className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
-        >
-          Ask Decifer about the news
-          <ArrowRight size={9} />
-        </button>
-      )}
+      <div className="mt-2">
+        <AskDeciferButton label="Ask Decifer about the news" />
+      </div>
     </section>
   );
 }
@@ -915,15 +1021,9 @@ function CauseGroupCard({
           )}
         </div>
       )}
-      {onAskAbout && (
-        <button
-          onClick={() => onAskAbout(`Why is ${card.cause_label.toLowerCase()} affecting markets?`)}
-          className="mt-2.5 flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
-        >
-          Ask Decifer why
-          <ArrowRight size={9} />
-        </button>
-      )}
+      <div className="mt-2.5">
+        <AskDeciferButton label="Ask Decifer why" />
+      </div>
     </div>
   );
 }
@@ -964,14 +1064,10 @@ function WhereLookingSection({
             ))}
           </div>
         )}
-        {onAskAbout && (stories.length > 0 || names.length > 0) && (
-          <button
-            onClick={() => onAskAbout(`Which names are connected to ${stories[0] ?? "these themes"} today?`)}
-            className="mt-3 flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
-          >
-            Ask Decifer about these names
-            <ArrowRight size={9} />
-          </button>
+        {(stories.length > 0 || names.length > 0) && (
+          <div className="mt-3">
+            <AskDeciferButton label="Ask Decifer about these names" />
+          </div>
         )}
       </div>
     </section>
@@ -1060,39 +1156,54 @@ export default function TodayTab({
         )}
 
         {/* ── B: Since you were away ────────────────────────────────────── */}
-        {sinceAway.lastSeenAt && (
-          <section>
-            <SectionLabel>
-              {sinceAway.awayDuration
-                ? `Since you were away · ${sinceAway.awayDuration} ago`
-                : "Since your last visit"}
-            </SectionLabel>
-            {sinceAway.hasChanges && sinceAway.items.length > 0 ? (
-              <div className="space-y-2">
-                {sinceAway.items.map((item, i) => (
-                  <div key={i} className="rounded-xl px-4 py-3 flex items-start gap-3"
-                    style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5"
-                      style={{
-                        background: item.type === "event" ? "#f59e0b" : item.type === "theme" ? "#3b82f6" : "#10b981",
-                      }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] text-slate-200 leading-snug">{item.title}</p>
-                      {item.detail && (
-                        <p className="text-[11px] text-slate-200 mt-0.5 leading-relaxed line-clamp-2">{item.detail}</p>
-                      )}
+        {sinceAway.lastSeenAt && (() => {
+          // Driver items are synthesised boilerplate — show top key events instead
+          const themeItems = sinceAway.items.filter(item => item.type === "theme");
+          const headlineItems = keyEvents.slice(0, 3);
+          const hasContent = headlineItems.length > 0 || themeItems.length > 0;
+          return (
+            <section>
+              <SectionLabel>
+                {sinceAway.awayDuration
+                  ? `Since you were away · ${sinceAway.awayDuration} ago`
+                  : "Since your last visit"}
+              </SectionLabel>
+              {hasContent ? (
+                <div className="space-y-2">
+                  {headlineItems.map((ev, i) => (
+                    <div key={`ev-${i}`} className="rounded-xl px-4 py-3 flex items-start gap-3"
+                      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: "#f59e0b" }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-slate-200 leading-snug">{ev.title}</p>
+                        {ev.summary_plain_english && (
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">{ev.summary_plain_english}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <p className="text-sm text-white">Market story looks the same since you were away.</p>
-                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">Scroll down for the full briefing.</p>
-              </div>
-            )}
-          </section>
-        )}
+                  ))}
+                  {themeItems.map((item, i) => (
+                    <div key={`th-${i}`} className="rounded-xl px-4 py-3 flex items-start gap-3"
+                      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: "#3b82f6" }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-slate-200 leading-snug">{item.title}</p>
+                        {item.detail && (
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">{item.detail}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <p className="text-sm text-white">Market story is unchanged since your last visit.</p>
+                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">Scroll down for the full briefing.</p>
+                </div>
+              )}
+            </section>
+          );
+        })()}
 
         {/* ── C: Top movers ────────────────────────────────────────────── */}
         <MoversSection />
@@ -1112,15 +1223,9 @@ export default function TodayTab({
                 <EventCard key={i} ev={ev} />
               ))}
             </div>
-            {onAskAbout && (
-              <button
-                onClick={() => onAskAbout("What real-world events are driving markets today?")}
-                className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all active:scale-95"
-              >
-                Ask Decifer about these events
-                <ArrowRight size={9} />
-              </button>
-            )}
+            <div className="mt-2">
+              <AskDeciferButton label="Ask Decifer about these events" />
+            </div>
           </section>
         )}
 
