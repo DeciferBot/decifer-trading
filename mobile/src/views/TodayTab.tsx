@@ -344,8 +344,8 @@ function HeroHeader({
   const freshnessTimeCopy =
     freshnessState === "fresh" && data.freshness_timestamp
       ? new Date(data.freshness_timestamp).toLocaleTimeString("en-US", {
-          hour: "2-digit", minute: "2-digit", timeZoneName: "short",
-        })
+          hour: "2-digit", minute: "2-digit", timeZone: "America/New_York",
+        }) + " New York"
       : freshnessLabel;
 
   const sessionDot =
@@ -661,7 +661,7 @@ function MoverDetailSheet({
           <p className="text-[10px] text-slate-700">
             Market data via Financial Modeling Prep · Market intelligence only
             {profileTs && (
-              <> · as of {new Date(profileTs).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZoneName: "short" })}</>
+              <> · as of {new Date(profileTs).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "America/New_York" })} New York</>
             )}
           </p>
         </div>
