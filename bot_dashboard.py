@@ -1542,13 +1542,39 @@ class DashHandler(BaseHTTPRequestHandler):
                 ):
                     payload = _movers_payload_cache["data"]
                 else:
-                    from alpaca_data import get_live_movers as _glm
+                    from alpaca_data import get_live_movers as _glm, fetch_snapshots_batched as _fsb
                     _raw = _glm(top=15)
+                    gainers = _raw.get("gainers", [])
+                    losers  = _raw.get("losers", [])
+                    # Screener is empty outside market hours (pre-market, after-hours, weekends).
+                    # Fall back to snapshots on the core liquid universe sorted by change_1d.
+                    if not gainers and not losers:
+                        from scanner import CORE_EQUITIES, CORE_SYMBOLS
+                        _fallback_syms = list(dict.fromkeys(CORE_EQUITIES + CORE_SYMBOLS))
+                        _snaps = _fsb(_fallback_syms)
+                        _candidates = []
+                        for _sym, _s in _snaps.items():
+                            _chg = _s.get("change_1d")
+                            _pc  = _s.get("prior_close") or _s.get("prev_close")
+                            _pr  = _s.get("price")
+                            if _chg is None or _pr is None or _pr <= 0:
+                                continue
+                            _candidates.append({
+                                "sym": _sym,
+                                "price": round(float(_pr), 2),
+                                "prev_close": round(float(_pc), 2) if _pc else 0.0,
+                                "pct": round(float(_chg) * 100, 2),
+                                "volume": int(_s.get("volume") or 0),
+                                "tag": "up" if _chg > 0 else "down",
+                            })
+                        _candidates.sort(key=lambda x: abs(x["pct"]), reverse=True)
+                        gainers = [c for c in _candidates if c["pct"] > 0][:10]
+                        losers  = [c for c in _candidates if c["pct"] < 0][:10]
                     payload = {
                         "ts": int(_now),
                         "live": True,
-                        "gainers": _raw.get("gainers", []),
-                        "losers": _raw.get("losers", []),
+                        "gainers": gainers,
+                        "losers": losers,
                     }
                     _movers_payload_cache["data"] = payload
                     _movers_payload_cache["fetched_at"] = _now
