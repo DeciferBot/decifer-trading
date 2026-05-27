@@ -240,15 +240,18 @@ export default function CustomerApp() {
       >
         <div className="flex items-start justify-between gap-3">
 
-          {/* Branding — minimal single line; time/session live in the hero */}
-          <div className="flex items-center gap-2">
+          {/* Branding — tapping returns to Today tab */}
+          <button
+            onClick={() => handleTabChange("today")}
+            className="flex items-center gap-2 transition-all active:scale-95"
+          >
             <span className="text-sm font-black tracking-[0.15em] uppercase" style={{ color: "#f97316" }}>
               DECIFER
             </span>
             <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-500">
               Market Intelligence
             </span>
-          </div>
+          </button>
 
           {/* Freshness + hamburger */}
           <div className="flex items-center gap-2 shrink-0 pt-0.5">
