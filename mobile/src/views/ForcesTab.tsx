@@ -45,7 +45,7 @@ function ConnectionTree({
 }: {
   node: CustomerConnectionNode;
   onThemeSelect: (id: string) => void;
-  onGoToNames?: () => void;
+  onGoToNames?: (themeIds: string[]) => void;
 }) {
   if (node.themes.length === 0) return null;
   return (
@@ -78,10 +78,10 @@ function ConnectionTree({
         </div>
       ))}
       {/* See names CTA */}
-      {onGoToNames && (
+      {onGoToNames && node.themes.length > 0 && (
         <div className="pl-4 pt-0.5">
           <button
-            onClick={onGoToNames}
+            onClick={() => onGoToNames(node.themes.map(t => t.theme_id))}
             className="flex items-center gap-1 text-[11px] font-semibold transition-all active:scale-95"
             style={{ color: "#94a3b8" }}
           >
@@ -107,7 +107,7 @@ function ActiveForceCard({
   treeNode?: CustomerConnectionNode;
   onThemeSelect: (id: string) => void;
   onAskAbout?: (ctx: string) => void;
-  onGoToNames?: () => void;
+  onGoToNames?: (themeIds: string[]) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -275,7 +275,7 @@ interface Props {
   connectionTree: CustomerConnectionNode[];
   onThemeSelect: (themeId: string) => void;
   onAskAbout?: (context: string) => void;
-  onGoToNames?: () => void;
+  onGoToNames?: (themeIds: string[]) => void;
 }
 
 export default function ForcesTab({

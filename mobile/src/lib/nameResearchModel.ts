@@ -183,7 +183,8 @@ export function buildStoryGroups(
   const groups: ResearchStoryGroup[] = expanded
     .map(theme => {
       const storyLabel = TTG_STORY_LABELS[theme.theme_id] ?? theme.label;
-      const cards = theme.symbols.map(card => buildResearchCard(card, priceMap, storyLabel));
+      const sortedSymbols = [...theme.symbols].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+      const cards = sortedSymbols.map(card => buildResearchCard(card, priceMap, storyLabel));
       return {
         storyLabel,
         themeId: theme.theme_id,

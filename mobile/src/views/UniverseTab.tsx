@@ -281,10 +281,14 @@ interface Props {
   onThemeSelect: (themeId: string) => void;
   onSymbolSelect?: (card: TtgSymbolCard) => void;
   onAskAbout?: (context: string) => void;
+  /** When set, only show story groups whose themeId is in this list. */
+  focusThemeIds?: string[];
+  /** Called when user clears the focus filter to return to full universe. */
+  onClearFilter?: () => void;
 }
 
 export default function UniverseTab(props: Props) {
-  const { data, onNameSelect, onThemeSelect, onAskAbout } = props;
+  const { data, onNameSelect, onThemeSelect, onAskAbout, focusThemeIds, onClearFilter } = props;
   // props.onSymbolSelect preserved in interface for CustomerApp compatibility
 
   const [ttgData, setTtgData] = useState<TtgThemeDetail[]>([]);
@@ -332,9 +336,24 @@ export default function UniverseTab(props: Props) {
     return () => { cancelled = true; };
   }, []);
 
-  const storyGroups = buildStoryGroups(ttgData, priceMap);
+  const allStoryGroups = buildStoryGroups(ttgData, priceMap);
   const radarCards = buildRadarCards(radar, priceMap);
   const totalNames = ttgData.reduce((acc, t) => acc + t.symbols.length, 0);
+
+  // Focused view: expand ai_energy_nuclear to its two virtual split IDs
+  const focusSet = focusThemeIds
+    ? new Set(
+        focusThemeIds.flatMap(id =>
+          id === "ai_energy_nuclear"
+            ? ["ai_energy_nuclear_ai", "ai_energy_nuclear_energy"]
+            : [id],
+        ),
+      )
+    : null;
+  const storyGroups = focusSet
+    ? allStoryGroups.filter(g => focusSet.has(g.themeId))
+    : allStoryGroups;
+  const isFocused = focusSet !== null;
 
   // ── Loading skeleton
   if (loading) {
@@ -364,6 +383,14 @@ export default function UniverseTab(props: Props) {
         <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
           Market story context is available in the Theme Map. Connected names will appear here as the intelligence layer refreshes.
         </p>
+        {isFocused && onClearFilter && (
+          <button
+            onClick={onClearFilter}
+            className="mt-2 text-[11px] font-semibold text-slate-400 underline underline-offset-2"
+          >
+            View full universe
+          </button>
+        )}
       </div>
     );
   }
@@ -372,22 +399,45 @@ export default function UniverseTab(props: Props) {
     <>
     <div className="px-4 pt-2 pb-8 space-y-6">
 
-      {/* Intro card */}
-      <div
-        className="rounded-2xl px-4 py-3"
-        style={{
-          background: "rgba(249,115,22,0.05)",
-          border: "1px solid rgba(249,115,22,0.12)",
-        }}
-      >
-        <p className="text-[11px] font-semibold text-slate-300 leading-snug">
-          Names in play today
-        </p>
-        <p className="text-[10px] text-slate-500 mt-0.5">
-          {totalNames} names · {storyGroups.length} themes
-          {pricesLoading && " · Updating prices…"}
-        </p>
-      </div>
+      {/* Focused-view header or full-universe intro */}
+      {isFocused ? (
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-300 leading-snug">
+              Connected names
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {storyGroups.reduce((n, g) => n + g.cards.length, 0)} names · {storyGroups.length} sector{storyGroups.length !== 1 ? "s" : ""}
+              {pricesLoading && " · Updating prices…"}
+            </p>
+          </div>
+          {onClearFilter && (
+            <button
+              onClick={onClearFilter}
+              className="text-[11px] font-semibold text-slate-400 transition-all active:scale-95"
+              style={{ color: "#fb923c" }}
+            >
+              ← All names
+            </button>
+          )}
+        </div>
+      ) : (
+        <div
+          className="rounded-2xl px-4 py-3"
+          style={{
+            background: "rgba(249,115,22,0.05)",
+            border: "1px solid rgba(249,115,22,0.12)",
+          }}
+        >
+          <p className="text-[11px] font-semibold text-slate-300 leading-snug">
+            Names in play today
+          </p>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            {totalNames} names · {allStoryGroups.length} sectors
+            {pricesLoading && " · Updating prices…"}
+          </p>
+        </div>
+      )}
 
       {/* Live intelligence overlay */}
       {radarCards.length > 0 && (

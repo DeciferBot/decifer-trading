@@ -209,6 +209,7 @@ export default function CustomerApp() {
   const [selectedSymbol, setSelectedSymbol] = useState<TtgSymbolCard | null>(null);
   const [askContext, setAskContext] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [namesThemeFilter, setNamesThemeFilter] = useState<string[] | null>(null);
 
   const goToTheme = useCallback((themeId: string) => {
     setSelectedTheme(themeId);
@@ -219,6 +220,14 @@ export default function CustomerApp() {
     setActiveTab(tab);
     if (tab !== "themes") setSelectedTheme(null);
     if (tab !== "ask") setAskContext(null);
+    // Direct tab nav always shows full universe — filtered nav uses goToNamesFiltered
+    if (tab === "names") setNamesThemeFilter(null);
+  }, []);
+
+  const goToNamesFiltered = useCallback((themeIds: string[]) => {
+    setNamesThemeFilter(themeIds);
+    setActiveTab("names");
+    setAskContext(null);
   }, []);
 
   const handleAskAbout = useCallback((context: string) => {
@@ -369,7 +378,7 @@ export default function CustomerApp() {
             connectionTree={connectionTree}
             onThemeSelect={goToTheme}
             onAskAbout={handleAskAbout}
-            onGoToNames={() => handleTabChange("names")}
+            onGoToNames={goToNamesFiltered}
           />
         )}
 
@@ -380,8 +389,7 @@ export default function CustomerApp() {
             onThemeSelect={setSelectedTheme}
             onNameSelect={setSelectedName}
             onGoToUniverseTheme={(ttgId) => {
-              setSelectedTheme(ttgId);
-              handleTabChange("names");
+              goToNamesFiltered([ttgId]);
             }}
           />
         )}
@@ -393,6 +401,8 @@ export default function CustomerApp() {
             onThemeSelect={goToTheme}
             onSymbolSelect={setSelectedSymbol}
             onAskAbout={handleAskAbout}
+            focusThemeIds={namesThemeFilter ?? undefined}
+            onClearFilter={() => setNamesThemeFilter(null)}
           />
         )}
       </main>
