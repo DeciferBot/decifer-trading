@@ -772,7 +772,7 @@ canvas{display:block;width:100% !important}
   <div class="hdr-centre">
     <div class="regime-hero" id="regime-hero-card">
       <div class="regime-hero-label" id="regime-hero-label">READING MARKET…</div>
-      <div class="regime-hero-sub" id="regime-hero-sub">Waiting for first scan</div>
+      <div class="regime-hero-sub" id="regime-hero-sub">Fetching live regime…</div>
     </div>
   </div>
 
@@ -6282,10 +6282,26 @@ setInterval(loadMovers, 30_000);       // live movers from Alpaca screener every
 setInterval(loadLiveTabNews, 90_000);  // live tab news refresh every 90 s
 setInterval(loadNews, 90_000);         // News tab refresh every 90 s
 setInterval(loadIntelligence, 300_000); // intelligence panels every 5 min
+setInterval(loadRegimeLive, 300_000);  // regime refresh every 5 min (matches server cache)
+loadRegimeLive();                 // regime on page load — no bot scan needed
 loadMovers();                     // live movers — never reads brief
 loadLiveTabNews();                // live tab news — never reads brief
 loadNews();                       // News tab — load immediately on page open
 loadOvernightNotes();             // morning brief: events/calendar/performance only
+
+// ── Live regime from Alpaca/FMP — populates header before first bot scan ─────
+async function loadRegimeLive() {
+  try {
+    const r = await fetch('/api/regime-live');
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.ok && d.regime) {
+      // Only update the hero if the bot poll hasn't already populated a real regime
+      // (bot poll writes via updateRegime too; last-writer wins is fine — both are fresh)
+      updateRegime(d.regime);
+    }
+  } catch (_) {}
+}
 
 // ── Live movers from Alpaca screener — replaces overnight-brief movers ──────
 async function loadMovers() {

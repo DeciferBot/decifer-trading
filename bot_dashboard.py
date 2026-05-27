@@ -43,6 +43,9 @@ _CATALYST_CACHE_TTL = 30  # seconds
 _movers_payload_cache: dict = {"data": None, "fetched_at": 0.0}
 _MOVERS_CACHE_TTL = 30  # seconds
 
+_regime_live_cache: dict = {"data": None, "fetched_at": 0.0}
+_REGIME_LIVE_CACHE_TTL = 300  # 5 minutes — regime changes slowly
+
 # ── Intelligence pipeline trigger state ──────────────────────────────────────
 _intel_pipeline_lock = threading.Lock()
 _intel_pipeline_state: dict = {"running": False, "triggered_at": None, "error": None}
@@ -1582,6 +1585,29 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("movers API error: %s", exc)
                 payload = {"ts": 0, "live": False, "gainers": [], "losers": []}
             self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/regime-live":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            try:
+                import time as _t
+                _now = _t.time()
+                if (
+                    _regime_live_cache["data"]
+                    and _now - _regime_live_cache["fetched_at"] < _REGIME_LIVE_CACHE_TTL
+                ):
+                    payload = _regime_live_cache["data"]
+                else:
+                    from scanner import get_market_regime as _gmr
+                    # ib param is never used by _regime_download — Alpaca/FMP called directly
+                    _r = _gmr(None)
+                    payload = {"ok": True, "ts": int(_now), "regime": _r}
+                    _regime_live_cache["data"] = payload
+                    _regime_live_cache["fetched_at"] = _now
+            except Exception as exc:
+                log.warning("regime-live API error: %s", exc)
+                payload = {"ok": False, "error": str(exc)}
+            self.wfile.write(json.dumps(payload, default=str).encode())
         elif self.path == "/api/health":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
