@@ -871,7 +871,7 @@ canvas{display:block;width:100% !important}
     <div id="on-sector-row" class="mkt-sectors"></div>
     <div class="mkt-strip-actions">
       <span id="on-prev-close-date" style="font-size:11px;color:var(--muted2)"></span>
-      <button id="on-movers-refresh-btn" onclick="refreshMovers()" style="background:transparent;border:1px solid var(--border2);color:var(--muted2);font-size:11px;padding:2px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px" title="Refresh live prices">↻</button>
+      <button id="on-movers-refresh-btn" onclick="loadMovers()" style="background:transparent;border:1px solid var(--border2);color:var(--muted2);font-size:11px;padding:2px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px" title="Refresh live movers">↻</button>
     </div>
   </div>
 
@@ -2080,72 +2080,7 @@ async function loadOvernightNotes() {
         '<span style="color:var(--muted2);font-size:11px">No sector data</span>';
     }
 
-    // ── Gainers / Losers (split pre-market movers) ─────────────
-    window._moverSymbols = (D.movers || []).map(m => m.sym);
-    window._moverData    = D.movers || [];
-
-    // Prev-close date label + stale badge when brief is from a previous day
-    const prevCloseDateEl = document.getElementById('on-prev-close-date');
-    if (prevCloseDateEl && D.generated) {
-      try {
-        const genParts = D.generated.match(/(\d{4})-(\d{2})-(\d{2})/);
-        if (genParts) {
-          // Use date-only construction (no timezone) so local-time day arithmetic is stable
-          const [, gy, gm, gd] = genParts.map(Number);
-          const genDate = new Date(gy, gm - 1, gd); // midnight local time on the generated date
-          // Check staleness: compare brief date to today's local date
-          const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
-          const briefDaysOld = Math.round((todayMidnight - genDate) / 86400000);
-          // Compute reference close (one trading day before brief date)
-          const refDate = new Date(genDate);
-          refDate.setDate(refDate.getDate() - 1);
-          while (refDate.getDay() === 0 || refDate.getDay() === 6) refDate.setDate(refDate.getDate() - 1);
-          const prevStr = refDate.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-          prevCloseDateEl.textContent = `vs ${prevStr} close`;
-          // Add stale badge to section labels when movers are from a previous day
-          const staleTag = briefDaysOld > 0
-            ? ` <span style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--orange)20;border:1px solid var(--orange)60;color:var(--orange);font-weight:600;letter-spacing:.3px">yesterday</span>`
-            : '';
-          const gainerLbl = document.getElementById('on-gainers-label');
-          const loserLbl  = document.getElementById('on-losers-label');
-          if (gainerLbl) gainerLbl.innerHTML = 'Top gainers' + staleTag;
-          if (loserLbl)  loserLbl.innerHTML  = 'Top losers'  + staleTag;
-        }
-      } catch(e) { prevCloseDateEl.textContent = ''; }
-    }
-
-    function _moverRow(m, liveSnaps) {
-      const col  = m.pct > 0 ? 'var(--green)' : 'var(--red)';
-      const sign = m.pct > 0 ? '+' : '';
-      const live = liveSnaps && liveSnaps[m.sym];
-      const liveStr = live && live.price != null
-        ? `<span style="color:var(--orange)">${live.price.toFixed(2)}</span>`
-        : `<span style="color:var(--muted)">—</span>`;
-      return `<div class="mover-row">
-        <span style="color:#fff;font-weight:700">${esc(m.sym)}</span>
-        <span style="color:var(--muted2)">${m.price.toFixed(2)}</span>
-        ${liveStr}
-        <span style="color:${col};font-weight:700;text-align:right">${sign}${m.pct.toFixed(2)}%</span>
-      </div>`;
-    }
-
-    function _renderMoverLists(liveSnaps) {
-      const movers = D.movers || [];
-      const gainers = movers.filter(m => m.pct > 0).sort((a,b) => b.pct - a.pct);
-      const losers  = movers.filter(m => m.pct < 0).sort((a,b) => a.pct - b.pct);
-      const gainersEl = document.getElementById('on-gainers');
-      const losersEl  = document.getElementById('on-losers');
-      if (gainersEl) gainersEl.innerHTML = gainers.length
-        ? gainers.slice(0,8).map(m => _moverRow(m, liveSnaps)).join('')
-        : '<span style="color:var(--muted2);font-size:11px">No gainers</span>';
-      if (losersEl) losersEl.innerHTML = losers.length
-        ? losers.slice(0,8).map(m => _moverRow(m, liveSnaps)).join('')
-        : '<span style="color:var(--muted2);font-size:11px">No losers</span>';
-    }
-
-    _renderMoverLists(null);
-    // Auto-fetch live prices for movers immediately after render
-    setTimeout(refreshMovers, 400);
+    // Movers (gainers/losers) are now live — rendered by loadMovers(), not from brief.
 
     // ── Analyst changes ────────────────────────────────────────
     const analystChanges = D.analyst_changes || [];
@@ -2210,60 +2145,7 @@ async function loadOvernightNotes() {
       perfEl.innerHTML = '<span style="color:var(--muted2);font-size:11px">No trade data for yesterday</span>';
     }
 
-    // ── News ───────────────────────────────────────────────────
-    const news = D.news || {};
-    const newsLabel = document.getElementById('on-news-label');
-    const newsEl = document.getElementById('on-news');
-    const biasEl = document.getElementById('on-bias');
-
-    if (newsLabel && news.count) {
-      const biasCol = news.net_bias === 'bullish' ? 'var(--green)' : news.net_bias === 'bearish' ? 'var(--red)' : 'var(--muted2)';
-      newsLabel.innerHTML = `NEWS <span style="color:${biasCol};font-weight:700;margin-left:6px">${(news.net_bias||'').toUpperCase()}</span>
-        <span style="color:var(--muted2);font-size:11px;margin-left:6px">${news.bull_count||0}▲ ${news.bear_count||0}▼ ${news.neutral_count||0}─</span>`;
-    }
-
-    if (newsEl) {
-      newsEl.innerHTML = (news.articles || []).map(a => {
-        const col = a.sentiment === 'BULLISH' ? 'var(--green)' : a.sentiment === 'BEARISH' ? 'var(--red)' : 'var(--muted2)';
-        const icon = a.sentiment === 'BULLISH' ? '▲' : a.sentiment === 'BEARISH' ? '▼' : '─';
-        const ageStr = a.age_hours < 1 ? `${Math.round(a.age_hours*60)}m` : `${Math.round(a.age_hours)}h`;
-        const symTag = a.sym ? `<span style="color:var(--orange);font-weight:700">[${esc(a.sym)}]</span> ` : '';
-        return `<div style="padding:3px 0;font-size:11px;display:flex;gap:6px;align-items:baseline;border-bottom:1px solid var(--border)">
-          <span style="color:${col};flex-shrink:0">${icon}</span>
-          <span style="color:var(--muted2);font-size:11px;flex-shrink:0;min-width:24px">${ageStr}</span>
-          <span>${symTag}<span style="color:var(--text)">${esc(a.headline)}</span></span>
-        </div>`;
-      }).join('') || '<span style="color:var(--muted2);font-size:11px">No news in last 16h</span>';
-    }
-
-    if (biasEl) {
-      const avoid = (news.avoid || []);
-      const favor = (news.favor || []);
-      const hasSignal = avoid.length || favor.length;
-      biasEl.classList.toggle('visible', hasSignal);
-      if (hasSignal) {
-        let html = '';
-        if (avoid.length) {
-          const chips = avoid.map(x =>
-            `<span class="bias-chip avoid" title="${esc(x.reason || '')}">${esc(x.sym)}</span>`
-          ).join('');
-          html += `<div class="bias-section avoid">
-            <span class="bias-label avoid">⊗ Avoid</span>${chips}
-          </div>`;
-        }
-        if (favor.length) {
-          const chips = favor.map(x =>
-            `<span class="bias-chip favor" title="${esc(x.reason || '')}">${esc(x.sym)}</span>`
-          ).join('');
-          html += `<div class="bias-section favor">
-            <span class="bias-label favor">✓ Favor</span>${chips}
-          </div>`;
-        }
-        biasEl.innerHTML = html;
-      } else {
-        biasEl.innerHTML = '';
-      }
-    }
+    // Live tab news is now always-fresh — rendered by loadLiveTabNews(), not from brief.
 
   } catch (err) {
     const tone = document.getElementById('on-tone-row');
@@ -6396,11 +6278,136 @@ setInterval(async () => {
   try { await poll(); } finally { _pollInFlight = false; }
 }, 2000);
 setInterval(fetchPrices, 1000);      // live price updates between full polls
-setInterval(refreshMovers, 30_000);  // refresh mover live prices every 30 s
-setInterval(loadNews, 90_000);       // auto-refresh news every 90 s
-setInterval(loadIntelligence, 300_000);  // auto-refresh intelligence panels every 5 min
-loadNews();                       // load immediately on page open
-loadOvernightNotes();             // morning brief lives on Live tab, load at startup
+setInterval(loadMovers, 30_000);       // live movers from Alpaca screener every 30 s
+setInterval(loadLiveTabNews, 90_000);  // live tab news refresh every 90 s
+setInterval(loadNews, 90_000);         // News tab refresh every 90 s
+setInterval(loadIntelligence, 300_000); // intelligence panels every 5 min
+loadMovers();                     // live movers — never reads brief
+loadLiveTabNews();                // live tab news — never reads brief
+loadNews();                       // News tab — load immediately on page open
+loadOvernightNotes();             // morning brief: events/calendar/performance only
+
+// ── Live movers from Alpaca screener — replaces overnight-brief movers ──────
+async function loadMovers() {
+  const btn = document.getElementById('on-movers-refresh-btn');
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  try {
+    const r = await fetch('/api/movers');
+    const d = await r.json();
+    const gainers = d.gainers || [];
+    const losers  = d.losers  || [];
+
+    // Update prev-close date label to last trading day (always live)
+    const prevCloseDateEl = document.getElementById('on-prev-close-date');
+    if (prevCloseDateEl) {
+      const ref = new Date(); ref.setHours(0,0,0,0);
+      ref.setDate(ref.getDate() - 1);
+      while (ref.getDay() === 0 || ref.getDay() === 6) ref.setDate(ref.getDate() - 1);
+      prevCloseDateEl.textContent = `vs ${ref.toLocaleDateString('en-US', {month:'short', day:'numeric'})} close`;
+    }
+    // Always show live badge — never stale
+    const gainerLbl = document.getElementById('on-gainers-label');
+    const loserLbl  = document.getElementById('on-losers-label');
+    if (gainerLbl) gainerLbl.innerHTML = 'Top gainers <span style="font-size:10px;color:var(--green);font-family:\'JetBrains Mono\',monospace;margin-left:4px">● live</span>';
+    if (loserLbl)  loserLbl.innerHTML  = 'Top losers <span style="font-size:10px;color:var(--green);font-family:\'JetBrains Mono\',monospace;margin-left:4px">● live</span>';
+
+    // Keep globals in sync for any downstream references
+    window._moverSymbols = [...gainers, ...losers].map(m => m.sym);
+    window._moverData    = [...gainers, ...losers];
+
+    const moverRow = m => {
+      const col  = m.pct >= 0 ? 'var(--green)' : 'var(--red)';
+      const sign = m.pct >= 0 ? '+' : '';
+      const prevStr = m.prev_close > 0 ? m.prev_close.toFixed(2) : '—';
+      const curStr  = m.price > 0
+        ? `<span style="color:var(--orange)">${m.price.toFixed(2)}</span>`
+        : `<span style="color:var(--muted)">—</span>`;
+      return `<div class="mover-row">
+        <span style="color:#fff;font-weight:700">${esc(m.sym)}</span>
+        <span style="color:var(--muted2)">${prevStr}</span>
+        ${curStr}
+        <span style="color:${col};font-weight:700;text-align:right">${sign}${m.pct.toFixed(2)}%</span>
+      </div>`;
+    };
+
+    const gEl = document.getElementById('on-gainers');
+    const lEl = document.getElementById('on-losers');
+    if (gEl) gEl.innerHTML = gainers.length
+      ? gainers.map(moverRow).join('')
+      : '<span style="color:var(--muted2);font-size:11px">No data</span>';
+    if (lEl) lEl.innerHTML = losers.length
+      ? losers.map(moverRow).join('')
+      : '<span style="color:var(--muted2);font-size:11px">No data</span>';
+
+    if (btn) btn.textContent = '✓ Live';
+  } catch(e) {
+    if (btn) btn.textContent = '✗';
+  } finally {
+    if (btn) { btn.disabled = false; setTimeout(() => { if(btn) btn.textContent = '↻'; }, 3000); }
+  }
+}
+
+// ── Live tab news — always-fresh from /api/news (60s cache on backend) ───────
+async function loadLiveTabNews() {
+  try {
+    const r = await fetch('/api/news');
+    const d = await r.json();
+    const articles = (d.articles || []).slice(0, 20);
+    const seen = new Set();
+    const deduped = articles.filter(a => {
+      const hl = a.headline || '';
+      if (seen.has(hl)) return false;
+      seen.add(hl);
+      return true;
+    });
+
+    const newsLabel = document.getElementById('on-news-label');
+    const biasEl    = document.getElementById('on-bias');
+
+    const bull = deduped.filter(a => a.sentiment === 'BULLISH').length;
+    const bear = deduped.filter(a => a.sentiment === 'BEARISH').length;
+    const neut = deduped.length - bull - bear;
+    const net  = bull > bear ? 'BULLISH' : bear > bull ? 'BEARISH' : 'NEUTRAL';
+    const netCol = net === 'BULLISH' ? 'var(--green)' : net === 'BEARISH' ? 'var(--red)' : 'var(--muted2)';
+
+    if (newsLabel) {
+      newsLabel.innerHTML = `NEWS <span style="color:${netCol};font-weight:700;margin-left:6px">${net}</span>`
+        + `<span style="color:var(--muted2);font-size:11px;margin-left:6px">${bull}▲ ${bear}▼ ${neut}─</span>`;
+    }
+
+    const newsEl2 = document.getElementById('on-news');
+    if (newsEl2) {
+      newsEl2.innerHTML = deduped.map(a => {
+        const col  = a.sentiment === 'BULLISH' ? 'var(--green)' : a.sentiment === 'BEARISH' ? 'var(--red)' : 'var(--muted2)';
+        const icon = a.sentiment === 'BULLISH' ? '▲' : a.sentiment === 'BEARISH' ? '▼' : '─';
+        const age  = a.age_hours != null ? (a.age_hours < 1 ? `${Math.round(a.age_hours*60)}m` : `${Math.round(a.age_hours)}h`) : '—';
+        const sym  = (a.symbols || [])[0] || '';
+        const symTag = sym ? `<span style="color:var(--orange);font-weight:700">[${esc(sym)}]</span> ` : '';
+        return `<div style="padding:3px 0;font-size:11px;display:flex;gap:6px;align-items:baseline;border-bottom:1px solid var(--border)">
+          <span style="color:${col};flex-shrink:0">${icon}</span>
+          <span style="color:var(--muted2);font-size:11px;flex-shrink:0;min-width:24px">${age}</span>
+          <span>${symTag}<span style="color:var(--text)">${esc(a.headline || '')}</span></span>
+        </div>`;
+      }).join('') || '<span style="color:var(--muted2);font-size:11px">No recent news</span>';
+    }
+
+    // Avoid/favor: derive from scan-cycle sentinel/catalyst triggers in the news payload
+    if (biasEl) {
+      const avoid = (d.sentinel_triggers || []).filter(t => t.bias === 'avoid').slice(0, 5);
+      const favor = (d.sentinel_triggers || []).filter(t => t.bias === 'favor').slice(0, 5);
+      const hasSignal = avoid.length || favor.length;
+      biasEl.classList.toggle('visible', hasSignal);
+      if (hasSignal) {
+        let html = '';
+        if (avoid.length) html += `<div class="bias-section avoid"><span class="bias-label avoid">⊗ Avoid</span>${avoid.map(x => `<span class="bias-chip avoid" title="${esc(x.reason||'')}">${esc(x.sym)}</span>`).join('')}</div>`;
+        if (favor.length) html += `<div class="bias-section favor"><span class="bias-label favor">✓ Favor</span>${favor.map(x => `<span class="bias-chip favor" title="${esc(x.reason||'')}">${esc(x.sym)}</span>`).join('')}</div>`;
+        biasEl.innerHTML = html;
+      } else {
+        biasEl.innerHTML = '';
+      }
+    }
+  } catch(e) {}
+}
 
 async function refreshMovers() {
   const btn = document.getElementById('on-movers-refresh-btn');

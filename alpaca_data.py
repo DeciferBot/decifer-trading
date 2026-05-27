@@ -869,7 +869,7 @@ def fetch_snapshots(symbols: list[str]) -> dict[str, dict]:
                 price = float(snap.latest_trade.price)
                 prev_close = float(snap.previous_daily_bar.close) if snap.previous_daily_bar else None
                 change_1d = ((price - prev_close) / prev_close) if prev_close else None
-                result[sym] = {"price": price, "change_1d": change_1d}
+                result[sym] = {"price": price, "prev_close": prev_close, "change_1d": change_1d}
             except Exception as exc:
                 log.debug(f"fetch_snapshots: parse failed for {sym} — {exc}")
         return result
@@ -1068,3 +1068,53 @@ def get_all_tradable_equities() -> list[dict]:
             log.debug(f"get_all_tradable_equities: row parse failed — {exc}")
     log.info(f"get_all_tradable_equities: {len(out)} tradable US equities")
     return out
+
+
+def get_live_movers(top: int = 15) -> dict:
+    """
+    Fetch live top gainers and losers from Alpaca screener REST endpoint.
+    Returns {"gainers": [...], "losers": [...]} or empty lists on failure.
+    Each entry: {sym, price, prev_close, pct, volume, tag}
+    """
+    api_key = CONFIG.get("alpaca_api_key", "")
+    secret_key = CONFIG.get("alpaca_secret_key", "")
+    if not api_key or not secret_key:
+        return {"gainers": [], "losers": []}
+    try:
+        import requests as _req
+
+        resp = _req.get(
+            "https://data.alpaca.markets/v1beta1/screener/stocks/movers",
+            headers={
+                "APCA-API-KEY-ID": api_key,
+                "APCA-API-SECRET-KEY": secret_key,
+            },
+            params={"top": top, "price_greater_than": 2},
+            timeout=6,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        def _norm(items: list, tag: str) -> list:
+            out = []
+            for item in items:
+                try:
+                    out.append({
+                        "sym": item["symbol"],
+                        "price": round(float(item.get("price", 0)), 2),
+                        "prev_close": round(float(item.get("prev_close", 0)), 2),
+                        "pct": round(float(item.get("percent_change", 0)), 2),
+                        "volume": int(item.get("volume", 0)),
+                        "tag": tag,
+                    })
+                except Exception:
+                    pass
+            return out
+
+        return {
+            "gainers": _norm(data.get("gainers", []), "up"),
+            "losers": _norm(data.get("losers", []), "down"),
+        }
+    except Exception as exc:
+        log.debug(f"get_live_movers: {exc}")
+        return {"gainers": [], "losers": []}

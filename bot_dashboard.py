@@ -40,6 +40,9 @@ _NEWS_CACHE_TTL = 60  # seconds
 _catalyst_payload_cache: dict = {"data": None, "fetched_at": 0.0}
 _CATALYST_CACHE_TTL = 30  # seconds
 
+_movers_payload_cache: dict = {"data": None, "fetched_at": 0.0}
+_MOVERS_CACHE_TTL = 30  # seconds
+
 # ── Intelligence pipeline trigger state ──────────────────────────────────────
 _intel_pipeline_lock = threading.Lock()
 _intel_pipeline_state: dict = {"running": False, "triggered_at": None, "error": None}
@@ -1515,6 +1518,7 @@ class DashHandler(BaseHTTPRequestHandler):
                     "snapshots": {
                         sym: {
                             "price": s.get("price"),
+                            "prev_close": s.get("prev_close"),
                             "change_1d": s.get("change_1d"),
                             "pct": round((s.get("change_1d") or 0) * 100, 2) if s.get("change_1d") is not None else None,
                         }
@@ -1524,6 +1528,33 @@ class DashHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log.warning("snapshots API error: %s", exc)
                 payload = {"ts": 0, "snapshots": {}}
+            self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/movers":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            try:
+                import time as _t
+                _now = _t.time()
+                if (
+                    _movers_payload_cache["data"]
+                    and _now - _movers_payload_cache["fetched_at"] < _MOVERS_CACHE_TTL
+                ):
+                    payload = _movers_payload_cache["data"]
+                else:
+                    from alpaca_data import get_live_movers as _glm
+                    _raw = _glm(top=15)
+                    payload = {
+                        "ts": int(_now),
+                        "live": True,
+                        "gainers": _raw.get("gainers", []),
+                        "losers": _raw.get("losers", []),
+                    }
+                    _movers_payload_cache["data"] = payload
+                    _movers_payload_cache["fetched_at"] = _now
+            except Exception as exc:
+                log.warning("movers API error: %s", exc)
+                payload = {"ts": 0, "live": False, "gainers": [], "losers": []}
             self.wfile.write(json.dumps(payload).encode())
         elif self.path == "/api/health":
             self.send_response(200)
