@@ -43,18 +43,57 @@ function WatchBadge({ watchType }: { watchType: ResearchNameCard["watchType"] })
   );
 }
 
-// ── Price action display ───────────────────────────────────────────────────────
+// ── Company logo circle ────────────────────────────────────────────────────────
 
-function PriceChip({ card }: { card: ResearchNameCard }) {
-  const { tone, displayText } = card.priceAction;
+function LogoCircle({ symbol, logoUrl }: { symbol: string; logoUrl?: string }) {
+  const monogram = symbol.slice(0, 2);
+  if (logoUrl) {
+    return (
+      <div
+        className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
+        style={{ background: "#1e293b" }}
+      >
+        <img
+          src={logoUrl}
+          alt={symbol}
+          className="w-full h-full object-contain p-1"
+          onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+        />
+      </div>
+    );
+  }
+  return (
+    <div
+      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+      style={{ background: "#1e293b" }}
+    >
+      <span className="text-[11px] font-black" style={{ color: "#475569" }}>
+        {monogram}
+      </span>
+    </div>
+  );
+}
+
+// ── Price hero (top-right, prominent) ─────────────────────────────────────────
+
+function PriceHero({ card }: { card: ResearchNameCard }) {
+  const { tone, changePct, price } = card.priceAction;
   if (tone === "unknown") {
-    return <span className="text-[9px] text-slate-600">{displayText}</span>;
+    return <span className="text-[11px] text-slate-600">—</span>;
   }
   const color = tone === "positive" ? "#34d399" : tone === "negative" ? "#f87171" : "#94a3b8";
+  const sign = changePct != null && changePct > 0 ? "+" : "";
   return (
-    <span className="text-[10px] font-semibold" style={{ color }}>
-      {displayText}
-    </span>
+    <div className="text-right shrink-0">
+      <div className="text-[16px] font-black leading-none" style={{ color }}>
+        {changePct != null ? `${sign}${changePct.toFixed(1)}%` : "—"}
+      </div>
+      {price != null && (
+        <div className="text-[10px] text-slate-500 mt-0.5">
+          ${price >= 1000 ? price.toFixed(0) : price.toFixed(2)}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -75,27 +114,23 @@ function ResearchCard({
 
   const inner = (
     <>
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-base font-black text-slate-100">{card.symbol}</span>
+      {/* Header: logo + symbol/name + price */}
+      <div className="flex items-start gap-3 mb-2.5">
+        <LogoCircle symbol={card.symbol} logoUrl={card.logoUrl} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-[15px] font-black text-slate-100 leading-none">{card.symbol}</span>
             {card.companyName && card.companyName !== card.symbol && (
-              <span className="text-[11px] text-slate-500 truncate max-w-[180px]">
+              <span className="text-[10px] text-slate-500 truncate max-w-[130px]">
                 {card.companyName}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[9px] text-slate-500">{card.confidenceLanguage}</span>
+          <div className="mt-1">
+            <WatchBadge watchType={card.watchType} />
           </div>
         </div>
-        <WatchBadge watchType={card.watchType} />
-      </div>
-
-      {/* Price action */}
-      <div className="mb-2">
-        <PriceChip card={card} />
+        <PriceHero card={card} />
       </div>
 
       {/* Reason to care */}
@@ -260,7 +295,7 @@ export default function UniverseTab(props: Props) {
 
   const radar = data.radar ?? [];
 
-  // Phase 1 → TTG data; Phase 2 → prices for priority symbols
+  // Phase 1 → TTG structure; Phase 2 → prices for priority symbols
   useEffect(() => {
     let cancelled = false;
 
@@ -313,7 +348,7 @@ export default function UniverseTab(props: Props) {
           />
         ))}
         <p className="text-[10px] text-slate-600 text-center pt-2">
-          Loading connected names…
+          Loading names in play…
         </p>
       </div>
     );
@@ -346,10 +381,10 @@ export default function UniverseTab(props: Props) {
         }}
       >
         <p className="text-[11px] font-semibold text-slate-300 leading-snug">
-          Where today&rsquo;s market stories connect to names
+          Names in play today
         </p>
         <p className="text-[10px] text-slate-500 mt-0.5">
-          {totalNames} evidence-verified names · {storyGroups.length} market stories
+          {totalNames} names · {storyGroups.length} themes
           {pricesLoading && " · Updating prices…"}
         </p>
       </div>
@@ -362,7 +397,7 @@ export default function UniverseTab(props: Props) {
             style={{ color: "#f97316" }}
           >
             <Zap size={9} />
-            Live Intelligence
+            On the radar
           </p>
           <div className="space-y-2">
             {radar.map((radarItem, i) => {

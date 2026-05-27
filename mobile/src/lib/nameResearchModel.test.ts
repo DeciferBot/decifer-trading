@@ -96,7 +96,7 @@ describe("buildPriceAction", () => {
   it("returns unknown with fallback text when no entry provided", () => {
     const pa = buildPriceAction(null);
     expect(pa.tone).toBe("unknown");
-    expect(pa.displayText).toBe("Live price confirmation not available yet.");
+    expect(pa.displayText).toBe("Price updating…");
     expect(pa.changePct).toBeNull();
     expect(pa.price).toBeNull();
   });
@@ -104,7 +104,7 @@ describe("buildPriceAction", () => {
   it("returns unknown with fallback text when changePct is null", () => {
     const pa = buildPriceAction({ symbol: "NVDA", price: 900, changePct: null });
     expect(pa.tone).toBe("unknown");
-    expect(pa.displayText).toBe("Live price confirmation not available yet.");
+    expect(pa.displayText).toBe("Price updating…");
     expect(pa.price).toBe(900);
   });
 

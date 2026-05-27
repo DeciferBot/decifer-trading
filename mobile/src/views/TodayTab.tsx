@@ -647,8 +647,8 @@ export default function TodayTab({
             </div>
           ) : (
             <Card>
-              <p className="text-sm text-slate-400">No major new changes detected since your last visit.</p>
-              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">The latest market briefing is below.</p>
+              <p className="text-sm text-slate-400">Market story looks the same since you were away.</p>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">Scroll down for the full briefing.</p>
             </Card>
           )}
         </section>

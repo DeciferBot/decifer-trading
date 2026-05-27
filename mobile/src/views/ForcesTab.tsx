@@ -54,7 +54,7 @@ function ConnectionTree({
       style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
     >
       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-        Connection path
+        Connected themes
       </p>
       {/* Force node */}
       <div className="flex items-center gap-2">
@@ -316,9 +316,9 @@ export default function ForcesTab({
           className="rounded-2xl px-6 py-8 text-center"
           style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
         >
-          <p className="text-sm text-slate-400">No force data available right now.</p>
+          <p className="text-sm text-slate-400">No active market forces right now.</p>
           <p className="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-xs mx-auto">
-            Market forces appear when Decifer detects active drivers. Check the Theme Map for structural context.
+            Check the Themes tab for structural context.
           </p>
         </div>
       )}

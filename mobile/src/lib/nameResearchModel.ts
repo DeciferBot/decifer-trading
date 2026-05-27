@@ -26,6 +26,7 @@ export interface ResearchFundamentals {
 export interface ResearchNameCard {
   symbol: string;
   companyName: string;
+  logoUrl?: string;
   storyGroup: string;
   customerStory: string;
   priceAction: ResearchPriceAction;
@@ -77,7 +78,7 @@ export function buildPriceAction(entry?: NamePriceEntry | null): ResearchPriceAc
       tone: "unknown",
       changePct: null,
       price: entry?.price ?? null,
-      displayText: "Live price confirmation not available yet.",
+      displayText: "Price updating…",
     };
   }
   const tone = derivePriceActionTone(entry.changePct);
@@ -116,6 +117,12 @@ function resolveConfidenceLanguage(exposureType: string): string {
   return map[exposureType] ?? "Connected name";
 }
 
+// ── Logo URL (FMP public CDN — no API key required) ───────────────────────────
+
+export function buildLogoUrl(symbol: string): string {
+  return `https://images.financialmodelingprep.com/symbol/${symbol.toUpperCase()}.png`;
+}
+
 // ── Card builder ──────────────────────────────────────────────────────────────
 
 export function buildResearchCard(
@@ -127,10 +134,11 @@ export function buildResearchCard(
   return {
     symbol: card.symbol,
     companyName: card.label || card.symbol,
+    logoUrl: buildLogoUrl(card.symbol),
     storyGroup: storyLabel,
     customerStory: card.theme_label,
     priceAction: buildPriceAction(priceEntry),
-    fundamentals: { available: false, note: "Fundamentals snapshot not available yet." },
+    fundamentals: { available: false, note: "Fundamentals not available." },
     reasonToCare: card.reason_to_care,
     watchType: resolveWatchType(card),
     confidenceLanguage: resolveConfidenceLanguage(card.exposure_type),
@@ -177,7 +185,8 @@ export function buildRadarCards(
   return radarItems.map(item => ({
     symbol: item.symbol,
     companyName: item.symbol,
-    storyGroup: "Live Intelligence",
+    logoUrl: buildLogoUrl(item.symbol),
+    storyGroup: "On the radar",
     customerStory: "Current market attention",
     priceAction: buildPriceAction(priceMap.get(item.symbol) ?? null),
     fundamentals: { available: false, note: "Fundamentals snapshot not available yet." },
@@ -238,7 +247,7 @@ export function buildCompanyLine(
 ): string {
   if (!profile?.companyName) {
     const storyPart = storyGroup ? ` in the ${storyGroup} story` : "";
-    return `${symbol} is connected${storyPart} based on structural intelligence evidence.`;
+    return `${symbol} is on our radar${storyPart}.`;
   }
   const industryPart =
     profile.sector && profile.industry
