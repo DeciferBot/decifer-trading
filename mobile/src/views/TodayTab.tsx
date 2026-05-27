@@ -557,18 +557,23 @@ function MoverDetailSheet({
 }) {
   const [imgErr, setImgErr] = useState(false);
   const [profile, setProfile] = useState<{
+    companyName?: string;
     description?: string;
     sector?: string;
     industry?: string;
     mktCap?: number;
   } | null>(null);
+  const [profileTs, setProfileTs] = useState<string | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
     fetch(`/api/name-fundamentals?symbol=${encodeURIComponent(mover.symbol)}`, { signal: ctrl.signal })
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.profile) setProfile(d.profile); })
-      .catch(() => {});
+      .then(d => {
+        setProfile(d?.profile ?? {});
+        if (d?.ts) setProfileTs(d.ts);
+      })
+      .catch(() => { setProfile({}); });
     return () => ctrl.abort();
   }, [mover.symbol]);
 
@@ -653,7 +658,12 @@ function MoverDetailSheet({
             </div>
           )}
 
-          <p className="text-[10px] text-slate-700">Market data via Financial Modeling Prep · Market intelligence only</p>
+          <p className="text-[10px] text-slate-700">
+            Market data via Financial Modeling Prep · Market intelligence only
+            {profileTs && (
+              <> · as of {new Date(profileTs).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZoneName: "short" })}</>
+            )}
+          </p>
         </div>
       </div>
     </>

@@ -39,9 +39,10 @@ export async function GET(req: NextRequest) {
   // ── Profile ──────────────────────────────────────────────────────────────────
   let profile: {
     companyName?: string;
+    description?: string;
     sector?: string;
     industry?: string;
-    marketCap?: number;
+    mktCap?: number;
   } | undefined;
 
   if (profileResult.status === "fulfilled" && profileResult.value.ok) {
@@ -51,11 +52,14 @@ export async function GET(req: NextRequest) {
       if (p) {
         profile = {
           companyName: typeof p.companyName === "string" ? p.companyName : undefined,
+          description: typeof p.description === "string" && p.description.length > 20
+            ? p.description.slice(0, 600)
+            : undefined,
           sector: typeof p.sector === "string" ? p.sector : undefined,
           industry: typeof p.industry === "string" ? p.industry : undefined,
-          marketCap: typeof p.mktCap === "number" && p.mktCap > 0 ? p.mktCap : undefined,
+          mktCap: typeof p.mktCap === "number" && p.mktCap > 0 ? p.mktCap : undefined,
         };
-        if (!profile.companyName && !profile.sector) profile = undefined;
+        if (!profile.companyName && !profile.sector && !profile.description) profile = undefined;
       }
     } catch { /* graceful */ }
   }
