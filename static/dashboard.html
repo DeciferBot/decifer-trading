@@ -31,7 +31,7 @@ body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospa
 body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,var(--scanline) 2px,var(--scanline) 4px);pointer-events:none;z-index:9999}
 
 /* ── HEADER — 3-zone grid ──────────────────────────────────────────────────── */
-.hdr{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:56px;padding:0 16px;background:var(--bg2);border-bottom:2px solid transparent;border-image:linear-gradient(to right,transparent 0%,var(--orange) 40%,var(--orange) 60%,transparent 100%) 1}
+.hdr{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:56px;padding:0 16px;background:var(--bg2);border-bottom:2px solid transparent;border-image:linear-gradient(to right,transparent 0%,var(--orange) 40%,var(--orange) 60%,transparent 100%) 1;overflow:hidden}
 .hdr-left{display:flex;align-items:center}
 .hdr-centre{display:flex;justify-content:center;align-items:center}
 .hdr-right{display:flex;align-items:center;justify-content:flex-end;gap:8px;overflow:hidden;flex-shrink:0}
@@ -44,7 +44,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 /* Regime hero card — centre of header */
 .regime-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 24px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);min-width:210px;cursor:default;transition:border-color .25s,background .25s,box-shadow .25s}
 .regime-hero-label{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;letter-spacing:.5px;line-height:1.2;color:var(--text)}
-.regime-hero-sub{font-size:11px;color:var(--muted2);margin-top:3px;letter-spacing:.25px}
+.regime-hero-sub{font-size:11px;color:var(--muted2);margin-top:3px;letter-spacing:.25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:clamp(200px,38vw,520px)}
 /* Regime colour variants */
 .regime-hero.rh-bull{border-color:rgba(0,230,118,.55);background:rgba(0,230,118,.08);box-shadow:0 0 18px rgba(0,230,118,.1)}
 .regime-hero.rh-bull .regime-hero-label{color:var(--green)}
@@ -69,6 +69,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .stats .stat:first-child .sl,.stats .stat:nth-child(2) .sl{color:var(--muted2)}
 .sl{font-size:11px;letter-spacing:.15px;color:var(--muted2);text-transform:none;margin-bottom:3px}
 .sv{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#s-session{font-size:13px;line-height:1.2}
 .ss{font-size:11px;color:var(--muted2);margin-top:2px}
 .co{color:var(--orange)}.cg{color:var(--green)}.cr{color:var(--red)}.cw{color:#fff}
 
@@ -890,18 +891,18 @@ canvas{display:block;width:100% !important}
 
       <!-- Gainers -->
       <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:14px 16px">
-        <div class="section-label" style="color:var(--green);margin-bottom:10px">Top gainers</div>
+        <div id="on-gainers-label" class="section-label" style="color:var(--green);margin-bottom:10px">Top gainers</div>
         <div class="mover-hdr">
-          <span>Symbol</span><span>Prev close</span><span>Live</span><span style="text-align:right">Change</span>
+          <span>Symbol</span><span>Price</span><span>Live</span><span style="text-align:right">Change</span>
         </div>
         <div id="on-gainers"></div>
       </div>
 
       <!-- Losers -->
       <div style="flex-shrink:0;border-bottom:1px solid var(--border);padding:14px 16px">
-        <div class="section-label" style="color:var(--red);margin-bottom:10px">Top losers</div>
+        <div id="on-losers-label" class="section-label" style="color:var(--red);margin-bottom:10px">Top losers</div>
         <div class="mover-hdr">
-          <span>Symbol</span><span>Prev close</span><span>Live</span><span style="text-align:right">Change</span>
+          <span>Symbol</span><span>Price</span><span>Live</span><span style="text-align:right">Change</span>
         </div>
         <div id="on-losers"></div>
       </div>
@@ -2083,19 +2084,32 @@ async function loadOvernightNotes() {
     window._moverSymbols = (D.movers || []).map(m => m.sym);
     window._moverData    = D.movers || [];
 
-    // Prev-close date label: computed from generated timestamp (movers = change vs prev close)
+    // Prev-close date label + stale badge when brief is from a previous day
     const prevCloseDateEl = document.getElementById('on-prev-close-date');
     if (prevCloseDateEl && D.generated) {
-      // generated is "YYYY-MM-DD HH:MM ET" — previous close is the prior trading day
       try {
-        const genParts = D.generated.match(/(\d{4}-\d{2}-\d{2})/);
+        const genParts = D.generated.match(/(\d{4})-(\d{2})-(\d{2})/);
         if (genParts) {
-          const genDate = new Date(genParts[1] + 'T16:00:00-04:00'); // 4 PM ET close of prior day
-          genDate.setDate(genDate.getDate() - 1);
-          // Skip back over weekends
-          while (genDate.getDay() === 0 || genDate.getDay() === 6) genDate.setDate(genDate.getDate() - 1);
-          const prevStr = genDate.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+          // Use date-only construction (no timezone) so local-time day arithmetic is stable
+          const [, gy, gm, gd] = genParts.map(Number);
+          const genDate = new Date(gy, gm - 1, gd); // midnight local time on the generated date
+          // Check staleness: compare brief date to today's local date
+          const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+          const briefDaysOld = Math.round((todayMidnight - genDate) / 86400000);
+          // Compute reference close (one trading day before brief date)
+          const refDate = new Date(genDate);
+          refDate.setDate(refDate.getDate() - 1);
+          while (refDate.getDay() === 0 || refDate.getDay() === 6) refDate.setDate(refDate.getDate() - 1);
+          const prevStr = refDate.toLocaleDateString('en-US', {month:'short', day:'numeric'});
           prevCloseDateEl.textContent = `vs ${prevStr} close`;
+          // Add stale badge to section labels when movers are from a previous day
+          const staleTag = briefDaysOld > 0
+            ? ` <span style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--orange)20;border:1px solid var(--orange)60;color:var(--orange);font-weight:600;letter-spacing:.3px">yesterday</span>`
+            : '';
+          const gainerLbl = document.getElementById('on-gainers-label');
+          const loserLbl  = document.getElementById('on-losers-label');
+          if (gainerLbl) gainerLbl.innerHTML = 'Top gainers' + staleTag;
+          if (loserLbl)  loserLbl.innerHTML  = 'Top losers'  + staleTag;
         }
       } catch(e) { prevCloseDateEl.textContent = ''; }
     }
@@ -5919,11 +5933,16 @@ async function poll() {
     pnlPctEl.style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
     // Decode session name to human-readable label
     const _SESSION_LABELS = {
-      'PRIME_AM':    'Prime Morning',
-      'PRIME':       'Trading Hours',
-      'AFTER_HOURS': 'After Hours',
-      'CLOSED':      'Market Closed',
-      'WEEKEND':     'Weekend',
+      'PRE_MARKET':   'Pre-Market',
+      'PRE_OPEN':     'Pre-Open',
+      'OPEN_BUFFER':  'Opening',
+      'PRIME_AM':     'Prime Morning',
+      'LUNCH':        'Midday',
+      'PRIME_PM':     'Afternoon',
+      'CLOSE_BUFFER': 'Closing',
+      'AFTER_HOURS':  'After Hours',
+      'CLOSED':       'Market Closed',
+      'WEEKEND':      'Weekend',
     };
     const rawSession = d.session || '—';
     document.getElementById('s-session').textContent = _SESSION_LABELS[rawSession] || rawSession;
@@ -6392,25 +6411,60 @@ async function refreshMovers() {
     const r = await fetch('/api/snapshots?syms=' + syms.join(','));
     const d = await r.json();
     const snaps = d.snapshots || {};
-    // Re-render mover lists with live price overlay
+    // Re-render mover lists using live prev_close + current price
     const moversData = window._moverData || [];
     if (moversData.length) {
-      const gainers = moversData.filter(m => m.pct > 0).sort((a,b) => b.pct - a.pct);
-      const losers  = moversData.filter(m => m.pct < 0).sort((a,b) => a.pct - b.pct);
       const row = (m) => {
-        const col  = m.pct > 0 ? 'var(--green)' : 'var(--red)';
-        const sign = m.pct > 0 ? '+' : '';
         const live = snaps[m.sym];
-        const liveStr = live && live.price != null
-          ? `<span style="color:var(--orange)">${Number(live.price).toFixed(2)}</span>`
+        // Use live prev_close and price when available; fall back to brief data
+        const prevClose = live && live.prev_close != null ? live.prev_close : m.price;
+        const curPrice  = live && live.price     != null ? live.price      : null;
+        const livePct   = curPrice != null && prevClose > 0
+          ? ((curPrice - prevClose) / prevClose * 100)
+          : m.pct;
+        const col  = livePct >= 0 ? 'var(--green)' : 'var(--red)';
+        const sign = livePct >= 0 ? '+' : '';
+        const prevStr = `<span style="color:var(--muted2)">${prevClose.toFixed(2)}</span>`;
+        const curStr  = curPrice != null
+          ? `<span style="color:var(--orange)">${curPrice.toFixed(2)}</span>`
           : `<span style="color:var(--muted)">—</span>`;
         return `<div class="mover-row">
           <span style="color:#fff;font-weight:700">${m.sym}</span>
-          <span style="color:var(--muted2)">${m.price.toFixed(2)}</span>
-          ${liveStr}
-          <span style="color:${col};font-weight:700;text-align:right">${sign}${m.pct.toFixed(2)}%</span>
+          ${prevStr}
+          ${curStr}
+          <span style="color:${col};font-weight:700;text-align:right">${sign}${livePct.toFixed(2)}%</span>
         </div>`;
       };
+      const gainers = moversData.filter(m => {
+        const live = snaps[m.sym];
+        const pc = live && live.prev_close != null ? live.prev_close : m.price;
+        const cp = live && live.price != null ? live.price : null;
+        const pct = cp != null && pc > 0 ? (cp - pc) / pc * 100 : m.pct;
+        return pct > 0;
+      }).sort((a, b) => {
+        const pct = (m) => {
+          const live = snaps[m.sym];
+          const pc = live && live.prev_close != null ? live.prev_close : m.price;
+          const cp = live && live.price != null ? live.price : null;
+          return cp != null && pc > 0 ? (cp - pc) / pc * 100 : m.pct;
+        };
+        return pct(b) - pct(a);
+      });
+      const losers = moversData.filter(m => {
+        const live = snaps[m.sym];
+        const pc = live && live.prev_close != null ? live.prev_close : m.price;
+        const cp = live && live.price != null ? live.price : null;
+        const pct = cp != null && pc > 0 ? (cp - pc) / pc * 100 : m.pct;
+        return pct <= 0;
+      }).sort((a, b) => {
+        const pct = (m) => {
+          const live = snaps[m.sym];
+          const pc = live && live.prev_close != null ? live.prev_close : m.price;
+          const cp = live && live.price != null ? live.price : null;
+          return cp != null && pc > 0 ? (cp - pc) / pc * 100 : m.pct;
+        };
+        return pct(a) - pct(b);
+      });
       const gEl = document.getElementById('on-gainers');
       const lEl = document.getElementById('on-losers');
       if (gEl) gEl.innerHTML = gainers.slice(0,8).map(row).join('') || '<span style="color:var(--muted2);font-size:11px">No gainers</span>';
@@ -6522,28 +6576,36 @@ async function loadNews() {
     const r = await fetch('/api/news');
     const j = await r.json();
     const articles = j.articles || [];
-    _allNewsItems = articles.map(a => ({
-      symbol:           (a.symbols || [])[0] || '—',
-      headline:         a.headline || '',
-      summary:          a.summary  || '',
-      sentiment:        a.sentiment  || 'NEUTRAL',
-      keyword_score:    a.keyword_score || 0,
-      catalyst:         a.catalyst  || '',
-      recency:          a.age_hours || 999,
-      news_score:       a.news_score || 0,
-      image_url:        a.image_url  || '',
-      url:              a.url        || '#',
-      source:           a.source     || '',
-      macro_event:      a.macro_event      || false,
-      macro_type:       a.macro_type       || '',
-      macro_label:      a.macro_label      || '',
-      macro_color:      a.macro_color      || '',
-      macro_impact:     a.macro_impact     || 0,
-      macro_direction:  a.macro_direction  || '',
-      macro_implication:a.macro_implication|| '',
-      top_story:        a.top_story        || false,
-      sector:           a.sector           || '',
-    }));
+    // Deduplicate by headline: same article can arrive for multiple ticker attributions
+    const _seenHl = new Set();
+    _allNewsItems = articles.reduce((acc, a) => {
+      const hl = a.headline || '';
+      if (_seenHl.has(hl)) return acc;
+      _seenHl.add(hl);
+      acc.push({
+        symbol:           (a.symbols || [])[0] || '—',
+        headline:         hl,
+        summary:          a.summary  || '',
+        sentiment:        a.sentiment  || 'NEUTRAL',
+        keyword_score:    a.keyword_score || 0,
+        catalyst:         a.catalyst  || '',
+        recency:          a.age_hours || 999,
+        news_score:       a.news_score || 0,
+        image_url:        a.image_url  || '',
+        url:              a.url        || '#',
+        source:           a.source     || '',
+        macro_event:      a.macro_event      || false,
+        macro_type:       a.macro_type       || '',
+        macro_label:      a.macro_label      || '',
+        macro_color:      a.macro_color      || '',
+        macro_impact:     a.macro_impact     || 0,
+        macro_direction:  a.macro_direction  || '',
+        macro_implication:a.macro_implication|| '',
+        top_story:        a.top_story        || false,
+        sector:           a.sector           || '',
+      });
+      return acc;
+    }, []);
     window._newsItems = _allNewsItems;
     filterNews();
     if (upd) upd.textContent = 'Updated ' + new Date().toTimeString().slice(0,8);
@@ -6557,12 +6619,16 @@ async function loadNews() {
 function renderNews(newsData) {
   // Called by poll() when scan data arrives — merge into existing items
   if (!newsData || !Object.keys(newsData).length) return;
+  const _scanSeen = new Set();
   const scanItems = [];
   for (const [sym, nd] of Object.entries(newsData)) {
     if (!nd.headlines || !nd.headlines.length) continue;
+    const hl = nd.headlines[0];
+    if (_scanSeen.has(hl)) continue; // same headline for multiple ticker attributions
+    _scanSeen.add(hl);
     scanItems.push({
       symbol: sym,
-      headline: nd.headlines[0],
+      headline: hl,
       sentiment: nd.claude_sentiment || 'NEUTRAL',
       keyword_score: nd.keyword_score || 0,
       catalyst: nd.claude_catalyst || '',
