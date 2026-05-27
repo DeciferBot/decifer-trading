@@ -26,7 +26,9 @@ import {
   buildNarrativeParagraph,
   buildWhereLooking,
   buildWhatCouldChange,
+  buildCustomerForces,
   type TapeSnapshot,
+  type CustomerMarketForce,
 } from "@/lib/customerBriefingModel";
 import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory";
 import type { TapeEntry } from "@/app/api/market-tape/route";
@@ -85,35 +87,102 @@ function deriveTapeSnapshot(tape: TapeEntry[]): TapeSnapshot {
   };
 }
 
-// ── Dual clock ────────────────────────────────────────────────────────────────
-// Renders nothing on SSR; mounts client-only to avoid hydration mismatch.
+// ── Force direction helper ────────────────────────────────────────────────────
 
-function DualClock({ clock }: { clock: MarketClockState }) {
-  const [localTz, setLocalTz] = useState<string | null>(null);
+const NEGATIVE_FORCES = new Set([
+  "geopolitical_risk_rising", "futures_risk_off", "yields_rising",
+  "oil_supply_shock", "smh_tactical_weakness", "reits_falling_yield",
+]);
 
-  useEffect(() => {
-    const tz = new Intl.DateTimeFormat("en-US", { timeZoneName: "short" })
-      .formatToParts(new Date())
-      .find(p => p.type === "timeZoneName")?.value ?? "";
-    setLocalTz(tz);
-  }, []);
+const FORCE_ICON: Record<string, string> = {
+  ai_capex_growth:         "AI",
+  ai_compute_demand:       "GPU",
+  geopolitical_risk_rising:"GEO",
+  futures_risk_on:         "ES↑",
+  futures_risk_off:        "ES↓",
+  yields_falling:          "10Y↓",
+  yields_rising:           "10Y↑",
+  risk_on_rotation:        "RISK",
+  gold_safe_haven_bid:     "GLD",
+  credit_stress_easing:    "HYG",
+  small_cap_risk_on:       "IWM",
+  oil_supply_shock:        "OIL",
+  smh_tactical_weakness:   "SMH",
+  reits_falling_yield:     "REIT",
+};
 
-  if (localTz === null) return null;
+// ── Story circle ──────────────────────────────────────────────────────────────
 
-  const localEqNY =
-    clock.localTime === clock.newYorkTime || localTz === "ET" || localTz === "EST" || localTz === "EDT";
+function StoryCircle({
+  force,
+  onTap,
+}: {
+  force: CustomerMarketForce;
+  onTap: () => void;
+}) {
+  const isNeg = NEGATIVE_FORCES.has(force.id);
+  const color = isNeg ? "#f87171" : "#34d399";
+  const icon  = FORCE_ICON[force.id] ?? force.label.slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex items-center gap-2 text-[11px]">
-      <span className="font-semibold text-slate-200">{clock.newYorkTime}</span>
-      <span className="text-slate-500 text-[10px]">ET</span>
-      {!localEqNY && (
-        <>
-          <span className="text-slate-600">·</span>
-          <span className="font-semibold text-slate-400">{clock.localTime}</span>
-          <span className="text-slate-500 text-[10px]">{localTz}</span>
-        </>
-      )}
+    <button
+      onClick={onTap}
+      className="flex flex-col items-center gap-1.5 shrink-0 transition-all active:scale-95"
+    >
+      <div
+        className="w-14 h-14 rounded-full flex items-center justify-center"
+        style={{
+          background: `${color}12`,
+          border: `2px solid ${color}45`,
+          boxShadow: `0 0 12px ${color}18`,
+        }}
+      >
+        <span className="text-[11px] font-black tracking-tight" style={{ color }}>
+          {icon}
+        </span>
+      </div>
+      <span
+        className="text-[9px] font-semibold text-center leading-tight"
+        style={{ color: "#94a3b8", maxWidth: "56px" }}
+      >
+        {force.label}
+      </span>
+    </button>
+  );
+}
+
+// ── Story circles strip ───────────────────────────────────────────────────────
+
+function StoryCirclesStrip({
+  data,
+  onAskAbout,
+}: {
+  data: MarketNowPayload;
+  onAskAbout?: (ctx: string) => void;
+}) {
+  const { active } = buildCustomerForces(data);
+  if (active.length === 0) return null;
+
+  return (
+    <div
+      className="py-3"
+      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+    >
+      <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        <div className="flex gap-5 px-5 min-w-max">
+          {active.slice(0, 10).map((force, i) => (
+            <StoryCircle
+              key={i}
+              force={force}
+              onTap={() =>
+                onAskAbout?.(
+                  `Tell me about the ${force.label} market force and what it means for investors today`,
+                )
+              }
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -152,51 +221,97 @@ function HeroHeader({
   const freshnessTimeCopy =
     freshnessState === "fresh" && data.freshness_timestamp
       ? new Date(data.freshness_timestamp).toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZoneName: "short",
+          hour: "2-digit", minute: "2-digit", timeZoneName: "short",
         })
       : freshnessLabel;
 
   const sessionDot =
-    clock.session === "open"       ? "#34d399" :
-    clock.session === "pre_market" ? "#fbbf24" :
-    clock.session === "after_hours"? "#94a3b8" :
-                                     "#475569";
+    clock.session === "open"        ? "#34d399" :
+    clock.session === "pre_market"  ? "#fbbf24" :
+    clock.session === "after_hours" ? "#94a3b8" :
+                                      "#475569";
+
+  const localEqNY = clock.localTime === clock.newYorkTime;
 
   return (
     <div style={{ background: c.heroGradient }}>
       <div className="px-5 pt-5 pb-6">
 
-        {/* Top row: session pill + refresh */}
-        <div className="flex items-center justify-between mb-5">
+        {/* ── Row 1: greeting left, clocks right ── */}
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <p
+              className="font-black leading-tight text-white"
+              style={{ fontSize: "30px" }}
+              suppressHydrationWarning
+            >
+              {clock.greeting}.
+            </p>
+            <p
+              className="text-[12px] text-slate-400 mt-0.5"
+              suppressHydrationWarning
+            >
+              {clock.sessionLabel}
+            </p>
+          </div>
+
+          {/* Clocks stacked — NY always on top */}
+          <div className="text-right pt-1">
+            <div className="mb-1">
+              <p
+                className="text-[17px] font-black text-slate-100 leading-none"
+                suppressHydrationWarning
+              >
+                {clock.newYorkTime}
+              </p>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500 mt-0.5">
+                New York
+              </p>
+            </div>
+            {!localEqNY && (
+              <div className="mt-2">
+                <p
+                  className="text-[14px] font-semibold text-slate-400 leading-none"
+                  suppressHydrationWarning
+                >
+                  {clock.localTime}
+                </p>
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-600 mt-0.5">
+                  Local
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Divider ── */}
+        <div className="mb-4" style={{ height: "1px", background: `${c.border}20` }} />
+
+        {/* ── Row 2: regime badge + refresh ── */}
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: sessionDot }}
-            />
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: sessionDot }} />
             <span
               className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
               style={{ background: c.badge, color: c.text }}
             >
               {ms.regime.label}
             </span>
-            <span className="text-[10px] text-slate-500">{clock.sessionLabel}</span>
           </div>
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-1 text-[10px] text-slate-500 transition-all active:scale-95"
+            className="flex items-center gap-1 text-[10px] text-slate-600 transition-all active:scale-95"
           >
             <RefreshCw size={9} className={isRefreshing ? "animate-spin" : ""} />
             {isRefreshing ? "…" : freshnessTimeCopy}
           </button>
         </div>
 
-        {/* SPY hero number — only when live data is available */}
+        {/* ── Row 3: SPY number or regime fallback ── */}
         {spy != null ? (
-          <div className="mb-1">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
               S&amp;P 500
             </p>
             <div className="flex items-end gap-3">
@@ -211,39 +326,30 @@ function HeroHeader({
                   <p className="text-[9px] uppercase text-slate-600 tracking-wide">VIX</p>
                   <p
                     className="text-[16px] font-black leading-none"
-                    style={{
-                      color: vix >= 25 ? "#f87171" : vix >= 20 ? "#fbbf24" : "#64748b",
-                    }}
+                    style={{ color: vix >= 25 ? "#f87171" : vix >= 20 ? "#fbbf24" : "#64748b" }}
                   >
                     {vix.toFixed(1)}
                   </p>
                 </div>
               )}
             </div>
-            <p className="text-[12px] font-medium text-slate-400 mt-1 mb-4">
-              {ms.macro_label}
-            </p>
+            <p className="text-[12px] text-slate-400 mt-1">{ms.macro_label}</p>
           </div>
         ) : (
-          /* No live price data — regime narrative leads instead */
-          <div className="mb-4">
-            <p
-              className="text-[28px] font-black leading-tight mb-2"
-              style={{ color: c.text }}
-            >
-              {ms.regime.label}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+              Market view
             </p>
-            <p className="text-[14px] font-medium text-slate-300 leading-snug">
+            <p
+              className="font-black leading-tight"
+              style={{ color: c.text, fontSize: "26px" }}
+            >
               {ms.macro_label}
             </p>
           </div>
         )}
-
-        {/* Dual clock */}
-        <DualClock clock={clock} />
       </div>
 
-      {/* Bottom rule */}
       <div style={{ height: "1px", background: `${c.border}25` }} />
     </div>
   );
@@ -814,6 +920,9 @@ export default function TodayTab({
           onRefresh={onRefresh}
         />
       )}
+
+      {/* ── STORY CIRCLES (full-bleed, below hero) ───────────────────────── */}
+      <StoryCirclesStrip data={data} onAskAbout={onAskAbout} />
 
       {/* ── PADDED CONTENT ────────────────────────────────────────────────── */}
       <div className="px-4 pb-8 space-y-5 pt-5">
