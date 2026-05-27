@@ -58,9 +58,9 @@ export async function GET() {
     try {
       const raw = await gainersRes.value.json();
       gainers = (Array.isArray(raw) ? raw : [])
-        .slice(0, 5)
         .map(toMover)
-        .filter(m => !isNaN(m.changePct) && !isNaN(m.price));
+        .filter(m => !isNaN(m.changePct) && !isNaN(m.price) && m.price >= 5)
+        .slice(0, 5);
     } catch { /* graceful */ }
   }
 
@@ -68,9 +68,9 @@ export async function GET() {
     try {
       const raw = await losersRes.value.json();
       losers = (Array.isArray(raw) ? raw : [])
-        .slice(0, 5)
         .map(toMover)
-        .filter(m => !isNaN(m.changePct) && !isNaN(m.price));
+        .filter(m => !isNaN(m.changePct) && !isNaN(m.price) && m.price >= 5)
+        .slice(0, 5);
     } catch { /* graceful */ }
   }
 

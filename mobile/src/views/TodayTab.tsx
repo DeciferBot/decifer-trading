@@ -514,40 +514,42 @@ function NewsSection({ onAskAbout }: { onAskAbout?: (ctx: string) => void }) {
       <SectionLabel>What&apos;s in the news</SectionLabel>
       <div className="space-y-2">
         {items.map((item, i) => (
-          <div
+          <button
             key={i}
-            className="rounded-xl px-3.5 py-3"
+            onClick={() =>
+              onAskAbout?.(`Tell me about this news story and how it affects markets: "${item.title}"`)
+            }
+            className="w-full rounded-xl px-3.5 py-3 text-left transition-all active:scale-[0.99]"
             style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
           >
-            <div className="flex items-start gap-2">
-              <div className="flex-1 min-w-0">
-                {item.themeLabel && (
-                  <div className="mb-1.5">
-                    <ThemeChip label={item.themeLabel} />
-                  </div>
-                )}
-                <p className="text-[13px] font-semibold text-slate-100 leading-snug line-clamp-2">
-                  {item.title}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  {item.logoUrl && (
-                    <img
-                      src={item.logoUrl}
-                      alt=""
-                      className="w-3.5 h-3.5 rounded object-contain"
-                      style={{ background: "#1e293b" }}
-                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                    />
-                  )}
-                  <p className="text-[10px] text-slate-500">
-                    {item.source}
-                    <span className="mx-1">·</span>
-                    {fmtAge(item.minutesAgo)} ago
-                  </p>
-                </div>
+            {item.themeLabel && (
+              <div className="mb-1.5">
+                <ThemeChip label={item.themeLabel} />
               </div>
+            )}
+            <p className="text-[13px] font-semibold text-slate-100 leading-snug line-clamp-2">
+              {item.title}
+            </p>
+            <div className="flex items-center justify-between mt-1.5">
+              <div className="flex items-center gap-1.5">
+                {item.logoUrl && (
+                  <img
+                    src={item.logoUrl}
+                    alt=""
+                    className="w-3.5 h-3.5 rounded object-contain"
+                    style={{ background: "#1e293b" }}
+                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                )}
+                <p className="text-[10px] text-slate-500">
+                  {item.source}
+                  <span className="mx-1">·</span>
+                  {fmtAge(item.minutesAgo)} ago
+                </p>
+              </div>
+              <span className="text-[10px] text-slate-600">Ask →</span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 

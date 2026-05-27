@@ -226,60 +226,28 @@ export default function CustomerApp() {
     setActiveTab("ask");
   }, []);
 
-  const sessionColor =
-    clock.session === "open"
-      ? "#10b981"
-      : clock.session === "pre_market" || clock.session === "after_hours"
-        ? "#f59e0b"
-        : "#475569";
-
   return (
     <div className="flex flex-col h-[100dvh]" style={{ background: "#0c1117" }}>
 
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
+      {/* ── Header — minimal brand bar; time/session live in the Today hero ── */}
       <header
-        className="shrink-0 px-5 pb-3"
+        className="shrink-0 px-5 pb-2"
         style={{
-          paddingTop: "max(env(safe-area-inset-top), 1rem)",
+          paddingTop: "max(env(safe-area-inset-top), 0.75rem)",
           borderBottom: "1px solid rgba(255,255,255,0.05)",
           background: "#0c1117",
         }}
       >
         <div className="flex items-start justify-between gap-3">
 
-          {/* Branding + greeting */}
-          <div>
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-sm font-black tracking-[0.15em] uppercase" style={{ color: "#f97316" }}>
-                DECIFER
-              </span>
-              <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400">
-                Market Intelligence
-              </span>
-              <span className="text-[9px] text-slate-500">
-                v{process.env.NEXT_PUBLIC_APP_VERSION}
-              </span>
-            </div>
-            {/* suppressHydrationWarning: clock values are computed from new Date()
-                — server (UTC) and client (local timezone) always differ */}
-            <p className="text-[13px] font-medium text-slate-200 leading-snug" suppressHydrationWarning>
-              {clock.greeting}. Here is your market briefing.
-            </p>
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              <span className="text-[11px] text-slate-400" suppressHydrationWarning>{clock.localTime}</span>
-              <span className="flex items-center gap-1.5 whitespace-nowrap">
-                <span className="text-[10px] text-slate-600">·</span>
-                <span className="text-[11px] text-slate-400" suppressHydrationWarning>
-                  {clock.newYorkTime} <span className="text-slate-500">ET</span>
-                </span>
-              </span>
-              <span className="flex items-center gap-1.5 whitespace-nowrap">
-                <span className="text-[10px] text-slate-600">·</span>
-                <span className="text-[11px] font-semibold" style={{ color: sessionColor }} suppressHydrationWarning>
-                  {clock.sessionLabel}
-                </span>
-              </span>
-            </div>
+          {/* Branding — minimal single line; time/session live in the hero */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-black tracking-[0.15em] uppercase" style={{ color: "#f97316" }}>
+              DECIFER
+            </span>
+            <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-500">
+              Market Intelligence
+            </span>
           </div>
 
           {/* Freshness + hamburger */}
