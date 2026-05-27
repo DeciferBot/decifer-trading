@@ -115,10 +115,10 @@ const FORCE_ICON: Record<string, string> = {
 
 function StoryCircle({
   force,
-  onTap,
+  onSelect,
 }: {
   force: CustomerMarketForce;
-  onTap: () => void;
+  onSelect: (f: CustomerMarketForce) => void;
 }) {
   const isNeg = NEGATIVE_FORCES.has(force.id);
   const color = isNeg ? "#f87171" : "#34d399";
@@ -126,15 +126,15 @@ function StoryCircle({
 
   return (
     <button
-      onClick={onTap}
+      onClick={() => onSelect(force)}
       className="flex flex-col items-center gap-1.5 shrink-0 transition-all active:scale-95"
     >
       <div
         className="w-14 h-14 rounded-full flex items-center justify-center"
         style={{
-          background: `${color}12`,
-          border: `2px solid ${color}45`,
-          boxShadow: `0 0 12px ${color}18`,
+          background: `${color}15`,
+          border: `2.5px solid ${color}60`,
+          boxShadow: `0 0 14px ${color}20`,
         }}
       >
         <span className="text-[11px] font-black tracking-tight" style={{ color }}>
@@ -143,7 +143,7 @@ function StoryCircle({
       </div>
       <span
         className="text-[9px] font-semibold text-center leading-tight"
-        style={{ color: "#94a3b8", maxWidth: "56px" }}
+        style={{ color: "#e2e8f0", maxWidth: "56px" }}
       >
         {force.label}
       </span>
@@ -155,10 +155,10 @@ function StoryCircle({
 
 function StoryCirclesStrip({
   data,
-  onAskAbout,
+  onSelect,
 }: {
   data: MarketNowPayload;
-  onAskAbout?: (ctx: string) => void;
+  onSelect: (f: CustomerMarketForce) => void;
 }) {
   const { active } = buildCustomerForces(data);
   if (active.length === 0) return null;
@@ -171,19 +171,139 @@ function StoryCirclesStrip({
       <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
         <div className="flex gap-5 px-5 min-w-max">
           {active.slice(0, 10).map((force, i) => (
-            <StoryCircle
-              key={i}
-              force={force}
-              onTap={() =>
-                onAskAbout?.(
-                  `Tell me about the ${force.label} market force and what it means for investors today`,
-                )
-              }
-            />
+            <StoryCircle key={i} force={force} onSelect={onSelect} />
           ))}
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Force story sheet ─────────────────────────────────────────────────────────
+
+function ForceStorySheet({
+  force,
+  onClose,
+  onAskAbout,
+}: {
+  force: CustomerMarketForce;
+  onClose: () => void;
+  onAskAbout?: (ctx: string) => void;
+}) {
+  const isNeg  = NEGATIVE_FORCES.has(force.id);
+  const color  = isNeg ? "#f87171" : "#34d399";
+  const dirLabel = isNeg ? "Market headwind" : "Market tailwind";
+  const icon   = FORCE_ICON[force.id] ?? force.label.slice(0, 2).toUpperCase();
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40"
+        style={{ background: "rgba(0,0,0,0.65)" }}
+        onClick={onClose}
+      />
+      {/* Sheet */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-y-auto"
+        style={{
+          background: "#0d1520",
+          border: "1px solid rgba(255,255,255,0.1)",
+          maxHeight: "82vh",
+        }}
+      >
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.15)" }} />
+        </div>
+
+        <div className="px-5 pb-10">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-5">
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: `${color}15`, border: `2.5px solid ${color}60` }}
+            >
+              <span className="text-[13px] font-black" style={{ color }}>{icon}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[20px] font-black text-white leading-tight">{force.label}</p>
+              <p className="text-[11px] font-semibold mt-0.5" style={{ color }}>
+                {dirLabel} · Active now
+              </p>
+            </div>
+            <button onClick={onClose} className="text-slate-500 text-[11px] px-2 py-1">
+              close
+            </button>
+          </div>
+
+          {/* Why it matters */}
+          {force.why_it_matters && (
+            <div className="mb-5">
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#f97316" }}>
+                Why it matters
+              </p>
+              <p className="text-[14px] text-white leading-relaxed">{force.why_it_matters}</p>
+            </div>
+          )}
+
+          {/* Market impact */}
+          {force.market_impact && (
+            <div className="mb-5">
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#f97316" }}>
+                Market impact
+              </p>
+              <p className="text-[13px] text-slate-200 leading-relaxed">{force.market_impact}</p>
+            </div>
+          )}
+
+          {/* Risk to watch */}
+          {force.risk_to_monitor && (
+            <div
+              className="rounded-xl px-3 py-3 mb-5 flex items-start gap-2"
+              style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)" }}
+            >
+              <Shield size={12} className="text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-[12px] text-amber-200 leading-relaxed">{force.risk_to_monitor}</p>
+            </div>
+          )}
+
+          {/* Connected themes */}
+          {force.connected_theme_labels.length > 0 && (
+            <div className="mb-5">
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#f97316" }}>
+                Connected themes
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {force.connected_theme_labels.map((lbl, i) => (
+                  <span
+                    key={i}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                    style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+                  >
+                    {lbl}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ask CTA */}
+          {onAskAbout && (
+            <button
+              onClick={() => {
+                onClose();
+                onAskAbout(`Tell me more about the ${force.label} market force and which names are connected`);
+              }}
+              className="w-full py-3.5 rounded-2xl text-[14px] font-bold transition-all active:scale-[0.98]"
+              style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c", border: "1px solid rgba(249,115,22,0.25)" }}
+            >
+              Ask Decifer about this →
+            </button>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -333,7 +453,7 @@ function HeroHeader({
                 </div>
               )}
             </div>
-            <p className="text-[12px] text-slate-400 mt-1">{ms.macro_label}</p>
+            <p className="text-[12px] text-slate-200 mt-1">{ms.macro_label}</p>
           </div>
         ) : (
           <div>
@@ -395,7 +515,7 @@ function MarketNarrative({
           {ms.supporting_bullets.slice(0, 2).map((b, i) => (
             <li key={i} className="flex items-start gap-2">
               <span className="w-1 h-1 rounded-full shrink-0 mt-1.5" style={{ background: "#f97316" }} />
-              <p className="text-[11px] text-slate-400 leading-relaxed">{b}</p>
+              <p className="text-[11px] text-slate-200 leading-relaxed">{b}</p>
             </li>
           ))}
         </ul>
@@ -548,7 +668,7 @@ function SectorTile({ entry }: { entry: SectorEntry }) {
       className="rounded-xl px-2.5 py-2.5"
       style={{ background: bg, border: `1px solid ${borderColor}` }}
     >
-      <p className="text-[10px] font-semibold text-slate-400 leading-none mb-1.5 truncate">
+      <p className="text-[10px] font-semibold text-slate-200 leading-none mb-1.5 truncate">
         {entry.shortLabel}
       </p>
       <p className="text-[14px] font-black leading-none" style={{ color: textColor }}>
@@ -777,7 +897,7 @@ function CauseGroupCard({
         </div>
       </div>
       <p className="text-[12px] text-slate-300 leading-relaxed mb-1">{card.what_happened}</p>
-      <p className="text-[12px] text-slate-400 leading-relaxed">{card.market_impact}</p>
+      <p className="text-[12px] text-slate-200 leading-relaxed">{card.market_impact}</p>
       {card.connected_themes.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2.5">
           {card.connected_themes.slice(0, 3).map((t, j) => (
@@ -839,7 +959,7 @@ function WhereLookingSection({
             {names.map((n, i) => (
               <div key={i} className="flex items-start gap-2.5">
                 <span className="text-[11px] font-bold text-slate-200 shrink-0 w-11">{n.symbol}</span>
-                <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{n.reason}</p>
+                <p className="text-[11px] text-slate-200 leading-relaxed line-clamp-2">{n.reason}</p>
               </div>
             ))}
           </div>
@@ -894,6 +1014,7 @@ export default function TodayTab({
   const watchNext = apiWatch.length > 0 ? apiWatch : buildWhatCouldChange(data);
   const groups    = buildCauseGroups(data);
 
+  const [selectedForce, setSelectedForce] = useState<CustomerMarketForce | null>(null);
   const [tape, setTape] = useState<TapeEntry[]>([]);
   useEffect(() => {
     fetch("/api/market-tape")
@@ -922,7 +1043,7 @@ export default function TodayTab({
       )}
 
       {/* ── STORY CIRCLES (full-bleed, below hero) ───────────────────────── */}
-      <StoryCirclesStrip data={data} onAskAbout={onAskAbout} />
+      <StoryCirclesStrip data={data} onSelect={setSelectedForce} />
 
       {/* ── PADDED CONTENT ────────────────────────────────────────────────── */}
       <div className="px-4 pb-8 space-y-5 pt-5">
@@ -958,7 +1079,7 @@ export default function TodayTab({
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] text-slate-200 leading-snug">{item.title}</p>
                       {item.detail && (
-                        <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">{item.detail}</p>
+                        <p className="text-[11px] text-slate-200 mt-0.5 leading-relaxed line-clamp-2">{item.detail}</p>
                       )}
                     </div>
                   </div>
@@ -966,7 +1087,7 @@ export default function TodayTab({
               </div>
             ) : (
               <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <p className="text-sm text-slate-400">Market story looks the same since you were away.</p>
+                <p className="text-sm text-white">Market story looks the same since you were away.</p>
                 <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">Scroll down for the full briefing.</p>
               </div>
             )}
@@ -1037,7 +1158,7 @@ export default function TodayTab({
                 {watchNext.map((item, i) => (
                   <li key={i} className="flex items-start gap-2.5">
                     <Eye size={11} className="text-slate-500 shrink-0 mt-1" />
-                    <p className="text-xs text-slate-300 leading-relaxed">{item}</p>
+                    <p className="text-xs text-white leading-relaxed">{item}</p>
                   </li>
                 ))}
               </ul>
@@ -1057,6 +1178,15 @@ export default function TodayTab({
         </div>
 
       </div>
+
+      {/* ── Force story sheet overlay ──────────────────────────────────────── */}
+      {selectedForce && (
+        <ForceStorySheet
+          force={selectedForce}
+          onClose={() => setSelectedForce(null)}
+          onAskAbout={onAskAbout}
+        />
+      )}
     </div>
   );
 }
