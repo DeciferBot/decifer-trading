@@ -1564,6 +1564,9 @@ export default function TodayTab({
           {data.data_entitlement_note && (
             <p className="text-[10px] text-slate-500 mt-1">{data.data_entitlement_note}</p>
           )}
+          <p className="text-[10px] text-slate-700 mt-1">
+            v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
+          </p>
         </div>
 
       </div>
