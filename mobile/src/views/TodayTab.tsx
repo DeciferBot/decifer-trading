@@ -1421,27 +1421,34 @@ export default function TodayTab({
     async function load() {
       try {
         const themes = await fetchTtgThemes();
-        const activeThemes = themes.filter((t: { driver_active: boolean }) => t.driver_active);
-        if (activeThemes.length === 0) {
+        if (themes.length === 0) {
           if (!cancelled) setTtgData({ names: [], symbolMap: new Map() });
           return;
         }
-        const details = await Promise.allSettled(
-          activeThemes.map((t: { theme_id: string }) => fetchTtgThemeDetail(t.theme_id))
+        // Fetch ALL themes for a complete symbolMap (used by Agenda + Analyst filters).
+        // Active themes are used separately for name selection (WhereLooking).
+        const activeThemeIds = new Set(
+          themes.filter((t: { driver_active: boolean }) => t.driver_active)
+                .map((t: { theme_id: string }) => t.theme_id)
+        );
+        const allDetails = await Promise.allSettled(
+          themes.map((t: { theme_id: string }) => fetchTtgThemeDetail(t.theme_id))
         );
         const symbolMap = new Map<string, { theme_label: string }>();
-        // Collect all candidates across themes with their confidence for global ranking
         const candidates: Array<NameEntry & { _conf: number }> = [];
-        for (const result of details) {
+        for (const result of allDetails) {
           if (result.status !== "fulfilled" || !result.value) continue;
           const detail = result.value;
+          // All active symbols go into symbolMap regardless of theme driver state
           for (const s of detail.symbols) {
             if (s.status === "active") symbolMap.set(s.symbol, { theme_label: detail.label });
           }
+          // Only driver-active themes contribute candidates for WhereLooking
+          if (!activeThemeIds.has(detail.theme_id)) continue;
           const eligible = detail.symbols
             .filter((s: TtgSymbolCard) => s.status === "active" && s.driver_active)
             .sort((a: TtgSymbolCard, b: TtgSymbolCard) => (b.confidence ?? 0) - (a.confidence ?? 0))
-            .slice(0, 3); // take top 3 per theme for global pool
+            .slice(0, 3);
           for (const s of eligible) {
             if (candidates.find(c => c.symbol === s.symbol)) continue;
             const chip = s.exposure_type === "direct_beneficiary" ? "Direct"
