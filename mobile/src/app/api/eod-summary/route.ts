@@ -105,21 +105,6 @@ async function fetchTape(): Promise<EodTape> {
     } catch { /* graceful */ }
   }
 
-  // Fallback: derive VIX level from UVXY if index call failed
-  if (tape.vix === null && FMP_KEY) {
-    try {
-      const res = await fetch(`${BASE}/batch-quote-short?symbols=VIXY&apikey=${FMP_KEY}`, {
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const raw: Array<{ symbol: string; price: number }> = await res.json();
-        const v = raw.find((r) => r.symbol === "VIXY");
-        // VIXY ≈ VIX/4 rough proxy — flag as approximate
-        if (v) tape.vix = parseFloat((v.price * 4).toFixed(1));
-      }
-    } catch { /* graceful */ }
-  }
-
   return tape;
 }
 
