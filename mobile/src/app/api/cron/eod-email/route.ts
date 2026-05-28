@@ -9,7 +9,7 @@ import {
   parseEodItems,
   extractWatchTomorrow,
   type EodSummaryPayload,
-  type EodTape,
+  type EodMover,
 } from "@/app/api/eod-summary/route";
 
 export const maxDuration = 90;
@@ -32,14 +32,34 @@ function tapeColor(v: number | null, isVix = false): string {
   return v >= 0 ? "#22c55e" : "#ef4444";
 }
 
-// ── Email HTML builder ────────────────────────────────────────────────────────
+// ── Category icons ────────────────────────────────────────────────────────────
 
-function buildTapeCell(label: string, value: string, color: string): string {
-  return `<td style="padding:10px 14px;text-align:center;background:#111827;border-radius:8px;">
-    <div style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">${label}</div>
-    <div style="color:${color};font-size:18px;font-weight:700;margin-top:4px;font-feature-settings:'tnum';">${value}</div>
-  </td>`;
+const CATEGORY_ICONS: Record<string, string> = {
+  ANALYST: "&#128202;", // 📊
+  INSIDER: "&#128100;", // 👤
+  EARNINGS: "&#128176;", // 💰
+  MACRO: "&#127968;",   // 🏦
+  MOVERS: "&#128200;",  // 📈
+  DEAL: "&#129309;",    // 🤝
+  NEWS: "&#128240;",    // 📰
+  SECTOR: "&#127981;",  // 🏭
+  RATES: "&#128201;",   // 📉
+  FED: "&#127968;",     // 🏦
+};
+
+function extractCategory(text: string): { icon: string; cleanText: string } {
+  const match = text.match(/^\[([A-Z]+)\]\s*/);
+  if (match) {
+    const cat = match[1].toUpperCase();
+    return {
+      icon: CATEGORY_ICONS[cat] ?? "&bull;",
+      cleanText: text.slice(match[0].length),
+    };
+  }
+  return { icon: "&bull;", cleanText: text };
 }
+
+// ── Ticker highlighter ────────────────────────────────────────────────────────
 
 function highlightTickers(text: string): string {
   return text.replace(
@@ -48,23 +68,195 @@ function highlightTickers(text: string): string {
   );
 }
 
-function buildItemRow(text: string, index: number): string {
-  const highlighted = highlightTickers(text);
+// ── Tape cell builder ─────────────────────────────────────────────────────────
+
+function buildTapeCell(label: string, value: string, color: string): string {
+  return `<td style="padding:10px 14px;text-align:center;background:#111827;border-radius:8px;">
+    <div style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">${label}</div>
+    <div style="color:${color};font-size:18px;font-weight:700;margin-top:4px;font-feature-settings:'tnum';">${value}</div>
+  </td>`;
+}
+
+// ── Movers section ────────────────────────────────────────────────────────────
+
+function buildMoverRows(movers: EodMover[], color: string, sign: string): string {
+  return movers.slice(0, 5).map(m => {
+    const absPct = Math.abs(m.pct).toFixed(1);
+    const pctStr = `${sign}${absPct}%`;
+    const priceStr = m.price !== undefined ? `$${m.price.toFixed(2)}` : "";
+    return `
+    <tr>
+      <td style="padding:5px 0;border-bottom:1px solid #0d1117;vertical-align:middle;">
+        <table cellpadding="0" cellspacing="0" width="100%"><tr>
+          <td style="vertical-align:middle;">
+            <div style="color:#f97316;font-weight:700;font-size:12px;font-family:'Courier New',Courier,monospace;letter-spacing:0.5px;">${m.symbol}</div>
+            <div style="color:#374151;font-size:10px;overflow:hidden;white-space:nowrap;max-width:90px;text-overflow:ellipsis;">${m.name.slice(0, 20)}</div>
+          </td>
+          <td align="right" style="vertical-align:middle;white-space:nowrap;padding-left:8px;">
+            <div style="color:${color};font-size:15px;font-weight:700;line-height:1.2;">${pctStr}</div>
+            <div style="color:#374151;font-size:10px;">${priceStr}</div>
+          </td>
+        </tr></table>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function buildMoversSection(gainers: EodMover[], losers: EodMover[]): string {
+  if (!gainers.length && !losers.length) return "";
+
   return `
   <tr>
-    <td style="padding:18px 0;border-bottom:1px solid #1f2937;vertical-align:top;">
+    <td style="background:#0d1117;padding:14px 32px 18px;border-bottom:1px solid #1f2937;">
+      <table cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <!-- Gainers column -->
+          <td width="46%" style="vertical-align:top;">
+            <div style="color:#22c55e;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding-bottom:8px;border-bottom:1px solid #1f2937;margin-bottom:2px;">&#9650; Top Gainers</div>
+            <table cellpadding="0" cellspacing="0" width="100%">
+              ${buildMoverRows(gainers, "#22c55e", "+")}
+            </table>
+          </td>
+          <!-- Spacer -->
+          <td width="8%" style="min-width:16px;"></td>
+          <!-- Losers column -->
+          <td width="46%" style="vertical-align:top;">
+            <div style="color:#ef4444;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding-bottom:8px;border-bottom:1px solid #1f2937;margin-bottom:2px;">&#9660; Top Losers</div>
+            <table cellpadding="0" cellspacing="0" width="100%">
+              ${buildMoverRows(losers, "#ef4444", "-")}
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>`;
+}
+
+// ── Summary item row ──────────────────────────────────────────────────────────
+
+function buildItemRow(text: string, index: number): string {
+  const { icon, cleanText } = extractCategory(text);
+  const highlighted = highlightTickers(cleanText);
+  return `
+  <tr>
+    <td style="padding:14px 0;border-bottom:1px solid #1f2937;vertical-align:top;">
       <table cellpadding="0" cellspacing="0" width="100%"><tr>
-        <td style="width:32px;vertical-align:top;padding-top:2px;">
-          <div style="width:26px;height:26px;background:#1f2937;border-radius:50%;text-align:center;line-height:26px;color:#f97316;font-weight:700;font-size:13px;">${index}</div>
+        <td style="width:28px;vertical-align:top;padding-top:1px;">
+          <div style="width:22px;height:22px;background:#1f2937;border-radius:50%;text-align:center;line-height:22px;color:#f97316;font-weight:700;font-size:11px;">${index}</div>
         </td>
-        <td style="color:#e5e7eb;font-size:15px;line-height:1.65;padding-left:12px;">${highlighted}</td>
+        <td style="width:20px;vertical-align:top;padding-top:1px;padding-left:6px;font-size:14px;line-height:22px;">${icon}</td>
+        <td style="color:#d1d5db;font-size:14px;line-height:1.55;padding-left:8px;">${highlighted}</td>
       </tr></table>
     </td>
   </tr>`;
 }
 
-function buildHtml(payload: EodSummaryPayload): string {
-  const { marketDate, tape, rawText, items, generatedAt } = payload;
+// ── Watch Tomorrow section ────────────────────────────────────────────────────
+
+function renderWatchSection(raw: string): string {
+  if (!raw) return "";
+
+  const subHeaders = ["Earnings:", "Macro Data:", "Fed/Other:", "Watch Tomorrow"];
+  const lines = raw.split("\n").map((l) => l.replace(/^[-•*]\s*/, "").trim()).filter(Boolean);
+
+  let html = "";
+  let inEarnings = false;
+  let earningsTableOpen = false;
+
+  for (const line of lines) {
+    const isHeader = subHeaders.some((h) => line.startsWith(h));
+
+    if (isHeader) {
+      if (earningsTableOpen) {
+        html += `</table>`;
+        earningsTableOpen = false;
+        inEarnings = false;
+      }
+      const label = line.replace(/:?\s*$/, "");
+      html += `<div style="color:#f97316;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:14px 0 6px;">${label}</div>`;
+      inEarnings = line.startsWith("Earnings:");
+      if (inEarnings) {
+        earningsTableOpen = true;
+        html += `<table cellpadding="0" cellspacing="4" width="100%">
+          <tr>
+            <th align="left" style="color:#374151;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;padding:0 0 6px 0;font-weight:600;border-bottom:1px solid #1f2937;">Company</th>
+            <th align="left" style="color:#374151;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;padding:0 8px 6px;font-weight:600;border-bottom:1px solid #1f2937;">When</th>
+            <th align="right" style="color:#374151;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;padding:0 0 6px 0;font-weight:600;border-bottom:1px solid #1f2937;">EPS Est</th>
+            <th align="right" style="color:#374151;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;padding:0 0 6px 4px;font-weight:600;border-bottom:1px solid #1f2937;">Rev Est</th>
+          </tr>`;
+      }
+      continue;
+    }
+
+    // Earnings table row: $TICKER (Name) — pre-market | EPS est $X.XX | Rev est $XB
+    if (inEarnings && earningsTableOpen && line.startsWith("$")) {
+      const tickerMatch = line.match(/^\$([A-Z]{1,5})/);
+      const nameMatch = line.match(/\(([^)]+)\)/);
+      const timingMatch = line.match(/(pre-market|after-close|during market hours|BMO|AMC|DMH)/i);
+      const epsMatch = line.match(/EPS\s+est\s+\$([0-9.-]+)/i);
+      const revMatch = line.match(/Rev\s+est\s+\$([0-9.]+[BMKbmk]?)/i);
+
+      const sym = tickerMatch ? tickerMatch[1] : line.slice(0, 6);
+      const name = nameMatch ? nameMatch[1].slice(0, 16) : sym;
+      const t = timingMatch ? timingMatch[1].toLowerCase() : "";
+      const timingLabel = t.includes("pre") || t === "bmo" ? "BMO" :
+                          t.includes("after") || t === "amc" ? "AMC" :
+                          t === "dmh" || t.includes("during") ? "DMH" : "—";
+      const eps = epsMatch ? `$${epsMatch[1]}` : "—";
+      const rev = revMatch ? `$${revMatch[1]}` : "—";
+
+      html += `
+        <tr>
+          <td style="padding:5px 0;border-bottom:1px solid #111827;vertical-align:middle;">
+            <div style="color:#f97316;font-weight:700;font-size:12px;font-family:'Courier New',monospace;">${sym}</div>
+            <div style="color:#4b5563;font-size:10px;">${name}</div>
+          </td>
+          <td style="padding:5px 8px;border-bottom:1px solid #111827;vertical-align:middle;">
+            <span style="background:#1f2937;color:#9ca3af;font-size:10px;padding:2px 6px;border-radius:3px;font-weight:600;white-space:nowrap;">${timingLabel}</span>
+          </td>
+          <td align="right" style="padding:5px 0;border-bottom:1px solid #111827;color:#e5e7eb;font-size:12px;font-weight:600;white-space:nowrap;">${eps}</td>
+          <td align="right" style="padding:5px 4px;border-bottom:1px solid #111827;color:#9ca3af;font-size:12px;white-space:nowrap;">${rev}</td>
+        </tr>`;
+      continue;
+    }
+
+    if (earningsTableOpen && !line.startsWith("$")) {
+      html += `</table>`;
+      earningsTableOpen = false;
+      inEarnings = false;
+    }
+
+    // Macro line: [High|Medium] TIME ET — EVENT (prev X, est Y)
+    const macroMatch = line.match(/^\[(High|Medium|HIGH|MED)\]/i);
+    if (macroMatch) {
+      const isHigh = macroMatch[1].toUpperCase().startsWith("H");
+      const impactColor = isHigh ? "#ef4444" : "#f59e0b";
+      const cleanLine = highlightTickers(line.replace(/^\[[^\]]+\]\s*/, ""));
+      html += `
+        <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:3px;">
+          <tr>
+            <td style="width:36px;vertical-align:top;padding-top:4px;">
+              <span style="background:${impactColor}20;color:${impactColor};font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px;white-space:nowrap;">${isHigh ? "HIGH" : "MED"}</span>
+            </td>
+            <td style="color:#9ca3af;font-size:13px;line-height:1.5;padding:3px 0;">${cleanLine}</td>
+          </tr>
+        </table>`;
+      continue;
+    }
+
+    // Default plain line
+    html += `<div style="color:#9ca3af;font-size:13px;line-height:1.7;padding:4px 0;margin-bottom:2px;">${highlightTickers(line)}</div>`;
+  }
+
+  if (earningsTableOpen) html += `</table>`;
+
+  return html;
+}
+
+// ── Full email HTML builder ───────────────────────────────────────────────────
+
+export function buildHtml(payload: EodSummaryPayload): string {
+  const { marketDate, tape, rawText, items, gainers, losers, generatedAt } = payload;
 
   const tapeCells: Array<[string, string, string]> = [
     ["S&P 500", fmtPct(tape.spy), tapeColor(tape.spy)],
@@ -86,34 +278,17 @@ function buildHtml(payload: EodSummaryPayload): string {
       ? `<tr><td style="padding:20px 0;color:#9ca3af;font-size:14px;line-height:1.7;white-space:pre-line;">${highlightTickers(rawText)}</td></tr>`
       : `<tr><td style="padding:20px 0;color:#6b7280;">No summary data available.</td></tr>`;
 
-  // Structured Watch Tomorrow — renders Earnings / Macro Data / Fed sub-sections
   const watchRaw = extractWatchTomorrow(rawText);
-
-  function renderWatchSection(raw: string): string {
-    if (!raw) return "";
-    const subHeaders = ["Earnings:", "Macro Data:", "Fed/Other:", "Watch Tomorrow"];
-    const lines = raw.split("\n").map((l) => l.replace(/^[-•*]\s*/, "").trim()).filter(Boolean);
-    let html = "";
-    for (const line of lines) {
-      const isHeader = subHeaders.some((h) => line.startsWith(h));
-      if (isHeader) {
-        const label = line.replace(/:?\s*$/, "").replace("Watch Tomorrow", "Watch Tomorrow");
-        html += `<div style="color:#f97316;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:16px 0 6px;">${label}</div>`;
-      } else {
-        html += `<div style="color:#9ca3af;font-size:13px;line-height:1.7;padding:5px 0 5px 14px;border-left:2px solid #1f2937;margin-bottom:2px;">${highlightTickers(line)}</div>`;
-      }
-    }
-    return html;
-  }
+  const watchBodyHtml = watchRaw ? renderWatchSection(watchRaw) : "";
 
   const watchHtml = watchRaw
     ? `
   <tr>
-    <td style="padding:28px 0 8px;border-top:1px solid #1f2937;">
-      <div style="display:inline-block;background:#1c1007;border:1px solid #431407;border-radius:6px;padding:4px 12px;margin-bottom:4px;">
+    <td style="background:#0d1117;padding:20px 32px 24px;border-top:1px solid #1f2937;">
+      <div style="display:inline-block;background:#1c1007;border:1px solid #431407;border-radius:6px;padding:4px 12px;margin-bottom:2px;">
         <span style="color:#f97316;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Watch Tomorrow</span>
       </div>
-      ${renderWatchSection(watchRaw)}
+      ${watchBodyHtml}
     </td>
   </tr>`
     : "";
@@ -157,22 +332,27 @@ function buildHtml(payload: EodSummaryPayload): string {
 
       <!-- Market Tape -->
       <tr>
-        <td style="background:#0d1117;padding:20px 32px 20px;border-bottom:1px solid #1f2937;">
+        <td style="background:#0d1117;padding:20px 32px;border-bottom:1px solid #1f2937;">
           <table cellpadding="0" cellspacing="0" width="100%">
             <tr>${tapeHtml}</tr>
           </table>
         </td>
       </tr>
 
+      <!-- Movers -->
+      ${buildMoversSection(gainers ?? [], losers ?? [])}
+
       <!-- Summary Items -->
       <tr>
         <td style="background:#0d1117;padding:8px 32px 0;">
           <table width="100%" cellpadding="0" cellspacing="0">
             ${itemsHtml}
-            ${watchHtml}
           </table>
         </td>
       </tr>
+
+      <!-- Watch Tomorrow -->
+      ${watchHtml}
 
       <!-- Footer -->
       <tr>
@@ -237,7 +417,6 @@ function buildSubject(payload: EodSummaryPayload): string {
 // ── GET handler ───────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  // Validate Vercel cron secret (skipped if CRON_SECRET not set — allows manual triggers)
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get("authorization");
@@ -246,10 +425,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Re-parse items in case we need them fresh (generateEodSummary also calls parseEodItems internally)
   const payload = await generateEodSummary();
 
-  // Ensure items are populated even if generateEodSummary had a partial parse
   if (!payload.items.length && payload.rawText) {
     payload.items = parseEodItems(payload.rawText);
   }
@@ -264,6 +441,8 @@ export async function GET(request: NextRequest) {
     sentTo: EOD_EMAIL_TO,
     subject,
     itemCount: payload.items.length,
+    gainerCount: payload.gainers?.length ?? 0,
+    loserCount: payload.losers?.length ?? 0,
     marketDate: payload.marketDate,
     generatedAt: payload.generatedAt,
     ...(result.error ? { error: result.error } : {}),
