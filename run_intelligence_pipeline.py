@@ -179,10 +179,23 @@ def run() -> None:
     summary = activation.get("activation_summary", {})
     print(f"      {summary.get('activated', 0)}/{summary.get('total_themes', 0)} themes activated → theme_activation.json")
 
+    # Step 3.5 — thesis divergence scanner (fail-soft)
+    print("[3.5/5] Computing thesis divergence (candidate vs proxy 5D returns)...")
+    thesis_intact_map: dict = {}
+    try:
+        from thesis_divergence import compute_thesis_divergence
+        thesis_intact_map = compute_thesis_divergence()
+        diverging = sum(1 for v in thesis_intact_map.values() if v is False)
+        intact    = sum(1 for v in thesis_intact_map.values() if v is True)
+        print(f"      {intact} intact / {diverging} diverging candidates flagged → thesis_divergence.json")
+    except Exception as _td_err:
+        log.warning("thesis_divergence step failed (non-fatal): %s", _td_err)
+        print(f"      [WARN] thesis_divergence skipped: {_td_err}")
+
     # Step 4 — build shadow universe, promote to live
     print("[4/5] Building universe + promoting to live handoff...")
     from universe_builder import UniverseBuilder
-    universe = UniverseBuilder().write()
+    universe = UniverseBuilder(thesis_intact_map=thesis_intact_map).write()
     n_candidates = len(universe.candidates)
     print(f"      {n_candidates} candidates → {_SHADOW_PATH}")
 

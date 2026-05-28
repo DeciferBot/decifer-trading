@@ -247,6 +247,19 @@ def flag_positions_for_review(
         if not reason:
             continue
         flagged.append(_build_review_payload(pos, reason))
+
+    # Enrich flagged positions with analyst / price structure / fundamentals / theme data.
+    # Fail-soft — enrichment failure never removes positions or aborts the review.
+    if flagged:
+        try:
+            from pm_enrichment import enrich_review_positions
+            enrich_review_positions(
+                flagged,
+                all_open_positions=open_positions,
+            )
+        except Exception as _enr_err:
+            log.debug("flag_positions_for_review: enrichment skipped — %s", _enr_err)
+
     return flagged
 
 

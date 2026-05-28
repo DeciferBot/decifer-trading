@@ -1082,16 +1082,71 @@ def _format_candidate_line(c: dict) -> str:
     return line
 
 
-def _format_review_line(p: dict) -> str:
+def _format_review_block(p: dict) -> str:
+    """Render a Track B position for Apex — enriched when available, 7-field fallback."""
     pnl = p.get("pnl_pct")
     pnl_str = f"{pnl:+.2%}" if pnl is not None else "n/a"
-    return (
+    days = p.get("days_held")
+    days_str = f"{days:.1f}" if days is not None else "n/a"
+    header = (
         f"{p.get('symbol')}: tt={p.get('trade_type')} dir={p.get('direction')} "
-        f"pnl={pnl_str} days={p.get('days_held')} "
+        f"pnl={pnl_str} days={days_str} "
         f"flag={p.get('flagged_reason')} "
         f"band {p.get('entry_conviction_band')}→{p.get('current_conviction_band')} "
         f"earn_d={p.get('earnings_days_away')}"
     )
+
+    lines = [header]
+
+    # Layer 1 — analyst
+    consensus   = p.get("analyst_consensus")
+    pt          = p.get("analyst_pt")
+    upside      = p.get("analyst_upside_pct")
+    buy_count   = p.get("analyst_buy_count")
+    sell_count  = p.get("analyst_sell_count")
+    if consensus or pt:
+        pt_str     = f" | PT ${pt:.0f}" if pt else ""
+        upside_str = f" | upside {upside:+.1f}%" if upside is not None else ""
+        grade_str  = f" | {buy_count}↑/{sell_count}↓" if buy_count is not None and sell_count is not None else ""
+        lines.append(f"  analyst: {consensus or 'n/a'}{pt_str}{upside_str}{grade_str}")
+
+    # Layer 2 — price structure
+    w52h     = p.get("week52_high")
+    w52d     = p.get("week52_high_distance_pct")
+    above200 = p.get("stock_above_200d")
+    thesis   = p.get("thesis_intact")
+    if w52h is not None or above200 is not None or thesis is not None:
+        w52_str    = f"52wk_high=${w52h:.2f} ({w52d:+.1f}%)" if w52h is not None and w52d is not None else ""
+        ma200_str  = f"above_200d={'yes' if above200 else 'no'}" if above200 is not None else ""
+        thesis_str = f"thesis_intact={'True' if thesis else ('False' if thesis is False else 'n/a')}"
+        parts = [s for s in [w52_str, ma200_str, thesis_str] if s]
+        if parts:
+            lines.append(f"  price_struct: {' | '.join(parts)}")
+
+    # Layer 3 — fundamentals
+    pe          = p.get("pe_ratio")
+    profitable  = p.get("is_profitable")
+    rev_yoy     = p.get("revenue_growth_yoy")
+    rev_decel   = p.get("revenue_decelerating")
+    fcf         = p.get("fcf_yield")
+    if pe is not None or profitable is not None or rev_yoy is not None or fcf is not None:
+        pe_str      = f"P/E={pe:.1f}" if pe is not None else "P/E=n/a"
+        profit_str  = f"profitable={'yes' if profitable else 'no'}" if profitable is not None else ""
+        rev_str     = f"rev_yoy={rev_yoy:+.1f}%{'⬇' if rev_decel else ''}" if rev_yoy is not None else ""
+        fcf_str     = f"FCF_yield={fcf:.1f}%" if fcf is not None else ""
+        parts = [s for s in [profit_str, pe_str, rev_str, fcf_str] if s]
+        if parts:
+            lines.append(f"  fundamentals: {' | '.join(parts)}")
+
+    # Layer 4 — theme concentration
+    peers        = p.get("theme_peers") or []
+    concentration = p.get("theme_concentration_pct")
+    if peers or concentration is not None:
+        peer_str   = f"{len(peers)} other names open ({','.join(peers[:4])})" if peers else "no theme peers"
+        conc_str   = f" — {concentration:.1f}% theme concentration" if concentration is not None else ""
+        lines.append(f"  portfolio: {peer_str}{conc_str}")
+
+    return "\n".join(lines)
 
 
 def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> str:
@@ -1234,7 +1289,7 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
 
     parts.append(f"\n[TRACK B — OPEN POSITIONS] ({len(review)})")
     for p in review:
-        parts.append("  " + _format_review_line(p))
+        parts.append(_format_review_block(p))
 
     parts.append(f"\n[SCAN_TS] {apex_input.get('scan_ts', '')}")
     parts.append("\nReturn the JSON object only. No commentary outside JSON.")

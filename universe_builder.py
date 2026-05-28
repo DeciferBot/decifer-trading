@@ -621,11 +621,13 @@ class UniverseBuilder:
         output_path: str = _DEFAULT_OUTPUT_PATH,
         snapshot_path: str = _DEFAULT_SNAPSHOT_PATH,
         adapter_snapshot_path: str = _ADAPTER_SNAPSHOT_PATH,
+        thesis_intact_map: "dict[str, bool | None] | None" = None,
     ) -> None:
         self._feed_path = feed_path
         self._output_path = output_path
         self._snapshot_path = snapshot_path
         self._adapter_snapshot_path = adapter_snapshot_path
+        self._thesis_intact_map: dict[str, bool | None] = thesis_intact_map or {}
 
     def build(self) -> ShadowUniverse:
         from route_tagger import RouteContext, assign_route
@@ -686,6 +688,8 @@ class UniverseBuilder:
             cand = _from_economic_candidate(ec)
             if cand is None:
                 continue
+            if self._thesis_intact_map:
+                cand.thesis_intact = self._thesis_intact_map.get(cand.symbol)
             role = ec.get("role", "")
             ctx = RouteContext(
                 symbol=cand.symbol, reason_to_care=cand.reason_to_care,
