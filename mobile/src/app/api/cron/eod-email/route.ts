@@ -17,7 +17,10 @@ export const maxDuration = 90;
 const RESEND_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM =
   process.env.RESEND_FROM_EMAIL ?? "Decifer <noreply@decifertrading.com>";
-const EOD_EMAIL_TO = process.env.EOD_EMAIL_TO ?? "amit@decifer.io";
+const EOD_EMAIL_TO: string[] = (process.env.EOD_EMAIL_TO ?? "amit@decifer.io")
+  .split(",")
+  .map((e) => e.trim())
+  .filter(Boolean);
 
 // ── Tape formatting ───────────────────────────────────────────────────────────
 
@@ -386,7 +389,7 @@ async function sendEmail(
       },
       body: JSON.stringify({
         from: RESEND_FROM,
-        to: [EOD_EMAIL_TO],
+        to: EOD_EMAIL_TO,
         subject,
         html,
       }),
