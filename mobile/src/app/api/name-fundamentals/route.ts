@@ -27,14 +27,13 @@ export async function GET(req: NextRequest) {
   const base = "https://financialmodelingprep.com/stable";
   const key = `apikey=${FMP_KEY}`;
 
-  // FMP stable API uses singular ?symbol= for single-symbol endpoints.
-  // profile-symbol replaces the legacy v3/profile; grades-summary + price-target-consensus
-  // replace the deprecated analyst-consensus endpoint.
-  const [profileResult, metricsResult, gradeResult, priceTargetResult, growthResult] =
+  // FMP stable API — verified working endpoints for this plan:
+  // stable/profile (not profile-symbol), key-metrics-ttm, price-target-consensus, financial-growth.
+  // grades-summary returns [] with this key — omitted.
+  const [profileResult, metricsResult, priceTargetResult, growthResult] =
     await Promise.allSettled([
-      fetch(`${base}/profile-symbol?symbol=${symbol}&${key}`, CACHE_OPTS),
+      fetch(`${base}/profile?symbol=${symbol}&${key}`, CACHE_OPTS),
       fetch(`${base}/key-metrics-ttm?symbol=${symbol}&${key}`, CACHE_OPTS),
-      fetch(`${base}/grades-summary?symbol=${symbol}&${key}`, CACHE_OPTS),
       fetch(`${base}/price-target-consensus?symbol=${symbol}&${key}`, CACHE_OPTS),
       fetch(`${base}/financial-growth?symbol=${symbol}&period=annual&limit=1&${key}`, CACHE_OPTS),
     ]);
@@ -101,33 +100,12 @@ export async function GET(req: NextRequest) {
     } catch { /* graceful */ }
   }
 
-  // ── Analyst: consensus from grades-summary, price target from price-target-consensus ──
+  // ── Analyst: price target from price-target-consensus ────────────────────────
   let analyst: {
     consensus?: string;
     priceTarget?: number;
     ratingCount?: number;
   } | undefined;
-
-  if (gradeResult.status === "fulfilled" && gradeResult.value.ok) {
-    try {
-      const data = await gradeResult.value.json();
-      const g = Array.isArray(data) ? data[0] : data;
-      if (g) {
-        const consensus = typeof g.consensus === "string" ? g.consensus : undefined;
-        const buy =
-          (typeof g.buy === "number" ? g.buy : 0) +
-          (typeof g.strongBuy === "number" ? g.strongBuy : 0);
-        const total =
-          buy +
-          (typeof g.hold === "number" ? g.hold : 0) +
-          (typeof g.sell === "number" ? g.sell : 0) +
-          (typeof g.strongSell === "number" ? g.strongSell : 0);
-        if (consensus || total > 0) {
-          analyst = { consensus, ratingCount: total > 0 ? total : undefined };
-        }
-      }
-    } catch { /* graceful */ }
-  }
 
   if (priceTargetResult.status === "fulfilled" && priceTargetResult.value.ok) {
     try {

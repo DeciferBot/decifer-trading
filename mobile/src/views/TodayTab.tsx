@@ -832,8 +832,8 @@ function MoversSection() {
 
   if (!data || (data.gainers.length === 0 && data.losers.length === 0)) return null;
 
-  const gainers = data.gainers.slice(0, 3);
-  const losers  = data.losers.slice(0, 3);
+  const gainers = data.gainers.slice(0, 5);
+  const losers  = data.losers.slice(0, 5);
 
   const freshnessLabel = data.ts
     ? (() => {
