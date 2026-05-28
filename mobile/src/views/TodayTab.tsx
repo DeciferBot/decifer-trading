@@ -34,7 +34,6 @@ import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory"
 import type { TapeEntry } from "@/app/api/market-tape/route";
 import type { MarketMoversPayload, Mover } from "@/app/api/market-movers/route";
 import type { MorningBriefPayload, EconEvent, EarningsItem, AnalystItem } from "@/app/api/morning-brief/route";
-import type { NewsItem } from "@/app/api/market-news/route";
 
 // ── Regime colour palette ─────────────────────────────────────────────────────
 
@@ -884,97 +883,6 @@ function MoversSection() {
   );
 }
 
-// ── Theme chip colours ────────────────────────────────────────────────────────
-
-const THEME_CHIP: Record<string, { bg: string; color: string }> = {
-  "AI Infrastructure":  { bg: "rgba(139,92,246,0.12)", color: "#a78bfa" },
-  Tech:                 { bg: "rgba(59,130,246,0.12)",  color: "#60a5fa" },
-  Defence:              { bg: "rgba(148,163,184,0.10)", color: "#94a3b8" },
-  Energy:               { bg: "rgba(249,115,22,0.12)",  color: "#fb923c" },
-  Gold:                 { bg: "rgba(234,179,8,0.12)",   color: "#facc15" },
-  Healthcare:           { bg: "rgba(16,185,129,0.10)",  color: "#34d399" },
-  "EV & Autos":         { bg: "rgba(132,204,22,0.10)",  color: "#a3e635" },
-  Autos:                { bg: "rgba(132,204,22,0.10)",  color: "#a3e635" },
-  Financials:           { bg: "rgba(14,165,233,0.10)",  color: "#38bdf8" },
-  "Digital Assets":     { bg: "rgba(99,102,241,0.12)",  color: "#818cf8" },
-};
-
-function ThemeChip({ label }: { label: string }) {
-  const style = THEME_CHIP[label] ?? { bg: "rgba(255,255,255,0.06)", color: "#64748b" };
-  return (
-    <span
-      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
-      style={{ background: style.bg, color: style.color }}
-    >
-      {label}
-    </span>
-  );
-}
-
-// ── News section ──────────────────────────────────────────────────────────────
-
-function NewsSection({ onAskAbout }: { onAskAbout?: (ctx: string) => void }) {
-  const [items, setItems] = useState<NewsItem[]>([]);
-
-  useEffect(() => {
-    fetch("/api/market-news")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.news) setItems(d.news.slice(0, 8)); })
-      .catch(() => {});
-  }, []);
-
-  if (items.length === 0) return null;
-
-  const fmtAge = (mins: number) =>
-    mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
-
-  return (
-    <section>
-      <SectionLabel>What&apos;s in the news</SectionLabel>
-      <div className="space-y-2">
-        {items.map((item, i) => (
-          <div
-            key={i}
-            className="rounded-xl px-3.5 py-3"
-            style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-          >
-            {item.themeLabel && (
-              <div className="mb-1.5">
-                <ThemeChip label={item.themeLabel} />
-              </div>
-            )}
-            <p className="text-[13px] font-semibold text-slate-100 leading-snug line-clamp-2">
-              {item.title}
-            </p>
-            <div className="flex items-center justify-between mt-1.5">
-              <div className="flex items-center gap-1.5">
-                {item.logoUrl && (
-                  <img
-                    src={item.logoUrl}
-                    alt=""
-                    className="w-3.5 h-3.5 rounded object-contain"
-                    style={{ background: "#1e293b" }}
-                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  />
-                )}
-                <p className="text-[10px] text-slate-500">
-                  {item.source}
-                  <span className="mx-1">·</span>
-                  {fmtAge(item.minutesAgo)} ago
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-2">
-        <AskDeciferButton label="Ask Decifer about the news" />
-      </div>
-    </section>
-  );
-}
-
 // ── Cause group card ──────────────────────────────────────────────────────────
 
 function CauseGroupCard({
@@ -1098,6 +1006,69 @@ function earningsTimeLabel(t: string): string {
   return "";
 }
 
+// ── Economic event plain-language labels ──────────────────────────────────────
+
+const ECON_PLAIN_LABELS: Array<{ keywords: string[]; label: string }> = [
+  { keywords: ["nonfarm payroll", "non-farm payroll", "nfp"], label: "Jobs Report — Non-Farm Payrolls" },
+  { keywords: ["initial jobless claim"], label: "Weekly Jobless Claims (New Filings)" },
+  { keywords: ["continuing jobless claim"], label: "Ongoing Unemployment Claims" },
+  { keywords: ["jolts", "job openings and labor"], label: "Job Openings Report (JOLTS)" },
+  { keywords: ["adp employment", "adp nonfarm"], label: "ADP Private Sector Jobs" },
+  { keywords: ["unemployment rate"], label: "Unemployment Rate" },
+  { keywords: ["core cpi", "cpi excl"], label: "Core Inflation — Excl. Food & Energy" },
+  { keywords: ["cpi yoy", "consumer price index yoy"], label: "Consumer Inflation — Year on Year" },
+  { keywords: ["cpi mom", "consumer price index mom"], label: "Consumer Inflation — Month on Month" },
+  { keywords: ["core pce", "pce price index excl", "personal consumption expenditures excl"], label: "Core PCE Inflation — Fed's Preferred Gauge" },
+  { keywords: ["pce price index yoy", "pce yoy"], label: "PCE Inflation — Year on Year" },
+  { keywords: ["pce price index mom", "pce mom"], label: "PCE Inflation — Month on Month" },
+  { keywords: ["personal income"], label: "Personal Income" },
+  { keywords: ["personal spending", "personal consumption expenditures"], label: "Consumer Spending" },
+  { keywords: ["fomc minutes", "fed minutes", "fomc meeting minutes"], label: "Fed Meeting Minutes (FOMC)" },
+  { keywords: ["fomc", "federal open market committee", "fed rate", "interest rate decision"], label: "Fed Interest Rate Decision" },
+  { keywords: ["fed chair", "powell speech", "yellen"], label: "Fed Chair Speech" },
+  { keywords: ["beige book"], label: "Fed Beige Book — Regional Conditions" },
+  { keywords: ["gdp annualized", "gdp qoq", "gdp growth", "gross domestic product"], label: "Economic Growth (GDP)" },
+  { keywords: ["retail sales mom"], label: "Retail Sales — Month on Month" },
+  { keywords: ["retail sales"], label: "Retail Sales" },
+  { keywords: ["consumer confidence"], label: "Consumer Confidence Index" },
+  { keywords: ["consumer sentiment", "michigan"], label: "Consumer Sentiment (Univ. of Michigan)" },
+  { keywords: ["ism manufacturing", "manufacturing pmi", "pmi manufacturing"], label: "Manufacturing Activity (ISM)" },
+  { keywords: ["ism services", "services pmi", "pmi services", "ism non-manufacturing", "ism non manufacturing"], label: "Services Sector Activity (ISM)" },
+  { keywords: ["industrial production"], label: "Industrial Production" },
+  { keywords: ["building permit"], label: "Building Permits" },
+  { keywords: ["housing start"], label: "Housing Starts" },
+  { keywords: ["existing home sale"], label: "Existing Home Sales" },
+  { keywords: ["new home sale"], label: "New Home Sales" },
+  { keywords: ["durable goods"], label: "Durable Goods Orders" },
+  { keywords: ["crude oil inventories", "eia crude"], label: "Crude Oil Inventories (EIA)" },
+  { keywords: ["natural gas inventories", "eia natural gas"], label: "Natural Gas Inventories (EIA)" },
+  { keywords: ["trade balance", "current account"], label: "Trade Balance" },
+  { keywords: ["ppi yoy", "producer price index yoy"], label: "Producer Prices — Year on Year" },
+  { keywords: ["ppi mom", "producer price index mom"], label: "Producer Prices — Month on Month" },
+  { keywords: ["producer price"], label: "Producer Price Index (PPI)" },
+  { keywords: ["treasury auction", "note auction", "bond auction", "bill auction"], label: "Treasury Auction" },
+  { keywords: ["empire state", "philly fed", "kansas city fed", "richmond fed", "dallas fed"], label: "Regional Manufacturing Survey" },
+  { keywords: ["chicago pmi", "chicago business barometer"], label: "Chicago Business Activity" },
+  { keywords: ["flash pmi", "composite pmi"], label: "Composite Business Activity (PMI)" },
+];
+
+function econPlainLabel(eventName: string): string {
+  const lower = eventName.toLowerCase();
+  for (const { keywords, label } of ECON_PLAIN_LABELS) {
+    if (keywords.some(k => lower.includes(k))) return label;
+  }
+  return eventName;
+}
+
+function econBeatMiss(ev: EconEvent): { label: string; color: string } | null {
+  if (ev.actual == null || ev.estimate == null) return null;
+  const diff = ev.actual - ev.estimate;
+  if (Math.abs(diff) < 0.00001) return null;
+  return diff > 0
+    ? { label: "↑ Above est.", color: "#34d399" }
+    : { label: "↓ Below est.", color: "#f87171" };
+}
+
 // ── Where Decifer is looking ──────────────────────────────────────────────────
 
 function WhereLookingSection({
@@ -1197,36 +1168,56 @@ function TodayAgendaSection({
               <CalendarDays size={11} style={{ color: "#f97316" }} />
               <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: "#f97316" }}>Economic releases</p>
             </div>
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {econEvents.slice(0, 8).map((ev, i) => {
                 const driver = annotateEconEvent(ev.event, activeDrivers);
                 const isHigh = ev.impact === "High";
-                const hasActual = ev.actual != null;
+                const hasTime = ev.time && ev.time !== "All Day";
+                const beatMiss = econBeatMiss(ev);
+                const plainLabel = econPlainLabel(ev.event);
                 return (
-                  <div key={i} className="flex items-start gap-2.5">
-                    <div className="shrink-0 w-14 text-right">
-                      <p className="text-[10px] font-semibold" style={{ color: isHigh ? "#fbbf24" : "#64748b" }}>
-                        {formatEconTime(ev.time)}
-                      </p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-[11px] text-slate-200 leading-snug">{ev.event}</p>
+                  <div key={i} className="flex flex-col gap-1" style={{
+                    paddingBottom: i < Math.min(econEvents.length, 8) - 1 ? "12px" : "0",
+                    borderBottom: i < Math.min(econEvents.length, 8) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                  }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[12px] font-semibold text-slate-100 leading-snug flex-1">{plainLabel}</p>
+                      <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                        {beatMiss && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ background: `${beatMiss.color}18`, color: beatMiss.color }}>
+                            {beatMiss.label}
+                          </span>
+                        )}
                         {driver && (
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0"
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
                             style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}>
                             {driver}
                           </span>
                         )}
+                        {isHigh && !driver && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ background: "rgba(251,191,36,0.1)", color: "#fbbf24" }}>
+                            High Impact
+                          </span>
+                        )}
                       </div>
-                      {hasActual ? (
-                        <p className="text-[10px] mt-0.5" style={{ color: "#34d399" }}>
-                          Actual: {ev.actual}{ev.unit ? ` ${ev.unit}` : ""}
-                          {ev.estimate != null ? <span className="text-slate-500"> · Est: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span> : null}
-                        </p>
-                      ) : ev.estimate != null ? (
-                        <p className="text-[10px] text-slate-500 mt-0.5">Est: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</p>
-                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {hasTime && (
+                        <span className="text-[10px]" style={{ color: isHigh ? "#fbbf24" : "#64748b" }}>
+                          {formatEconTime(ev.time)} ET
+                        </span>
+                      )}
+                      {ev.actual != null && (
+                        <span className="text-[10px] text-slate-400">
+                          Released: <span className="text-slate-200">{ev.actual}{ev.unit ? ` ${ev.unit}` : ""}</span>
+                          {ev.estimate != null && <span className="text-slate-600"> · Forecast was {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>}
+                        </span>
+                      )}
+                      {ev.actual == null && ev.estimate != null && (
+                        <span className="text-[10px] text-slate-500">Forecast: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>
+                      )}
                     </div>
                   </div>
                 );
@@ -1297,13 +1288,13 @@ function AnalystMovesSection({
   ttgSymbolMap: Map<string, { theme_label: string }>;
 }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" }); })();
+  const sevenDaysAgo = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" }); })();
 
   const moves = (brief?.analyst ?? [])
     .filter(a => {
       if (!ttgSymbolMap.has(a.symbol)) return false;
       const dateStr = a.publishedDate?.slice(0, 10);
-      if (dateStr !== today && dateStr !== yesterday) return false;
+      if (!dateStr || dateStr < sevenDaysAgo || dateStr > today) return false;
       const act = a.action.toLowerCase();
       return act.includes("upgrade") || act.includes("downgrade") || act === "initiated" || act === "initiation" || act.includes("target raised") || act.includes("target lowered") || act.includes("raise") || act.includes("lower");
     })
@@ -1456,7 +1447,7 @@ export default function TodayTab({
             ? eligible
             : [...eligible.slice(start, start + 2), ...eligible.slice(0, Math.max(0, 2 - (eligible.length - start)))].slice(0, 2);
           for (const s of picked) {
-            if (names.length >= 6 || names.find((n: NameEntry) => n.symbol === s.symbol)) continue;
+            if (names.length >= 5 || names.find((n: NameEntry) => n.symbol === s.symbol)) continue;
             const chip = s.exposure_type === "direct_beneficiary" ? "Direct"
               : s.exposure_type === "supply_chain_beneficiary" ? "Supply chain"
               : s.exposure_type === "etf_proxy" ? "ETF"
@@ -1551,9 +1542,6 @@ export default function TodayTab({
           ttgNames={ttgData?.names ?? null}
           onAskAbout={onAskAbout}
         />
-
-        {/* ── G: News feed ─────────────────────────────────────────────── */}
-        <NewsSection onAskAbout={onAskAbout} />
 
         {/* ── Disclaimer ─────────────────────────────────────────────────── */}
         <div className="rounded-xl p-4 text-center"
