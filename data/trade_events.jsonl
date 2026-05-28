@@ -1106,3 +1106,5 @@
 {"ts": "2026-05-27T10:16:28.629892+00:00", "event": "POSITION_CLOSED", "trade_id": "ASML_20260520_115626_180725", "symbol": "ASML", "exit_price": 1653.22, "pnl": 5715.5, "exit_reason": "tp_hit", "hold_minutes": 0}
 {"ts": "2026-05-27T12:49:05.831025+00:00", "event": "POSITION_CLOSED", "trade_id": "USO_20260520_132508_176526", "symbol": "USO", "exit_price": 130.3, "pnl": -5060.92, "exit_reason": "bracket_audit_missed_stop", "hold_minutes": 0}
 {"ts": "2026-05-27T13:40:29.979382+00:00", "event": "POSITION_CLOSED", "trade_id": "VRT_20260520_121347_985350", "symbol": "VRT", "exit_price": 313.99, "pnl": -1723.05, "exit_reason": "sl_hit", "hold_minutes": 0}
+{"ts": "2026-05-28T08:27:46.111776+00:00", "event": "POSITION_QTY_CORRECTED", "trade_id": "NVDA_20260522_103342_795958", "symbol": "NVDA", "corrected_qty": 289, "reason": "reconcile_ibkr"}
+{"ts": "2026-05-28T08:27:48.098267+00:00", "event": "POSITION_QTY_CORRECTED", "trade_id": "WDC_20260508_204731_398437", "symbol": "WDC", "corrected_qty": 49, "reason": "reconcile_ibkr"}
