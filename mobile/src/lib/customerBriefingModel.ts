@@ -499,6 +499,7 @@ export function buildContextualSuggestions(payload: MarketNowPayload): string[] 
 export interface TapeSnapshot {
   spy_pct:   number | null;
   qqq_pct:   number | null;
+  dia_pct:   number | null;  // DIA ETF — Dow proxy
   iwm_pct:   number | null;  // IWM — small-cap breadth proxy
   tlt_pct:   number | null;
   gld_pct:   number | null;
@@ -840,6 +841,7 @@ export interface WhereLookingName {
   symbol: string;
   reason: string;
   theme_label: string;
+  exposure_type?: string; // "Direct" | "Supply chain" | "ETF" | undefined
 }
 
 export interface WhereLooking {
@@ -850,10 +852,29 @@ export interface WhereLooking {
   empty: boolean;
 }
 
+// Strips the boilerplate template prefix from radar reason strings:
+// "VRT is a direct beneficiary of Data Centre Power: [insight]" → "[insight]"
+function distillReason(raw: string): string {
+  const colonIdx = raw.indexOf(": ");
+  if (colonIdx > 0 && colonIdx < raw.length - 15) {
+    return raw.slice(colonIdx + 2).trim();
+  }
+  return raw.trim();
+}
+
+// Maps raw exposure_type strings to a short customer-readable chip label.
+function parseExposureChip(raw: string): string | undefined {
+  const lower = raw.toLowerCase();
+  if (lower.includes("etf") || lower.includes("sector-level")) return "ETF";
+  if (lower.includes("second-order") || lower.includes("supply_chain") || lower.includes("supply chain") || lower.includes("indirect")) return "Supply chain";
+  if (lower.includes("direct")) return "Direct";
+  return undefined;
+}
+
 /**
- * Derives the sectors and names Decifer is watching from active drivers.
- * Pulls sector labels from FORCE_THEMES and names from payload.radar /
- * payload.universe_snapshot.  Deduplicates both.
+ * Fallback path used when TTG is unavailable.
+ * Buckets radar/universe items by theme, caps at 2 per theme, and applies
+ * a day-based rotation so VRT isn't always top.
  */
 export function buildWhereLooking(payload: MarketNowPayload): WhereLooking {
   const activeIds = (payload.key_drivers ?? [])
@@ -875,31 +896,44 @@ export function buildWhereLooking(payload: MarketNowPayload): WhereLooking {
     }
   }
 
-  // Theme-id set for name matching (FORCE_THEMES values are market_now IDs)
   const activeThemeIds = new Set(activeIds.flatMap(id => FORCE_THEMES[id] ?? []));
 
-  // Names from radar first
+  // Collect all matching names bucketed by theme
   const seenSymbols = new Set<string>();
-  const names: WhereLookingName[] = [];
-  for (const r of (payload.radar ?? [])) {
-    if (names.length >= 5) break;
-    if (seenSymbols.has(r.symbol)) continue;
-    if (r.theme_link && activeThemeIds.has(r.theme_link)) {
-      seenSymbols.add(r.symbol);
-      const label = THEME_LABELS[r.theme_link] ?? r.theme_link.replace(/_/g, " ");
-      names.push({ symbol: r.symbol, reason: r.reason_to_watch, theme_label: label });
-    }
-  }
+  const byTheme: Record<string, WhereLookingName[]> = {};
 
-  // Supplement with universe_snapshot when radar is sparse
-  if (names.length < 3) {
-    for (const u of (payload.universe_snapshot ?? [])) {
+  const collect = (symbol: string, rawReason: string, themeId: string | null | undefined) => {
+    if (!themeId || !activeThemeIds.has(themeId) || seenSymbols.has(symbol)) return;
+    seenSymbols.add(symbol);
+    const label = THEME_LABELS[themeId] ?? themeId.replace(/_/g, " ");
+    if (!byTheme[themeId]) byTheme[themeId] = [];
+    byTheme[themeId].push({
+      symbol,
+      reason: distillReason(rawReason),
+      theme_label: label,
+      exposure_type: parseExposureChip(rawReason),
+    });
+  };
+
+  for (const r of (payload.radar ?? [])) collect(r.symbol, r.reason_to_watch, r.theme_link);
+  for (const u of (payload.universe_snapshot ?? [])) collect(u.symbol, u.why_connected, u.theme_id);
+
+  // Round-robin across themes with a day-based offset, max 2 per theme
+  const dayOffset = Math.floor(Date.now() / 86400000) % 7;
+  const themeKeys = Object.keys(byTheme);
+  const names: WhereLookingName[] = [];
+  const countByTheme: Record<string, number> = {};
+
+  for (let round = 0; round < 4 && names.length < 5; round++) {
+    for (const theme of themeKeys) {
       if (names.length >= 5) break;
-      if (seenSymbols.has(u.symbol)) continue;
-      if (activeThemeIds.has(u.theme_id)) {
-        seenSymbols.add(u.symbol);
-        const label = THEME_LABELS[u.theme_id] ?? u.theme_id.replace(/_/g, " ");
-        names.push({ symbol: u.symbol, reason: u.why_connected, theme_label: label });
+      if ((countByTheme[theme] ?? 0) >= 2) continue;
+      const bucket = byTheme[theme];
+      const idx = (round + dayOffset) % bucket.length;
+      const candidate = bucket[idx];
+      if (candidate && !names.find(n => n.symbol === candidate.symbol)) {
+        names.push(candidate);
+        countByTheme[theme] = (countByTheme[theme] ?? 0) + 1;
       }
     }
   }

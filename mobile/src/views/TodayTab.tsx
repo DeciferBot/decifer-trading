@@ -1,20 +1,20 @@
 "use client";
 // Today tab — Sprint M16 redesign.
-// Immersive hero header, dual clock, top movers, sector map, themed news feed.
 
 import { useState, useEffect } from "react";
 import {
   ArrowRight,
-  Eye,
-  ChevronDown,
-  ChevronUp,
   RefreshCw,
   Shield,
   Zap,
   Layers,
   TrendingUp,
+  TrendingDown,
+  CalendarDays,
+  BarChart2,
 } from "lucide-react";
-import type { MarketNowPayload, KeyEvent } from "@/lib/customerApi";
+import type { MarketNowPayload, TtgSymbolCard } from "@/lib/customerApi";
+import { fetchTtgThemes, fetchTtgThemeDetail } from "@/lib/customerApi";
 import type { CustomerStory } from "@/lib/customerStory";
 import type {
   MarketClockState,
@@ -26,7 +26,6 @@ import {
   buildCustomerMarketStory,
   buildNarrativeParagraph,
   buildWhereLooking,
-  buildWhatCouldChange,
   buildCustomerForces,
   type TapeSnapshot,
   type CustomerMarketForce,
@@ -34,7 +33,7 @@ import {
 import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory";
 import type { TapeEntry } from "@/app/api/market-tape/route";
 import type { MarketMoversPayload, Mover } from "@/app/api/market-movers/route";
-import type { SectorEntry } from "@/app/api/sectors/route";
+import type { MorningBriefPayload, EconEvent, EarningsItem, AnalystItem } from "@/app/api/morning-brief/route";
 import type { NewsItem } from "@/app/api/market-news/route";
 
 // ── Regime colour palette ─────────────────────────────────────────────────────
@@ -164,6 +163,7 @@ function deriveTapeSnapshot(tape: TapeEntry[]): TapeSnapshot {
   return {
     spy_pct:   by["SPY"]?.changePct ?? null,
     qqq_pct:   by["QQQ"]?.changePct ?? null,
+    dia_pct:   by["DIA"]?.changePct ?? null,
     iwm_pct:   by["IWM"]?.changePct ?? null,
     tlt_pct:   by["TLT"]?.changePct ?? null,
     gld_pct:   by["GLD"]?.changePct ?? null,
@@ -414,9 +414,14 @@ function HeroHeader({
   const c  = regimeColors(ms.regime.state);
 
   const spy = tapeSnapshot.spy_pct;
+  const qqq = tapeSnapshot.qqq_pct;
+  const dia = tapeSnapshot.dia_pct;
   const vix = tapeSnapshot.vix_level;
   const spyColor = spy == null ? "#64748b" : spy > 0 ? "#34d399" : spy < 0 ? "#f87171" : "#94a3b8";
   const spySign  = spy != null && spy > 0 ? "+" : "";
+  const pctColor = (v: number | null) =>
+    v == null ? "#64748b" : v > 0 ? "#34d399" : v < 0 ? "#f87171" : "#94a3b8";
+  const pctSign  = (v: number | null) => (v != null && v > 0 ? "+" : "");
 
   const freshnessTimeCopy =
     freshnessState === "fresh" && data.freshness_timestamp
@@ -509,32 +514,47 @@ function HeroHeader({
           </button>
         </div>
 
-        {/* ── Row 3: SPY number or regime fallback ── */}
+        {/* ── Row 3: index numbers or regime fallback ── */}
         {spy != null ? (
           <div>
+            {/* Primary — S&P 500 big number */}
             <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
               S&amp;P 500
             </p>
-            <div className="flex items-end gap-3">
-              <span
-                className="font-black leading-none"
-                style={{ color: spyColor, fontSize: "52px" }}
-              >
-                {spySign}{spy.toFixed(2)}%
-              </span>
+            <p className="font-black leading-none mb-3" style={{ color: spyColor, fontSize: "52px" }}>
+              {spySign}{spy.toFixed(2)}%
+            </p>
+
+            {/* Secondary strip — Nasdaq · Dow · VIX */}
+            <div className="flex items-center gap-4">
+              {qqq != null && (
+                <div>
+                  <p className="text-[9px] uppercase text-slate-600 tracking-wide mb-0.5">Nasdaq</p>
+                  <p className="text-[15px] font-black leading-none" style={{ color: pctColor(qqq) }}>
+                    {pctSign(qqq)}{qqq.toFixed(2)}%
+                  </p>
+                </div>
+              )}
+              {dia != null && (
+                <div>
+                  <p className="text-[9px] uppercase text-slate-600 tracking-wide mb-0.5">Dow</p>
+                  <p className="text-[15px] font-black leading-none" style={{ color: pctColor(dia) }}>
+                    {pctSign(dia)}{dia.toFixed(2)}%
+                  </p>
+                </div>
+              )}
               {vix != null && (
-                <div className="mb-2">
-                  <p className="text-[9px] uppercase text-slate-600 tracking-wide">VIX</p>
-                  <p
-                    className="text-[16px] font-black leading-none"
-                    style={{ color: vix >= 25 ? "#f87171" : vix >= 20 ? "#fbbf24" : "#64748b" }}
-                  >
+                <div>
+                  <p className="text-[9px] uppercase text-slate-600 tracking-wide mb-0.5">VIX</p>
+                  <p className="text-[15px] font-black leading-none"
+                    style={{ color: vix >= 25 ? "#f87171" : vix >= 20 ? "#fbbf24" : "#64748b" }}>
                     {vix.toFixed(1)}
                   </p>
                 </div>
               )}
             </div>
-            <p className="text-[12px] text-slate-200 mt-1">{ms.macro_label}</p>
+
+            <p className="text-[12px] text-slate-200 mt-3">{ms.macro_label}</p>
           </div>
         ) : (
           <div>
@@ -736,6 +756,10 @@ function MoverDetailSheet({
             </div>
           )}
 
+          {profile !== null && !profile?.sector && !profile?.description && !profile?.mktCap && (
+            <p className="text-[13px] text-slate-500 mb-5">No company details available.</p>
+          )}
+
           <p className="text-[10px] text-slate-700">
             Market data via Financial Modeling Prep · Market intelligence only
             {profileTs && (
@@ -812,9 +836,26 @@ function MoversSection() {
   const gainers = data.gainers.slice(0, 3);
   const losers  = data.losers.slice(0, 3);
 
+  const freshnessLabel = data.ts
+    ? (() => {
+        const diffMs = Date.now() - new Date(data.ts).getTime();
+        const mins = Math.floor(diffMs / 60000);
+        if (mins < 1) return "Just updated";
+        if (mins < 60) return `Updated ${mins}m ago`;
+        return `Updated ${Math.floor(mins / 60)}h ago`;
+      })()
+    : null;
+
   return (
     <section>
-      <SectionLabel>Today&apos;s biggest moves</SectionLabel>
+      <div className="flex items-baseline justify-between mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: "#f97316" }}>
+          Today&apos;s biggest moves
+        </p>
+        {freshnessLabel && (
+          <span className="text-[10px] text-slate-600">{freshnessLabel}</span>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl px-3 py-3"
           style={{ background: "#141b26", border: "1px solid rgba(16,185,129,0.12)" }}>
@@ -839,71 +880,6 @@ function MoversSection() {
           onClose={() => setSelectedMover(null)}
         />
       )}
-    </section>
-  );
-}
-
-// ── Sector tile ───────────────────────────────────────────────────────────────
-
-function SectorTile({ entry }: { entry: SectorEntry }) {
-  const pct = entry.changePct;
-  const isPos   = pct != null && pct > 0;
-  const isNeg   = pct != null && pct < 0;
-  const strong  = pct != null && Math.abs(pct) >= 1;
-  const textColor  = pct == null ? "#64748b" : isPos ? "#34d399" : isNeg ? "#f87171" : "#94a3b8";
-  const borderColor = pct == null
-    ? "rgba(255,255,255,0.06)"
-    : isPos
-      ? strong ? "rgba(16,185,129,0.22)" : "rgba(16,185,129,0.12)"
-      : isNeg
-        ? strong ? "rgba(239,68,68,0.22)" : "rgba(239,68,68,0.12)"
-        : "rgba(255,255,255,0.06)";
-  const bg = pct == null
-    ? "#141b26"
-    : isPos
-      ? strong ? "rgba(16,185,129,0.07)" : "rgba(16,185,129,0.04)"
-      : isNeg
-        ? strong ? "rgba(239,68,68,0.07)" : "rgba(239,68,68,0.04)"
-        : "#141b26";
-  const sign = isPos ? "+" : "";
-
-  return (
-    <div
-      className="rounded-xl px-2.5 py-2.5"
-      style={{ background: bg, border: `1px solid ${borderColor}` }}
-    >
-      <p className="text-[10px] font-semibold text-slate-200 leading-none mb-1.5 truncate">
-        {entry.shortLabel}
-      </p>
-      <p className="text-[14px] font-black leading-none" style={{ color: textColor }}>
-        {pct != null ? `${sign}${pct.toFixed(1)}%` : "—"}
-      </p>
-    </div>
-  );
-}
-
-// ── Sector grid ───────────────────────────────────────────────────────────────
-
-function SectorGrid() {
-  const [sectors, setSectors] = useState<SectorEntry[]>([]);
-
-  useEffect(() => {
-    fetch("/api/sectors")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.sectors) setSectors(d.sectors); })
-      .catch(() => {});
-  }, []);
-
-  if (sectors.length === 0) return null;
-
-  return (
-    <section>
-      <SectionLabel>Market at a glance</SectionLabel>
-      <div className="grid grid-cols-3 gap-2">
-        {sectors.map(s => (
-          <SectorTile key={s.sym} entry={s} />
-        ))}
-      </div>
     </section>
   );
 }
@@ -999,65 +975,6 @@ function NewsSection({ onAskAbout }: { onAskAbout?: (ctx: string) => void }) {
   );
 }
 
-// ── Event card ────────────────────────────────────────────────────────────────
-
-function EventCard({ ev }: { ev: KeyEvent }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div
-      className="rounded-xl cursor-pointer"
-      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
-      onClick={() => setOpen(o => !o)}
-    >
-      <div className="p-3.5 flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-2">
-            <p className="text-[13px] font-semibold text-slate-100 leading-snug flex-1">
-              {ev.title}
-            </p>
-            {ev.materiality === "high" && (
-              <span
-                className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
-                style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
-              >
-                High impact
-              </span>
-            )}
-          </div>
-        </div>
-        {open
-          ? <ChevronUp size={14} className="text-slate-500 shrink-0 mt-0.5" />
-          : <ChevronDown size={14} className="text-slate-500 shrink-0 mt-0.5" />
-        }
-      </div>
-      {open && (
-        <div className="px-3.5 pb-3.5 pt-3 space-y-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-          {ev.summary_plain_english && (
-            <p className="text-xs text-slate-300 leading-relaxed">{ev.summary_plain_english}</p>
-          )}
-          {((ev.likely_positive_exposures?.length ?? 0) > 0 ||
-            (ev.likely_negative_exposures?.length ?? 0) > 0) && (
-            <div className="flex flex-wrap gap-1.5">
-              {(ev.likely_positive_exposures ?? []).map((s, i) => (
-                <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(16,185,129,0.1)", color: "#34d399" }}>
-                  {s}
-                </span>
-              ))}
-              {(ev.likely_negative_exposures ?? []).map((s, i) => (
-                <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(239,68,68,0.1)", color: "#f87171" }}>
-                  {s}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Cause group card ──────────────────────────────────────────────────────────
 
 function CauseGroupCard({
@@ -1118,23 +1035,99 @@ function CauseGroupCard({
 
 // ── Where Decifer is looking ──────────────────────────────────────────────────
 
+interface NameEntry {
+  symbol: string;
+  reason: string;
+  theme_label: string;
+  exposure_type?: string;
+}
+
+function exposureColor(chip?: string): string {
+  if (chip === "Direct") return "#34d399";
+  if (chip === "Supply chain") return "#60a5fa";
+  if (chip === "ETF") return "#94a3b8";
+  return "#94a3b8";
+}
+
+// ── Economic event → active driver annotation ─────────────────────────────────
+
+const ECON_DRIVER_KEYWORDS: Array<{ keywords: string[]; drivers: string[]; label: string }> = [
+  { keywords: ["oil", "crude", "petroleum", "opec", "gasoline", "distillate", "refin", "cushing"], drivers: ["oil_supply_shock"], label: "Oil Supply" },
+  { keywords: ["cpi", "consumer price", "inflation", "pce", "personal consumption", "price index", "core price"], drivers: ["yields_rising", "yields_falling"], label: "Inflation" },
+  { keywords: ["fed", "fomc", "interest rate", "fed funds", "monetary policy", "beige book", "powell"], drivers: ["yields_rising", "yields_falling"], label: "Fed Policy" },
+  { keywords: ["jobs", "employment", "unemployment", "nonfarm", "payroll", "adp", "labor", "jobless", "jolt", "jolts"], drivers: ["risk_on_rotation", "small_cap_risk_on"], label: "Jobs" },
+  { keywords: ["gdp", "gross domestic product", "economic growth", "economic output"], drivers: ["risk_on_rotation"], label: "Growth" },
+  { keywords: ["consumer confidence", "consumer sentiment", "retail sales", "consumer spending"], drivers: ["risk_on_rotation"], label: "Consumer" },
+  { keywords: ["housing", "existing home", "new home", "building permit", "construction", "mortgage"], drivers: ["reits", "reits_falling_yield"], label: "Housing" },
+  { keywords: ["ism", "manufacturing pmi", "factory orders", "industrial production"], drivers: ["risk_on_rotation"], label: "Manufacturing" },
+];
+
+function annotateEconEvent(eventName: string, activeDrivers: string[]): string | null {
+  const lower = eventName.toLowerCase();
+  for (const { keywords, drivers, label } of ECON_DRIVER_KEYWORDS) {
+    if (keywords.some(k => lower.includes(k)) && drivers.some(d => activeDrivers.includes(d))) {
+      return label;
+    }
+  }
+  return null;
+}
+
+function formatEconTime(t: string): string {
+  if (!t || t === "All Day") return "All Day";
+  // "08:30:00" → "8:30 AM"
+  const [h, m] = t.split(":").map(Number);
+  if (isNaN(h)) return t;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+function formatEarningsDate(dateStr: string): string {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" }); })();
+  if (dateStr === today) return "Today";
+  if (dateStr === tomorrow) return "Tomorrow";
+  const d = new Date(dateStr + "T12:00:00Z");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function earningsTimeLabel(t: string): string {
+  if (t === "bmo") return "Pre-market";
+  if (t === "amc") return "After close";
+  if (t === "dmh") return "During session";
+  return "";
+}
+
+// ── Where Decifer is looking ──────────────────────────────────────────────────
+
 function WhereLookingSection({
   data,
+  ttgNames,
   onAskAbout,
 }: {
   data: MarketNowPayload;
+  ttgNames: NameEntry[] | null;
   onAskAbout?: (ctx: string) => void;
 }) {
-  const { stories, names, empty } = buildWhereLooking(data);
-  if (empty) return null;
+  // Radar fallback when TTG is unavailable or returned nothing
+  const { stories: radarStories, names: radarNames, empty: radarEmpty } = buildWhereLooking(data);
+  const useTtg = ttgNames !== null && ttgNames.length > 0;
+  const names: NameEntry[] = useTtg ? ttgNames : radarNames;
+
+  // Derive theme chips from actual displayed names, not all driver themes
+  const themeChips = [...new Set(names.map(n => n.theme_label))];
+  const chipList = useTtg ? themeChips : radarStories.slice(0, 5);
+
+  if (!useTtg && radarEmpty) return null;
+  if (useTtg && names.length === 0) return null;
 
   return (
     <section>
       <SectionLabel>Where Decifer is looking</SectionLabel>
       <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
-        {stories.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {stories.map((s, i) => (
+        {chipList.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {chipList.map((s, i) => (
               <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                 style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}>
                 {s}
@@ -1142,21 +1135,235 @@ function WhereLookingSection({
             ))}
           </div>
         )}
-        {names.length > 0 && (
-          <div className="space-y-2.5">
-            {names.map((n, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <span className="text-[11px] font-bold text-slate-200 shrink-0 w-11">{n.symbol}</span>
-                <p className="text-[11px] text-slate-200 leading-relaxed line-clamp-2">{n.reason}</p>
+        <div className="space-y-4">
+          {names.map((n, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <span className="text-[12px] font-black text-white shrink-0 w-11 pt-0.5">{n.symbol}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  {n.exposure_type && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: "rgba(255,255,255,0.05)", color: exposureColor(n.exposure_type) }}>
+                      {n.exposure_type}
+                    </span>
+                  )}
+                  <span className="text-[9px] text-slate-600 truncate">{n.theme_label}</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-2">{n.reason}</p>
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+        <div className="mt-4">
+          <AskDeciferButton label="Ask Decifer about these names" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+// ── Today's Agenda ────────────────────────────────────────────────────────────
+
+function TodayAgendaSection({
+  data,
+  brief,
+  ttgSymbolMap,
+}: {
+  data: MarketNowPayload;
+  brief: MorningBriefPayload | null;
+  ttgSymbolMap: Map<string, { theme_label: string }>;
+}) {
+  const activeDrivers = data.key_drivers ?? [];
+
+  const econEvents = (brief?.econ ?? []).filter(e => e.impact === "High" || e.impact === "Medium");
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const earningsThisWeek = (brief?.earnings ?? []).filter(e => ttgSymbolMap.has(e.symbol));
+  const todayEarnings = earningsThisWeek.filter(e => e.date === today);
+  const upcomingEarnings = earningsThisWeek.filter(e => e.date !== today).slice(0, 5);
+
+  if (econEvents.length === 0 && earningsThisWeek.length === 0) return null;
+
+  return (
+    <section>
+      <SectionLabel>Today&apos;s agenda</SectionLabel>
+      <div className="rounded-2xl overflow-hidden" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
+
+        {/* Economic events */}
+        {econEvents.length > 0 && (
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex items-center gap-1.5 mb-3">
+              <CalendarDays size={11} style={{ color: "#f97316" }} />
+              <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: "#f97316" }}>Economic releases</p>
+            </div>
+            <div className="space-y-2.5">
+              {econEvents.slice(0, 8).map((ev, i) => {
+                const driver = annotateEconEvent(ev.event, activeDrivers);
+                const isHigh = ev.impact === "High";
+                const hasActual = ev.actual != null;
+                return (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <div className="shrink-0 w-14 text-right">
+                      <p className="text-[10px] font-semibold" style={{ color: isHigh ? "#fbbf24" : "#64748b" }}>
+                        {formatEconTime(ev.time)}
+                      </p>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[11px] text-slate-200 leading-snug">{ev.event}</p>
+                        {driver && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0"
+                            style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}>
+                            {driver}
+                          </span>
+                        )}
+                      </div>
+                      {hasActual ? (
+                        <p className="text-[10px] mt-0.5" style={{ color: "#34d399" }}>
+                          Actual: {ev.actual}{ev.unit ? ` ${ev.unit}` : ""}
+                          {ev.estimate != null ? <span className="text-slate-500"> · Est: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span> : null}
+                        </p>
+                      ) : ev.estimate != null ? (
+                        <p className="text-[10px] text-slate-500 mt-0.5">Est: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
-        {(stories.length > 0 || names.length > 0) && (
-          <div className="mt-3">
-            <AskDeciferButton label="Ask Decifer about these names" />
+
+        {/* Divider between sections */}
+        {econEvents.length > 0 && earningsThisWeek.length > 0 && (
+          <div style={{ height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 16px" }} />
+        )}
+
+        {/* Earnings */}
+        {earningsThisWeek.length > 0 && (
+          <div className="px-4 pt-3 pb-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <BarChart2 size={11} style={{ color: "#f97316" }} />
+              <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: "#f97316" }}>Earnings — your themes</p>
+            </div>
+            <div className="space-y-2.5">
+              {[...todayEarnings, ...upcomingEarnings].map((e, i) => {
+                const info = ttgSymbolMap.get(e.symbol);
+                const timeLabel = earningsTimeLabel(e.time);
+                const dateLabel = formatEarningsDate(e.date);
+                const isToday = e.date === today;
+                return (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <span className="text-[12px] font-black text-white shrink-0 w-12 pt-0.5">{e.symbol}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-semibold" style={{ color: isToday ? "#fbbf24" : "#64748b" }}>
+                          {dateLabel}
+                        </span>
+                        {timeLabel && (
+                          <span className="text-[9px] text-slate-600">{timeLabel}</span>
+                        )}
+                        {info && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                            style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}>
+                            {info.theme_label}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{e.name}</p>
+                      {e.epsEst != null && (
+                        <p className="text-[10px] text-slate-500 mt-0.5">EPS est: ${e.epsEst.toFixed(2)}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
+      </div>
+    </section>
+  );
+}
+
+// ── Analyst Moves on Your Names ───────────────────────────────────────────────
+
+function AnalystMovesSection({
+  brief,
+  ttgSymbolMap,
+}: {
+  brief: MorningBriefPayload | null;
+  ttgSymbolMap: Map<string, { theme_label: string }>;
+}) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" }); })();
+
+  const moves = (brief?.analyst ?? [])
+    .filter(a => {
+      if (!ttgSymbolMap.has(a.symbol)) return false;
+      const dateStr = a.publishedDate?.slice(0, 10);
+      if (dateStr !== today && dateStr !== yesterday) return false;
+      const act = a.action.toLowerCase();
+      return act.includes("upgrade") || act.includes("downgrade") || act === "initiated" || act === "initiation" || act.includes("target raised") || act.includes("target lowered") || act.includes("raise") || act.includes("lower");
+    })
+    .slice(0, 8);
+
+  if (moves.length === 0) return null;
+
+  function actionDisplay(action: string): { icon: "up" | "down" | "new" | "target"; label: string; color: string } {
+    const a = action.toLowerCase();
+    if (a.includes("upgrade")) return { icon: "up", label: "Upgraded", color: "#34d399" };
+    if (a.includes("downgrade")) return { icon: "down", label: "Downgraded", color: "#f87171" };
+    if (a === "initiated" || a === "initiation" || a.includes("initiat")) return { icon: "new", label: "Initiated", color: "#60a5fa" };
+    if (a.includes("raise") || a.includes("target raised")) return { icon: "target", label: "Target ↑", color: "#34d399" };
+    if (a.includes("lower") || a.includes("target lowered")) return { icon: "target", label: "Target ↓", color: "#f87171" };
+    return { icon: "target", label: action, color: "#94a3b8" };
+  }
+
+  return (
+    <section>
+      <SectionLabel>Analyst moves on your names</SectionLabel>
+      <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <div className="space-y-3">
+          {moves.map((m, i) => {
+            const { icon, label, color } = actionDisplay(m.action);
+            const info = ttgSymbolMap.get(m.symbol);
+            return (
+              <div key={i} className="flex items-start gap-2.5">
+                <div className="shrink-0 mt-0.5 w-4 flex justify-center">
+                  {icon === "up" && <TrendingUp size={13} style={{ color }} />}
+                  {icon === "down" && <TrendingDown size={13} style={{ color }} />}
+                  {(icon === "new" || icon === "target") && <span className="text-[11px] font-bold" style={{ color }}>→</span>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[12px] font-black text-white">{m.symbol}</span>
+                    <span className="text-[10px] font-semibold" style={{ color }}>{label}</span>
+                    {m.fromGrade && m.toGrade && m.fromGrade !== m.toGrade && (
+                      <span className="text-[9px] text-slate-500">{m.fromGrade} → {m.toGrade}</span>
+                    )}
+                    {!m.fromGrade && m.toGrade && (
+                      <span className="text-[9px] text-slate-500">{m.toGrade}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="text-[10px] text-slate-500">{m.gradingCompany}</p>
+                    {info && (
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                        style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}>
+                        {info.theme_label}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {m.priceWhenPosted != null && (
+                  <span className="text-[10px] text-slate-500 shrink-0">${m.priceWhenPosted.toFixed(0)}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
@@ -1184,7 +1391,6 @@ export default function TodayTab({
   data,
   story,
   clock,
-  sinceAway,
   freshnessState,
   freshnessLabel,
   isRefreshing,
@@ -1193,12 +1399,11 @@ export default function TodayTab({
   onAskAbout,
   onGoToForces,
 }: Props) {
-  const keyEvents = data.key_events ?? [];
-  const apiWatch  = data.watch_next?.length ? data.watch_next : (data.what_to_watch ?? []);
-  const watchNext = apiWatch.length > 0 ? apiWatch : buildWhatCouldChange(data);
-  const groups    = buildCauseGroups(data);
+  const groups = buildCauseGroups(data);
 
   const [selectedForce, setSelectedForce] = useState<CustomerMarketForce | null>(null);
+
+  // Market tape
   const [tape, setTape] = useState<TapeEntry[]>([]);
   useEffect(() => {
     fetch("/api/market-tape")
@@ -1206,8 +1411,67 @@ export default function TodayTab({
       .then(d => { if (d?.tape) setTape(d.tape); })
       .catch(() => {});
   }, []);
-
   const tapeSnapshot = deriveTapeSnapshot(tape);
+
+  // Morning brief — economic calendar, earnings, analyst moves
+  const [morningBrief, setMorningBrief] = useState<MorningBriefPayload | null>(null);
+  useEffect(() => {
+    fetch("/api/morning-brief")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setMorningBrief(d); })
+      .catch(() => {});
+  }, []);
+
+  // TTG data — names for WhereLooking + symbolMap for Agenda & Analyst sections
+  interface TtgData { names: NameEntry[]; symbolMap: Map<string, { theme_label: string }>; }
+  const [ttgData, setTtgData] = useState<TtgData | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const dayOffset = Math.floor(Date.now() / 86400000) % 5;
+    async function load() {
+      try {
+        const themes = await fetchTtgThemes();
+        const activeThemes = themes.filter((t: { driver_active: boolean }) => t.driver_active);
+        if (activeThemes.length === 0) {
+          if (!cancelled) setTtgData({ names: [], symbolMap: new Map() });
+          return;
+        }
+        const details = await Promise.allSettled(
+          activeThemes.map((t: { theme_id: string }) => fetchTtgThemeDetail(t.theme_id))
+        );
+        const names: NameEntry[] = [];
+        const symbolMap = new Map<string, { theme_label: string }>();
+        for (const result of details) {
+          if (result.status !== "fulfilled" || !result.value) continue;
+          const detail = result.value;
+          for (const s of detail.symbols) {
+            if (s.status === "active") symbolMap.set(s.symbol, { theme_label: detail.label });
+          }
+          const eligible = detail.symbols
+            .filter((s: TtgSymbolCard) => s.status === "active" && s.driver_active)
+            .sort((a: TtgSymbolCard, b: TtgSymbolCard) => (b.confidence ?? 0) - (a.confidence ?? 0));
+          if (eligible.length === 0) continue;
+          const start = eligible.length <= 2 ? 0 : dayOffset % eligible.length;
+          const picked = eligible.length <= 2
+            ? eligible
+            : [...eligible.slice(start, start + 2), ...eligible.slice(0, Math.max(0, 2 - (eligible.length - start)))].slice(0, 2);
+          for (const s of picked) {
+            if (names.length >= 6 || names.find((n: NameEntry) => n.symbol === s.symbol)) continue;
+            const chip = s.exposure_type === "direct_beneficiary" ? "Direct"
+              : s.exposure_type === "supply_chain_beneficiary" ? "Supply chain"
+              : s.exposure_type === "etf_proxy" ? "ETF"
+              : undefined;
+            names.push({ symbol: s.symbol, reason: s.reason_to_care, theme_label: detail.label, exposure_type: chip });
+          }
+        }
+        if (!cancelled) setTtgData({ names, symbolMap });
+      } catch {
+        if (!cancelled) setTtgData({ names: [], symbolMap: new Map() });
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div>
@@ -1243,81 +1507,14 @@ export default function TodayTab({
           />
         )}
 
-        {/* ── B: Since you were away ────────────────────────────────────── */}
-        {sinceAway.lastSeenAt && (() => {
-          // Driver items are synthesised boilerplate — show top key events instead
-          const themeItems = sinceAway.items.filter(item => item.type === "theme");
-          const headlineItems = keyEvents.slice(0, 3);
-          const hasContent = headlineItems.length > 0 || themeItems.length > 0;
-          return (
-            <section>
-              <SectionLabel>
-                {sinceAway.awayDuration
-                  ? `Since you were away · ${sinceAway.awayDuration} ago`
-                  : "Since your last visit"}
-              </SectionLabel>
-              {hasContent ? (
-                <div className="space-y-2">
-                  {headlineItems.map((ev, i) => (
-                    <div key={`ev-${i}`} className="rounded-xl px-4 py-3 flex items-start gap-3"
-                      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: "#f59e0b" }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] text-slate-200 leading-snug">{ev.title}</p>
-                        {ev.summary_plain_english && (
-                          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">{ev.summary_plain_english}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {themeItems.map((item, i) => (
-                    <div key={`th-${i}`} className="rounded-xl px-4 py-3 flex items-start gap-3"
-                      style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: "#3b82f6" }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] text-slate-200 leading-snug">{item.title}</p>
-                        {item.detail && (
-                          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">{item.detail}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <p className="text-sm text-white">Market story is unchanged since your last visit.</p>
-                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">Scroll down for the full briefing.</p>
-                </div>
-              )}
-            </section>
-          );
-        })()}
+        {/* ── B: Today's agenda — economic releases + earnings on your themes ── */}
+        <TodayAgendaSection
+          data={data}
+          brief={morningBrief}
+          ttgSymbolMap={ttgData?.symbolMap ?? new Map()}
+        />
 
-        {/* ── C: Top movers ────────────────────────────────────────────── */}
-        <MoversSection />
-
-        {/* ── D: Sector map ────────────────────────────────────────────── */}
-        <SectorGrid />
-
-        {/* ── E: News feed ─────────────────────────────────────────────── */}
-        <NewsSection onAskAbout={onAskAbout} />
-
-        {/* ── F: Key events from intelligence layer ────────────────────── */}
-        {keyEvents.length > 0 && (
-          <section>
-            <SectionLabel>Events behind today&apos;s moves</SectionLabel>
-            <div className="space-y-2">
-              {keyEvents.slice(0, 5).map((ev, i) => (
-                <EventCard key={i} ev={ev} />
-              ))}
-            </div>
-            <div className="mt-2">
-              <AskDeciferButton label="Ask Decifer about these events" />
-            </div>
-          </section>
-        )}
-
-        {/* ── G: What is moving markets ─────────────────────────────────── */}
+        {/* ── C: What is moving markets ─────────────────────────────────── */}
         {groups.length > 0 && (
           <section>
             <SectionLabel>What is moving markets</SectionLabel>
@@ -1339,25 +1536,24 @@ export default function TodayTab({
           </section>
         )}
 
-        {/* ── H: Where Decifer is looking ───────────────────────────────── */}
-        <WhereLookingSection data={data} onAskAbout={onAskAbout} />
+        {/* ── D: Top movers ────────────────────────────────────────────── */}
+        <MoversSection />
 
-        {/* ── I: What could change the picture ─────────────────────────── */}
-        {watchNext.length > 0 && (
-          <section>
-            <SectionLabel>What could change the picture</SectionLabel>
-            <div className="rounded-2xl p-4" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
-              <ul className="space-y-2.5">
-                {watchNext.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <Eye size={11} className="text-slate-500 shrink-0 mt-1" />
-                    <p className="text-xs text-white leading-relaxed">{item}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-        )}
+        {/* ── E: Analyst moves on your themes ──────────────────────────── */}
+        <AnalystMovesSection
+          brief={morningBrief}
+          ttgSymbolMap={ttgData?.symbolMap ?? new Map()}
+        />
+
+        {/* ── F: Where Decifer is looking ───────────────────────────────── */}
+        <WhereLookingSection
+          data={data}
+          ttgNames={ttgData?.names ?? null}
+          onAskAbout={onAskAbout}
+        />
+
+        {/* ── G: News feed ─────────────────────────────────────────────── */}
+        <NewsSection onAskAbout={onAskAbout} />
 
         {/* ── Disclaimer ─────────────────────────────────────────────────── */}
         <div className="rounded-xl p-4 text-center"

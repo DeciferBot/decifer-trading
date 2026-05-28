@@ -15,6 +15,7 @@ export interface TapeEntry {
 const ETF_TAPE: Array<{ sym: string; label: string; type: TapeType }> = [
   { sym: "SPY", label: "S&P 500",    type: "equity"    },
   { sym: "QQQ", label: "Nasdaq",     type: "equity"    },
+  { sym: "DIA", label: "Dow",        type: "equity"    },
   { sym: "IWM", label: "Small Caps", type: "equity"    },
   { sym: "TLT", label: "Bonds",      type: "rates"     },
   { sym: "GLD", label: "Gold",       type: "safe_haven"},

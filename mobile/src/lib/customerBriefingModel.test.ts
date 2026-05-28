@@ -496,6 +496,7 @@ function makeTape(overrides: Partial<TapeSnapshot> = {}): TapeSnapshot {
   return {
     spy_pct:   null,
     qqq_pct:   null,
+    dia_pct:   null,
     iwm_pct:   null,
     tlt_pct:   null,
     gld_pct:   null,
