@@ -162,7 +162,7 @@ services:
       --error-logfile -
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8001:8000"
     volumes:
       - decifer-data:/app/data:ro   # read-only mount — intelligence cloud never writes execution state
       - ./logs:/app/logs
