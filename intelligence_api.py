@@ -364,6 +364,81 @@ def mobile_portfolio() -> Response:
 
 
 # ---------------------------------------------------------------------------
+# Intelligence universe endpoint — full operational symbol roster
+# ---------------------------------------------------------------------------
+
+_ROSTER_PATH = os.path.join(_BASE_DIR, "data", "intelligence", "thematic_roster.json")
+_TAXONOMY_PATH = os.path.join(_BASE_DIR, "data", "intelligence", "theme_taxonomy.json")
+
+
+def _load_roster_universe() -> list[dict[str, str]]:
+    """Return a clean projection of the operational symbol roster.
+
+    Reads thematic_roster.json (symbols) and theme_taxonomy.json (theme names).
+    Returns only: symbol, theme_id, theme_label, role.
+    All other roster fields (route_bias, max_candidates, notes, activation_drivers,
+    risk_flags, etc.) are intentionally excluded — they reveal operational strategy.
+    Returns [] on any read failure (fail-closed).
+    """
+    try:
+        with open(_ROSTER_PATH, encoding="utf-8") as f:
+            roster = _json.load(f)
+        with open(_TAXONOMY_PATH, encoding="utf-8") as f:
+            taxonomy = _json.load(f)
+    except Exception as exc:
+        log.warning("_load_roster_universe: could not read roster files — %s", exc)
+        return []
+
+    theme_names: dict[str, str] = {
+        t["theme_id"]: t["name"]
+        for t in taxonomy.get("themes", [])
+        if isinstance(t, dict) and "theme_id" in t and "name" in t
+    }
+
+    seen: set[str] = set()
+    items: list[dict[str, str]] = []
+    for entry in roster.get("rosters", []):
+        if not isinstance(entry, dict):
+            continue
+        theme_id = entry.get("theme_id", "")
+        theme_label = theme_names.get(theme_id, theme_id)
+        for symbol in entry.get("core_symbols", []):
+            if isinstance(symbol, str) and symbol not in seen:
+                seen.add(symbol)
+                items.append({"symbol": symbol, "theme_id": theme_id,
+                               "theme_label": theme_label, "role": "core"})
+        for symbol in entry.get("etf_proxies", []):
+            if isinstance(symbol, str) and symbol not in seen:
+                seen.add(symbol)
+                items.append({"symbol": symbol, "theme_id": theme_id,
+                               "theme_label": theme_label, "role": "etf_proxy"})
+    return items
+
+
+@app.route("/api/intelligence/universe", methods=["GET", "OPTIONS"])
+def intelligence_universe() -> Response:
+    """Full Decifer intelligence universe — all curated symbols across 23 operational themes.
+
+    Returns symbol, theme_id, theme_label, and role (core | etf_proxy) for every
+    symbol in the operational roster. Used by the mobile app to filter earnings
+    and analyst moves to Decifer-tracked names.
+
+    Safe fields only — no route_bias, max_candidates, notes, activation_drivers,
+    risk_flags, or any execution/broker data.
+    """
+    if request.method == "OPTIONS":
+        return Response(status=204)
+
+    universe = _load_roster_universe()
+    payload = {
+        "theme_graph_universe": universe,
+        "total": len(universe),
+        "ts": _now_iso(),
+    }
+    return _json_response(payload)
+
+
+# ---------------------------------------------------------------------------
 # Market data endpoints — generic FMP data for customer surfaces
 # Shadow mode: these endpoints exist but mobile is not yet wired to them.
 # ---------------------------------------------------------------------------

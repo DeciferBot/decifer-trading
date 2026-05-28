@@ -90,6 +90,8 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset({
     "theme_graph_search_results",
     # ── Sprint M11C — Customer universe snapshot (approved by Amit) ──
     "universe_snapshot",
+    # ── Sprint M16 — Full intelligence universe symbol list (approved by Amit) ──
+    "theme_graph_universe",
 })
 
 # Field-name substrings that are forbidden anywhere in the payload — even

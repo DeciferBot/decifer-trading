@@ -131,6 +131,21 @@ export interface TtgThemeDetail extends TtgTheme {
   symbol_count: number;
 }
 
+export interface UniverseSymbol {
+  symbol: string;
+  theme_id: string;
+  theme_label: string;
+  role: "core" | "etf_proxy";
+}
+
+export async function fetchUniverseSymbols(): Promise<UniverseSymbol[]> {
+  const base = getIntelligenceApiBase().replace(/\/$/, "");
+  const res = await fetch(`${base}/api/intelligence/universe`);
+  if (!res.ok) throw new Error(`/api/intelligence/universe → ${res.status}`);
+  const data = await res.json();
+  return data.theme_graph_universe ?? [];
+}
+
 export async function fetchTtgThemes(): Promise<TtgTheme[]> {
   const base = getIntelligenceApiBase().replace(/\/$/, "");
   const res = await fetch(`${base}/api/intelligence/themes`);

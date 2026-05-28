@@ -34,7 +34,7 @@ import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory"
 import type { TapeEntry } from "@/app/api/market-tape/route";
 import type { MarketMoversPayload, Mover } from "@/app/api/market-movers/route";
 import type { MorningBriefPayload, EconEvent, EarningsItem, AnalystItem } from "@/app/api/morning-brief/route";
-import { ROSTER_UNIVERSE } from "@/data/rosterUniverse";
+import { fetchUniverseSymbols } from "@/lib/customerApi";
 
 // ── Regime colour palette ─────────────────────────────────────────────────────
 
@@ -1420,16 +1420,30 @@ export default function TodayTab({
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      // Fetch TTG themes + operational roster in parallel — roster extends
+      // earnings/analyst coverage from 10 TTG packs to all 23 operational themes.
+      const [themesResult, rosterResult] = await Promise.allSettled([
+        fetchTtgThemes(),
+        fetchUniverseSymbols(),
+      ]);
+
+      const themes = themesResult.status === "fulfilled" ? themesResult.value : [];
+      const roster = rosterResult.status === "fulfilled" ? rosterResult.value : [];
+
+      // Seed the symbolMap from the operational roster first (broadest coverage).
+      // TTG entries will overwrite with richer customer-facing labels where they exist.
+      const symbolMap = new Map<string, { theme_label: string }>();
+      for (const u of roster) {
+        symbolMap.set(u.symbol, { theme_label: u.theme_label });
+      }
+
+      if (themes.length === 0) {
+        if (!cancelled) setTtgData({ names: [], symbolMap });
+        return;
+      }
+
       try {
-        const themes = await fetchTtgThemes();
-        if (themes.length === 0) {
-          const fallbackMap = new Map<string, { theme_label: string }>(
-            Object.entries(ROSTER_UNIVERSE)
-          );
-          if (!cancelled) setTtgData({ names: [], symbolMap: fallbackMap });
-          return;
-        }
-        // Fetch ALL themes for a complete symbolMap (used by Agenda + Analyst filters).
+        // Fetch ALL TTG themes for a complete symbolMap (used by Agenda + Analyst filters).
         // Active themes are used separately for name selection (WhereLooking).
         const activeThemeIds = new Set(
           themes.filter((t: { driver_active: boolean }) => t.driver_active)
@@ -1438,12 +1452,11 @@ export default function TodayTab({
         const allDetails = await Promise.allSettled(
           themes.map((t: { theme_id: string }) => fetchTtgThemeDetail(t.theme_id))
         );
-        const symbolMap = new Map<string, { theme_label: string }>();
         const candidates: Array<NameEntry & { _conf: number }> = [];
         for (const result of allDetails) {
           if (result.status !== "fulfilled" || !result.value) continue;
           const detail = result.value;
-          // All active symbols go into symbolMap regardless of theme driver state
+          // TTG active symbols overwrite roster entries (richer labels)
           for (const s of detail.symbols) {
             if (s.status === "active") symbolMap.set(s.symbol, { theme_label: detail.label });
           }
@@ -1468,12 +1481,6 @@ export default function TodayTab({
             });
           }
         }
-        // Merge intelligence-layer roster symbols — expands earnings/analyst coverage
-        // to all 23 operational themes (vs TTG's 10 customer-facing packs).
-        // TTG entries take precedence (richer theme labels).
-        for (const [sym, entry] of Object.entries(ROSTER_UNIVERSE)) {
-          if (!symbolMap.has(sym)) symbolMap.set(sym, entry);
-        }
         // Global sort by confidence — highest conviction first
         const names: NameEntry[] = candidates
           .sort((a, b) => b._conf - a._conf)
@@ -1481,10 +1488,7 @@ export default function TodayTab({
           .map(({ _conf: _, ...n }) => n);
         if (!cancelled) setTtgData({ names, symbolMap });
       } catch {
-        const fallbackMap = new Map<string, { theme_label: string }>(
-          Object.entries(ROSTER_UNIVERSE)
-        );
-        if (!cancelled) setTtgData({ names: [], symbolMap: fallbackMap });
+        if (!cancelled) setTtgData({ names: [], symbolMap });
       }
     }
     load();
