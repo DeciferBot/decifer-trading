@@ -4215,3 +4215,17 @@
 {"ts": "2026-05-27T10:05:30.900876+00:00", "trigger": "margin_block:UVXY", "positions": {}}
 {"ts": "2026-05-27T10:05:32.076562+00:00", "trigger": "margin_block:AAPL", "positions": {}}
 {"ts": "2026-05-27T10:05:32.092035+00:00", "trigger": "margin_block:AAPL", "positions": {}}
+{"ts": "2026-05-28T18:00:11.601995+00:00", "trigger": "margin_block:AAPL", "positions": {}}
+{"ts": "2026-05-28T18:00:11.622336+00:00", "trigger": "margin_block:AAPL", "positions": {}}
+{"ts": "2026-05-28T18:03:24.088750+00:00", "trigger": "margin_block:SPXS", "positions": {}}
+{"ts": "2026-05-28T18:03:24.103091+00:00", "trigger": "margin_block:SQQQ", "positions": {}}
+{"ts": "2026-05-28T18:03:24.117740+00:00", "trigger": "margin_block:UVXY", "positions": {}}
+{"ts": "2026-05-28T18:03:25.468204+00:00", "trigger": "margin_block:AAPL", "positions": {}}
+{"ts": "2026-05-28T18:03:25.495603+00:00", "trigger": "margin_block:AAPL", "positions": {}}
+{"ts": "2026-05-28T18:04:16.180611+00:00", "trigger": "margin_block:AAPL", "positions": {}}
+{"ts": "2026-05-28T18:04:16.188557+00:00", "trigger": "margin_block:AAPL", "positions": {}}
+{"ts": "2026-05-28T18:06:59.838310+00:00", "trigger": "margin_block:SPXS", "positions": {}}
+{"ts": "2026-05-28T18:06:59.850452+00:00", "trigger": "margin_block:SQQQ", "positions": {}}
+{"ts": "2026-05-28T18:06:59.861679+00:00", "trigger": "margin_block:UVXY", "positions": {}}
+{"ts": "2026-05-28T18:07:00.928006+00:00", "trigger": "margin_block:AAPL", "positions": {}}
+{"ts": "2026-05-28T18:07:00.940784+00:00", "trigger": "margin_block:AAPL", "positions": {}}

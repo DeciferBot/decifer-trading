@@ -1,5 +1,5 @@
 {
-  "updated": "2026-05-28T16:37:57.838442+00:00",
+  "updated": "2026-05-28T18:38:48.136489+00:00",
   "raw_ic": {
     "trend": 0.0337801999915237,
     "momentum": -0.07087602318468525,
@@ -17,6 +17,6 @@
     "analyst_revision": 0.0,
     "insider_buying": -0.08510272974168005
   },
-  "n_records": 54356,
+  "n_records": 55617,
   "source": "live_trades_only"
 }

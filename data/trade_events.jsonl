@@ -1108,3 +1108,4 @@
 {"ts": "2026-05-27T13:40:29.979382+00:00", "event": "POSITION_CLOSED", "trade_id": "VRT_20260520_121347_985350", "symbol": "VRT", "exit_price": 313.99, "pnl": -1723.05, "exit_reason": "sl_hit", "hold_minutes": 0}
 {"ts": "2026-05-28T08:27:46.111776+00:00", "event": "POSITION_QTY_CORRECTED", "trade_id": "NVDA_20260522_103342_795958", "symbol": "NVDA", "corrected_qty": 289, "reason": "reconcile_ibkr"}
 {"ts": "2026-05-28T08:27:48.098267+00:00", "event": "POSITION_QTY_CORRECTED", "trade_id": "WDC_20260508_204731_398437", "symbol": "WDC", "corrected_qty": 49, "reason": "reconcile_ibkr"}
+{"ts": "2026-05-28T18:13:29.854016+00:00", "event": "POSITION_CLOSED", "trade_id": "SNX_20260429_172800_821400", "symbol": "SNX", "exit_price": 284.0, "pnl": 7896.24, "exit_reason": "closed_while_bot_down", "hold_minutes": 41800}
