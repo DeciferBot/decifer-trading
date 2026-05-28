@@ -26,7 +26,11 @@ from typing import Any
 log = logging.getLogger("decifer.theme_graph")
 
 _BASE = os.path.dirname(os.path.abspath(__file__))
-_TTG_DIR = os.path.join(_BASE, "data", "intelligence", "theme_graph")
+# Prefer intelligence_ref/theme_graph/ (baked into Docker image outside volume mount);
+# fall back to data/intelligence/theme_graph/ for local dev.
+_INTEL_REF_TTG = os.path.join(_BASE, "intelligence_ref", "theme_graph")
+_INTEL_DATA_TTG = os.path.join(_BASE, "data", "intelligence", "theme_graph")
+_TTG_DIR = _INTEL_REF_TTG if os.path.isdir(_INTEL_REF_TTG) else _INTEL_DATA_TTG
 _DRIVER_STATE_PATH = os.path.join(_BASE, "data", "intelligence", "live_driver_state.json")
 
 # ---------------------------------------------------------------------------

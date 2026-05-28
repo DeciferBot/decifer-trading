@@ -105,9 +105,10 @@ RUN rm -f .env .env.local .env.*.local
 
 # Bake static intelligence reference files outside /app/data/ so the named
 # volume mount (decifer-data:/app/data:ro) does not hide them at runtime.
-RUN mkdir -p /app/intelligence_ref \
+RUN mkdir -p /app/intelligence_ref/theme_graph \
     && cp /app/data/intelligence/thematic_roster.json /app/intelligence_ref/ \
-    && cp /app/data/intelligence/theme_taxonomy.json /app/intelligence_ref/
+    && cp /app/data/intelligence/theme_taxonomy.json /app/intelligence_ref/ \
+    && cp /app/data/intelligence/theme_graph/*.json /app/intelligence_ref/theme_graph/
 
 # Create runtime directories
 RUN mkdir -p data/live data/heartbeats data/intelligence data/universe_builder \

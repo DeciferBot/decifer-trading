@@ -133,7 +133,9 @@ function parseEarnings(raw: unknown[]): EarningsItem[] {
   return results;
 }
 
-function parseAnalyst(raw: unknown[]): AnalystItem[] {
+// FMP stable/grades response fields: symbol, date, gradingCompany, previousGrade, newGrade, action.
+// Note: FMP ignores limit= on this endpoint and returns full history — cutoffDate guards memory.
+function parseAnalyst(raw: unknown[], cutoffDate?: string): AnalystItem[] {
   const results: AnalystItem[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
@@ -144,22 +146,43 @@ function parseAnalyst(raw: unknown[]): AnalystItem[] {
       typeof r.gradingCompany === "string" ? r.gradingCompany.trim() : "";
     if (!symbol || !gradingCompany) continue;
 
+    // date field in grades endpoint (YYYY-MM-DD), map to publishedDate for downstream consumers
+    const publishedDate = typeof r.date === "string" ? r.date.slice(0, 10) : "";
+    if (!publishedDate) continue;
+    // FMP returns full history sorted newest-first; stop once past our cutoff window
+    if (cutoffDate && publishedDate < cutoffDate) break;
+
     results.push({
       symbol,
-      publishedDate:
-        typeof r.publishedDate === "string" ? r.publishedDate : "",
+      publishedDate,
       gradingCompany,
       action: typeof r.action === "string" ? r.action : "",
-      fromGrade: typeof r.fromGrade === "string" ? r.fromGrade : "",
-      toGrade: typeof r.toGrade === "string" ? r.toGrade : "",
-      priceWhenPosted:
-        typeof r.priceWhenPosted === "number" ? r.priceWhenPosted : null,
+      fromGrade: typeof r.previousGrade === "string" ? r.previousGrade : "",
+      toGrade: typeof r.newGrade === "string" ? r.newGrade : "",
+      priceWhenPosted: null,
     });
-
-    if (results.length >= 100) break;
   }
   return results;
 }
+
+// Key symbols from the intelligence roster — covers all major TTG and operational themes.
+// Fetch recent grades for these in parallel (stable/grades requires a symbol; no bulk endpoint).
+const ANALYST_SYMBOLS = [
+  // AI semiconductors & infrastructure
+  "NVDA", "TSM", "AVGO", "AMD", "ASML", "QCOM", "MRVL", "ARM",
+  // AI compute / cloud platforms
+  "MSFT", "GOOGL", "AMZN", "META", "CRM", "PLTR", "ORCL", "SNOW",
+  // AI servers & power
+  "SMCI", "DELL", "VRT", "ETN", "CEG", "ANET",
+  // Defence
+  "RTX", "LMT", "NOC", "GD",
+  // Healthcare / GLP-1
+  "LLY", "MRK", "ABBV", "NVO",
+  // Financials
+  "JPM", "GS", "BAC",
+  // Copper / critical minerals
+  "FCX", "SCCO",
+];
 
 // ── GET handler ───────────────────────────────────────────────────────────────
 
@@ -174,7 +197,9 @@ export async function GET(): Promise<NextResponse<MorningBriefPayload>> {
   const in7d = addDays(today, 7);
   const key = `apikey=${FMP_KEY}`;
 
-  const [econResult, earningsResult, analystResult] = await Promise.allSettled([
+  // Fetch econ, earnings, and analyst grades in parallel.
+  // Analyst grades require per-symbol calls (no bulk endpoint in FMP stable API).
+  const [econResult, earningsResult, ...analystResults] = await Promise.allSettled([
     fetch(
       `${BASE}/economic-calendar?from=${today}&to=${today}&${key}`,
       CACHE_OPTS
@@ -183,7 +208,9 @@ export async function GET(): Promise<NextResponse<MorningBriefPayload>> {
       `${BASE}/earnings-calendar?from=${today}&to=${in7d}&${key}`,
       CACHE_OPTS
     ),
-    fetch(`${BASE}/upgrades-downgrades?limit=100&${key}`, CACHE_OPTS),
+    ...ANALYST_SYMBOLS.map(sym =>
+      fetch(`${BASE}/grades?symbol=${sym}&limit=30&${key}`, CACHE_OPTS)
+    ),
   ]);
 
   let econ: EconEvent[] = [];
@@ -204,12 +231,27 @@ export async function GET(): Promise<NextResponse<MorningBriefPayload>> {
     } catch { /* graceful — returns empty */ }
   }
 
-  if (analystResult.status === "fulfilled" && analystResult.value.ok) {
+  // Merge per-symbol analyst grade results, deduplicate by symbol+date+firm, sort newest first.
+  // cutoff=14 days ago: parseAnalyst stops early on each symbol's full-history response (FMP ignores limit=).
+  const cutoff14d = addDays(today, -14);
+  const analystRaw: AnalystItem[] = [];
+  for (const result of analystResults) {
+    if (result.status !== "fulfilled" || !result.value.ok) continue;
     try {
-      const data = await analystResult.value.json();
-      analyst = parseAnalyst(Array.isArray(data) ? data : []);
-    } catch { /* graceful — returns empty */ }
+      const data = await result.value.json();
+      analystRaw.push(...parseAnalyst(Array.isArray(data) ? data : [], cutoff14d));
+    } catch { /* graceful */ }
   }
+  const seen = new Set<string>();
+  analyst = analystRaw
+    .filter(a => {
+      const key = `${a.symbol}|${a.publishedDate}|${a.gradingCompany}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => b.publishedDate.localeCompare(a.publishedDate))
+    .slice(0, 100);
 
   return NextResponse.json({ econ, earnings, analyst, ts });
 }

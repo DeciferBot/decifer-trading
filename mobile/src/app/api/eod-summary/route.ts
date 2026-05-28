@@ -28,11 +28,20 @@ export interface EodTape {
   gld: number | null;
 }
 
+export interface EodMover {
+  symbol: string;
+  name: string;
+  pct: number;
+  price?: number;
+}
+
 export interface EodSummaryPayload {
   marketDate: string;
   tape: EodTape;
   rawText: string;
   items: EodItem[];
+  gainers: EodMover[];
+  losers: EodMover[];
   generatedAt: string;
   error?: string;
 }
@@ -108,48 +117,53 @@ async function fetchTape(): Promise<EodTape> {
   return tape;
 }
 
-async function fetchMovers(): Promise<string> {
-  if (!FMP_KEY) return "";
+async function fetchMovers(): Promise<{ gainers: EodMover[]; losers: EodMover[]; text: string }> {
+  const empty = { gainers: [], losers: [], text: "" };
+  if (!FMP_KEY) return empty;
+
+  type RawMover = { symbol: string; name: string; changesPercentage: number | string; price?: number };
+
+  const parseMover = (r: RawMover): EodMover => {
+    const rawPct = typeof r.changesPercentage === "string"
+      ? parseFloat(r.changesPercentage.replace(/[^0-9.-]/g, ""))
+      : Number(r.changesPercentage);
+    return {
+      symbol: r.symbol,
+      name: r.name ?? r.symbol,
+      pct: isNaN(rawPct) ? 0 : parseFloat(rawPct.toFixed(2)),
+      price: r.price ? parseFloat(Number(r.price).toFixed(2)) : undefined,
+    };
+  };
+
   const [gainersRes, losersRes] = await Promise.allSettled([
     fetch(`${BASE}/biggest-gainers?apikey=${FMP_KEY}`, { cache: "no-store" }),
     fetch(`${BASE}/biggest-losers?apikey=${FMP_KEY}`, { cache: "no-store" }),
   ]);
 
-  const lines: string[] = [];
+  let gainers: EodMover[] = [];
+  let losers: EodMover[] = [];
 
   if (gainersRes.status === "fulfilled" && gainersRes.value.ok) {
     try {
-      const raw: Array<{ symbol: string; name: string; changesPercentage: number | string; price?: number }> =
-        await gainersRes.value.json();
-      const top = raw.slice(0, 5).map((r) => {
-        const pct =
-          typeof r.changesPercentage === "string"
-            ? r.changesPercentage
-            : `+${Number(r.changesPercentage).toFixed(1)}%`;
-        const price = r.price ? ` at $${Number(r.price).toFixed(2)}` : "";
-        return `$${r.symbol} (${r.name}) ${pct}${price}`;
-      });
-      if (top.length) lines.push(`TOP GAINERS: ${top.join(", ")}`);
+      const raw: RawMover[] = await gainersRes.value.json();
+      gainers = raw.slice(0, 5).map(parseMover);
     } catch { /* graceful */ }
   }
 
   if (losersRes.status === "fulfilled" && losersRes.value.ok) {
     try {
-      const raw: Array<{ symbol: string; name: string; changesPercentage: number | string; price?: number }> =
-        await losersRes.value.json();
-      const top = raw.slice(0, 5).map((r) => {
-        const pct =
-          typeof r.changesPercentage === "string"
-            ? r.changesPercentage
-            : `${Number(r.changesPercentage).toFixed(1)}%`;
-        const price = r.price ? ` at $${Number(r.price).toFixed(2)}` : "";
-        return `$${r.symbol} (${r.name}) ${pct}${price}`;
-      });
-      if (top.length) lines.push(`TOP LOSERS: ${top.join(", ")}`);
+      const raw: RawMover[] = await losersRes.value.json();
+      losers = raw.slice(0, 5).map(parseMover);
     } catch { /* graceful */ }
   }
 
-  return lines.join("\n");
+  const lines: string[] = [];
+  if (gainers.length)
+    lines.push(`TOP GAINERS: ${gainers.map(m => `$${m.symbol} (${m.name}) +${m.pct.toFixed(1)}%${m.price ? ` at $${m.price}` : ""}`).join(", ")}`);
+  if (losers.length)
+    lines.push(`TOP LOSERS: ${losers.map(m => `$${m.symbol} (${m.name}) ${m.pct.toFixed(1)}%${m.price ? ` at $${m.price}` : ""}`).join(", ")}`);
+
+  return { gainers, losers, text: lines.join("\n") };
 }
 
 async function fetchMostActive(): Promise<string> {
@@ -185,52 +199,77 @@ async function fetchMostActive(): Promise<string> {
   } catch { return ""; }
 }
 
+// Key symbols from the intelligence roster — covers all major TTG and operational themes.
+// FMP stable/grades requires a per-symbol call; no bulk/recent endpoint exists.
+const ANALYST_SYMBOLS_EOD = [
+  "NVDA", "TSM", "AVGO", "AMD", "ASML", "QCOM", "MRVL", "ARM",
+  "MSFT", "GOOGL", "AMZN", "META", "CRM", "PLTR", "ORCL", "SNOW",
+  "SMCI", "DELL", "VRT", "ETN", "CEG", "ANET",
+  "RTX", "LMT", "NOC", "GD",
+  "LLY", "MRK", "ABBV", "NVO",
+  "JPM", "GS", "BAC",
+  "FCX", "SCCO",
+];
+
 async function fetchAnalystMoves(today: string): Promise<string> {
   if (!FMP_KEY) return "";
   try {
-    // Fetch 500 records — analyst moves can arrive pre-market or late previous day
-    const res = await fetch(
-      `${BASE}/upgrades-downgrades?limit=500&apikey=${FMP_KEY}`,
-      { cache: "no-store" }
-    );
-    if (!res.ok) return "";
+    const yesterday = addDays(today, -1);
 
-    const raw: Array<{
+    // FMP stable/grades: per-symbol, returns {symbol, date, gradingCompany, previousGrade, newGrade, action}
+    const results = await Promise.allSettled(
+      ANALYST_SYMBOLS_EOD.map(sym =>
+        fetch(`${BASE}/grades?symbol=${sym}&limit=30&apikey=${FMP_KEY}`, { cache: "no-store" })
+      )
+    );
+
+    type GradeRow = {
       symbol: string;
-      publishedDate: string;
+      date: string;
       gradingCompany: string;
       action: string;
-      fromGrade: string;
-      toGrade: string;
-      newPriceTarget?: number | null;
-      previousPriceTarget?: number | null;
-    }> = await res.json();
+      previousGrade: string;
+      newGrade: string;
+    };
+    const allRows: GradeRow[] = [];
+    for (const r of results) {
+      if (r.status !== "fulfilled" || !r.value.ok) continue;
+      try {
+        const data = await r.value.json();
+        if (Array.isArray(data)) allRows.push(...data);
+      } catch { /* skip */ }
+    }
 
-    const yesterday = addDays(today, -1);
-    // Include today and yesterday (pre-market calls filed overnight)
-    const relevant = raw.filter(
-      (r) =>
-        r.publishedDate?.startsWith(today) ||
-        r.publishedDate?.startsWith(yesterday)
-    );
+    // Include today and yesterday; filter out "maintain"/"reiterated" (noise)
+    const relevant = allRows.filter(r => {
+      const d = r.date?.slice(0, 10);
+      if (d !== today && d !== yesterday) return false;
+      const act = (r.action ?? "").toLowerCase();
+      return act === "upgrade" || act === "downgrade" || act === "initiated" || act === "init";
+    });
 
     if (!relevant.length) return "";
 
-    const lines = relevant.slice(0, 30).map((r) => {
-      const dateLabel = r.publishedDate?.startsWith(today) ? "today" : "yesterday";
-      let line = `$${r.symbol} [${dateLabel}]: ${r.gradingCompany} — ${r.action}`;
-      if (r.fromGrade && r.toGrade && r.fromGrade !== r.toGrade) {
-        line += ` (${r.fromGrade} → ${r.toGrade})`;
-      } else if (r.toGrade) {
-        line += ` (${r.toGrade})`;
-      }
-      if (r.previousPriceTarget && r.newPriceTarget) {
-        line += ` | PT: $${r.previousPriceTarget} → $${r.newPriceTarget}`;
-      } else if (r.newPriceTarget) {
-        line += ` | PT: $${r.newPriceTarget}`;
-      }
-      return line;
-    });
+    const seen = new Set<string>();
+    const lines = relevant
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .filter(r => {
+        const k = `${r.symbol}|${r.date}|${r.gradingCompany}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      })
+      .slice(0, 30)
+      .map(r => {
+        const dateLabel = r.date?.startsWith(today) ? "today" : "yesterday";
+        let line = `$${r.symbol} [${dateLabel}]: ${r.gradingCompany} — ${r.action}`;
+        if (r.previousGrade && r.newGrade && r.previousGrade !== r.newGrade) {
+          line += ` (${r.previousGrade} → ${r.newGrade})`;
+        } else if (r.newGrade) {
+          line += ` (${r.newGrade})`;
+        }
+        return line;
+      });
 
     return `ANALYST MOVES (today + yesterday, ${relevant.length} total):\n${lines.join("\n")}`;
   } catch { return ""; }
@@ -476,25 +515,29 @@ ${tomorrowBlock || "No scheduled events data available."}
 
 Write a numbered market summary with two sections:
 
-SECTION 1 — TODAY (numbered items 1 through 12-15):
-- Order from most to least market-moving
-- Use $TICKER format for every company (e.g., $NVDA, $MU, $MSFT)
-- Each item: 2-4 sentences. State what happened, quantify it with exact numbers, explain market significance
-- For analyst moves: always name the firm, old PT, new PT, and the thesis behind the call
-- For insider purchases: GROUP ALL insider buys into ONE single item. List each purchase on its own line with: $TICKER — Name (Title) bought X,XXX shares at $XX.XX = ~$X.XM on [date]
-- For most active stocks: note the top 3-5 by volume in one item as a proxy for where options activity concentrated
-- Only include facts from the data — never invent details
+SECTION 1 — TODAY (10-12 numbered items):
+- Order: most market-moving first
+- Use $TICKER format for every company mentioned
+- EVERY item MUST begin with a category tag in brackets: [ANALYST], [INSIDER], [EARNINGS], [MACRO], [MOVERS], [DEAL], or [NEWS]
+- Each item: 1-2 sentences MAXIMUM. Lead with the key fact and exact numbers. Be punchy — this is a decision-making tool, not a newsletter.
+- Analyst moves: firm name, grade change (old → new), and exact price target change in sentence 1
+- Insider buys: group ALL buys into ONE [INSIDER] item; each buy on its own line: $TICKER — Name (Title) bought X,XXX shares at $XX.XX = ~$XM
+- Most active: one [MOVERS] item with top 3-5 by volume, one sentence
+- Only use facts from the data — never invent details
 
 SECTION 2 — WATCH TOMORROW:
-Write this as a structured forward-looking section. Use the tomorrow's schedule data to produce:
+Write EXACTLY these sub-headers as plain text on their own lines:
 
-Earnings: For each company reporting tomorrow, one sentence: who reports, when (pre-market/after-close), consensus EPS and revenue estimates, and what a beat or miss would mean for the sector.
+Earnings:
+(One line per company: $TICKER (Name) — [pre-market|after-close] | EPS est $X.XX | Rev est $XB)
 
-Macro Data: For each High/Medium impact economic release, one sentence: what the release is, prior reading, consensus estimate, and what a surprise in either direction would mean for rates or equities.
+Macro Data:
+(One line per release: [High|Medium] TIME ET — EVENT (prev X, est Y))
 
-Fed/Other: If any Fed speakers or FOMC events are in the data, note them and the key question markets are watching. If none, write "No Fed events scheduled."
+Fed/Other:
+(One sentence, or exactly: No Fed events scheduled.)
 
-Plain text only. No markdown headers, bold, italics, or --- dividers. Numbered items only for Section 1. Section 2 uses the Earnings/Macro Data/Fed labels as plain text headers.
+Plain text only. No markdown bold (**), no italics, no --- dividers. Numbered items for Section 1 only.
 
 Write the summary now.`;
 
@@ -580,7 +623,7 @@ export async function generateEodSummary(): Promise<EodSummaryPayload> {
   const marketDate = nyDateLabel();
   const generatedAt = new Date().toISOString();
 
-  const [tape, movers, mostActive, analystMoves, insiderBuys, topNews, tomorrowCalendar] =
+  const [tape, moversData, mostActive, analystMoves, insiderBuys, topNews, tomorrowCalendar] =
     await Promise.all([
       fetchTape(),
       fetchMovers(),
@@ -593,13 +636,21 @@ export async function generateEodSummary(): Promise<EodSummaryPayload> {
 
   const rawText = await synthesize(
     tape,
-    [movers, mostActive, analystMoves, insiderBuys, topNews],
+    [moversData.text, mostActive, analystMoves, insiderBuys, topNews],
     tomorrowCalendar,
     marketDate
   );
   const items = parseEodItems(rawText);
 
-  return { marketDate, tape, rawText, items, generatedAt };
+  return {
+    marketDate,
+    tape,
+    rawText,
+    items,
+    gainers: moversData.gainers,
+    losers: moversData.losers,
+    generatedAt,
+  };
 }
 
 // ── GET handler ───────────────────────────────────────────────────────────────
