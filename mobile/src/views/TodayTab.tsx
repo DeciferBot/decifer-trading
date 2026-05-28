@@ -1418,7 +1418,6 @@ export default function TodayTab({
   const [ttgData, setTtgData] = useState<TtgData | null>(null);
   useEffect(() => {
     let cancelled = false;
-    const dayOffset = Math.floor(Date.now() / 86400000) % 5;
     async function load() {
       try {
         const themes = await fetchTtgThemes();
@@ -1430,8 +1429,9 @@ export default function TodayTab({
         const details = await Promise.allSettled(
           activeThemes.map((t: { theme_id: string }) => fetchTtgThemeDetail(t.theme_id))
         );
-        const names: NameEntry[] = [];
         const symbolMap = new Map<string, { theme_label: string }>();
+        // Collect all candidates across themes with their confidence for global ranking
+        const candidates: Array<NameEntry & { _conf: number }> = [];
         for (const result of details) {
           if (result.status !== "fulfilled" || !result.value) continue;
           const detail = result.value;
@@ -1440,21 +1440,28 @@ export default function TodayTab({
           }
           const eligible = detail.symbols
             .filter((s: TtgSymbolCard) => s.status === "active" && s.driver_active)
-            .sort((a: TtgSymbolCard, b: TtgSymbolCard) => (b.confidence ?? 0) - (a.confidence ?? 0));
-          if (eligible.length === 0) continue;
-          const start = eligible.length <= 2 ? 0 : dayOffset % eligible.length;
-          const picked = eligible.length <= 2
-            ? eligible
-            : [...eligible.slice(start, start + 2), ...eligible.slice(0, Math.max(0, 2 - (eligible.length - start)))].slice(0, 2);
-          for (const s of picked) {
-            if (names.length >= 5 || names.find((n: NameEntry) => n.symbol === s.symbol)) continue;
+            .sort((a: TtgSymbolCard, b: TtgSymbolCard) => (b.confidence ?? 0) - (a.confidence ?? 0))
+            .slice(0, 3); // take top 3 per theme for global pool
+          for (const s of eligible) {
+            if (candidates.find(c => c.symbol === s.symbol)) continue;
             const chip = s.exposure_type === "direct_beneficiary" ? "Direct"
               : s.exposure_type === "supply_chain_beneficiary" ? "Supply chain"
               : s.exposure_type === "etf_proxy" ? "ETF"
               : undefined;
-            names.push({ symbol: s.symbol, reason: s.reason_to_care, theme_label: detail.label, exposure_type: chip });
+            candidates.push({
+              symbol: s.symbol,
+              reason: s.reason_to_care,
+              theme_label: detail.label,
+              exposure_type: chip,
+              _conf: s.confidence ?? 0,
+            });
           }
         }
+        // Global sort by confidence — highest conviction first
+        const names: NameEntry[] = candidates
+          .sort((a, b) => b._conf - a._conf)
+          .slice(0, 5)
+          .map(({ _conf: _, ...n }) => n);
         if (!cancelled) setTtgData({ names, symbolMap });
       } catch {
         if (!cancelled) setTtgData({ names: [], symbolMap: new Map() });
