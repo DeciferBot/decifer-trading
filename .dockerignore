@@ -16,9 +16,11 @@
 # ── Runtime state (bind-mounted from host at runtime) ─────────────────────────
 data/
 # Static intelligence reference files are NOT runtime state — they are config baked
-# into the image and read by /api/intelligence/universe. Exclude from data/ blanket rule.
+# into the image and read by /api/intelligence/universe and /api/intelligence/themes.
+# Exclude from data/ blanket rule.
 !data/intelligence/thematic_roster.json
 !data/intelligence/theme_taxonomy.json
+!data/intelligence/theme_graph/
 logs/
 
 # ── Archived / retired modules (not part of production runtime) ───────────────
