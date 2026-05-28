@@ -34,6 +34,7 @@ import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory"
 import type { TapeEntry } from "@/app/api/market-tape/route";
 import type { MarketMoversPayload, Mover } from "@/app/api/market-movers/route";
 import type { MorningBriefPayload, EconEvent, EarningsItem, AnalystItem } from "@/app/api/morning-brief/route";
+import { ROSTER_UNIVERSE } from "@/data/rosterUniverse";
 
 // ── Regime colour palette ─────────────────────────────────────────────────────
 
@@ -1422,7 +1423,10 @@ export default function TodayTab({
       try {
         const themes = await fetchTtgThemes();
         if (themes.length === 0) {
-          if (!cancelled) setTtgData({ names: [], symbolMap: new Map() });
+          const fallbackMap = new Map<string, { theme_label: string }>(
+            Object.entries(ROSTER_UNIVERSE)
+          );
+          if (!cancelled) setTtgData({ names: [], symbolMap: fallbackMap });
           return;
         }
         // Fetch ALL themes for a complete symbolMap (used by Agenda + Analyst filters).
@@ -1464,6 +1468,12 @@ export default function TodayTab({
             });
           }
         }
+        // Merge intelligence-layer roster symbols — expands earnings/analyst coverage
+        // to all 23 operational themes (vs TTG's 10 customer-facing packs).
+        // TTG entries take precedence (richer theme labels).
+        for (const [sym, entry] of Object.entries(ROSTER_UNIVERSE)) {
+          if (!symbolMap.has(sym)) symbolMap.set(sym, entry);
+        }
         // Global sort by confidence — highest conviction first
         const names: NameEntry[] = candidates
           .sort((a, b) => b._conf - a._conf)
@@ -1471,7 +1481,10 @@ export default function TodayTab({
           .map(({ _conf: _, ...n }) => n);
         if (!cancelled) setTtgData({ names, symbolMap });
       } catch {
-        if (!cancelled) setTtgData({ names: [], symbolMap: new Map() });
+        const fallbackMap = new Map<string, { theme_label: string }>(
+          Object.entries(ROSTER_UNIVERSE)
+        );
+        if (!cancelled) setTtgData({ names: [], symbolMap: fallbackMap });
       }
     }
     load();
