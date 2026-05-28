@@ -322,6 +322,7 @@ Write a numbered market summary. Requirements:
 - Include analyst moves (name the firm and the exact PT change), insider purchases (role + dollar size), notable corporate deals, macro observations
 - Only include facts from the data provided — never invent details
 - End with a line break then "Watch Tomorrow:" followed by 3 forward-looking bullets derived strictly from today's stories
+- IMPORTANT: Plain text only. No markdown headers, no bold (**), no italics, no --- dividers. Just numbered items.
 
 Write the summary now.`;
 
@@ -357,18 +358,24 @@ export function parseEodItems(rawText: string): EodItem[] {
     }
   };
 
-  for (const line of rawText.split("\n")) {
+  for (const rawLine of rawText.split("\n")) {
+    // Strip markdown: bold markers, header hashes, horizontal rules
+    const line = rawLine
+      .replace(/^\*{1,2}/, "")   // leading **
+      .replace(/\*{1,2}$/, "")   // trailing **
+      .replace(/^#{1,3}\s*/, "")  // ## headers
+      .replace(/\*\*/g, "")       // inline bold
+      .trim();
+
+    if (!line || line === "---") continue;
+
     const match = line.match(/^(\d{1,2})\.\s+(.+)/);
     if (match) {
       flush();
       currentNum = parseInt(match[1]);
       currentText = match[2];
-    } else if (
-      currentNum > 0 &&
-      line.trim() &&
-      !line.startsWith("Watch Tomorrow")
-    ) {
-      currentText += " " + line.trim();
+    } else if (currentNum > 0 && !line.startsWith("Watch Tomorrow")) {
+      currentText += " " + line;
     } else if (line.startsWith("Watch Tomorrow")) {
       flush();
       break;
