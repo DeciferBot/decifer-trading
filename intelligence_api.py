@@ -367,8 +367,19 @@ def mobile_portfolio() -> Response:
 # Intelligence universe endpoint — full operational symbol roster
 # ---------------------------------------------------------------------------
 
-_ROSTER_PATH = os.path.join(_BASE_DIR, "data", "intelligence", "thematic_roster.json")
-_TAXONOMY_PATH = os.path.join(_BASE_DIR, "data", "intelligence", "theme_taxonomy.json")
+# Intelligence reference files are baked into /app/intelligence_ref/ in the Docker image
+# (outside the /app/data/ named-volume mount) so they remain accessible in production.
+# Fall back to data/intelligence/ for local dev where no volume overlay exists.
+_INTELLIGENCE_REF_DIR = os.path.join(_BASE_DIR, "intelligence_ref")
+_INTELLIGENCE_DATA_DIR = os.path.join(_BASE_DIR, "data", "intelligence")
+_ROSTER_PATH = os.path.join(
+    _INTELLIGENCE_REF_DIR if os.path.isdir(_INTELLIGENCE_REF_DIR) else _INTELLIGENCE_DATA_DIR,
+    "thematic_roster.json",
+)
+_TAXONOMY_PATH = os.path.join(
+    _INTELLIGENCE_REF_DIR if os.path.isdir(_INTELLIGENCE_REF_DIR) else _INTELLIGENCE_DATA_DIR,
+    "theme_taxonomy.json",
+)
 
 
 def _load_roster_universe() -> list[dict[str, str]]:
