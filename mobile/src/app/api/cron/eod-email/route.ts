@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   generateEodSummary,
   parseEodItems,
+  extractWatchTomorrow,
   type EodSummaryPayload,
   type EodTape,
 } from "@/app/api/eod-summary/route";
@@ -78,15 +79,6 @@ function buildHtml(payload: EodSummaryPayload): string {
     .map(([label, value, color]) => buildTapeCell(label, value, color))
     .join('<td style="width:6px;"></td>');
 
-  // Split items from watch-tomorrow section
-  const watchIdx = rawText.indexOf("Watch Tomorrow:");
-  const watchSection =
-    watchIdx >= 0 ? rawText.slice(watchIdx + "Watch Tomorrow:".length).trim() : "";
-  const watchLines = watchSection
-    .split("\n")
-    .map((l) => l.replace(/^[-•*]\s*/, "").trim())
-    .filter(Boolean);
-
   const itemsHtml =
     items.length > 0
       ? items.map((item) => buildItemRow(item.text, item.number)).join("")
@@ -94,18 +86,37 @@ function buildHtml(payload: EodSummaryPayload): string {
       ? `<tr><td style="padding:20px 0;color:#9ca3af;font-size:14px;line-height:1.7;white-space:pre-line;">${highlightTickers(rawText)}</td></tr>`
       : `<tr><td style="padding:20px 0;color:#6b7280;">No summary data available.</td></tr>`;
 
-  const watchHtml =
-    watchLines.length > 0
-      ? `
+  // Structured Watch Tomorrow — renders Earnings / Macro Data / Fed sub-sections
+  const watchRaw = extractWatchTomorrow(rawText);
+
+  function renderWatchSection(raw: string): string {
+    if (!raw) return "";
+    const subHeaders = ["Earnings:", "Macro Data:", "Fed/Other:", "Watch Tomorrow"];
+    const lines = raw.split("\n").map((l) => l.replace(/^[-•*]\s*/, "").trim()).filter(Boolean);
+    let html = "";
+    for (const line of lines) {
+      const isHeader = subHeaders.some((h) => line.startsWith(h));
+      if (isHeader) {
+        const label = line.replace(/:?\s*$/, "").replace("Watch Tomorrow", "Watch Tomorrow");
+        html += `<div style="color:#f97316;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:16px 0 6px;">${label}</div>`;
+      } else {
+        html += `<div style="color:#9ca3af;font-size:13px;line-height:1.7;padding:5px 0 5px 14px;border-left:2px solid #1f2937;margin-bottom:2px;">${highlightTickers(line)}</div>`;
+      }
+    }
+    return html;
+  }
+
+  const watchHtml = watchRaw
+    ? `
   <tr>
-    <td style="padding:28px 0 8px;">
-      <div style="display:inline-block;background:#1c1007;border:1px solid #431407;border-radius:6px;padding:4px 10px;margin-bottom:14px;">
+    <td style="padding:28px 0 8px;border-top:1px solid #1f2937;">
+      <div style="display:inline-block;background:#1c1007;border:1px solid #431407;border-radius:6px;padding:4px 12px;margin-bottom:4px;">
         <span style="color:#f97316;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Watch Tomorrow</span>
       </div>
-      ${watchLines.map((l) => `<div style="color:#9ca3af;font-size:14px;line-height:1.7;padding:4px 0 4px 16px;border-left:2px solid #374151;">${highlightTickers(l)}</div>`).join("")}
+      ${renderWatchSection(watchRaw)}
     </td>
   </tr>`
-      : "";
+    : "";
 
   const generatedStr = new Date(generatedAt).toLocaleString("en-US", {
     timeZone: "America/New_York",

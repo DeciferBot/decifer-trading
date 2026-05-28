@@ -1,4 +1,4 @@
-// EOD Market Summary — fetches 5 data sources, synthesizes with claude-sonnet-4-6.
+// EOD Market Summary — fetches 7 data sources, synthesizes with claude-sonnet-4-6.
 // Exported generateEodSummary() is also called by the cron email route.
 
 import { NextResponse } from "next/server";
@@ -58,6 +58,12 @@ export function nyDateLabel(): string {
   }).format(new Date());
 }
 
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
 async function fetchTape(): Promise<EodTape> {
@@ -68,6 +74,7 @@ async function fetchTape(): Promise<EodTape> {
     fetch(`${BASE}/batch-quote-short?symbols=SPY,QQQ,IWM,TLT,GLD&apikey=${FMP_KEY}`, {
       cache: "no-store",
     }),
+    // Try index symbol first, fall back to ETF proxy VIXY
     fetch(`${BASE}/quote/%5EVIX?apikey=${FMP_KEY}`, { cache: "no-store" }),
   ]);
 
@@ -98,6 +105,21 @@ async function fetchTape(): Promise<EodTape> {
     } catch { /* graceful */ }
   }
 
+  // Fallback: derive VIX level from UVXY if index call failed
+  if (tape.vix === null && FMP_KEY) {
+    try {
+      const res = await fetch(`${BASE}/batch-quote-short?symbols=VIXY&apikey=${FMP_KEY}`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const raw: Array<{ symbol: string; price: number }> = await res.json();
+        const v = raw.find((r) => r.symbol === "VIXY");
+        // VIXY ≈ VIX/4 rough proxy — flag as approximate
+        if (v) tape.vix = parseFloat((v.price * 4).toFixed(1));
+      }
+    } catch { /* graceful */ }
+  }
+
   return tape;
 }
 
@@ -112,14 +134,15 @@ async function fetchMovers(): Promise<string> {
 
   if (gainersRes.status === "fulfilled" && gainersRes.value.ok) {
     try {
-      const raw: Array<{ symbol: string; name: string; changesPercentage: number | string }> =
+      const raw: Array<{ symbol: string; name: string; changesPercentage: number | string; price?: number }> =
         await gainersRes.value.json();
       const top = raw.slice(0, 5).map((r) => {
         const pct =
           typeof r.changesPercentage === "string"
             ? r.changesPercentage
             : `+${Number(r.changesPercentage).toFixed(1)}%`;
-        return `$${r.symbol} (${r.name}) ${pct}`;
+        const price = r.price ? ` at $${Number(r.price).toFixed(2)}` : "";
+        return `$${r.symbol} (${r.name}) ${pct}${price}`;
       });
       if (top.length) lines.push(`TOP GAINERS: ${top.join(", ")}`);
     } catch { /* graceful */ }
@@ -127,14 +150,15 @@ async function fetchMovers(): Promise<string> {
 
   if (losersRes.status === "fulfilled" && losersRes.value.ok) {
     try {
-      const raw: Array<{ symbol: string; name: string; changesPercentage: number | string }> =
+      const raw: Array<{ symbol: string; name: string; changesPercentage: number | string; price?: number }> =
         await losersRes.value.json();
       const top = raw.slice(0, 5).map((r) => {
         const pct =
           typeof r.changesPercentage === "string"
             ? r.changesPercentage
             : `${Number(r.changesPercentage).toFixed(1)}%`;
-        return `$${r.symbol} (${r.name}) ${pct}`;
+        const price = r.price ? ` at $${Number(r.price).toFixed(2)}` : "";
+        return `$${r.symbol} (${r.name}) ${pct}${price}`;
       });
       if (top.length) lines.push(`TOP LOSERS: ${top.join(", ")}`);
     } catch { /* graceful */ }
@@ -143,11 +167,45 @@ async function fetchMovers(): Promise<string> {
   return lines.join("\n");
 }
 
+async function fetchMostActive(): Promise<string> {
+  if (!FMP_KEY) return "";
+  try {
+    const res = await fetch(`${BASE}/actives?apikey=${FMP_KEY}`, { cache: "no-store" });
+    if (!res.ok) return "";
+    const raw: Array<{
+      symbol: string;
+      name: string;
+      price?: number;
+      changesPercentage?: number | string;
+      volume?: number;
+    }> = await res.json();
+    if (!Array.isArray(raw) || !raw.length) return "";
+
+    const lines = raw.slice(0, 10).map((r, i) => {
+      const pct =
+        r.changesPercentage !== undefined
+          ? typeof r.changesPercentage === "number"
+            ? ` ${r.changesPercentage >= 0 ? "+" : ""}${r.changesPercentage.toFixed(1)}%`
+            : ` ${r.changesPercentage}`
+          : "";
+      const vol = r.volume
+        ? r.volume >= 1_000_000
+          ? ` vol ${(r.volume / 1_000_000).toFixed(1)}M shares`
+          : ` vol ${(r.volume / 1_000).toFixed(0)}K shares`
+        : "";
+      return `${i + 1}. $${r.symbol} (${r.name})${pct}${vol}`;
+    });
+
+    return `MOST ACTIVE STOCKS TODAY (by share volume — these names typically dominate options flow too):\n${lines.join("\n")}`;
+  } catch { return ""; }
+}
+
 async function fetchAnalystMoves(today: string): Promise<string> {
   if (!FMP_KEY) return "";
   try {
+    // Fetch 500 records — analyst moves can arrive pre-market or late previous day
     const res = await fetch(
-      `${BASE}/upgrades-downgrades?limit=200&apikey=${FMP_KEY}`,
+      `${BASE}/upgrades-downgrades?limit=500&apikey=${FMP_KEY}`,
       { cache: "no-store" }
     );
     if (!res.ok) return "";
@@ -163,21 +221,33 @@ async function fetchAnalystMoves(today: string): Promise<string> {
       previousPriceTarget?: number | null;
     }> = await res.json();
 
-    const todayItems = raw.filter((r) => r.publishedDate?.startsWith(today));
-    if (!todayItems.length) return "";
+    const yesterday = addDays(today, -1);
+    // Include today and yesterday (pre-market calls filed overnight)
+    const relevant = raw.filter(
+      (r) =>
+        r.publishedDate?.startsWith(today) ||
+        r.publishedDate?.startsWith(yesterday)
+    );
 
-    const lines = todayItems.slice(0, 20).map((r) => {
-      let line = `$${r.symbol}: ${r.gradingCompany} ${r.action}`;
-      if (r.fromGrade && r.toGrade) line += ` (${r.fromGrade} → ${r.toGrade})`;
-      if (r.newPriceTarget && r.previousPriceTarget) {
-        line += ` — PT $${r.previousPriceTarget} → $${r.newPriceTarget}`;
+    if (!relevant.length) return "";
+
+    const lines = relevant.slice(0, 30).map((r) => {
+      const dateLabel = r.publishedDate?.startsWith(today) ? "today" : "yesterday";
+      let line = `$${r.symbol} [${dateLabel}]: ${r.gradingCompany} — ${r.action}`;
+      if (r.fromGrade && r.toGrade && r.fromGrade !== r.toGrade) {
+        line += ` (${r.fromGrade} → ${r.toGrade})`;
+      } else if (r.toGrade) {
+        line += ` (${r.toGrade})`;
+      }
+      if (r.previousPriceTarget && r.newPriceTarget) {
+        line += ` | PT: $${r.previousPriceTarget} → $${r.newPriceTarget}`;
       } else if (r.newPriceTarget) {
-        line += ` — PT $${r.newPriceTarget}`;
+        line += ` | PT: $${r.newPriceTarget}`;
       }
       return line;
     });
 
-    return `ANALYST MOVES TODAY (${todayItems.length} total, showing top 20):\n${lines.join("\n")}`;
+    return `ANALYST MOVES (today + yesterday, ${relevant.length} total):\n${lines.join("\n")}`;
   } catch { return ""; }
 }
 
@@ -185,7 +255,7 @@ async function fetchInsiderBuys(): Promise<string> {
   if (!FMP_KEY) return "";
   try {
     const res = await fetch(
-      `${BASE}/insider-trading?limit=100&apikey=${FMP_KEY}`,
+      `${BASE}/insider-trading?limit=200&apikey=${FMP_KEY}`,
       { cache: "no-store" }
     );
     if (!res.ok) return "";
@@ -213,17 +283,114 @@ async function fetchInsiderBuys(): Promise<string> {
 
     if (!buys.length) return "";
 
-    const lines = buys.slice(0, 12).map((r) => {
-      const qty = r.securitiesTransacted?.toLocaleString();
-      const value =
+    const lines = buys.slice(0, 15).map((r) => {
+      const shares = r.securitiesTransacted?.toLocaleString();
+      const priceStr = r.price ? ` at $${r.price.toFixed(2)}/share` : "";
+      const totalVal =
         r.price && r.securitiesTransacted
-          ? ` ~$${((r.price * r.securitiesTransacted) / 1_000_000).toFixed(2)}M`
-          : ` ${qty} shares`;
-      return `$${r.symbol}: ${r.reportingName} (${r.typeOfOwner}) bought${value} on ${r.filingDate?.slice(0, 10)}`;
+          ? ` = ~$${((r.price * r.securitiesTransacted) / 1_000_000).toFixed(2)}M`
+          : "";
+      return `$${r.symbol}: ${r.reportingName} (${r.typeOfOwner}) — ${shares} shares${priceStr}${totalVal} — filed ${r.filingDate?.slice(0, 10)}`;
     });
 
-    return `INSIDER PURCHASES (last 48h):\n${lines.join("\n")}`;
+    return `INSIDER PURCHASES (last 48h — ${buys.length} buys):\n${lines.join("\n")}`;
   } catch { return ""; }
+}
+
+async function fetchTomorrowCalendar(today: string): Promise<string> {
+  if (!FMP_KEY) return "";
+
+  const tomorrow = addDays(today, 1);
+  // Skip weekends
+  const tomorrowDay = new Date(`${tomorrow}T12:00:00`).getDay();
+  if (tomorrowDay === 0 || tomorrowDay === 6) return "";
+
+  const [earningsRes, econRes] = await Promise.allSettled([
+    fetch(
+      `${BASE}/earnings-calendar?from=${tomorrow}&to=${tomorrow}&apikey=${FMP_KEY}`,
+      { cache: "no-store" }
+    ),
+    fetch(
+      `${BASE}/economic-calendar?from=${tomorrow}&to=${tomorrow}&apikey=${FMP_KEY}`,
+      { cache: "no-store" }
+    ),
+  ]);
+
+  const blocks: string[] = [];
+
+  if (earningsRes.status === "fulfilled" && earningsRes.value.ok) {
+    try {
+      const raw: Array<{
+        symbol: string;
+        name: string;
+        time: string;
+        epsEstimated: number | null;
+        revenueEstimated: number | null;
+      }> = await earningsRes.value.json();
+
+      if (Array.isArray(raw) && raw.length) {
+        const items = raw.slice(0, 20).map((r) => {
+          const timing =
+            r.time === "bmo"
+              ? "pre-market"
+              : r.time === "amc"
+              ? "after-close"
+              : r.time === "dmh"
+              ? "during market hours"
+              : "";
+          const eps =
+            r.epsEstimated !== null
+              ? `EPS est $${r.epsEstimated.toFixed(2)}`
+              : "";
+          const rev =
+            r.revenueEstimated !== null
+              ? `Rev est $${(r.revenueEstimated / 1e9).toFixed(2)}B`
+              : "";
+          const estimates = [eps, rev].filter(Boolean).join(", ");
+          return `$${r.symbol} (${r.name || r.symbol})${timing ? " — " + timing : ""}${estimates ? " | " + estimates : ""}`;
+        });
+        blocks.push(`TOMORROW'S EARNINGS (${raw.length} companies reporting):\n${items.join("\n")}`);
+      }
+    } catch { /* graceful */ }
+  }
+
+  if (econRes.status === "fulfilled" && econRes.value.ok) {
+    try {
+      const raw: Array<{
+        event: string;
+        time: string;
+        actual: number | null;
+        previous: number | null;
+        estimate: number | null;
+        impact: string;
+        country: string;
+        unit?: string;
+      }> = await econRes.value.json();
+
+      if (Array.isArray(raw)) {
+        const usEvents = raw
+          .filter(
+            (r) =>
+              (r.country === "US" || !r.country) &&
+              (r.impact === "High" || r.impact === "Medium")
+          )
+          .slice(0, 12);
+
+        if (usEvents.length) {
+          const items = usEvents.map((r) => {
+            const prev = r.previous !== null ? `prev ${r.previous}${r.unit || ""}` : "";
+            const est = r.estimate !== null ? `est ${r.estimate}${r.unit || ""}` : "";
+            const context = [prev, est].filter(Boolean).join(", ");
+            const time = r.time ? `${r.time} ET — ` : "";
+            return `[${r.impact}] ${time}${r.event}${context ? ` (${context})` : ""}`;
+          });
+          blocks.push(`TOMORROW'S MACRO RELEASES (US, High/Medium impact):\n${items.join("\n")}`);
+        }
+      }
+    } catch { /* graceful */ }
+  }
+
+  return blocks.join("\n\n");
 }
 
 async function fetchTopNews(): Promise<string> {
@@ -243,7 +410,7 @@ async function fetchTopNews(): Promise<string> {
         ? new Date(n.publishedDate.replace(" ", "T") + "Z").getTime()
         : 0;
       const minutesAgo = pub ? Math.max(0, Math.round((now - pub) / 60_000)) : 9999;
-      if (minutesAgo > 720) continue; // last 12h only
+      if (minutesAgo > 720) continue;
       items.push({
         title: n.title.trim(),
         symbol: n.symbol?.toUpperCase() ?? null,
@@ -281,7 +448,7 @@ async function fetchTopNews(): Promise<string> {
     return `${age}${sym} — ${n.title}`;
   });
 
-  return `NOTABLE NEWS (last 12h, ${deduped.length} items):\n${lines.join("\n")}`;
+  return `NOTABLE NEWS (last 12h):\n${lines.join("\n")}`;
 }
 
 // ── Claude synthesis ──────────────────────────────────────────────────────────
@@ -289,6 +456,7 @@ async function fetchTopNews(): Promise<string> {
 async function synthesize(
   tape: EodTape,
   contextBlocks: string[],
+  tomorrowBlock: string,
   marketDate: string
 ): Promise<string> {
   if (!ANTHROPIC_KEY) return "";
@@ -311,18 +479,37 @@ async function synthesize(
 
 Market close tape: ${tapeStr}
 
-Today's data:
+===TODAY'S DATA===
 
 ${dataBlock || "Limited data available — synthesize from the tape and any available context."}
 
-Write a numbered market summary. Requirements:
-- 10–15 numbered items, ordered from most to least market-moving
-- Use $TICKER format for every company mentioned (e.g., $NVDA, $MU, $MSFT)
-- Each item: 2–4 sentences. State what happened, quantify it, explain why it matters to a sophisticated investor
-- Include analyst moves (name the firm and the exact PT change), insider purchases (role + dollar size), notable corporate deals, macro observations
-- Only include facts from the data provided — never invent details
-- End with a line break then "Watch Tomorrow:" followed by 3 forward-looking bullets derived strictly from today's stories
-- IMPORTANT: Plain text only. No markdown headers, no bold (**), no italics, no --- dividers. Just numbered items.
+===TOMORROW'S SCHEDULE===
+
+${tomorrowBlock || "No scheduled events data available."}
+
+===INSTRUCTIONS===
+
+Write a numbered market summary with two sections:
+
+SECTION 1 — TODAY (numbered items 1 through 12-15):
+- Order from most to least market-moving
+- Use $TICKER format for every company (e.g., $NVDA, $MU, $MSFT)
+- Each item: 2-4 sentences. State what happened, quantify it with exact numbers, explain market significance
+- For analyst moves: always name the firm, old PT, new PT, and the thesis behind the call
+- For insider purchases: GROUP ALL insider buys into ONE single item. List each purchase on its own line with: $TICKER — Name (Title) bought X,XXX shares at $XX.XX = ~$X.XM on [date]
+- For most active stocks: note the top 3-5 by volume in one item as a proxy for where options activity concentrated
+- Only include facts from the data — never invent details
+
+SECTION 2 — WATCH TOMORROW:
+Write this as a structured forward-looking section. Use the tomorrow's schedule data to produce:
+
+Earnings: For each company reporting tomorrow, one sentence: who reports, when (pre-market/after-close), consensus EPS and revenue estimates, and what a beat or miss would mean for the sector.
+
+Macro Data: For each High/Medium impact economic release, one sentence: what the release is, prior reading, consensus estimate, and what a surprise in either direction would mean for rates or equities.
+
+Fed/Other: If any Fed speakers or FOMC events are in the data, note them and the key question markets are watching. If none, write "No Fed events scheduled."
+
+Plain text only. No markdown headers, bold, italics, or --- dividers. Numbered items only for Section 1. Section 2 uses the Earnings/Macro Data/Fed labels as plain text headers.
 
 Write the summary now.`;
 
@@ -330,7 +517,7 @@ Write the summary now.`;
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
     const msg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 2500,
+      max_tokens: 3000,
       messages: [{ role: "user", content: userContent }],
     });
     const block = msg.content[0];
@@ -358,32 +545,47 @@ export function parseEodItems(rawText: string): EodItem[] {
     }
   };
 
+  const SECTION2_MARKERS = ["Watch Tomorrow", "Earnings:", "Macro Data:", "Fed/Other:"];
+
   for (const rawLine of rawText.split("\n")) {
-    // Strip markdown: bold markers, header hashes, horizontal rules
     const line = rawLine
-      .replace(/^\*{1,2}/, "")   // leading **
-      .replace(/\*{1,2}$/, "")   // trailing **
-      .replace(/^#{1,3}\s*/, "")  // ## headers
-      .replace(/\*\*/g, "")       // inline bold
+      .replace(/^\*{1,2}/, "")
+      .replace(/\*{1,2}$/, "")
+      .replace(/^#{1,3}\s*/, "")
+      .replace(/\*\*/g, "")
       .trim();
 
     if (!line || line === "---") continue;
+
+    // Stop parsing numbered items when Section 2 starts
+    if (SECTION2_MARKERS.some((m) => line.startsWith(m))) {
+      flush();
+      break;
+    }
 
     const match = line.match(/^(\d{1,2})\.\s+(.+)/);
     if (match) {
       flush();
       currentNum = parseInt(match[1]);
       currentText = match[2];
-    } else if (currentNum > 0 && !line.startsWith("Watch Tomorrow")) {
+    } else if (currentNum > 0) {
       currentText += " " + line;
-    } else if (line.startsWith("Watch Tomorrow")) {
-      flush();
-      break;
     }
   }
   flush();
 
   return items;
+}
+
+// ── Extract Watch Tomorrow section ────────────────────────────────────────────
+
+export function extractWatchTomorrow(rawText: string): string {
+  const markers = ["Watch Tomorrow", "WATCH TOMORROW", "Earnings:", "Macro Data:"];
+  for (const marker of markers) {
+    const idx = rawText.indexOf(marker);
+    if (idx >= 0) return rawText.slice(idx).trim();
+  }
+  return "";
 }
 
 // ── Main generator (exported for cron route) ──────────────────────────────────
@@ -393,17 +595,21 @@ export async function generateEodSummary(): Promise<EodSummaryPayload> {
   const marketDate = nyDateLabel();
   const generatedAt = new Date().toISOString();
 
-  const [tape, movers, analystMoves, insiderBuys, topNews] = await Promise.all([
-    fetchTape(),
-    fetchMovers(),
-    fetchAnalystMoves(today),
-    fetchInsiderBuys(),
-    fetchTopNews(),
-  ]);
+  const [tape, movers, mostActive, analystMoves, insiderBuys, topNews, tomorrowCalendar] =
+    await Promise.all([
+      fetchTape(),
+      fetchMovers(),
+      fetchMostActive(),
+      fetchAnalystMoves(today),
+      fetchInsiderBuys(),
+      fetchTopNews(),
+      fetchTomorrowCalendar(today),
+    ]);
 
   const rawText = await synthesize(
     tape,
-    [movers, analystMoves, insiderBuys, topNews],
+    [movers, mostActive, analystMoves, insiderBuys, topNews],
+    tomorrowCalendar,
     marketDate
   );
   const items = parseEodItems(rawText);
