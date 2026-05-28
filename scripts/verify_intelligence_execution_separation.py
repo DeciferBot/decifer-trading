@@ -155,9 +155,11 @@ def _check_file(path: Path, exec_names: frozenset[str]) -> Violations:
     # V3: yfinance import in any RUNTIME module (not tests or scripts — those may
     # reference yfinance in strings or to assert its absence).
     # Use AST import detection only to avoid false positives on string literals.
-    # Approved exceptions: futures_data.py is the sole approved runtime yfinance user
-    # (ES=F / NQ=F advisory sensors only). Mirrors _YFINANCE_APPROVED in test_no_yfinance_runtime.py.
-    _V3_APPROVED = frozenset({"futures_data"})
+    # Approved exceptions — mirrors _YFINANCE_APPROVED in test_no_yfinance_runtime.py.
+    # futures_data.py: ES=F / NQ=F advisory sensors (only source for futures data).
+    # live_driver_resolver.py: Alpaca fallback for cloud server / weekend market closure
+    #   (Amit approval 2026-05-26).
+    _V3_APPROVED = frozenset({"futures_data", "live_driver_resolver"})
     if layer not in (Layer.TEST_ONLY, Layer.ARCHIVE_OR_DEPRECATED):
         if "yfinance" in imports and path.stem not in _V3_APPROVED:
             violations.append(

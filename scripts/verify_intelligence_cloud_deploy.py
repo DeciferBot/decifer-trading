@@ -229,9 +229,14 @@ def check_requirements() -> None:
     ]
     active_content = "\n".join(active_lines)
 
-    # R1: yfinance absent from active requirements
+    # R1: yfinance absent from active requirements, OR present only with an approved
+    # exception annotation (live_driver_resolver Alpaca fallback, Amit 2026-05-26).
     if "yfinance" in active_content:
-        _record("R1", False, "yfinance found as active requirement in requirements.intelligence.txt — must not be present")
+        full_content = req_path.read_text(encoding="utf-8").lower()
+        if "approved exception" in full_content and "live_driver_resolver" in full_content:
+            _record("R1", True, "yfinance present with approved exception annotation (live_driver_resolver fallback)")
+        else:
+            _record("R1", False, "yfinance found as active requirement without approved exception annotation")
     else:
         _record("R1", True, "yfinance is absent from requirements.intelligence.txt (active lines)")
 
