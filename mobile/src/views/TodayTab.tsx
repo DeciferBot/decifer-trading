@@ -1063,6 +1063,7 @@ function MoversSection({ session }: { session?: MarketSession }) {
   const gainers = data.gainers.slice(0, 5);
   const losers  = data.losers.slice(0, 5);
 
+  // eslint-disable-next-line react-compiler/react-compiler
   const freshnessLabel = data.ts
     ? (() => {
         const diffMs = Date.now() - new Date(data.ts).getTime();

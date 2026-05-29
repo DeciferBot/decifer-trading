@@ -1001,7 +1001,7 @@ function toggleCard(bodyId, header) {
 
 async function loadData() {
   try {
-    const r = await fetch('/api/counter-thesis');
+    const r = await fetch('/api/counter-thesis?fmp=false');
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
 

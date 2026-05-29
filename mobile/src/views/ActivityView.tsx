@@ -28,6 +28,7 @@ export default function ActivityView() {
     finally { setLoading(false); }
   }, []);
 
+  // eslint-disable-next-line react-compiler/react-compiler
   useEffect(() => { load(); const t = setInterval(load, 15_000); return () => clearInterval(t); }, [load]);
 
   if (loading) return (

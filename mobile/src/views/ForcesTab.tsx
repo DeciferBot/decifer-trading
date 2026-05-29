@@ -412,7 +412,7 @@ export default function ForcesTab({
           }}
         >
           <Zap size={11} />
-          Ask Decifer about today's forces
+          Ask Decifer about today&apos;s forces
         </button>
       )}
 

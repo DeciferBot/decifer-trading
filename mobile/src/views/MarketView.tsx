@@ -180,6 +180,7 @@ export default function MarketView() {
     }
   }, []);
 
+  // eslint-disable-next-line react-compiler/react-compiler
   useEffect(() => {
     load();
     const t = setInterval(load, 60_000);

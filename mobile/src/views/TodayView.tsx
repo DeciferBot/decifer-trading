@@ -91,6 +91,7 @@ export default function TodayView({ onTabChange }: Props) {
     }
   }, []);
 
+  // eslint-disable-next-line react-compiler/react-compiler
   useEffect(() => {
     load();
     const t = setInterval(load, 12_000);

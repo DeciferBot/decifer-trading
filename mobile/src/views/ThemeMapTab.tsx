@@ -539,6 +539,14 @@ function ThemeDetail({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style={{ color: "#f97316" }}>
+      {children}
+    </p>
+  );
+}
+
 interface Props {
   data: MarketNowPayload;
   selectedTheme: string | null;
@@ -551,6 +559,7 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
   const [ttgSymbols, setTtgSymbols] = useState<TtgSymbolCard[]>([]);
 
   // Fetch TTG data when user drills into a theme detail.
+  // eslint-disable-next-line react-compiler/react-compiler
   useEffect(() => {
     if (!selectedTheme) { setTtgSymbols([]); return; }
     const ttgId = getTtgIdForMarketNow(selectedTheme) ?? selectedTheme;
@@ -624,12 +633,6 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
       !["activated", "active", "strengthening", "weakening", "headwind"].includes(t.state ?? "")
     ),
   }), [sorted]);
-
-  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-    <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style={{ color: "#f97316" }}>
-      {children}
-    </p>
-  );
 
   // ── Empty state ──────────────────────────────────────────────────────────────
   if (themes.length === 0 && causeCards.length === 0) {

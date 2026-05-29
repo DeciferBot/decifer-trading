@@ -197,6 +197,14 @@ function SignalCard({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style={{ color: "#f97316" }}>
+      {children}
+    </p>
+  );
+}
+
 interface Props {
   data: MarketNowPayload;
   onThemeSelect: (themeId: string) => void;
@@ -219,12 +227,6 @@ export default function SignalsTab({ data, onThemeSelect }: Props) {
     fading:   themes.filter(t => matchesFilter(t, "fading")).length,
     quiet:    themes.filter(t => matchesFilter(t, "quiet")).length,
   };
-
-  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-    <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style={{ color: "#f97316" }}>
-      {children}
-    </p>
-  );
 
   return (
     <div className="px-4 pt-2 pb-8 space-y-5">

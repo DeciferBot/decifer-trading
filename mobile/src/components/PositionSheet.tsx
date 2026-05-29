@@ -111,7 +111,7 @@ export default function PositionSheet({ position, pmDecisions, onClose }: Props)
           </p>
           {thesisStatus && (
             <div className="mt-3 pt-3 border-t border-[#1e2a3a] flex items-center gap-2">
-              <p className="text-xs text-slate-500">Bot's view:</p>
+              <p className="text-xs text-slate-500">Bot&apos;s view:</p>
               <p className={`text-xs font-semibold ${thesisStatus.color}`}>{thesisStatus.label}</p>
             </div>
           )}

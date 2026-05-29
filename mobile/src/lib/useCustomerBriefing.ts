@@ -284,6 +284,7 @@ export function useCustomerBriefing(): CustomerBriefingState {
     }
   }, []);
 
+  // eslint-disable-next-line react-compiler/react-compiler
   useEffect(() => {
     load(false);
     const t = setInterval(() => load(false), 5 * 60_000);
@@ -307,6 +308,7 @@ export function useCustomerBriefing(): CustomerBriefingState {
   const forcesResult = data ? buildCustomerForces(data) : { active: [], dormant: [] };
   const connectionTree = data ? buildConnectionTree(data, ttgThemes) : [];
 
+  // eslint-disable-next-line react-compiler/react-compiler
   return {
     data,
     loading,

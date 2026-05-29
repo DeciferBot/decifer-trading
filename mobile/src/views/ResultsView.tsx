@@ -79,7 +79,7 @@ export default function ResultsView() {
   return (
     <div className="px-5 pt-6 pb-4 space-y-4">
       <div>
-        <h2 className="text-lg font-bold text-white">How you're doing</h2>
+        <h2 className="text-lg font-bold text-white">How you&apos;re doing</h2>
         <p className="text-sm text-slate-500">{trades} trades total</p>
       </div>
 
