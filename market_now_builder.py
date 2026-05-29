@@ -98,6 +98,9 @@ _DRIVER_LABELS: dict[str, str] = {
     "gold_safe_haven_bid":        "Safe-haven demand for gold elevated",
     "small_cap_risk_on":          "Small-cap stocks outperforming large-caps",
     "smh_tactical_weakness":      "Semiconductor sector under near-term pressure",
+    "futures_risk_on":            "Equity futures pointing higher",
+    "futures_risk_off":           "Equity futures pointing lower",
+    "credit_stress_rising":       "Credit spreads widening — borrowing conditions tightening",
 }
 
 _REGIME_LABELS: dict[str, str] = {
@@ -130,15 +133,20 @@ def _theme_name(theme_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _load_drivers() -> tuple[list[str], list[str]]:
-    """Returns (active_driver_labels, risk_notes_from_blocked_conditions)."""
+    """Returns (active_driver_ids, risk_notes_from_blocked_conditions).
+
+    key_drivers in the payload must be raw IDs so the frontend can map them to
+    icons and colours. Human-readable labels are derived client-side or via
+    _driver_label() when building plain-text summaries.
+    """
     try:
         ld = _read_json("data/intelligence/live_driver_state.json")
-        labels = [_driver_label(k) for k in ld.get("active_drivers", [])]
+        driver_ids = list(ld.get("active_drivers", []))
         risk_notes = [
             f"Market condition blocked: {c.replace('_', ' ')}"
             for c in ld.get("blocked_conditions", [])
         ]
-        return labels, risk_notes
+        return driver_ids, risk_notes
     except Exception as exc:
         log.debug("_load_drivers: %s", exc)
         return [], []
@@ -468,7 +476,7 @@ def build_market_now() -> SaaSIntelligencePayload:
     if apex_read:
         summary = apex_read
     elif drivers:
-        driver_str = ", ".join(drivers[:3])
+        driver_str = ", ".join(_driver_label(d) for d in drivers[:3])
         summary = (
             f"The market is currently {regime_label.lower()}. "
             f"Key drivers: {driver_str}. "
