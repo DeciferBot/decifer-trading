@@ -15,6 +15,7 @@ set -euo pipefail
 REPO_DIR="/Users/amitchopra/Desktop/decifer trading"
 DO_HOST="206.189.135.189"
 DO_DATA_DIR="/opt/decifer/data"
+DOCKER_VOL_DIR="/var/lib/docker/volumes/decifer_decifer-data/_data"
 LOG_FILE="/tmp/decifer-intelligence-sync.log"
 
 log() { echo "[$(date -u +%H:%M:%S)] $*" | tee -a "$LOG_FILE"; }
@@ -47,6 +48,23 @@ rsync -av \
   "$REPO_DIR/data/live/current_manifest.json" \
   "root@$DO_HOST:$DO_DATA_DIR/live/" \
   >> "$LOG_FILE" 2>&1
+
+# Mirror key runtime files into the Docker volume so the intelligence container
+# reads fresh data. The container mounts the named volume (decifer_decifer-data),
+# not /opt/decifer/data, so rsync alone is insufficient.
+ssh "root@$DO_HOST" "
+  cp $DO_DATA_DIR/intelligence/live_driver_state.json $DOCKER_VOL_DIR/intelligence/ 2>/dev/null || true
+  cp $DO_DATA_DIR/intelligence/theme_activation.json $DOCKER_VOL_DIR/intelligence/ 2>/dev/null || true
+  cp $DO_DATA_DIR/intelligence/economic_candidate_feed.json $DOCKER_VOL_DIR/intelligence/ 2>/dev/null || true
+  cp $DO_DATA_DIR/intelligence/customer_event_tape.json $DOCKER_VOL_DIR/intelligence/ 2>/dev/null || true
+  cp $DO_DATA_DIR/intelligence/thematic_roster.json $DOCKER_VOL_DIR/intelligence/ 2>/dev/null || true
+  cp $DO_DATA_DIR/intelligence/theme_taxonomy.json $DOCKER_VOL_DIR/intelligence/ 2>/dev/null || true
+  cp $DO_DATA_DIR/intelligence/transmission_rules.json $DOCKER_VOL_DIR/intelligence/ 2>/dev/null || true
+  cp $DO_DATA_DIR/intelligence/counter_thesis_cache.json $DOCKER_VOL_DIR/intelligence/ 2>/dev/null || true
+  rsync -a $DO_DATA_DIR/intelligence/theme_graph/ $DOCKER_VOL_DIR/intelligence/theme_graph/ 2>/dev/null || true
+  cp $DO_DATA_DIR/live/active_opportunity_universe.json $DOCKER_VOL_DIR/live/ 2>/dev/null || true
+  cp $DO_DATA_DIR/live/current_manifest.json $DOCKER_VOL_DIR/live/ 2>/dev/null || true
+" 2>> "$LOG_FILE"
 
 log "Sync complete"
 
