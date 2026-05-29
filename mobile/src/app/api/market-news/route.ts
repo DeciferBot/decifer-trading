@@ -32,20 +32,35 @@ export interface NewsItem {
   logoUrl: string | null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const ts = new Date().toISOString();
 
   if (!FMP_KEY) return NextResponse.json({ news: [], ts });
 
+  // When caller provides a symbol list, use the filtered endpoint (same as bot dashboard).
+  // Fall back to stock-latest only when no symbols are available.
+  const { searchParams } = new URL(request.url);
+  const symbolsParam = searchParams.get("symbols") ?? "";
+  const symbolList = symbolsParam
+    .split(",")
+    .map(s => s.trim().toUpperCase())
+    .filter(Boolean)
+    .slice(0, 50);
+
+  const stockUrl =
+    symbolList.length > 0
+      ? `https://financialmodelingprep.com/stable/news/stock?symbols=${symbolList.join(",")}&limit=30&apikey=${FMP_KEY}`
+      : `https://financialmodelingprep.com/stable/news/stock-latest?limit=20&apikey=${FMP_KEY}`;
+
+  const generalUrl = symbolList.length === 0
+    ? `https://financialmodelingprep.com/stable/news/general-latest?limit=10&apikey=${FMP_KEY}`
+    : null;
+
   const [stockRes, generalRes] = await Promise.allSettled([
-    fetch(
-      `https://financialmodelingprep.com/stable/news/stock-latest?limit=20&apikey=${FMP_KEY}`,
-      { next: { revalidate: 180 } },
-    ),
-    fetch(
-      `https://financialmodelingprep.com/stable/news/general-latest?limit=10&apikey=${FMP_KEY}`,
-      { next: { revalidate: 300 } },
-    ),
+    fetch(stockUrl, { next: { revalidate: 180 } }),
+    generalUrl
+      ? fetch(generalUrl, { next: { revalidate: 300 } })
+      : Promise.resolve(new Response("[]", { status: 200 })),
   ]);
 
   const now = Date.now();

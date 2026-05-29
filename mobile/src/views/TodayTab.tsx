@@ -1092,6 +1092,12 @@ function earningsTimeLabel(t: string): string {
 // ── Economic event plain-language labels ──────────────────────────────────────
 
 const ECON_PLAIN_LABELS: Array<{ keywords: string[]; label: string }> = [
+  { keywords: ["cftc s&p", "cftc s&p 500", "cftc spx"], label: "CFTC S&P 500 Positioning" },
+  { keywords: ["cftc nasdaq", "cftc ndx", "cftc nasdaq 100"], label: "CFTC Nasdaq 100 Positioning" },
+  { keywords: ["cftc crude oil", "cftc wti"], label: "CFTC Crude Oil Positioning" },
+  { keywords: ["cftc gold", "cftc xau"], label: "CFTC Gold Positioning" },
+  { keywords: ["cftc", "speculative net position", "commitment of traders"], label: "CFTC Futures Positioning" },
+  { keywords: ["wholesale inventories"], label: "Wholesale Inventories" },
   { keywords: ["nonfarm payroll", "non-farm payroll", "nfp"], label: "Jobs Report — Non-Farm Payrolls" },
   { keywords: ["initial jobless claim"], label: "Weekly Jobless Claims (New Filings)" },
   { keywords: ["continuing jobless claim"], label: "Ongoing Unemployment Claims" },
@@ -1141,6 +1147,158 @@ function econPlainLabel(eventName: string): string {
     if (keywords.some(k => lower.includes(k))) return label;
   }
   return eventName;
+}
+
+interface EconContext {
+  what: string;       // what this measures (1 sentence)
+  watch: string;      // what direction means what for markets (1 sentence)
+}
+
+const ECON_CONTEXT: Array<{ keywords: string[]; ctx: EconContext }> = [
+  {
+    keywords: ["cftc s&p", "cftc s&p 500", "cftc spx"],
+    ctx: { what: "Tracks how hedge funds and large speculators are positioned in S&P 500 futures.", watch: "Rising net longs = professional money leaning bullish on equities. Extreme positioning (very long or short) often precedes reversals." },
+  },
+  {
+    keywords: ["cftc nasdaq", "cftc ndx", "cftc nasdaq 100"],
+    ctx: { what: "Tracks speculative futures positioning in Nasdaq 100 — a direct gauge of sentiment on tech and growth stocks.", watch: "Crowded long positioning can amplify a selloff when it unwinds; net shorts building signals institutional caution on tech." },
+  },
+  {
+    keywords: ["cftc crude oil", "cftc wti"],
+    ctx: { what: "Shows how large traders are positioned in crude oil futures — net longs vs net shorts.", watch: "Rising speculative longs push oil prices up; a fast unwind can cause sharp oil drops which ripple into energy stocks." },
+  },
+  {
+    keywords: ["cftc gold", "cftc xau"],
+    ctx: { what: "Tracks speculative positioning in gold futures — a proxy for safe-haven and inflation hedging demand.", watch: "Net longs building signals rising fear or inflation expectations; sharp reduction often precedes a gold pullback." },
+  },
+  {
+    keywords: ["cftc", "speculative net position", "commitment of traders"],
+    ctx: { what: "Weekly snapshot of how large speculators (hedge funds, banks) are positioned in futures markets.", watch: "Extreme crowding in either direction is a contrarian signal — markets tend to reverse when everyone is already positioned the same way." },
+  },
+  {
+    keywords: ["wholesale inventories"],
+    ctx: { what: "Measures the monthly change in goods stockpiled by wholesalers — a supply chain health indicator.", watch: "Rising inventories with weak demand = goods sitting unsold, bearish for manufacturing. Rising inventories with strong demand = healthy restocking." },
+  },
+  {
+    keywords: ["nonfarm payroll", "non-farm payroll", "nfp"],
+    ctx: { what: "The most watched jobs report — measures how many new jobs the US economy added last month.", watch: "Strong jobs = Fed stays higher for longer (bad for bonds, mixed for stocks). Weak jobs = rate cut odds rise (good for bonds, growth stocks)." },
+  },
+  {
+    keywords: ["initial jobless claim"],
+    ctx: { what: "Weekly count of people filing for unemployment benefits for the first time — the freshest jobs data available.", watch: "Rising claims = labour market softening, rate cut expectations increase. Falling claims = economy still tight, Fed cautious." },
+  },
+  {
+    keywords: ["continuing jobless claim"],
+    ctx: { what: "Total number of people currently receiving unemployment benefits — shows how long people stay jobless.", watch: "Rising trend signals hiring has dried up and the unemployed are struggling to find new work — a leading recession indicator." },
+  },
+  {
+    keywords: ["jolts", "job openings and labor"],
+    ctx: { what: "Measures the number of unfilled job positions — a proxy for labour demand strength.", watch: "Falling openings = companies pulling back on hiring, Fed can cut sooner. Still-elevated openings = tight labour keeps inflation sticky." },
+  },
+  {
+    keywords: ["core cpi", "cpi excl"],
+    ctx: { what: "Measures inflation stripping out volatile food and energy — the Fed's preferred measure of underlying price pressure.", watch: "Above 3% keeps rate cut hopes on ice. Falling toward 2.5% or below is the clearest green light for Fed cuts." },
+  },
+  {
+    keywords: ["cpi yoy", "consumer price index yoy"],
+    ctx: { what: "Year-on-year change in what consumers pay for a basket of goods — the headline inflation number.", watch: "Above expectations = bond yields rise, growth stocks sell off. Below expectations = rate cut bets build, markets rally." },
+  },
+  {
+    keywords: ["cpi mom", "consumer price index mom"],
+    ctx: { what: "Month-on-month change in consumer prices — shows whether inflation is re-accelerating.", watch: "Even a small monthly overshoot (e.g. 0.4% vs 0.3% expected) moves bond markets because it compounds over the year." },
+  },
+  {
+    keywords: ["core pce", "pce price index excl"],
+    ctx: { what: "The Fed's single most-watched inflation gauge — strips out food and energy and adjusts for consumer substitution.", watch: "This is what determines the Fed's next move. Any print above 2.6% delays cuts; a print near 2.2% accelerates them." },
+  },
+  {
+    keywords: ["pce price index", "pce yoy", "pce mom"],
+    ctx: { what: "Broad measure of what consumers are spending and how prices are changing — feeds directly into Fed models.", watch: "Stronger spending = economy holding up; hotter prices = Fed cautious. Both together = stagflation risk." },
+  },
+  {
+    keywords: ["fomc minutes", "fed minutes"],
+    ctx: { what: "The detailed record of the Fed's last interest rate meeting — reveals what they were actually debating.", watch: "Hawkish language (more cuts delayed, inflation concern) = bond yields rise. Dovish language (worried about growth) = cut expectations move up." },
+  },
+  {
+    keywords: ["fomc", "fed rate", "interest rate decision"],
+    ctx: { what: "The Fed's decision on the overnight lending rate — the single most powerful lever in financial markets.", watch: "Surprise cut = equities and bonds rally. Surprise hold or hike = rates and dollar strengthen, growth stocks sell off." },
+  },
+  {
+    keywords: ["powell speech", "fed chair", "fed governor", "fed bowman", "fed waller", "fed williams", "fed speech"],
+    ctx: { what: "A speech from a Federal Reserve official — often used to signal upcoming policy shifts.", watch: "Listen for language around 'patient', 'data dependent', or 'still restrictive'. Any hint at timing of cuts or hikes moves bond markets immediately." },
+  },
+  {
+    keywords: ["beige book"],
+    ctx: { what: "The Fed's on-the-ground survey of economic conditions across 12 US districts — anecdotal but broad.", watch: "Phrases like 'slight decline' or 'modest growth' matter — a shift to weaker language across multiple districts is an early recession signal." },
+  },
+  {
+    keywords: ["gdp annualized", "gdp qoq", "gdp growth", "gross domestic product"],
+    ctx: { what: "The broadest measure of how fast the US economy grew last quarter — the score on the board.", watch: "Above 2.5% = economy running hot, Fed cautious. Below 1% = slowdown fears build, rate cut bets rise. Negative = recession alarm." },
+  },
+  {
+    keywords: ["retail sales mom"],
+    ctx: { what: "Monthly change in what consumers spent at stores and online — 70% of the US economy is consumer spending.", watch: "Strong retail = economy resilient, Fed less likely to cut. Weak retail = consumers pulling back, recession risk rising." },
+  },
+  {
+    keywords: ["consumer confidence"],
+    ctx: { what: "A survey of how optimistic Americans feel about the economy and their own finances.", watch: "Falling confidence = people are worried and will spend less — a leading indicator for weaker retail and GDP data ahead." },
+  },
+  {
+    keywords: ["consumer sentiment", "michigan"],
+    ctx: { what: "University of Michigan survey of consumer attitudes — also captures inflation expectations, which the Fed watches closely.", watch: "High inflation expectations in this survey are a direct Fed concern — it can cause them to stay hawkish even when data softens." },
+  },
+  {
+    keywords: ["ism manufacturing", "manufacturing pmi", "pmi manufacturing"],
+    ctx: { what: "Monthly survey of purchasing managers at factories — above 50 = expansion, below 50 = contraction.", watch: "A sustained read below 50 signals the manufacturing sector is in recession. New orders sub-index is the most forward-looking component." },
+  },
+  {
+    keywords: ["ism services", "services pmi", "ism non-manufacturing"],
+    ctx: { what: "Tracks activity in service industries (restaurants, healthcare, finance) which make up 80% of the US economy.", watch: "Services staying above 50 has kept the US out of recession even as manufacturing contracted. A drop below 50 here is serious." },
+  },
+  {
+    keywords: ["durable goods"],
+    ctx: { what: "Monthly orders for long-lasting manufactured items — planes, machines, appliances. A proxy for business investment.", watch: "Ex-aircraft orders matter most — rising business investment signals confidence. A drop signals companies tightening capex." },
+  },
+  {
+    keywords: ["crude oil inventories", "eia crude"],
+    ctx: { what: "Weekly US oil stockpile data — a direct measure of supply vs demand in the energy market.", watch: "Larger-than-expected build = supply glut, oil prices fall. Bigger-than-expected draw = tight supply, oil prices rise." },
+  },
+  {
+    keywords: ["trade balance", "current account"],
+    ctx: { what: "The difference between what the US exports and imports — a wider deficit means more foreign goods being bought.", watch: "A widening deficit can pressure the dollar. In tariff environments, this number becomes a political flashpoint." },
+  },
+  {
+    keywords: ["ppi yoy", "ppi mom", "producer price"],
+    ctx: { what: "Measures price changes at the factory gate — what producers charge before goods reach consumers.", watch: "PPI leads CPI by 1-3 months. A hot PPI print warns that consumer inflation may re-accelerate even if CPI looks tame today." },
+  },
+  {
+    keywords: ["chicago pmi", "chicago business barometer", "chicago business activity"],
+    ctx: { what: "A gauge of business activity in the Chicago region — considered an early signal for the national ISM Manufacturing report.", watch: "Below 45 adds to manufacturing recession concerns. Watch for the new orders component — it leads the headline by 1-2 months." },
+  },
+  {
+    keywords: ["empire state", "philly fed", "kansas city fed", "richmond fed", "dallas fed"],
+    ctx: { what: "Regional Federal Reserve survey of local manufacturing and business conditions.", watch: "On its own, limited impact. But a cluster of weak regional surveys (multiple below zero) is a reliable leading indicator for the national ISM." },
+  },
+  {
+    keywords: ["building permit"],
+    ctx: { what: "Monthly count of new building permits issued — a forward-looking gauge of housing construction activity.", watch: "Rising permits = housing market recovering, construction jobs incoming. Falling permits = developers see weak demand ahead." },
+  },
+  {
+    keywords: ["housing start"],
+    ctx: { what: "Measures how many new homes started construction last month — a real-time read on housing supply.", watch: "Strong starts with high rates = builders are betting on rate cuts. Weak starts = affordability crisis deepening, fewer homes in the pipeline." },
+  },
+  {
+    keywords: ["existing home sale"],
+    ctx: { what: "Volume of previously-owned homes sold — represents ~90% of the housing market.", watch: "Weak sales despite demand signals a supply lock-in effect (owners won't sell to avoid losing a low mortgage rate) — a structural issue for affordability." },
+  },
+];
+
+function econWhatItMeans(eventName: string): EconContext | null {
+  const lower = eventName.toLowerCase();
+  for (const { keywords, ctx } of ECON_CONTEXT) {
+    if (keywords.some(k => lower.includes(k))) return ctx;
+  }
+  return null;
 }
 
 function econBeatMiss(ev: EconEvent): { label: string; color: string } | null {
@@ -1242,11 +1400,13 @@ function NewsSection({ ttgSymbolMap }: { ttgSymbolMap: Map<string, { theme_label
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/market-news")
+    const symbols = [...ttgSymbolMap.keys()].slice(0, 50).join(",");
+    const url = symbols ? `/api/market-news?symbols=${symbols}` : "/api/market-news";
+    fetch(url)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.news) setNews(d.news); })
       .catch(() => {});
-  }, []);
+  }, [ttgSymbolMap]);
 
   if (news.length === 0) return null;
 
@@ -1411,6 +1571,7 @@ function TodayAgendaSection({
                 const hasTime = ev.time && ev.time !== "All Day";
                 const beatMiss = econBeatMiss(ev);
                 const plainLabel = econPlainLabel(ev.event);
+                const context = econWhatItMeans(ev.event);
                 return (
                   <div key={i} className="flex flex-col gap-1" style={{
                     paddingBottom: i < Math.min(econEvents.length, 8) - 1 ? "12px" : "0",
@@ -1439,7 +1600,16 @@ function TodayAgendaSection({
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    {/* Plain-English commentary */}
+                    {context && (
+                      <div className="mt-0.5 space-y-1">
+                        <p className="text-[11px] leading-relaxed" style={{ color: "#94a3b8" }}>{context.what}</p>
+                        <p className="text-[11px] leading-relaxed" style={{ color: "#64748b" }}>
+                          <span style={{ color: "#f97316", fontWeight: 600 }}>Watch: </span>{context.watch}
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
                       {hasTime && (
                         <span className="text-[10px]" style={{ color: isHigh ? "#fbbf24" : "#64748b" }}>
                           {formatEconTime(ev.time)} ET
