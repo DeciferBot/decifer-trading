@@ -35,6 +35,7 @@ import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory"
 import type { TapeEntry } from "@/app/api/market-tape/route";
 import type { MarketMoversPayload, Mover } from "@/app/api/market-movers/route";
 import type { MorningBriefPayload, EconEvent, EarningsItem, AnalystItem } from "@/app/api/morning-brief/route";
+import type { MarketCommentaryPayload } from "@/app/api/market-commentary/route";
 import type { NewsItem } from "@/app/api/market-news/route";
 import { fetchUniverseSymbols } from "@/lib/customerApi";
 
@@ -592,6 +593,7 @@ function MarketNarrative({
   tapeSnapshot,
   clock,
   morningBrief,
+  commentary,
   onAskAbout,
   onGoToForces,
 }: {
@@ -600,6 +602,7 @@ function MarketNarrative({
   tapeSnapshot: TapeSnapshot;
   clock: MarketClockState;
   morningBrief: MorningBriefPayload | null;
+  commentary: MarketCommentaryPayload | null;
   onAskAbout?: (ctx: string) => void;
   onGoToForces?: () => void;
 }) {
@@ -749,13 +752,27 @@ function MarketNarrative({
   const secondEvent = upcomingEvents[1] ?? null;
   const thirdEvent = upcomingEvents[2] ?? null;
 
+  // Use LLM commentary if available, fall back to template
+  const summaryText = commentary?.summary ?? sessionParagraph;
+  const watchItems = commentary?.watch ?? [];
+
   return (
     <div
       className="rounded-2xl p-4"
       style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
     >
-      {/* Session summary — authored paragraph with yesterday + overnight + driver context */}
-      <p className="text-[13px] text-slate-200 leading-relaxed">{sessionParagraph}</p>
+      {/* Summary — LLM-authored or template fallback */}
+      {summaryText
+        ? <p className="text-[13px] text-slate-200 leading-relaxed">{summaryText}</p>
+        : (
+          // Skeleton while LLM loads
+          <div className="space-y-2">
+            {[1, 0.85, 0.7].map((w, i) => (
+              <div key={i} className="h-3 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.06)", width: `${w * 100}%` }} />
+            ))}
+          </div>
+        )
+      }
 
       {/* Known conflict / caution */}
       {caution && (
@@ -768,8 +785,8 @@ function MarketNarrative({
         </div>
       )}
 
-      {/* What to watch today — authored commentary per event */}
-      {upcomingEvents.length > 0 && (
+      {/* What to watch today — LLM-authored items */}
+      {watchItems.length > 0 && (
         <div
           className="mt-3 pt-3 space-y-4"
           style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
@@ -777,48 +794,58 @@ function MarketNarrative({
           <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: "#64748b" }}>
             What to watch today
           </p>
-          {topEvent && (
-            <div>
+          {watchItems.map((item, i) => (
+            <div key={i}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{
+                    background: item.impact === "High" ? "rgba(251,191,36,0.1)" : "rgba(100,116,139,0.15)",
+                    color: item.impact === "High" ? "#fbbf24" : "#64748b",
+                  }}
+                >
+                  {item.impact}
+                </span>
+                {item.time && <span className="text-[10px]" style={{ color: "#64748b" }}>{item.time}</span>}
+                {item.est && <span className="text-[10px]" style={{ color: "#64748b" }}>Est: {item.est}</span>}
+                {item.prev && <span className="text-[10px]" style={{ color: "#475569" }}>Prev: {item.prev}</span>}
+              </div>
+              <p
+                className="text-[12px] leading-relaxed"
+                style={{ color: i === 0 ? "#cbd5e1" : i === 1 ? "#94a3b8" : "#64748b" }}
+              >
+                {item.commentary}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Fallback template watch items if LLM hasn't loaded yet */}
+      {watchItems.length === 0 && upcomingEvents.length > 0 && (
+        <div
+          className="mt-3 pt-3 space-y-3"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: "#64748b" }}>
+            What to watch today
+          </p>
+          {upcomingEvents.slice(0, 3).map((ev, i) => (
+            <div key={i}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: topEvent.impact === "High" ? "rgba(251,191,36,0.1)" : "rgba(100,116,139,0.15)", color: topEvent.impact === "High" ? "#fbbf24" : "#64748b" }}>
-                  {topEvent.impact}
+                  style={{ background: ev.impact === "High" ? "rgba(251,191,36,0.1)" : "rgba(100,116,139,0.15)", color: ev.impact === "High" ? "#fbbf24" : "#64748b" }}>
+                  {ev.impact}
                 </span>
-                {topEvent.time && topEvent.time !== "All Day" && (
-                  <span className="text-[10px]" style={{ color: "#64748b" }}>{formatEconTime(topEvent.time)} ET</span>
-                )}
+                {ev.time && ev.time !== "All Day" && <span className="text-[10px]" style={{ color: "#64748b" }}>{formatEconTime(ev.time)} ET</span>}
+                {ev.estimate != null && <span className="text-[10px]" style={{ color: "#64748b" }}>Est: {ev.estimate}{ev.unit ?? ""}</span>}
+                {ev.previous != null && <span className="text-[10px]" style={{ color: "#475569" }}>Prev: {ev.previous}{ev.unit ?? ""}</span>}
               </div>
-              <p className="text-[12px] leading-relaxed" style={{ color: "#cbd5e1" }}>{buildWatchCommentary(topEvent)}</p>
+              <p className="text-[12px] leading-relaxed animate-pulse" style={{ color: "#475569" }}>
+                {econPlainLabel(ev.event)} — loading commentary…
+              </p>
             </div>
-          )}
-          {secondEvent && (
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: secondEvent.impact === "High" ? "rgba(251,191,36,0.1)" : "rgba(100,116,139,0.15)", color: secondEvent.impact === "High" ? "#fbbf24" : "#64748b" }}>
-                  {secondEvent.impact}
-                </span>
-                {secondEvent.time && secondEvent.time !== "All Day" && (
-                  <span className="text-[10px]" style={{ color: "#64748b" }}>{formatEconTime(secondEvent.time)} ET</span>
-                )}
-              </div>
-              <p className="text-[12px] leading-relaxed" style={{ color: "#94a3b8" }}>{buildWatchCommentary(secondEvent)}</p>
-            </div>
-          )}
-          {thirdEvent && (
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: "rgba(100,116,139,0.15)", color: "#64748b" }}>
-                  {thirdEvent.impact}
-                </span>
-                {thirdEvent.time && thirdEvent.time !== "All Day" && (
-                  <span className="text-[10px]" style={{ color: "#64748b" }}>{formatEconTime(thirdEvent.time)} ET</span>
-                )}
-              </div>
-              <p className="text-[12px] leading-relaxed" style={{ color: "#64748b" }}>{buildWatchCommentary(thirdEvent)}</p>
-            </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -1948,6 +1975,15 @@ export default function TodayTab({
       .catch(() => {});
   }, []);
 
+  // LLM market commentary — single Claude call, plain-English briefing + watch items
+  const [commentary, setCommentary] = useState<MarketCommentaryPayload | null>(null);
+  useEffect(() => {
+    fetch("/api/market-commentary")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setCommentary(d); })
+      .catch(() => {});
+  }, []);
+
   // TTG data — names for WhereLooking + symbolMap for Agenda & Analyst sections
   interface TtgData { names: NameEntry[]; symbolMap: Map<string, { theme_label: string }>; }
   const [ttgData, setTtgData] = useState<TtgData | null>(null);
@@ -2060,6 +2096,7 @@ export default function TodayTab({
             tapeSnapshot={tapeSnapshot}
             clock={clock}
             morningBrief={morningBrief}
+            commentary={commentary}
             onAskAbout={onAskAbout}
             onGoToForces={onGoToForces}
           />
