@@ -681,6 +681,7 @@ function MarketNarrative({
   clock,
   morningBrief,
   commentary,
+  commentaryLoaded,
   onAskAbout,
   onGoToForces,
 }: {
@@ -690,6 +691,7 @@ function MarketNarrative({
   clock: MarketClockState;
   morningBrief: MorningBriefPayload | null;
   commentary: MarketCommentaryPayload | null;
+  commentaryLoaded: boolean;
   onAskAbout?: (ctx: string) => void;
   onGoToForces?: () => void;
 }) {
@@ -850,7 +852,22 @@ function MarketNarrative({
     >
       {/* Summary — LLM-authored or template fallback */}
       {summaryText
-        ? <p className="text-[13px] text-slate-200 leading-relaxed">{summaryText}</p>
+        ? (() => {
+            const bullets = summaryText
+              .split(/(?<=\.)\s+/)
+              .map(s => s.trim())
+              .filter(s => s.length > 0);
+            return (
+              <ul className="space-y-2">
+                {bullets.map((bullet, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-[5px] shrink-0 w-1 h-1 rounded-full bg-slate-500" />
+                    <span className="text-[13px] text-slate-200 leading-relaxed">{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+            );
+          })()
         : (
           // Skeleton while LLM loads
           <div className="space-y-2">
@@ -908,7 +925,7 @@ function MarketNarrative({
         </div>
       )}
 
-      {/* Fallback template watch items if LLM hasn't loaded yet */}
+      {/* Fallback template watch items — shown while loading OR after load if LLM returned no watch items */}
       {watchItems.length === 0 && upcomingEvents.length > 0 && (
         <div
           className="mt-3 pt-3 space-y-3"
@@ -928,9 +945,15 @@ function MarketNarrative({
                 {ev.estimate != null && <span className="text-[10px]" style={{ color: "#64748b" }}>Est: {ev.estimate}{ev.unit ?? ""}</span>}
                 {ev.previous != null && <span className="text-[10px]" style={{ color: "#475569" }}>Prev: {ev.previous}{ev.unit ?? ""}</span>}
               </div>
-              <p className="text-[12px] leading-relaxed animate-pulse" style={{ color: "#475569" }}>
-                {econPlainLabel(ev.event)} — loading commentary…
-              </p>
+              {commentaryLoaded ? (
+                <p className="text-[12px] leading-relaxed" style={{ color: i === 0 ? "#cbd5e1" : "#94a3b8" }}>
+                  {buildWatchCommentary(ev)}
+                </p>
+              ) : (
+                <p className="text-[12px] leading-relaxed animate-pulse" style={{ color: "#475569" }}>
+                  {econPlainLabel(ev.event)}…
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -2066,11 +2089,13 @@ export default function TodayTab({
 
   // LLM market commentary — single Claude call, plain-English briefing + watch items
   const [commentary, setCommentary] = useState<MarketCommentaryPayload | null>(null);
+  const [commentaryLoaded, setCommentaryLoaded] = useState(false);
   useEffect(() => {
     fetch("/api/market-commentary")
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setCommentary(d); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setCommentaryLoaded(true));
   }, []);
 
   // TTG data — names for WhereLooking + symbolMap for Agenda & Analyst sections
@@ -2186,6 +2211,7 @@ export default function TodayTab({
             clock={clock}
             morningBrief={morningBrief}
             commentary={commentary}
+            commentaryLoaded={commentaryLoaded}
             onAskAbout={onAskAbout}
             onGoToForces={onGoToForces}
           />
