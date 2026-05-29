@@ -615,109 +615,147 @@ function MarketNarrative({
   const es = tapeSnapshot.es_pct;
   const nq = tapeSnapshot.nq_pct;
 
-  // ── Yesterday / session summary sentence ──────────────────────────────────
-  let sessionSentence = "";
-  if (isOpen) {
-    // Live session — describe what's happening now
-    if (spy != null) {
-      const dir = spy >= 0.3 ? "rallying" : spy <= -0.3 ? "selling off" : "trading flat";
-      const techNote = qqq != null && Math.abs(qqq - spy) > 0.4
-        ? qqq > spy ? ` Tech is outperforming, with Nasdaq ${qqq >= 0 ? "+" : ""}${qqq.toFixed(1)}%.` : ` Tech is lagging, with Nasdaq ${qqq >= 0 ? "+" : ""}${qqq.toFixed(1)}%.`
-        : "";
-      sessionSentence = `The S&P 500 is ${dir} today, ${spy >= 0 ? "+" : ""}${spy.toFixed(2)}%.${techNote}`;
-    } else {
-      sessionSentence = buildNarrativeParagraph(data, ms2, tapeSnapshot);
-    }
-  } else {
-    // Market closed — yesterday's close + overnight futures
-    if (spy != null) {
-      const dir = spy >= 0.5 ? "gained" : spy <= -0.5 ? "fell" : "was roughly flat";
-      const close = `Yesterday the S&P 500 ${dir} ${Math.abs(spy).toFixed(2)}%`;
-      const techPart = qqq != null
-        ? ` and the Nasdaq ${qqq >= 0 ? "+" : ""}${qqq.toFixed(1)}%`
-        : "";
-      const closeSentence = `${close}${techPart}.`;
+  // Active drivers from intelligence for interlacing context
+  const activeDriverLabels: string[] = (data.key_drivers ?? []).slice(0, 3);
+  const marketMood: string = data.market_mood ?? data.market_regime_label ?? "";
+  const whatChanged: string[] = data.what_changed ?? [];
 
+  // ── Build authored session summary paragraph ───────────────────────────────
+  // Goal: sound like a morning briefing, not a data feed.
+  // Weave price numbers + driver context + cross-asset narrative together.
+
+  function fmt(n: number | null | undefined, decimals = 2): string {
+    if (n == null) return "";
+    return `${n >= 0 ? "+" : ""}${Math.abs(n).toFixed(decimals)}%`;
+  }
+
+  function buildSessionParagraph(): string {
+    const parts: string[] = [];
+
+    // 1. Lead with what the market did / is doing
+    if (isOpen && spy != null) {
+      const action = spy >= 0.5 ? "is rallying" : spy <= -0.5 ? "is selling off" : "is holding steady";
+      const techLine = qqq != null && Math.abs(qqq - spy) > 0.4
+        ? qqq > spy
+          ? ` Tech is leading the move — Nasdaq ${fmt(qqq, 1)} — driven by ${activeDriverLabels[0] ?? "AI and growth themes"}.`
+          : ` Tech is lagging — the Nasdaq is only ${fmt(qqq, 1)} while the broader market pushes higher.`
+        : activeDriverLabels.length > 0
+          ? ` ${activeDriverLabels[0]} is the primary driver.`
+          : "";
+      parts.push(`The S&P 500 ${action} today at ${fmt(spy)}.${techLine}`);
+    } else if (!isOpen && spy != null) {
+      // Closed — yesterday's close
+      const magnitude = Math.abs(spy) >= 1 ? "strongly" : Math.abs(spy) >= 0.4 ? "" : "modestly";
+      const direction = spy >= 0.4 ? `${magnitude} higher` : spy <= -0.4 ? `${magnitude} lower` : "essentially flat";
+      const techPart = qqq != null
+        ? qqq > spy + 0.4
+          ? ` Tech led — Nasdaq closed ${fmt(qqq, 1)}, outperforming on the back of ${activeDriverLabels[0] ?? "AI and growth themes"}.`
+          : qqq < spy - 0.4
+          ? ` Tech lagged — the Nasdaq finished ${fmt(qqq, 1)} even as the broader market gained.`
+          : qqq != null ? ` The Nasdaq finished ${fmt(qqq, 1)}.` : ""
+        : "";
+      parts.push(`Yesterday's session closed ${direction} — S&P 500 ${fmt(spy)}.${techPart}`);
+
+      // Cross-asset colour on yesterday
+      const crossAsset: string[] = [];
+      if (tlt != null && Math.abs(tlt) > 0.3) {
+        crossAsset.push(tlt > 0
+          ? `bonds rallied ${fmt(tlt, 1)}, reflecting growing conviction that the Fed will cut rates`
+          : `bonds sold off ${fmt(Math.abs(tlt), 1)}, with yields rising as the market pushed back on rate cut timing`);
+      }
+      if (gld != null && Math.abs(gld) > 0.5) {
+        crossAsset.push(gld > 0
+          ? `gold climbed ${fmt(gld, 1)} — safe-haven demand is still elevated despite equity gains`
+          : `gold dropped ${fmt(Math.abs(gld), 1)}, a sign of improving risk appetite`);
+      }
+      if (uso != null && Math.abs(uso) > 0.6) {
+        crossAsset.push(uso < 0
+          ? `oil fell ${fmt(Math.abs(uso), 1)}, easing the energy-driven inflation concern`
+          : `oil rose ${fmt(uso, 1)}, keeping supply-shock pressure alive`);
+      }
+      if (crossAsset.length > 0) {
+        parts.push(`Under the surface, ${crossAsset.join(" and ")}.`);
+      }
+
+      // Unusual cross-asset combination note (e.g. bonds AND gold up = caution)
+      if (tlt != null && tlt > 0.3 && gld != null && gld > 0.5 && spy != null && spy > 0.3) {
+        parts.push(`Notably, equities, bonds, and gold all moved higher together — an unusual combination that sometimes signals the market is pricing in Fed cuts while hedging against uncertainty.`);
+      }
+
+      // Overnight read
       if (es != null) {
-        const futDir = es >= 0.1 ? "pointing to a higher open" : es <= -0.1 ? "suggesting a lower open" : "flat overnight";
-        const nqFut = nq != null ? ` Nasdaq futures ${nq >= 0 ? "+" : ""}${nq.toFixed(2)}%.` : "";
-        sessionSentence = `${closeSentence} S&P futures are ${es >= 0 ? "+" : ""}${es.toFixed(2)}% — ${futDir}.${nqFut}`;
-      } else {
-        sessionSentence = closeSentence;
+        const futDir = es >= 0.15 ? "pointing to a higher open" : es <= -0.15 ? "pointing to a lower open" : "essentially flat overnight";
+        const nqFut = nq != null && Math.abs(nq - es) > 0.1
+          ? ` Nasdaq futures at ${fmt(nq, 2)}.`
+          : "";
+        const overnightContext = whatChanged.length > 0 && whatChanged[0].length < 120
+          ? ` ${whatChanged[0]}`
+          : "";
+        parts.push(`Overnight, S&P futures are ${fmt(es, 2)} — ${futDir}.${nqFut}${overnightContext}`);
       }
     } else if (es != null) {
-      const futDir = es >= 0.1 ? "pointing to a higher open" : es <= -0.1 ? "suggesting a lower open" : "flat overnight";
-      sessionSentence = `S&P futures ${es >= 0 ? "+" : ""}${es.toFixed(2)}% — ${futDir}.`;
+      const futDir = es >= 0.15 ? "pointing higher" : es <= -0.15 ? "pointing lower" : "flat overnight";
+      parts.push(`S&P futures are ${fmt(es, 2)} — ${futDir}.`);
     } else {
-      sessionSentence = buildNarrativeParagraph(data, ms2, tapeSnapshot);
+      return buildNarrativeParagraph(data, ms2, tapeSnapshot);
     }
+
+    return parts.join(" ");
   }
 
-  // ── What's moving (cross-asset context) ───────────────────────────────────
-  const insights: string[] = [];
-  if (tlt != null && Math.abs(tlt) > 0.3) {
-    insights.push(tlt > 0
-      ? `Bonds gained ${tlt.toFixed(1)}% — rate cut expectations are firming.`
-      : `Bonds fell ${Math.abs(tlt).toFixed(1)}% — yields pushing higher, tightening financial conditions.`);
-  }
-  if (gld != null && Math.abs(gld) > 0.5) {
-    insights.push(gld > 0
-      ? `Gold up ${gld.toFixed(1)}% — safe-haven demand elevated, uncertainty in the market.`
-      : `Gold fell ${Math.abs(gld).toFixed(1)}% — risk appetite is healthy, safe-haven unwind.`);
-  }
-  if (uso != null && Math.abs(uso) > 0.6) {
-    insights.push(uso < 0
-      ? `Oil down ${Math.abs(uso).toFixed(1)}% — supply shock premium is fading.`
-      : `Oil up ${uso.toFixed(1)}% — supply disruption fears building, energy names in focus.`);
-  }
-  if (iwm != null && spy != null && Math.abs(iwm - spy) > 0.6) {
-    const diff = iwm - spy;
-    insights.push(diff > 0
-      ? `Small caps outperformed by ${diff.toFixed(1)}% — risk appetite and market breadth both strong.`
-      : `Small caps lagged by ${Math.abs(diff).toFixed(1)}% — the move is concentrated in large caps.`);
-  }
-  if (dxy != null && Math.abs(dxy) > 0.3) {
-    insights.push(dxy > 0
-      ? `Dollar strengthening — headwind for commodities and US multinationals.`
-      : `Dollar weakening — tailwind for commodities and international earners.`);
-  }
+  const sessionParagraph = buildSessionParagraph();
 
+  // ── Caution / conflict ────────────────────────────────────────────────────
   const conflicts = data.known_conflicts ?? [];
   const caution = ms2.caution ?? (conflicts[0] ? conflicts[0] : null);
 
-  // ── What to watch today ───────────────────────────────────────────────────
-  // Show top 2 upcoming high-impact events with context
+  // ── What to watch today — authored commentary per event ───────────────────
   const upcomingEvents = (morningBrief?.econ ?? [])
     .filter(e => !e.actual)
     .sort((a, b) => (b.impact === "High" ? 1 : 0) - (a.impact === "High" ? 1 : 0))
-    .slice(0, 2);
+    .slice(0, 3);
+
+  function buildWatchCommentary(ev: EconEvent): string {
+    const ctx = econWhatItMeans(ev.event);
+    const label = econPlainLabel(ev.event);
+    const time = ev.time && ev.time !== "All Day" ? ` at ${formatEconTime(ev.time)} ET` : "";
+    const estPrev = ev.estimate != null
+      ? ` Forecast is ${ev.estimate}${ev.unit ?? ""}${ev.previous != null ? `, versus ${ev.previous}${ev.unit ?? ""} last time` : ""}.`
+      : ev.previous != null ? ` Previous reading was ${ev.previous}${ev.unit ?? ""}.` : "";
+
+    if (!ctx) return `${label}${time}.${estPrev}`;
+
+    // Build a stakes sentence: what does a beat vs miss mean right now?
+    const isInflation = /cpi|pce|ppi|inflation|price index/i.test(ev.event);
+    const isJobs = /payroll|jobless|jolts|adp|unemployment/i.test(ev.event);
+    const isFed = /fomc|fed|powell|bowman|waller|williams|beige/i.test(ev.event);
+    const isPositioning = /cftc|speculative/i.test(ev.event);
+
+    let stakes = "";
+    if (isInflation && activeDriverLabels.some(d => /rate|yield|bond/i.test(d))) {
+      stakes = ` This matters particularly right now because bond yields are in focus — a hot print would push rate cut hopes further out, while a cool number could extend the recent bond rally.`;
+    } else if (isJobs && activeDriverLabels.some(d => /rate|yield|bond/i.test(d))) {
+      stakes = ` With rate cut expectations building, a weak jobs number would accelerate that trade; a strong number puts it on hold.`;
+    } else if (isFed) {
+      stakes = ` With ${marketMood.toLowerCase().includes("risk") ? marketMood : "markets in risk-on mode"}, any hawkish tone could be a speed bump for equities.`;
+    } else if (isPositioning) {
+      stakes = ` Crowded positioning in one direction often sets up sharp reversals — worth watching whether speculative bets are building or unwinding.`;
+    }
+
+    return `${label}${time}.${estPrev} ${ctx.watch}${stakes}`;
+  }
 
   const topEvent = upcomingEvents[0] ?? null;
-  const watchText = topEvent
-    ? `${econPlainLabel(topEvent.event)}${topEvent.estimate != null ? ` — forecast ${topEvent.estimate}${topEvent.unit ?? ""}${topEvent.previous != null ? `, prev ${topEvent.previous}${topEvent.unit ?? ""}` : ""}` : ""}${topEvent.time && topEvent.time !== "All Day" ? ` at ${formatEconTime(topEvent.time)} ET` : ""}.`
-    : null;
-  const watchContext = topEvent ? econWhatItMeans(topEvent.event) : null;
   const secondEvent = upcomingEvents[1] ?? null;
+  const thirdEvent = upcomingEvents[2] ?? null;
 
   return (
     <div
       className="rounded-2xl p-4"
       style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
     >
-      {/* Session summary — yesterday close + overnight or live session */}
-      <p className="text-[13px] text-slate-200 leading-relaxed">{sessionSentence}</p>
-
-      {/* Cross-asset context bullets */}
-      {insights.length > 0 && (
-        <ul className="mt-3 space-y-1.5">
-          {insights.slice(0, 3).map((ins, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className="w-1 h-1 rounded-full shrink-0 mt-1.5" style={{ background: "#f97316" }} />
-              <p className="text-[11px] text-slate-300 leading-relaxed">{ins}</p>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* Session summary — authored paragraph with yesterday + overnight + driver context */}
+      <p className="text-[13px] text-slate-200 leading-relaxed">{sessionParagraph}</p>
 
       {/* Known conflict / caution */}
       {caution && (
@@ -730,36 +768,55 @@ function MarketNarrative({
         </div>
       )}
 
-      {/* Today's watch — top upcoming events with est, prev, and context */}
-      {(watchText || secondEvent) && (
+      {/* What to watch today — authored commentary per event */}
+      {upcomingEvents.length > 0 && (
         <div
-          className="mt-3 pt-3 space-y-3"
+          className="mt-3 pt-3 space-y-4"
           style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
         >
           <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: "#64748b" }}>
-            On the radar today
+            What to watch today
           </p>
-          {watchText && (
+          {topEvent && (
             <div>
-              <p className="text-[11px] font-semibold text-slate-200 leading-snug">{econPlainLabel(topEvent!.event)}</p>
-              {watchContext && (
-                <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">{watchContext.watch}</p>
-              )}
-              <p className="text-[10px] mt-1" style={{ color: "#64748b" }}>
-                {topEvent!.time && topEvent!.time !== "All Day" && `${formatEconTime(topEvent!.time)} ET`}
-                {topEvent!.estimate != null && ` · Est: ${topEvent!.estimate}${topEvent!.unit ?? ""}`}
-                {topEvent!.previous != null && ` · Prev: ${topEvent!.previous}${topEvent!.unit ?? ""}`}
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{ background: topEvent.impact === "High" ? "rgba(251,191,36,0.1)" : "rgba(100,116,139,0.15)", color: topEvent.impact === "High" ? "#fbbf24" : "#64748b" }}>
+                  {topEvent.impact}
+                </span>
+                {topEvent.time && topEvent.time !== "All Day" && (
+                  <span className="text-[10px]" style={{ color: "#64748b" }}>{formatEconTime(topEvent.time)} ET</span>
+                )}
+              </div>
+              <p className="text-[12px] leading-relaxed" style={{ color: "#cbd5e1" }}>{buildWatchCommentary(topEvent)}</p>
             </div>
           )}
           {secondEvent && (
             <div>
-              <p className="text-[11px] font-semibold text-slate-300 leading-snug">{econPlainLabel(secondEvent.event)}</p>
-              <p className="text-[10px] mt-0.5" style={{ color: "#64748b" }}>
-                {secondEvent.time && secondEvent.time !== "All Day" && `${formatEconTime(secondEvent.time)} ET`}
-                {secondEvent.estimate != null && ` · Est: ${secondEvent.estimate}${secondEvent.unit ?? ""}`}
-                {secondEvent.previous != null && ` · Prev: ${secondEvent.previous}${secondEvent.unit ?? ""}`}
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{ background: secondEvent.impact === "High" ? "rgba(251,191,36,0.1)" : "rgba(100,116,139,0.15)", color: secondEvent.impact === "High" ? "#fbbf24" : "#64748b" }}>
+                  {secondEvent.impact}
+                </span>
+                {secondEvent.time && secondEvent.time !== "All Day" && (
+                  <span className="text-[10px]" style={{ color: "#64748b" }}>{formatEconTime(secondEvent.time)} ET</span>
+                )}
+              </div>
+              <p className="text-[12px] leading-relaxed" style={{ color: "#94a3b8" }}>{buildWatchCommentary(secondEvent)}</p>
+            </div>
+          )}
+          {thirdEvent && (
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{ background: "rgba(100,116,139,0.15)", color: "#64748b" }}>
+                  {thirdEvent.impact}
+                </span>
+                {thirdEvent.time && thirdEvent.time !== "All Day" && (
+                  <span className="text-[10px]" style={{ color: "#64748b" }}>{formatEconTime(thirdEvent.time)} ET</span>
+                )}
+              </div>
+              <p className="text-[12px] leading-relaxed" style={{ color: "#64748b" }}>{buildWatchCommentary(thirdEvent)}</p>
             </div>
           )}
         </div>
