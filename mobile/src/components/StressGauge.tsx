@@ -294,39 +294,26 @@ export default function StressGauge({ data }: { data: MarketStressPayload }) {
         </svg>
       </div>
 
-      {/* ── Dimension bars ── */}
-      <div className="px-4 pb-3">
-        <div className="grid grid-cols-5 gap-2">
-          <DimBar
-            label="Credit"
-            score={dimensions.credit.score}
-            maxScore={dimensions.credit.maxScore}
-            confirming={dimensions.credit.confirming}
-          />
-          <DimBar
-            label="Vol"
-            score={dimensions.volatility.score}
-            maxScore={dimensions.volatility.maxScore}
-            confirming={dimensions.volatility.confirming}
-          />
-          <DimBar
-            label="Breadth"
-            score={dimensions.breadth.score}
-            maxScore={dimensions.breadth.maxScore}
-            confirming={dimensions.breadth.confirming}
-          />
-          <DimBar
-            label="Confirm"
-            score={dimensions.stress_confirmation.score}
-            maxScore={dimensions.stress_confirmation.maxScore}
-            confirming={dimensions.stress_confirmation.confirming}
-          />
-          <DimBar
-            label="Trend"
-            score={dimensions.trend.score}
-            maxScore={dimensions.trend.maxScore}
-            confirming={dimensions.trend.confirming}
-          />
+      {/* ── Dimension bars — 2 rows of 4 ── */}
+      <div className="px-4 pb-3 space-y-2">
+        {/* Tier 1 + 2 */}
+        <div className="grid grid-cols-4 gap-2">
+          <DimBar label="Credit"  score={dimensions.credit.score}              maxScore={dimensions.credit.maxScore}              confirming={dimensions.credit.confirming} />
+          <DimBar label="Vol"     score={dimensions.volatility.score}          maxScore={dimensions.volatility.maxScore}          confirming={dimensions.volatility.confirming} />
+          <DimBar label="Breadth" score={dimensions.breadth.score}             maxScore={dimensions.breadth.maxScore}             confirming={dimensions.breadth.confirming} />
+          <DimBar label="Confirm" score={dimensions.stress_confirmation.score} maxScore={dimensions.stress_confirmation.maxScore} confirming={dimensions.stress_confirmation.confirming} />
+        </div>
+        {/* Tier 3 + 4 */}
+        <div className="grid grid-cols-4 gap-2">
+          <DimBar label="Trend"   score={dimensions.trend.score}         maxScore={dimensions.trend.maxScore}         confirming={dimensions.trend.confirming} />
+          <DimBar label="Carry"   score={dimensions.carry.score}         maxScore={dimensions.carry.maxScore}         confirming={dimensions.carry.confirming} />
+          <DimBar label="Cu/Au"   score={dimensions.copper_gold.score}   maxScore={dimensions.copper_gold.maxScore}   confirming={dimensions.copper_gold.confirming} />
+          <DimBar label="News"    score={dimensions.news_velocity.score} maxScore={dimensions.news_velocity.maxScore} confirming={dimensions.news_velocity.confirming} />
+        </div>
+        {/* Tier labels */}
+        <div className="flex justify-between px-0.5">
+          <span className="text-[8px] text-slate-600">── Core ──────────────</span>
+          <span className="text-[8px] text-slate-600">── Leading ───────────</span>
         </div>
       </div>
 

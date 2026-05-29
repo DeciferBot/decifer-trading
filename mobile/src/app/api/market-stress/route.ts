@@ -28,11 +28,18 @@ export interface MarketStressPayload {
   confidence: "high" | "medium" | "low";
   confirmation_count: number;
   dimensions: {
+    // Tier 1 — Core Stress (max 2.0 each)
     credit: StressDimension;
     volatility: StressDimension;
+    // Tier 2 — Breadth / Confirmation (max 1.5 each)
     breadth: StressDimension;
     stress_confirmation: StressDimension;
+    // Tier 3 — Technical / Leading (max 1.0 each)
     trend: StressDimension;
+    carry: StressDimension;
+    // Tier 4 — Context / Early Warning (max 0.5 each)
+    copper_gold: StressDimension;
+    news_velocity: StressDimension;
   };
   liquidation_bonus: number;
   explanation: string;
@@ -58,7 +65,6 @@ function zScore(value: number, history: number[]): number | null {
   return (value - meanOf(history)) / s;
 }
 
-// closes must be sorted oldest-first
 function ret5d(closes: number[]): number | null {
   const n = closes.length;
   if (n < 6 || closes[n - 6] === 0) return null;
@@ -79,26 +85,36 @@ function all5dRets(closes: number[]): number[] {
   return rets;
 }
 
+function all10dRets(closes: number[]): number[] {
+  const rets: number[] = [];
+  for (let i = 10; i < closes.length; i++) {
+    if (closes[i - 10] !== 0) rets.push(closes[i] / closes[i - 10] - 1);
+  }
+  return rets;
+}
+
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
-const SYMBOLS = ["SPY", "QQQ", "IWM", "HYG", "LQD", "IEF", "TLT", "GLD", "UUP", "UVXY"];
-type ClosesMap = Record<string, number[]>; // symbol → oldest-first closes
+// Core ETF sensors + USDJPY (carry) + HG (copper)
+const SYMBOLS = [
+  "SPY", "QQQ", "IWM", "HYG", "LQD", "IEF", "TLT", "GLD", "UUP", "UVXY",
+  "USDJPY", "HG",
+];
 
-type FmpEodRow = { symbol: string; date: string; close: number };
+type ClosesMap = Record<string, number[]>;
+type FmpEodRow = { close: number };
 
 async function fetchOneSym(symbol: string, fromDate: string): Promise<number[]> {
-  const encoded = encodeURIComponent(symbol);
-  const url = `${STABLE}/historical-price-eod/full?symbol=${encoded}&from=${fromDate}&apikey=${FMP_KEY}`;
+  const url = `${STABLE}/historical-price-eod/full?symbol=${encodeURIComponent(symbol)}&from=${fromDate}&apikey=${FMP_KEY}`;
   try {
     const res = await fetch(url, { next: { revalidate: 900 } });
     if (!res.ok) return [];
     const rows: FmpEodRow[] = await res.json();
     if (!Array.isArray(rows) || rows.length === 0) return [];
-    // stable returns newest-first → reverse to oldest-first
     return [...rows].reverse().map((r) => r.close).filter((c) => c > 0);
   } catch {
     return [];
@@ -121,11 +137,28 @@ async function fetchCloses(fromDate: string): Promise<ClosesMap> {
 async function fetchVix(fromDate: string): Promise<{ closes: number[]; level: number | null }> {
   const rows = await fetchOneSym("^VIX", fromDate);
   if (rows.length === 0) return { closes: [], level: null };
-  // rows are oldest-first; latest is last element
   return { closes: rows, level: rows[rows.length - 1] };
 }
 
+type NewsArticle = { publishedDate?: string; title?: string; text?: string };
+
+async function fetchNewsArticles(): Promise<NewsArticle[]> {
+  try {
+    const res = await fetch(
+      `${STABLE}/news/general-latest?limit=250&apikey=${FMP_KEY}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
 // ── Dimension scorers ─────────────────────────────────────────────────────────
+
+// TIER 1 — Core Stress
 
 function scoreCredit(closes: ClosesMap): StressDimension {
   const hyg = closes["HYG"];
@@ -136,8 +169,11 @@ function scoreCredit(closes: ClosesMap): StressDimension {
     return { score: 0, maxScore: 2, z_score: null, data_quality: "unavailable", signal: "HYG/LQD unavailable", confirming: false };
   }
 
-  // Primary: HYG−LQD spread = pure HY credit quality signal, duration-adjusted.
-  // HY underperforming IG means HY spreads widening relative to IG — credit stress.
+  const hyg5d = ret5d(hyg);
+  const hygAbsZ = hyg5d != null ? zScore(hyg5d, all5dRets(hyg)) : null;
+  const hygActuallyFalling = hyg5d != null && hyg5d < 0;
+
+  // HYG-LQD spread (HY vs IG, duration-adjusted proxy)
   const minLen = Math.min(hyg.length, lqd.length);
   const hygLqdSpreads: number[] = [];
   for (let i = 5; i < minLen; i++) {
@@ -147,10 +183,9 @@ function scoreCredit(closes: ClosesMap): StressDimension {
   }
   const hygLqdCurrent = hygLqdSpreads.length > 0 ? hygLqdSpreads[hygLqdSpreads.length - 1] : null;
   const hygLqdZ = hygLqdCurrent != null && hygLqdSpreads.length > 10
-    ? zScore(hygLqdCurrent, hygLqdSpreads.slice(0, -1))
-    : null;
+    ? zScore(hygLqdCurrent, hygLqdSpreads.slice(0, -1)) : null;
 
-  // Secondary: LQD−IEF spread = IG credit spread (investment grade vs risk-free)
+  // LQD-IEF spread (IG vs risk-free)
   let lqdIefZ: number | null = null;
   if (ief) {
     const minLen2 = Math.min(lqd.length, ief.length);
@@ -160,67 +195,35 @@ function scoreCredit(closes: ClosesMap): StressDimension {
         lqdIefSpreads.push((lqd[i] / lqd[i - 5] - 1) - (ief[i] / ief[i - 5] - 1));
       }
     }
-    const lqdIefCurrent = lqdIefSpreads.length > 0 ? lqdIefSpreads[lqdIefSpreads.length - 1] : null;
-    lqdIefZ = lqdIefCurrent != null && lqdIefSpreads.length > 10
-      ? zScore(lqdIefCurrent, lqdIefSpreads.slice(0, -1))
-      : null;
+    const cur = lqdIefSpreads.length > 0 ? lqdIefSpreads[lqdIefSpreads.length - 1] : null;
+    lqdIefZ = cur != null && lqdIefSpreads.length > 10
+      ? zScore(cur, lqdIefSpreads.slice(0, -1)) : null;
   }
-
-  // HYG absolute return — needed to filter duration artifact.
-  // HYG duration ~3.8y vs LQD ~8.9y: when rates fall, LQD rises more than HYG
-  // purely from duration. That makes HYG-LQD spread negative with no credit stress.
-  // Credit stress is real only when HYG is also actually selling off (negative absolute return),
-  // OR when HYG-LQD spread is extreme AND HYG is not riding a rate rally.
-  const hyg5d = ret5d(hyg);
-  const hygAbsZ = hyg5d != null ? zScore(hyg5d, all5dRets(hyg)) : null;
-  const hygActuallyFalling = hyg5d != null && hyg5d < 0;
 
   let score = 0;
   let confirming = false;
 
-  // Condition A: HYG absolute breakdown — HY selling off regardless of rates
   if (hygAbsZ != null && hygAbsZ <= -1.5) {
-    score += 1.0;
-    confirming = true;
-    if (hygAbsZ <= -2.0) score += 0.5; // severity
+    score += 1.0; confirming = true;
+    if (hygAbsZ <= -2.0) score += 0.5;
   }
-
-  // Condition B: HYG-LQD spread highly negative AND HYG is actually negative
-  // (eliminates false signal when rates rally and LQD benefits more from duration)
   if (hygLqdZ != null && hygLqdZ <= -1.5 && hygActuallyFalling) {
-    score += 0.5;
-    confirming = true;
+    score += 0.5; confirming = true;
   }
-
-  // Condition C: IG spread widening (LQD underperforms risk-free) — systemic credit pressure
   if (lqdIefZ != null && lqdIefZ <= -1.5) {
-    score += 0.75;
-    confirming = true;
+    score += 0.75; confirming = true;
   }
 
   score = clamp(score, 0, 2);
 
-  const absStr = hyg5d != null ? `HYG ${(hyg5d * 100).toFixed(1)}%` : "HYG n/a";
-  const absZStr = hygAbsZ != null ? ` (z=${hygAbsZ.toFixed(1)})` : "";
-  const spreadStr = hygLqdCurrent != null ? `, HY-IG spread ${(hygLqdCurrent * 100).toFixed(2)}%` : "";
-  const spreadZStr = hygLqdZ != null ? ` (z=${hygLqdZ.toFixed(1)})` : "";
+  const absStr = hyg5d != null ? `HYG ${(hyg5d * 100).toFixed(1)}% (z=${hygAbsZ?.toFixed(1) ?? "n/a"})` : "HYG n/a";
+  const spreadStr = hygLqdCurrent != null ? `, HY-IG ${(hygLqdCurrent * 100).toFixed(2)}% (z=${hygLqdZ?.toFixed(1) ?? "n/a"})` : "";
   const igStr = lqdIefZ != null ? `, LQD-IEF z=${lqdIefZ.toFixed(1)}` : "";
 
-  return {
-    score,
-    maxScore: 2,
-    z_score: hygAbsZ,
-    data_quality: "proxy",
-    signal: `${absStr}${absZStr}${spreadStr}${spreadZStr}${igStr}`,
-    confirming,
-  };
+  return { score, maxScore: 2, z_score: hygAbsZ, data_quality: "proxy", signal: `${absStr}${spreadStr}${igStr}`, confirming };
 }
 
-function scoreVolatility(
-  closes: ClosesMap,
-  vixLevel: number | null,
-  vixCloses: number[],
-): StressDimension {
+function scoreVolatility(closes: ClosesMap, vixLevel: number | null, vixCloses: number[]): StressDimension {
   let score = 0;
   let confirming = false;
 
@@ -231,45 +234,36 @@ function scoreVolatility(
   }
 
   const vix5d = vixCloses.length >= 6 ? ret5d(vixCloses) : null;
-  const vixHist = all5dRets(vixCloses);
-  const vixZ = vix5d != null ? zScore(vix5d, vixHist) : null;
+  const vixZ = vix5d != null ? zScore(vix5d, all5dRets(vixCloses)) : null;
   if (vixZ != null && vixZ >= 1.5) { score += 0.5; confirming = true; }
 
   const uvxy = closes["UVXY"];
   if (uvxy) {
-    const uvxy5d = ret5d(uvxy);
-    const uvxyZ = uvxy5d != null ? zScore(uvxy5d, all5dRets(uvxy)) : null;
+    const uvxyZ = ret5d(uvxy) != null ? zScore(ret5d(uvxy)!, all5dRets(uvxy)) : null;
     if (uvxyZ != null && uvxyZ >= 1.5) score += 0.5;
   }
 
   score = clamp(score, 0, 2);
-  const vixStr = vixLevel != null ? `VIX ${vixLevel.toFixed(1)}` : "VIX n/a";
-  const changeStr = vixZ != null ? `, 5d z=${vixZ.toFixed(1)}` : "";
-
-  return {
-    score,
-    maxScore: 2,
-    z_score: vixZ,
-    data_quality: vixLevel != null ? "direct" : "proxy",
-    signal: `${vixStr}${changeStr}`,
-    confirming,
-  };
+  const vStr = vixLevel != null ? `VIX ${vixLevel.toFixed(1)}` : "VIX n/a";
+  const zStr = vixZ != null ? `, 5d z=${vixZ.toFixed(1)}` : "";
+  return { score, maxScore: 2, z_score: vixZ, data_quality: vixLevel != null ? "direct" : "proxy", signal: `${vStr}${zStr}`, confirming };
 }
+
+// TIER 2 — Breadth / Confirmation
 
 function scoreBreadth(closes: ClosesMap): StressDimension {
   const spy = closes["SPY"];
   const iwm = closes["IWM"];
   if (!spy || !iwm) {
-    return { score: 0, maxScore: 2, z_score: null, data_quality: "unavailable", signal: "Breadth data unavailable", confirming: false };
+    return { score: 0, maxScore: 1.5, z_score: null, data_quality: "unavailable", signal: "Breadth unavailable", confirming: false };
   }
 
   const spy5d = ret5d(spy);
   const iwm5d = ret5d(iwm);
   if (spy5d == null || iwm5d == null) {
-    return { score: 0, maxScore: 2, z_score: null, data_quality: "proxy", signal: "Insufficient data", confirming: false };
+    return { score: 0, maxScore: 1.5, z_score: null, data_quality: "proxy", signal: "Insufficient data", confirming: false };
   }
 
-  // Build IWM-SPY spread history
   const minLen = Math.min(spy.length, iwm.length);
   const spreadHist: number[] = [];
   for (let i = 5; i < minLen; i++) {
@@ -283,7 +277,6 @@ function scoreBreadth(closes: ClosesMap): StressDimension {
 
   let score = 0;
   let confirming = false;
-
   if (spreadZ != null && spreadZ <= -1.5) { score += 1.0; confirming = true; }
 
   const qqq = closes["QQQ"];
@@ -291,19 +284,11 @@ function scoreBreadth(closes: ClosesMap): StressDimension {
     const qqq5d = ret5d(qqq);
     if (qqq5d != null && qqq5d < 0 && spy5d < 0 && qqq5d < spy5d - 0.01) score += 0.5;
   }
-
   if (confirming && score >= 1.5) score += 0.5;
-  score = clamp(score, 0, 2);
+  score = clamp(score, 0, 1.5);
 
   const zStr = spreadZ != null ? ` (z=${spreadZ.toFixed(1)})` : "";
-  return {
-    score,
-    maxScore: 2,
-    z_score: spreadZ,
-    data_quality: "proxy",
-    signal: `IWM vs SPY ${(spread * 100).toFixed(1)}%${zStr}`,
-    confirming,
-  };
+  return { score, maxScore: 1.5, z_score: spreadZ, data_quality: "proxy", signal: `IWM vs SPY ${(spread * 100).toFixed(1)}%${zStr}`, confirming };
 }
 
 function scoreStressConfirmation(closes: ClosesMap): StressDimension {
@@ -324,9 +309,7 @@ function scoreStressConfirmation(closes: ClosesMap): StressDimension {
   const uupZ = uup && uup5d != null ? zScore(uup5d, all5dRets(uup)) : null;
   const iefZ = ief && ief5d != null ? zScore(ief5d, all5dRets(ief)) : null;
 
-  // Classic: bonds bid + gold bid
   const classicPath = (tltZ != null && tltZ >= 1.0) && (gldZ != null && gldZ >= 1.0);
-  // Rate shock: bonds selling while credit also selling (2022-style)
   const rateShockPath = (iefZ != null && iefZ <= -1.5) && (hyg5d != null && hyg5d < -0.01);
 
   let score = 0;
@@ -335,10 +318,9 @@ function scoreStressConfirmation(closes: ClosesMap): StressDimension {
 
   if (classicPath) { score += 1.5; confirming = true; regime = "classic_risk_off"; }
   else if (rateShockPath) { score += 1.5; confirming = true; regime = "rate_shock"; }
-
   if (uupZ != null && uupZ >= 1.0) score += 0.5;
 
-  score = clamp(score, 0, 2);
+  score = clamp(score, 0, 1.5);
 
   const parts: string[] = [];
   if (tlt5d != null) parts.push(`TLT ${(tlt5d * 100).toFixed(1)}%`);
@@ -346,20 +328,15 @@ function scoreStressConfirmation(closes: ClosesMap): StressDimension {
   if (uup5d != null) parts.push(`USD ${(uup5d * 100).toFixed(1)}%`);
   if (regime !== "none") parts.push(`[${regime}]`);
 
-  return {
-    score,
-    maxScore: 2,
-    z_score: tltZ,
-    data_quality: tlt ? "direct" : "proxy",
-    signal: parts.join(", ") || "No haven signal",
-    confirming,
-  };
+  return { score, maxScore: 1.5, z_score: tltZ, data_quality: tlt ? "direct" : "proxy", signal: parts.join(", ") || "No haven signal", confirming };
 }
+
+// TIER 3 — Technical / Leading
 
 function scoreTrend(closes: ClosesMap): StressDimension {
   const spy = closes["SPY"];
   if (!spy || spy.length < 11) {
-    return { score: 0, maxScore: 1.5, z_score: null, data_quality: "unavailable", signal: "Trend data unavailable", confirming: false };
+    return { score: 0, maxScore: 1.0, z_score: null, data_quality: "unavailable", signal: "Trend unavailable", confirming: false };
   }
 
   const spy5d = ret5d(spy);
@@ -369,20 +346,149 @@ function scoreTrend(closes: ClosesMap): StressDimension {
   let score = 0;
   let confirming = false;
 
-  if (spyZ != null && spyZ <= -1.5) { score += 0.75; confirming = true; }
+  if (spyZ != null && spyZ <= -1.5) { score += 0.5; confirming = true; }
   if (spy10d != null && spy10d < -0.03 && (spyZ == null || spyZ <= -1.0)) {
-    score += 0.75;
-    confirming = true;
+    score += 0.5; confirming = true;
   }
 
-  score = clamp(score, 0, 1.5);
+  score = clamp(score, 0, 1.0);
 
   const s5 = spy5d != null ? `SPY 5d ${(spy5d * 100).toFixed(1)}%` : "SPY n/a";
   const s10 = spy10d != null ? `, 10d ${(spy10d * 100).toFixed(1)}%` : "";
   const zStr = spyZ != null ? ` (z=${spyZ.toFixed(1)})` : "";
-
-  return { score, maxScore: 1.5, z_score: spyZ, data_quality: "direct", signal: `${s5}${s10}${zStr}`, confirming };
+  return { score, maxScore: 1.0, z_score: spyZ, data_quality: "direct", signal: `${s5}${s10}${zStr}`, confirming };
 }
+
+function scoreCarry(closes: ClosesMap): StressDimension {
+  // USD/JPY carry unwind: yen strengthening (USDJPY falling) = leveraged carry
+  // positions unwinding globally. One of the largest latent stress triggers.
+  const usdjpy = closes["USDJPY"];
+  if (!usdjpy) {
+    return { score: 0, maxScore: 1.0, z_score: null, data_quality: "unavailable", signal: "USDJPY unavailable", confirming: false };
+  }
+
+  const usd5d = ret5d(usdjpy);
+  const usdHist = all5dRets(usdjpy);
+  const usdZ = usd5d != null ? zScore(usd5d, usdHist) : null;
+
+  let score = 0;
+  let confirming = false;
+
+  // USDJPY falling = yen strengthening = carry unwind risk
+  if (usdZ != null && usdZ <= -1.5) { score += 0.75; confirming = true; }
+  if (usdZ != null && usdZ <= -2.0) { score = 1.0; confirming = true; } // severity
+
+  score = clamp(score, 0, 1.0);
+
+  const level = usdjpy[usdjpy.length - 1];
+  const retStr = usd5d != null ? `${(usd5d * 100).toFixed(2)}%` : "n/a";
+  const zStr = usdZ != null ? ` (z=${usdZ.toFixed(1)})` : "";
+  const dirStr = usdZ != null && usdZ <= -1.5 ? " — yen strengthening" : "";
+
+  return {
+    score, maxScore: 1.0, z_score: usdZ, data_quality: "direct",
+    signal: `USD/JPY ${level?.toFixed(1) ?? "n/a"}, 5d ${retStr}${zStr}${dirStr}`,
+    confirming,
+  };
+}
+
+// TIER 4 — Context / Early Warning
+
+function scoreCopperGold(closes: ClosesMap): StressDimension {
+  // Copper/gold ratio: falling = demand destruction, gold outperforming =
+  // flight to safety over industrial growth. Leads equity stress by weeks.
+  const hg = closes["HG"];
+  const gld = closes["GLD"];
+
+  if (!hg || !gld) {
+    return { score: 0, maxScore: 0.5, z_score: null, data_quality: "unavailable", signal: "Copper/Gold data unavailable", confirming: false };
+  }
+
+  // Copper absolute 10d return
+  const hg10d = ret10d(hg);
+  const hgZ = hg10d != null ? zScore(hg10d, all10dRets(hg)) : null;
+
+  // Copper-Gold relative spread (copper underperforming gold = risk-off macro)
+  const minLen = Math.min(hg.length, gld.length);
+  const spreadHist: number[] = [];
+  for (let i = 10; i < minLen; i++) {
+    if (hg[i - 10] !== 0 && gld[i - 10] !== 0) {
+      spreadHist.push((hg[i] / hg[i - 10] - 1) - (gld[i] / gld[i - 10] - 1));
+    }
+  }
+  const spreadCurrent = spreadHist.length > 0 ? spreadHist[spreadHist.length - 1] : null;
+  const spreadZ = spreadCurrent != null && spreadHist.length > 10
+    ? zScore(spreadCurrent, spreadHist.slice(0, -1)) : null;
+
+  let score = 0;
+  let confirming = false;
+
+  if (hgZ != null && hgZ <= -1.5) { score += 0.25; confirming = true; }
+  if (spreadZ != null && spreadZ <= -1.5) { score += 0.25; confirming = true; }
+
+  score = clamp(score, 0, 0.5);
+
+  const copperStr = hg10d != null ? `Copper 10d ${(hg10d * 100).toFixed(1)}%` : "Copper n/a";
+  const zStr = hgZ != null ? ` (z=${hgZ.toFixed(1)})` : "";
+  const ratioStr = spreadZ != null ? `, Cu/Au spread z=${spreadZ.toFixed(1)}` : "";
+
+  return { score, maxScore: 0.5, z_score: hgZ, data_quality: "proxy", signal: `${copperStr}${zStr}${ratioStr}`, confirming };
+}
+
+const STRESS_WORDS = [
+  "crash", "crisis", "panic", "recession", "default", "contagion",
+  "collapse", "downgrade", "liquidity", "sell-off", "selloff",
+  "turmoil", "meltdown", "fears", "plunge", "turmoil", "stagflation",
+];
+
+function scoreNewsVelocity(articles: NewsArticle[]): StressDimension {
+  if (articles.length < 10) {
+    return { score: 0, maxScore: 0.5, z_score: null, data_quality: "unavailable", signal: "Insufficient news data", confirming: false };
+  }
+
+  // Group by date, count stress hits per day
+  const byDay: Record<string, { total: number; stress: number }> = {};
+  for (const a of articles) {
+    const day = (a.publishedDate ?? "").slice(0, 10);
+    if (!day) continue;
+    if (!byDay[day]) byDay[day] = { total: 0, stress: 0 };
+    byDay[day].total++;
+    const text = ((a.title ?? "") + " " + (a.text ?? "")).toLowerCase();
+    if (STRESS_WORDS.some((w) => text.includes(w))) byDay[day].stress++;
+  }
+
+  const days = Object.keys(byDay).sort();
+  if (days.length < 2) {
+    return { score: 0, maxScore: 0.5, z_score: null, data_quality: "proxy", signal: "Insufficient news history", confirming: false };
+  }
+
+  // Stress density per day (fraction of articles with stress keywords)
+  const densities = days.map((d) => byDay[d].stress / Math.max(byDay[d].total, 1));
+  const today = densities[densities.length - 1];
+  const histDensities = densities.slice(0, -1);
+  const velocityZ = zScore(today, histDensities);
+
+  let score = 0;
+  let confirming = false;
+
+  if (velocityZ != null && velocityZ >= 1.5) { score += 0.25; confirming = true; }
+  if (velocityZ != null && velocityZ >= 2.0) { score = 0.5; confirming = true; }
+
+  score = clamp(score, 0, 0.5);
+
+  const todayDay = days[days.length - 1];
+  const todayCount = byDay[todayDay].stress;
+  const todayTotal = byDay[todayDay].total;
+  const zStr = velocityZ != null ? ` (z=${velocityZ.toFixed(1)})` : "";
+
+  return {
+    score, maxScore: 0.5, z_score: velocityZ, data_quality: "proxy",
+    signal: `${todayCount}/${todayTotal} stress articles today${zStr}`,
+    confirming,
+  };
+}
+
+// BONUS
 
 function liquidationBonus(closes: ClosesMap): number {
   const syms = ["SPY", "QQQ", "IWM", "HYG", "IEF"];
@@ -394,6 +500,8 @@ function liquidationBonus(closes: ClosesMap): number {
   }
   return 0.5;
 }
+
+// ── Label / explanation ───────────────────────────────────────────────────────
 
 function labelFor(score: number): { label: StressLabel; color: string } {
   if (score <= 2.5) return { label: "CALM", color: "#10b981" };
@@ -411,18 +519,20 @@ function buildExplanation(
   if (count === 0) return "No stress dimensions are confirming. Markets appear calm across all sensors.";
 
   const confirming: string[] = [];
-  if (dims.credit.confirming) confirming.push("credit stress");
-  if (dims.volatility.confirming) confirming.push("volatility");
-  if (dims.breadth.confirming) confirming.push("breadth deterioration");
-  if (dims.stress_confirmation.confirming) confirming.push("cross-asset confirmation");
-  if (dims.trend.confirming) confirming.push("trend damage");
+  const LABELS: Record<string, string> = {
+    credit: "credit stress",
+    volatility: "volatility",
+    breadth: "breadth deterioration",
+    stress_confirmation: "cross-asset confirmation",
+    trend: "trend damage",
+    carry: "yen carry unwind risk",
+    copper_gold: "copper/gold macro signal",
+    news_velocity: "elevated news stress velocity",
+  };
 
-  const quiet: string[] = [];
-  if (!dims.credit.confirming) quiet.push("credit");
-  if (!dims.volatility.confirming) quiet.push("volatility");
-  if (!dims.breadth.confirming) quiet.push("breadth");
-  if (!dims.stress_confirmation.confirming) quiet.push("cross-asset signals");
-  if (!dims.trend.confirming) quiet.push("trend");
+  for (const [k, v] of Object.entries(dims)) {
+    if (v.confirming) confirming.push(LABELS[k] ?? k);
+  }
 
   if (count === 1) return `Early signal: ${confirming[0]} is showing stress. Other dimensions remain quiet.`;
 
@@ -432,17 +542,11 @@ function buildExplanation(
       : confirming.slice(0, -1).join(", ") + ` and ${confirming[confirming.length - 1]}`;
   const c0 = confirmStr.charAt(0).toUpperCase() + confirmStr.slice(1);
 
-  const quietStr =
-    quiet.length > 0
-      ? ` ${quiet.join(" and ")} ${quiet.length === 1 ? "is" : "are"} not yet confirming.`
-      : "";
+  const liqStr = liqBonus > 0
+    ? " Simultaneous broad selling across equities and bonds suggests liquidation pressure."
+    : "";
 
-  const liqStr =
-    liqBonus > 0
-      ? " Simultaneous broad selling across equities and bonds suggests liquidation pressure."
-      : "";
-
-  return `${c0} are confirming stress.${quietStr}${liqStr}`;
+  return `${c0} are confirming stress.${liqStr}`;
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -454,36 +558,46 @@ export async function GET() {
     .toISOString()
     .slice(0, 10);
 
-  const [closesResult, vixResult] = await Promise.allSettled([
+  const [closesResult, vixResult, newsResult] = await Promise.allSettled([
     fetchCloses(fromDate),
     fetchVix(fromDate),
+    fetchNewsArticles(),
   ]);
 
   const closes = closesResult.status === "fulfilled" ? closesResult.value : {};
   const { closes: vixCloses, level: vixLevel } =
     vixResult.status === "fulfilled" ? vixResult.value : { closes: [], level: null };
+  const articles = newsResult.status === "fulfilled" ? newsResult.value : [];
 
-  const credit = scoreCredit(closes);
-  const volatility = scoreVolatility(closes, vixLevel, vixCloses);
-  const breadth = scoreBreadth(closes);
+  const credit          = scoreCredit(closes);
+  const volatility      = scoreVolatility(closes, vixLevel, vixCloses);
+  const breadth         = scoreBreadth(closes);
   const stress_confirmation = scoreStressConfirmation(closes);
-  const trend = scoreTrend(closes);
-  const liqBonus = liquidationBonus(closes);
+  const trend           = scoreTrend(closes);
+  const carry           = scoreCarry(closes);
+  const copper_gold     = scoreCopperGold(closes);
+  const news_velocity   = scoreNewsVelocity(articles);
+  const liqBonus        = liquidationBonus(closes);
 
-  const dimensions = { credit, volatility, breadth, stress_confirmation, trend };
+  const dimensions = {
+    credit, volatility, breadth, stress_confirmation,
+    trend, carry, copper_gold, news_velocity,
+  };
+
   const confirmation_count = Object.values(dimensions).filter((d) => d.confirming).length;
 
   const raw =
-    credit.score + volatility.score + breadth.score + stress_confirmation.score + trend.score + liqBonus;
-  const market_stress_score = clamp(parseFloat(raw.toFixed(1)), 0, 10);
+    credit.score + volatility.score + breadth.score + stress_confirmation.score +
+    trend.score + carry.score + copper_gold.score + news_velocity.score + liqBonus;
 
+  const market_stress_score = clamp(parseFloat(raw.toFixed(1)), 0, 10);
   const { label: stress_label, color: stress_color } = labelFor(market_stress_score);
 
   const unavailableCount = Object.values(dimensions).filter(
     (d) => d.data_quality === "unavailable",
   ).length;
   const confidence: "high" | "medium" | "low" =
-    unavailableCount >= 2 ? "low" : confirmation_count >= 3 ? "high" : "medium";
+    unavailableCount >= 3 ? "low" : confirmation_count >= 3 ? "high" : "medium";
 
   const payload: MarketStressPayload = {
     market_stress_score,
