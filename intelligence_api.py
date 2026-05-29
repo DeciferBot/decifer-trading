@@ -508,9 +508,17 @@ def counter_thesis() -> Response:
     if request.method == "OPTIONS":
         return Response(status=204)
     try:
-        from counter_thesis_engine import build_counter_thesis_dict
+        from counter_thesis_engine import (
+            build_counter_thesis_dict,
+            load_cached_counter_thesis,
+        )
         use_fmp = request.args.get("fmp", "true").lower() != "false"
-        data = build_counter_thesis_dict(use_fmp=use_fmp)
+        if use_fmp:
+            # Serve from cache (written by scheduled FMP refresh). Fast path.
+            # Falls back to fmp=false (curated) if cache is missing or stale.
+            data = load_cached_counter_thesis() or build_counter_thesis_dict(use_fmp=False)
+        else:
+            data = build_counter_thesis_dict(use_fmp=False)
         return _json_response(data)
     except Exception as exc:
         log.error("/api/counter-thesis: %s", exc)
@@ -1001,7 +1009,7 @@ function toggleCard(bodyId, header) {
 
 async function loadData() {
   try {
-    const r = await fetch('/api/counter-thesis?fmp=false');
+    const r = await fetch('/api/counter-thesis');
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
 

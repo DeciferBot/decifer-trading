@@ -627,6 +627,10 @@ def build_counter_thesis_report(use_fmp: bool = True) -> CounterThesisReport:
     )
 
 
+_CACHE_PATH = os.path.join(_BASE_DIR, "data", "intelligence", "counter_thesis_cache.json")
+_CACHE_MAX_AGE_SECONDS = 14 * 3600  # 14 hours — stale after one full trading day
+
+
 def build_counter_thesis_dict(use_fmp: bool = True) -> dict:
     """Serializable dict version for JSON API responses."""
     report = build_counter_thesis_report(use_fmp=use_fmp)
@@ -644,3 +648,30 @@ def build_counter_thesis_dict(use_fmp: bool = True) -> dict:
         "data_freshness": report.data_freshness,
         "note": report.note,
     }
+
+
+def build_and_cache_counter_thesis() -> dict:
+    """Run FMP verification and write result to cache. Returns the dict."""
+    data = build_counter_thesis_dict(use_fmp=True)
+    try:
+        tmp = _CACHE_PATH + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(data, f)
+        os.replace(tmp, _CACHE_PATH)
+        log.info("counter_thesis cache written: %s conflicts, freshness=%s",
+                 len(data["structural_conflicts"]), data["data_freshness"])
+    except Exception as exc:
+        log.warning("counter_thesis cache write failed: %s", exc)
+    return data
+
+
+def load_cached_counter_thesis() -> dict | None:
+    """Return cached dict if it exists and is less than 14 hours old, else None."""
+    try:
+        stat = os.stat(_CACHE_PATH)
+        if time.time() - stat.st_mtime > _CACHE_MAX_AGE_SECONDS:
+            return None
+        with open(_CACHE_PATH) as f:
+            return json.load(f)
+    except Exception:
+        return None

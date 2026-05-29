@@ -206,7 +206,7 @@ def run() -> None:
     print(f"      manifest → {_MANIFEST_PATH}")
 
     # Step 5 — IC weights (fail-soft)
-    print("[5/5] Updating IC weights + validation...")
+    print("[5/6] Updating IC weights + validation...")
     try:
         from ic_calculator import update_ic_weights, update_live_ic
         from ic_validator import validate_and_persist
@@ -218,6 +218,18 @@ def run() -> None:
     except Exception as _ic_err:
         log.warning("IC update failed (non-fatal): %s: %s", type(_ic_err).__name__, _ic_err)
         print(f"      [WARN] IC update skipped: {type(_ic_err).__name__}: {_ic_err}")
+
+    # Step 6 — Counter-thesis FMP verification cache (fail-soft)
+    print("[6/6] Refreshing counter-thesis cache (FMP verification)...")
+    try:
+        from counter_thesis_engine import build_and_cache_counter_thesis
+        ct = build_and_cache_counter_thesis()
+        n_conflicts = len(ct.get("structural_conflicts", []))
+        freshness = ct.get("data_freshness", "unknown")
+        print(f"      {n_conflicts} active conflicts cached (freshness={freshness})")
+    except Exception as _ct_err:
+        log.warning("Counter-thesis cache refresh failed (non-fatal): %s: %s", type(_ct_err).__name__, _ct_err)
+        print(f"      [WARN] Counter-thesis cache skipped: {type(_ct_err).__name__}: {_ct_err}")
 
     print("=== Done ===")
 
