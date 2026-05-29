@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const FMP_KEY = process.env.FMP_API_KEY;
-const V3 = "https://financialmodelingprep.com/api/v3";
+const STABLE = "https://financialmodelingprep.com/stable";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -88,48 +88,41 @@ function clamp(v: number, lo: number, hi: number): number {
 const SYMBOLS = ["SPY", "QQQ", "IWM", "HYG", "LQD", "IEF", "TLT", "GLD", "UUP", "UVXY"];
 type ClosesMap = Record<string, number[]>; // symbol → oldest-first closes
 
-async function fetchCloses(fromDate: string): Promise<ClosesMap> {
-  const url = `${V3}/historical-price-full/${SYMBOLS.join(",")}?from=${fromDate}&apikey=${FMP_KEY}`;
-  let res: Response;
+type FmpEodRow = { symbol: string; date: string; close: number };
+
+async function fetchOneSym(symbol: string, fromDate: string): Promise<number[]> {
+  const encoded = encodeURIComponent(symbol);
+  const url = `${STABLE}/historical-price-eod/full?symbol=${encoded}&from=${fromDate}&apikey=${FMP_KEY}`;
   try {
-    res = await fetch(url, { next: { revalidate: 900 } });
+    const res = await fetch(url, { next: { revalidate: 900 } });
+    if (!res.ok) return [];
+    const rows: FmpEodRow[] = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+    // stable returns newest-first → reverse to oldest-first
+    return [...rows].reverse().map((r) => r.close).filter((c) => c > 0);
   } catch {
-    return {};
+    return [];
   }
-  if (!res.ok) return {};
+}
 
-  const data = await res.json();
-  const list: Array<{ symbol: string; historical: Array<{ close: number }> }> =
-    data.historicalStockList ?? (data.symbol ? [data] : []);
-
-  const result: ClosesMap = {};
-  for (const item of list) {
-    if (!item?.symbol || !Array.isArray(item.historical)) continue;
-    const closes = [...item.historical]
-      .reverse()
-      .map((d) => d.close)
-      .filter((c) => c != null && c > 0);
-    if (closes.length >= 10) result[item.symbol] = closes;
-  }
-  return result;
+async function fetchCloses(fromDate: string): Promise<ClosesMap> {
+  const results = await Promise.allSettled(
+    SYMBOLS.map((sym) => fetchOneSym(sym, fromDate)),
+  );
+  const map: ClosesMap = {};
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled" && r.value.length >= 10) {
+      map[SYMBOLS[i]] = r.value;
+    }
+  });
+  return map;
 }
 
 async function fetchVix(fromDate: string): Promise<{ closes: number[]; level: number | null }> {
-  const url = `${V3}/historical-price-full/%5EVIX?from=${fromDate}&apikey=${FMP_KEY}`;
-  let res: Response;
-  try {
-    res = await fetch(url, { next: { revalidate: 900 } });
-  } catch {
-    return { closes: [], level: null };
-  }
-  if (!res.ok) return { closes: [], level: null };
-
-  const data = await res.json();
-  const hist: Array<{ close: number }> = data.historical ?? [];
-  if (hist.length === 0) return { closes: [], level: null };
-
-  const closes = [...hist].reverse().map((d) => d.close).filter((c) => c > 0);
-  return { closes, level: hist[0]?.close ?? null };
+  const rows = await fetchOneSym("^VIX", fromDate);
+  if (rows.length === 0) return { closes: [], level: null };
+  // rows are oldest-first; latest is last element
+  return { closes: rows, level: rows[rows.length - 1] };
 }
 
 // ── Dimension scorers ─────────────────────────────────────────────────────────
