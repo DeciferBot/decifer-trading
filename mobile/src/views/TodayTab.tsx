@@ -603,68 +603,111 @@ function MarketNarrative({
   onAskAbout?: (ctx: string) => void;
   onGoToForces?: () => void;
 }) {
-  const ms = buildCustomerMarketStory(data, story);
+  const ms2 = buildCustomerMarketStory(data, story);
   const isOpen = clock.session === "open";
-
-  // Build opening sentence based on session + available data
-  let opener = "";
-  if (!isOpen && tapeSnapshot.es_pct != null) {
-    const esSign = tapeSnapshot.es_pct >= 0 ? "+" : "";
-    const nqPart = tapeSnapshot.nq_pct != null
-      ? `, Nasdaq futures ${tapeSnapshot.nq_pct >= 0 ? "+" : ""}${tapeSnapshot.nq_pct.toFixed(2)}%`
-      : "";
-    const direction = tapeSnapshot.es_pct >= 0.1 ? "pointing to a higher open" : tapeSnapshot.es_pct <= -0.1 ? "pointing lower" : "flat overnight";
-    opener = `S&P futures ${esSign}${tapeSnapshot.es_pct.toFixed(2)}%${nqPart} — ${direction}.`;
-  } else {
-    opener = buildNarrativeParagraph(data, ms, tapeSnapshot);
-  }
-
-  // Build specific tape insights (things that actually changed today)
-  const insights: string[] = [];
+  const spy = tapeSnapshot.spy_pct;
+  const qqq = tapeSnapshot.qqq_pct;
   const uso = tapeSnapshot.uso_pct;
   const tlt = tapeSnapshot.tlt_pct;
   const gld = tapeSnapshot.gld_pct;
   const iwm = tapeSnapshot.iwm_pct;
-  const spyTape = tapeSnapshot.spy_pct;
   const dxy = tapeSnapshot.dxy_pct;
+  const es = tapeSnapshot.es_pct;
+  const nq = tapeSnapshot.nq_pct;
 
-  if (uso != null && Math.abs(uso) > 0.6) {
-    if (uso < 0) insights.push(`Oil down ${Math.abs(uso).toFixed(1)}% — supply shock premium is fading.`);
-    else insights.push(`Oil up ${uso.toFixed(1)}% — supply disruption fears are building.`);
+  // ── Yesterday / session summary sentence ──────────────────────────────────
+  let sessionSentence = "";
+  if (isOpen) {
+    // Live session — describe what's happening now
+    if (spy != null) {
+      const dir = spy >= 0.3 ? "rallying" : spy <= -0.3 ? "selling off" : "trading flat";
+      const techNote = qqq != null && Math.abs(qqq - spy) > 0.4
+        ? qqq > spy ? ` Tech is outperforming, with Nasdaq ${qqq >= 0 ? "+" : ""}${qqq.toFixed(1)}%.` : ` Tech is lagging, with Nasdaq ${qqq >= 0 ? "+" : ""}${qqq.toFixed(1)}%.`
+        : "";
+      sessionSentence = `The S&P 500 is ${dir} today, ${spy >= 0 ? "+" : ""}${spy.toFixed(2)}%.${techNote}`;
+    } else {
+      sessionSentence = buildNarrativeParagraph(data, ms2, tapeSnapshot);
+    }
+  } else {
+    // Market closed — yesterday's close + overnight futures
+    if (spy != null) {
+      const dir = spy >= 0.5 ? "gained" : spy <= -0.5 ? "fell" : "was roughly flat";
+      const close = `Yesterday the S&P 500 ${dir} ${Math.abs(spy).toFixed(2)}%`;
+      const techPart = qqq != null
+        ? ` and the Nasdaq ${qqq >= 0 ? "+" : ""}${qqq.toFixed(1)}%`
+        : "";
+      const closeSentence = `${close}${techPart}.`;
+
+      if (es != null) {
+        const futDir = es >= 0.1 ? "pointing to a higher open" : es <= -0.1 ? "suggesting a lower open" : "flat overnight";
+        const nqFut = nq != null ? ` Nasdaq futures ${nq >= 0 ? "+" : ""}${nq.toFixed(2)}%.` : "";
+        sessionSentence = `${closeSentence} S&P futures are ${es >= 0 ? "+" : ""}${es.toFixed(2)}% — ${futDir}.${nqFut}`;
+      } else {
+        sessionSentence = closeSentence;
+      }
+    } else if (es != null) {
+      const futDir = es >= 0.1 ? "pointing to a higher open" : es <= -0.1 ? "suggesting a lower open" : "flat overnight";
+      sessionSentence = `S&P futures ${es >= 0 ? "+" : ""}${es.toFixed(2)}% — ${futDir}.`;
+    } else {
+      sessionSentence = buildNarrativeParagraph(data, ms2, tapeSnapshot);
+    }
   }
+
+  // ── What's moving (cross-asset context) ───────────────────────────────────
+  const insights: string[] = [];
   if (tlt != null && Math.abs(tlt) > 0.3) {
-    if (tlt > 0) insights.push(`Bonds gained ${tlt.toFixed(1)}% — rate cut expectations are firming.`);
-    else insights.push(`Bonds fell ${Math.abs(tlt).toFixed(1)}% — yields are pushing higher again.`);
-  }
-  if (iwm != null && spyTape != null && Math.abs(iwm - spyTape) > 0.6) {
-    const diff = iwm - spyTape;
-    if (diff > 0) insights.push(`Small caps outperformed large caps by ${diff.toFixed(1)}% — market breadth is widening.`);
-    else insights.push(`Small caps lagged large caps by ${Math.abs(diff).toFixed(1)}% — the rally is narrow.`);
+    insights.push(tlt > 0
+      ? `Bonds gained ${tlt.toFixed(1)}% — rate cut expectations are firming.`
+      : `Bonds fell ${Math.abs(tlt).toFixed(1)}% — yields pushing higher, tightening financial conditions.`);
   }
   if (gld != null && Math.abs(gld) > 0.5) {
-    if (gld > 0) insights.push(`Gold up ${gld.toFixed(1)}% — safe-haven demand is elevated.`);
-    else insights.push(`Gold fell ${Math.abs(gld).toFixed(1)}% — risk appetite is healthy.`);
+    insights.push(gld > 0
+      ? `Gold up ${gld.toFixed(1)}% — safe-haven demand elevated, uncertainty in the market.`
+      : `Gold fell ${Math.abs(gld).toFixed(1)}% — risk appetite is healthy, safe-haven unwind.`);
+  }
+  if (uso != null && Math.abs(uso) > 0.6) {
+    insights.push(uso < 0
+      ? `Oil down ${Math.abs(uso).toFixed(1)}% — supply shock premium is fading.`
+      : `Oil up ${uso.toFixed(1)}% — supply disruption fears building, energy names in focus.`);
+  }
+  if (iwm != null && spy != null && Math.abs(iwm - spy) > 0.6) {
+    const diff = iwm - spy;
+    insights.push(diff > 0
+      ? `Small caps outperformed by ${diff.toFixed(1)}% — risk appetite and market breadth both strong.`
+      : `Small caps lagged by ${Math.abs(diff).toFixed(1)}% — the move is concentrated in large caps.`);
   }
   if (dxy != null && Math.abs(dxy) > 0.3) {
-    if (dxy > 0) insights.push(`Dollar strengthening — headwind for US multinationals and commodities.`);
-    else insights.push(`Dollar weakening — tailwind for international earners and commodities.`);
+    insights.push(dxy > 0
+      ? `Dollar strengthening — headwind for commodities and US multinationals.`
+      : `Dollar weakening — tailwind for commodities and international earners.`);
   }
 
   const conflicts = data.known_conflicts ?? [];
-  const caution = ms.caution ?? (conflicts[0] ? conflicts[0] : null);
+  const caution = ms2.caution ?? (conflicts[0] ? conflicts[0] : null);
 
-  const topEvent = (morningBrief?.econ ?? []).find(e => e.impact === "High" && !e.actual);
+  // ── What to watch today ───────────────────────────────────────────────────
+  // Show top 2 upcoming high-impact events with context
+  const upcomingEvents = (morningBrief?.econ ?? [])
+    .filter(e => !e.actual)
+    .sort((a, b) => (b.impact === "High" ? 1 : 0) - (a.impact === "High" ? 1 : 0))
+    .slice(0, 2);
+
+  const topEvent = upcomingEvents[0] ?? null;
   const watchText = topEvent
-    ? `${econPlainLabel(topEvent.event)}${topEvent.estimate != null ? ` — forecast ${topEvent.estimate}${topEvent.unit ?? ""}` : ""}${topEvent.time && topEvent.time !== "All Day" ? ` at ${formatEconTime(topEvent.time)} ET` : ""}.`
+    ? `${econPlainLabel(topEvent.event)}${topEvent.estimate != null ? ` — forecast ${topEvent.estimate}${topEvent.unit ?? ""}${topEvent.previous != null ? `, prev ${topEvent.previous}${topEvent.unit ?? ""}` : ""}` : ""}${topEvent.time && topEvent.time !== "All Day" ? ` at ${formatEconTime(topEvent.time)} ET` : ""}.`
     : null;
+  const watchContext = topEvent ? econWhatItMeans(topEvent.event) : null;
+  const secondEvent = upcomingEvents[1] ?? null;
 
   return (
     <div
       className="rounded-2xl p-4"
       style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
     >
-      <p className="text-[13px] text-slate-200 leading-relaxed">{opener}</p>
+      {/* Session summary — yesterday close + overnight or live session */}
+      <p className="text-[13px] text-slate-200 leading-relaxed">{sessionSentence}</p>
 
+      {/* Cross-asset context bullets */}
       {insights.length > 0 && (
         <ul className="mt-3 space-y-1.5">
           {insights.slice(0, 3).map((ins, i) => (
@@ -676,6 +719,7 @@ function MarketNarrative({
         </ul>
       )}
 
+      {/* Known conflict / caution */}
       {caution && (
         <div
           className="mt-3 rounded-xl px-3 py-2.5 flex items-start gap-2"
@@ -686,15 +730,38 @@ function MarketNarrative({
         </div>
       )}
 
-      {watchText && (
+      {/* Today's watch — top upcoming events with est, prev, and context */}
+      {(watchText || secondEvent) && (
         <div
-          className="mt-3 pt-3"
+          className="mt-3 pt-3 space-y-3"
           style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
         >
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: "#64748b" }}>
-            Today&apos;s watch
+          <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: "#64748b" }}>
+            On the radar today
           </p>
-          <p className="text-[11px] text-slate-300 leading-relaxed">{watchText}</p>
+          {watchText && (
+            <div>
+              <p className="text-[11px] font-semibold text-slate-200 leading-snug">{econPlainLabel(topEvent!.event)}</p>
+              {watchContext && (
+                <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">{watchContext.watch}</p>
+              )}
+              <p className="text-[10px] mt-1" style={{ color: "#64748b" }}>
+                {topEvent!.time && topEvent!.time !== "All Day" && `${formatEconTime(topEvent!.time)} ET`}
+                {topEvent!.estimate != null && ` · Est: ${topEvent!.estimate}${topEvent!.unit ?? ""}`}
+                {topEvent!.previous != null && ` · Prev: ${topEvent!.previous}${topEvent!.unit ?? ""}`}
+              </p>
+            </div>
+          )}
+          {secondEvent && (
+            <div>
+              <p className="text-[11px] font-semibold text-slate-300 leading-snug">{econPlainLabel(secondEvent.event)}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: "#64748b" }}>
+                {secondEvent.time && secondEvent.time !== "All Day" && `${formatEconTime(secondEvent.time)} ET`}
+                {secondEvent.estimate != null && ` · Est: ${secondEvent.estimate}${secondEvent.unit ?? ""}`}
+                {secondEvent.previous != null && ` · Prev: ${secondEvent.previous}${secondEvent.unit ?? ""}`}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -1618,11 +1685,16 @@ function TodayAgendaSection({
                       {ev.actual != null && (
                         <span className="text-[10px] text-slate-400">
                           Released: <span className="text-slate-200">{ev.actual}{ev.unit ? ` ${ev.unit}` : ""}</span>
-                          {ev.estimate != null && <span className="text-slate-600"> · Forecast was {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>}
+                          {ev.estimate != null && <span className="text-slate-500"> · Est: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>}
+                          {ev.previous != null && <span className="text-slate-600"> · Prev: {ev.previous}{ev.unit ? ` ${ev.unit}` : ""}</span>}
                         </span>
                       )}
-                      {ev.actual == null && ev.estimate != null && (
-                        <span className="text-[10px] text-slate-500">Forecast: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>
+                      {ev.actual == null && (ev.estimate != null || ev.previous != null) && (
+                        <span className="text-[10px]" style={{ color: "#64748b" }}>
+                          {ev.estimate != null && <span>Est: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>}
+                          {ev.estimate != null && ev.previous != null && <span> · </span>}
+                          {ev.previous != null && <span>Prev: {ev.previous}{ev.unit ? ` ${ev.unit}` : ""}</span>}
+                        </span>
                       )}
                     </div>
                   </div>
