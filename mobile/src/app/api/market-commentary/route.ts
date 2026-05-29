@@ -59,11 +59,32 @@ export async function GET(): Promise<NextResponse<MarketCommentaryPayload>> {
       : Promise.reject("no FMP key"),
   ]);
 
-  // Parse tape
+  // Parse tape — prefer intelligence server, fall back to FMP direct
   type Tape = Record<string, number | null>;
   let tape: Tape = {};
   if (tapeRes.status === "fulfilled" && tapeRes.value.ok) {
     try { tape = await tapeRes.value.json(); } catch { /* ignore */ }
+  }
+  // If intelligence tape is empty, fetch core symbols directly from FMP
+  const tapeIsEmpty = Object.values(tape).every(v => v == null);
+  if (tapeIsEmpty && FMP) {
+    try {
+      const fmpSymbols = "SPY,QQQ,DIA,IWM,TLT,GLD,USO,UUP";
+      const fmpRes = await fetch(
+        `${BASE}/batch-quote-short?symbols=${fmpSymbols}&apikey=${FMP}`,
+        { next: { revalidate: 120 } }
+      );
+      if (fmpRes.ok) {
+        const quotes: Array<{ symbol: string; price: number; change: number }> = await fmpRes.json();
+        for (const q of quotes) {
+          const prev = q.price - q.change;
+          const pct = prev !== 0 ? parseFloat(((q.change / prev) * 100).toFixed(2)) : null;
+          const key = ({ SPY: "spy_pct", QQQ: "qqq_pct", DIA: "dia_pct", IWM: "iwm_pct",
+                         TLT: "tlt_pct", GLD: "gld_pct", USO: "uso_pct", UUP: "dxy_pct" } as Record<string, string>)[q.symbol];
+          if (key) tape[key] = pct;
+        }
+      }
+    } catch { /* ignore */ }
   }
 
   // Parse intelligence
@@ -205,9 +226,21 @@ Return only the JSON object. No markdown, no explanation outside the JSON.`;
       prev: e.previous != null ? `${e.previous}${e.unit ?? ""}` : "",
       commentary: `${e.impact === "High" ? "High-impact release" : "Medium-impact release"}.${e.estimate != null ? ` Forecast: ${e.estimate}${e.unit ?? ""}.` : ""}${e.previous != null ? ` Previous: ${e.previous}${e.unit ?? ""}.` : ""}`,
     }));
-    const fallbackSummary = mood
-      ? `${mood}. Active drivers: ${drivers.slice(0, 2).join(", ") || "none"}.`
-      : "Market data is loading.";
+    // Build a real fallback from tape data rather than showing a loading message
+    let fallbackSummary: string;
+    if (mood) {
+      fallbackSummary = `${mood}. Active drivers: ${drivers.slice(0, 2).join(", ") || "none"}.`;
+    } else {
+      const tapeParts: string[] = [];
+      if (tape.spy_pct != null) tapeParts.push(`S&P 500 ${fmt(tape.spy_pct)}`);
+      if (tape.qqq_pct != null) tapeParts.push(`Nasdaq ${fmt(tape.qqq_pct)}`);
+      if (tape.tlt_pct != null) tapeParts.push(`bonds ${fmt(tape.tlt_pct)}`);
+      if (tape.gld_pct != null) tapeParts.push(`gold ${fmt(tape.gld_pct)}`);
+      if (tape.uso_pct != null) tapeParts.push(`oil ${fmt(tape.uso_pct)}`);
+      fallbackSummary = tapeParts.length > 0
+        ? `Markets today: ${tapeParts.join(", ")}.${econRaw.length > 0 ? ` ${econRaw.length} economic release${econRaw.length > 1 ? "s" : ""} scheduled.` : ""}`
+        : "Market data is currently unavailable. Check back shortly.";
+    }
     return NextResponse.json({ summary: fallbackSummary, watch: fallbackWatch, ts, source: "fallback" });
   }
 }
