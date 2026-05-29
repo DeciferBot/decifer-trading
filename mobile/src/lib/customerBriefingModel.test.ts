@@ -502,6 +502,8 @@ function makeTape(overrides: Partial<TapeSnapshot> = {}): TapeSnapshot {
     gld_pct:   null,
     uso_pct:   null,
     dxy_pct:   null,
+    es_pct:    null,
+    nq_pct:    null,
     vix_level: null,
     ...overrides,
   };

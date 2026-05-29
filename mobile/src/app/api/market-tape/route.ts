@@ -21,6 +21,8 @@ const ETF_TAPE: Array<{ sym: string; label: string; type: TapeType }> = [
   { sym: "GLD", label: "Gold",       type: "safe_haven"},
   { sym: "USO", label: "Oil",        type: "commodity" },
   { sym: "UUP", label: "US Dollar",  type: "dollar"    },
+  { sym: "ESUSD", label: "S&P Futures",    type: "equity" as TapeType },
+  { sym: "NQUSD", label: "Nasdaq Futures", type: "equity" as TapeType },
 ];
 
 export async function GET() {

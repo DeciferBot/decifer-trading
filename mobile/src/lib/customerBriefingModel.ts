@@ -505,6 +505,8 @@ export interface TapeSnapshot {
   gld_pct:   number | null;
   uso_pct:   number | null;
   dxy_pct:   number | null;  // UUP ETF — US dollar proxy
+  es_pct:    number | null;  // ESUSD — S&P futures
+  nq_pct:    number | null;  // NQUSD — Nasdaq futures
   vix_level: number | null;
 }
 

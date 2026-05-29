@@ -12,7 +12,6 @@ import {
   TrendingDown,
   CalendarDays,
   BarChart2,
-  ChevronDown,
 } from "lucide-react";
 import type { MarketNowPayload, TtgSymbolCard } from "@/lib/customerApi";
 import { fetchTtgThemes, fetchTtgThemeDetail } from "@/lib/customerApi";
@@ -169,8 +168,10 @@ function deriveTapeSnapshot(tape: TapeEntry[]): TapeSnapshot {
     tlt_pct:   by["TLT"]?.changePct ?? null,
     gld_pct:   by["GLD"]?.changePct ?? null,
     uso_pct:   by["USO"]?.changePct ?? null,
-    dxy_pct:   by["UUP"]?.changePct ?? null,
-    vix_level: by["VIX"]?.level     ?? null,
+    dxy_pct:   by["UUP"]?.changePct   ?? null,
+    es_pct:    by["ESUSD"]?.changePct ?? null,
+    nq_pct:    by["NQUSD"]?.changePct ?? null,
+    vix_level: by["VIX"]?.level       ?? null,
   };
 }
 
@@ -255,8 +256,13 @@ function StoryCirclesStrip({
       className="py-3"
       style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
-      <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        <div className="flex gap-5 px-5 min-w-max">
+      <div
+        className="overflow-x-auto"
+        style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" as never,
+          maskImage: "linear-gradient(to right, black 80%, transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to right, black 80%, transparent 100%)" }}
+      >
+        <div className="flex gap-5 px-5 min-w-max pr-8">
           {active.slice(0, 10).map((force, i) => (
             <StoryCircle key={i} force={force} onSelect={onSelect} />
           ))}
@@ -414,12 +420,11 @@ function HeroHeader({
   const ms = buildCustomerMarketStory(data, story);
   const c  = regimeColors(ms.regime.state);
 
+  const isMktOpen = clock.session === "open";
   const spy = tapeSnapshot.spy_pct;
   const qqq = tapeSnapshot.qqq_pct;
   const dia = tapeSnapshot.dia_pct;
   const vix = tapeSnapshot.vix_level;
-  const spyColor = spy == null ? "#64748b" : spy > 0 ? "#34d399" : spy < 0 ? "#f87171" : "#94a3b8";
-  const spySign  = spy != null && spy > 0 ? "+" : "";
   const pctColor = (v: number | null) =>
     v == null ? "#64748b" : v > 0 ? "#34d399" : v < 0 ? "#f87171" : "#94a3b8";
   const pctSign  = (v: number | null) => (v != null && v > 0 ? "+" : "");
@@ -516,60 +521,60 @@ function HeroHeader({
         </div>
 
         {/* ── Row 3: index numbers or regime fallback ── */}
-        {spy != null ? (
-          <div>
-            {/* Primary — S&P 500 big number */}
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
-              S&amp;P 500
-            </p>
-            <p className="font-black leading-none mb-3" style={{ color: spyColor, fontSize: "52px" }}>
-              {spySign}{spy.toFixed(2)}%
-            </p>
+        {/* When open: show SPY. When closed/pre-market: show ES futures if available, fall back to SPY */}
+        {(() => {
+          const primaryPct = isMktOpen ? spy : (tapeSnapshot.es_pct ?? spy);
+          const primaryLabel = isMktOpen ? "S&P 500" : (tapeSnapshot.es_pct != null ? "S&P FUTURES" : "S&P 500 (prev close)");
+          const primaryColor = primaryPct == null ? "#64748b" : primaryPct > 0 ? "#34d399" : primaryPct < 0 ? "#f87171" : "#94a3b8";
+          const primarySign = primaryPct != null && primaryPct > 0 ? "+" : "";
 
-            {/* Secondary strip — Nasdaq · Dow · VIX */}
-            <div className="flex items-center gap-4">
-              {qqq != null && (
-                <div>
-                  <p className="text-[9px] uppercase text-slate-600 tracking-wide mb-0.5">Nasdaq</p>
-                  <p className="text-[15px] font-black leading-none" style={{ color: pctColor(qqq) }}>
-                    {pctSign(qqq)}{qqq.toFixed(2)}%
-                  </p>
-                </div>
-              )}
-              {dia != null && (
-                <div>
-                  <p className="text-[9px] uppercase text-slate-600 tracking-wide mb-0.5">Dow</p>
-                  <p className="text-[15px] font-black leading-none" style={{ color: pctColor(dia) }}>
-                    {pctSign(dia)}{dia.toFixed(2)}%
-                  </p>
-                </div>
-              )}
-              {vix != null && (
-                <div>
-                  <p className="text-[9px] uppercase text-slate-600 tracking-wide mb-0.5">VIX</p>
-                  <p className="text-[15px] font-black leading-none"
-                    style={{ color: vix >= 25 ? "#f87171" : vix >= 20 ? "#fbbf24" : "#64748b" }}>
-                    {vix.toFixed(1)}
-                  </p>
-                </div>
-              )}
+          const secPct = isMktOpen ? qqq : (tapeSnapshot.nq_pct ?? qqq);
+          const secLabel = isMktOpen ? "NASDAQ" : (tapeSnapshot.nq_pct != null ? "NASDAQ FUT." : "NASDAQ");
+
+          if (primaryPct == null) return (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">Market view</p>
+              <p className="font-black leading-tight" style={{ color: c.text, fontSize: "26px" }}>{ms.macro_label}</p>
             </div>
+          );
 
-            <p className="text-[12px] text-slate-200 mt-3">{ms.macro_label}</p>
-          </div>
-        ) : (
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
-              Market view
-            </p>
-            <p
-              className="font-black leading-tight"
-              style={{ color: c.text, fontSize: "26px" }}
-            >
-              {ms.macro_label}
-            </p>
-          </div>
-        )}
+          return (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">{primaryLabel}</p>
+              <p className="font-black leading-none mb-3" style={{ color: primaryColor, fontSize: "52px" }}>
+                {primarySign}{primaryPct.toFixed(2)}%
+              </p>
+              <div className="flex items-center gap-4">
+                {secPct != null && (
+                  <div>
+                    <p className="text-[9px] uppercase text-slate-600 tracking-wide mb-0.5">{secLabel}</p>
+                    <p className="text-[15px] font-black leading-none" style={{ color: pctColor(secPct) }}>
+                      {pctSign(secPct)}{secPct.toFixed(2)}%
+                    </p>
+                  </div>
+                )}
+                {isMktOpen && dia != null && (
+                  <div>
+                    <p className="text-[9px] uppercase text-slate-600 tracking-wide mb-0.5">Dow</p>
+                    <p className="text-[15px] font-black leading-none" style={{ color: pctColor(dia) }}>
+                      {pctSign(dia)}{dia.toFixed(2)}%
+                    </p>
+                  </div>
+                )}
+                {vix != null && (
+                  <div>
+                    <p className="text-[9px] uppercase text-slate-600 tracking-wide mb-0.5">VIX</p>
+                    <p className="text-[15px] font-black leading-none"
+                      style={{ color: vix >= 25 ? "#f87171" : vix >= 20 ? "#fbbf24" : "#64748b" }}>
+                      {vix.toFixed(1)}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <p className="text-[12px] text-slate-200 mt-3">{ms.macro_label}</p>
+            </div>
+          );
+        })()}
       </div>
 
       <div style={{ height: "1px", background: `${c.border}25` }} />
@@ -583,44 +588,112 @@ function MarketNarrative({
   data,
   story,
   tapeSnapshot,
+  clock,
+  morningBrief,
   onAskAbout,
   onGoToForces,
 }: {
   data: MarketNowPayload;
   story: CustomerStory;
   tapeSnapshot: TapeSnapshot;
+  clock: MarketClockState;
+  morningBrief: MorningBriefPayload | null;
   onAskAbout?: (ctx: string) => void;
   onGoToForces?: () => void;
 }) {
   const ms = buildCustomerMarketStory(data, story);
-  const narrativeParagraph = buildNarrativeParagraph(data, ms, tapeSnapshot);
+  const isOpen = clock.session === "open";
+
+  // Build opening sentence based on session + available data
+  let opener = "";
+  if (!isOpen && tapeSnapshot.es_pct != null) {
+    const esSign = tapeSnapshot.es_pct >= 0 ? "+" : "";
+    const nqPart = tapeSnapshot.nq_pct != null
+      ? `, Nasdaq futures ${tapeSnapshot.nq_pct >= 0 ? "+" : ""}${tapeSnapshot.nq_pct.toFixed(2)}%`
+      : "";
+    const direction = tapeSnapshot.es_pct >= 0.1 ? "pointing to a higher open" : tapeSnapshot.es_pct <= -0.1 ? "pointing lower" : "flat overnight";
+    opener = `S&P futures ${esSign}${tapeSnapshot.es_pct.toFixed(2)}%${nqPart} — ${direction}.`;
+  } else {
+    opener = buildNarrativeParagraph(data, ms, tapeSnapshot);
+  }
+
+  // Build specific tape insights (things that actually changed today)
+  const insights: string[] = [];
+  const uso = tapeSnapshot.uso_pct;
+  const tlt = tapeSnapshot.tlt_pct;
+  const gld = tapeSnapshot.gld_pct;
+  const iwm = tapeSnapshot.iwm_pct;
+  const spyTape = tapeSnapshot.spy_pct;
+  const dxy = tapeSnapshot.dxy_pct;
+
+  if (uso != null && Math.abs(uso) > 0.6) {
+    if (uso < 0) insights.push(`Oil down ${Math.abs(uso).toFixed(1)}% — supply shock premium is fading.`);
+    else insights.push(`Oil up ${uso.toFixed(1)}% — supply disruption fears are building.`);
+  }
+  if (tlt != null && Math.abs(tlt) > 0.3) {
+    if (tlt > 0) insights.push(`Bonds gained ${tlt.toFixed(1)}% — rate cut expectations are firming.`);
+    else insights.push(`Bonds fell ${Math.abs(tlt).toFixed(1)}% — yields are pushing higher again.`);
+  }
+  if (iwm != null && spyTape != null && Math.abs(iwm - spyTape) > 0.6) {
+    const diff = iwm - spyTape;
+    if (diff > 0) insights.push(`Small caps outperformed large caps by ${diff.toFixed(1)}% — market breadth is widening.`);
+    else insights.push(`Small caps lagged large caps by ${Math.abs(diff).toFixed(1)}% — the rally is narrow.`);
+  }
+  if (gld != null && Math.abs(gld) > 0.5) {
+    if (gld > 0) insights.push(`Gold up ${gld.toFixed(1)}% — safe-haven demand is elevated.`);
+    else insights.push(`Gold fell ${Math.abs(gld).toFixed(1)}% — risk appetite is healthy.`);
+  }
+  if (dxy != null && Math.abs(dxy) > 0.3) {
+    if (dxy > 0) insights.push(`Dollar strengthening — headwind for US multinationals and commodities.`);
+    else insights.push(`Dollar weakening — tailwind for international earners and commodities.`);
+  }
+
+  const conflicts = data.known_conflicts ?? [];
+  const caution = ms.caution ?? (conflicts[0] ? conflicts[0] : null);
+
+  const topEvent = (morningBrief?.econ ?? []).find(e => e.impact === "High" && !e.actual);
+  const watchText = topEvent
+    ? `${econPlainLabel(topEvent.event)}${topEvent.estimate != null ? ` — forecast ${topEvent.estimate}${topEvent.unit ?? ""}` : ""}${topEvent.time && topEvent.time !== "All Day" ? ` at ${formatEconTime(topEvent.time)} ET` : ""}.`
+    : null;
 
   return (
     <div
       className="rounded-2xl p-4"
       style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}
     >
-      <p className="text-[13px] text-slate-200 leading-relaxed">{narrativeParagraph}</p>
+      <p className="text-[13px] text-slate-200 leading-relaxed">{opener}</p>
 
-      {ms.caution && (
+      {insights.length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {insights.slice(0, 3).map((ins, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className="w-1 h-1 rounded-full shrink-0 mt-1.5" style={{ background: "#f97316" }} />
+              <p className="text-[11px] text-slate-300 leading-relaxed">{ins}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {caution && (
         <div
           className="mt-3 rounded-xl px-3 py-2.5 flex items-start gap-2"
           style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.18)" }}
         >
           <Shield size={11} className="text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-amber-300 leading-relaxed">{ms.caution}</p>
+          <p className="text-[11px] text-amber-300 leading-relaxed">{caution}</p>
         </div>
       )}
 
-      {(ms.supporting_bullets.length > 0) && (
-        <ul className="mt-3 space-y-1.5">
-          {ms.supporting_bullets.slice(0, 2).map((b, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className="w-1 h-1 rounded-full shrink-0 mt-1.5" style={{ background: "#f97316" }} />
-              <p className="text-[11px] text-slate-200 leading-relaxed">{b}</p>
-            </li>
-          ))}
-        </ul>
+      {watchText && (
+        <div
+          className="mt-3 pt-3"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: "#64748b" }}>
+            Today&apos;s watch
+          </p>
+          <p className="text-[11px] text-slate-300 leading-relaxed">{watchText}</p>
+        </div>
       )}
 
       <div
@@ -821,7 +894,7 @@ function MoverRow({
 
 // ── Movers section ────────────────────────────────────────────────────────────
 
-function MoversSection() {
+function MoversSection({ session }: { session?: MarketSession }) {
   const [data, setData] = useState<MarketMoversPayload | null>(null);
   const [selectedMover, setSelectedMover] = useState<{ mover: Mover; direction: "up" | "down" } | null>(null);
 
@@ -847,11 +920,17 @@ function MoversSection() {
       })()
     : null;
 
+  const sectionTitle =
+    session === "open"        ? "Today's biggest moves" :
+    session === "pre_market"  ? "Pre-market movers" :
+    session === "after_hours" ? "After-hours movers" :
+                                "Yesterday's biggest moves";
+
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
         <p className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: "#f97316" }}>
-          Today&apos;s biggest moves
+          {sectionTitle}
         </p>
         {freshnessLabel && (
           <span className="text-[10px] text-slate-600">{freshnessLabel}</span>
@@ -1008,151 +1087,6 @@ function earningsTimeLabel(t: string): string {
   return "";
 }
 
-// ── Economic event context — layman explanations ──────────────────────────────
-
-interface EconContext {
-  what: string;
-  watch: string;
-  sectors: string[];
-}
-
-const ECON_CONTEXT: Array<{ keywords: string[]; ctx: EconContext }> = [
-  {
-    keywords: ["cftc", "s&p 500 spec", "s&p500 spec", "sp500 spec"],
-    ctx: {
-      what: "A weekly CFTC report showing how hedge funds and speculators are positioned in S&P 500 futures. Positive = more bets on stocks rising; negative = more bets on stocks falling.",
-      watch: "Sudden swings to net short signal institutional retreat from equities. Record-high net longs can mean the market is crowded and vulnerable to a shake-out.",
-      sectors: ["Broad equities", "Large-cap US stocks", "Index ETFs"],
-    },
-  },
-  {
-    keywords: ["cftc", "crude oil spec", "crude spec", "wti spec"],
-    ctx: {
-      what: "Hedge fund and speculator positioning in WTI crude oil futures. Heavy net longs = professionals expect oil prices to rise; net shorts = they expect a drop.",
-      watch: "If net longs are unwinding fast, oil prices can fall sharply even when supply is tight. Watch the direction of change week-on-week, not just the level.",
-      sectors: ["Energy (oil majors, E&P)", "Airlines & transport", "Petrochemicals"],
-    },
-  },
-  {
-    keywords: ["cftc", "gold spec"],
-    ctx: {
-      what: "Speculator net positioning in gold futures. A large net long means professionals are buying gold as a hedge against inflation, dollar weakness, or market stress.",
-      watch: "Extreme crowding in longs often precedes a correction — when speculators all rush for the exit at once, gold miners get hit hardest. Compare to the 52-week range.",
-      sectors: ["Gold miners (GDX, NEM)", "Precious metals ETFs", "Safe-haven assets"],
-    },
-  },
-  {
-    keywords: ["cftc", "nasdaq 100 spec", "nasdaq spec", "nq spec"],
-    ctx: {
-      what: "The clearest read on institutional sentiment toward tech and growth stocks — showing how hedge funds are positioned in Nasdaq 100 futures.",
-      watch: "A move from net long to net short signals professional money retreating from tech. Combined with rising rates, it can accelerate sell-offs in high-multiple names.",
-      sectors: ["Technology", "Semiconductors", "Growth stocks broadly"],
-    },
-  },
-  {
-    keywords: ["chicago business", "chicago pmi", "chicago barometer"],
-    ctx: {
-      what: "A monthly survey of purchasing managers at Chicago-area businesses. Above 50 means activity is expanding; below 50 means it is contracting. It is watched as a preview of the national manufacturing report.",
-      watch: "Check the new orders sub-index — that tells you whether the trend is turning. A miss below 50 often leads the national ISM number lower a few weeks later.",
-      sectors: ["Industrials", "Materials", "Manufacturing", "Logistics"],
-    },
-  },
-  {
-    keywords: ["bowman", "fed speech", "fed governor", "fomc speech", "powell speech", "waller", "jefferson", "cook", "kugler", "williams", "logan", "mester", "barkin", "bostic", "daly", "kashkari", "goolsbee", "collins", "harker", "barr"],
-    ctx: {
-      what: "A speech by a Federal Reserve official. These speeches give clues on when the Fed might cut or raise interest rates, and how worried policymakers are about inflation versus jobs.",
-      watch: "Listen for any shift in tone on inflation or the labour market. Softer language on inflation = markets price in earlier rate cuts. Hawkish tone = rate cut expectations pushed back, pressure on growth stocks.",
-      sectors: ["REITs", "Utilities", "Financials", "Rate-sensitive bonds", "Growth stocks"],
-    },
-  },
-  {
-    keywords: ["wholesale inventor"],
-    ctx: {
-      what: "The monthly change in goods stockpiled by wholesalers — the middlemen between manufacturers and retailers. Rising inventories can mean demand is healthy, or that goods are piling up because retailers have stopped buying.",
-      watch: "Rising inventories alongside soft retail sales is a warning — manufacturers will cut orders next. Rising inventories with strong sales is normal restocking and healthy. The direction matters more than the level.",
-      sectors: ["Consumer staples", "Consumer discretionary", "Logistics", "Industrials"],
-    },
-  },
-  {
-    keywords: ["trade balance", "current account"],
-    ctx: {
-      what: "The gap between what the US exports and imports. A deficit (like -$86.5B) means America is buying more from abroad than it is selling overseas. A widening deficit can drag on GDP growth.",
-      watch: "A bigger-than-expected deficit often weakens the US dollar. China trade flows and oil imports are usually the biggest swing factors. A surprise narrowing can trigger a dollar rally.",
-      sectors: ["US dollar (FX)", "US exporters (industrials, tech hardware)", "Retail importers", "Oil"],
-    },
-  },
-  {
-    keywords: ["nonfarm payroll", "non-farm payroll", "jobs report", "employment change"],
-    ctx: {
-      what: "The most-watched US jobs report — how many workers were added outside of farming in the prior month. Strong jobs data means the economy is growing but can delay Fed rate cuts.",
-      watch: "The headline number AND wage growth together. Strong jobs + rising wages = Fed stays higher for longer. Weak jobs + falling wages = Fed cuts sooner, risk-on.",
-      sectors: ["Broad equities", "Consumer discretionary", "Financials", "REITs"],
-    },
-  },
-  {
-    keywords: ["cpi", "consumer price index", "inflation"],
-    ctx: {
-      what: "Measures how much prices of everyday goods and services have risen compared to the same time last year. It is the Fed's main gauge for deciding whether to cut or raise interest rates.",
-      watch: "Core CPI (excluding food and energy) is what the Fed cares most about. A number above expectations delays rate cuts; a number below expectations brings them forward.",
-      sectors: ["REITs", "Utilities", "Consumer staples", "Bonds", "Gold"],
-    },
-  },
-  {
-    keywords: ["gdp", "gross domestic product"],
-    ctx: {
-      what: "The broadest measure of US economic output — essentially the total value of everything the country produces. A growing number means the economy is healthy; a shrinking number raises recession fears.",
-      watch: "Two consecutive negative GDP quarters is the classic recession definition. Watch the consumer spending component — it drives about 70% of US GDP.",
-      sectors: ["Broad equities", "Industrials", "Consumer discretionary"],
-    },
-  },
-  {
-    keywords: ["retail sales"],
-    ctx: {
-      what: "Monthly report on how much consumers spent at stores, restaurants, and online. Consumer spending drives roughly 70% of US GDP, so this is a direct pulse check on demand.",
-      watch: "Control group retail sales (excluding autos, gas, building materials) is the cleanest number and feeds directly into GDP. A surprise drop hits consumer stocks hard.",
-      sectors: ["Consumer discretionary", "Consumer staples", "E-commerce", "Restaurants"],
-    },
-  },
-  {
-    keywords: ["ism manufacturing", "manufacturing pmi", "pmi manufacturing"],
-    ctx: {
-      what: "A monthly survey of US factory purchasing managers. Above 50 means manufacturing is expanding; below 50 means it is contracting. It is one of the most reliable early indicators of economic direction.",
-      watch: "The new orders sub-index is the best leading signal. A new orders print above 55 suggests the manufacturing recovery has momentum.",
-      sectors: ["Industrials", "Materials", "Machinery", "Transportation"],
-    },
-  },
-  {
-    keywords: ["initial jobless claim", "jobless claim"],
-    ctx: {
-      what: "The number of people filing for unemployment benefits for the first time in the past week. A low, stable number means the labour market is healthy; a spike signals layoffs are picking up.",
-      watch: "Four-week moving average smooths out weekly noise. A sustained rise above 250k historically precedes broader economic slowdowns.",
-      sectors: ["Consumer discretionary", "Financials", "Broad equities"],
-    },
-  },
-  {
-    keywords: ["pce", "personal consumption"],
-    ctx: {
-      what: "The Fed's preferred inflation measure — broader than CPI because it captures how consumers substitute cheaper goods when prices rise. The Fed's 2% target is based on this number.",
-      watch: "Core PCE (ex food and energy) is the number that moves markets. A print above 2.5% is uncomfortable for the Fed; a print below 2.3% is genuinely rate-cut territory.",
-      sectors: ["Bonds", "REITs", "Utilities", "Growth stocks", "Gold"],
-    },
-  },
-];
-
-function getEconContext(eventName: string): EconContext | null {
-  const lower = eventName.toLowerCase();
-  for (const { keywords, ctx } of ECON_CONTEXT) {
-    // For CFTC entries require both "cftc" AND a specific asset keyword
-    if (keywords[0] === "cftc") {
-      if (!lower.includes("cftc")) continue;
-      if (keywords.slice(1).some(k => lower.includes(k))) return ctx;
-    } else if (keywords.some(k => lower.includes(k))) {
-      return ctx;
-    }
-  }
-  return null;
-}
-
 // ── Economic event plain-language labels ──────────────────────────────────────
 
 const ECON_PLAIN_LABELS: Array<{ keywords: string[]; label: string }> = [
@@ -1294,7 +1228,6 @@ function TodayAgendaSection({
   ttgSymbolMap: Map<string, { theme_label: string }>;
 }) {
   const activeDrivers = data.key_drivers ?? [];
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   const econEvents = (brief?.econ ?? []).filter(e => e.impact === "High" || e.impact === "Medium");
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
@@ -1323,95 +1256,50 @@ function TodayAgendaSection({
                 const hasTime = ev.time && ev.time !== "All Day";
                 const beatMiss = econBeatMiss(ev);
                 const plainLabel = econPlainLabel(ev.event);
-                const ctx = getEconContext(ev.event);
-                const isExpanded = expandedIdx === i;
-                const isLast = i >= Math.min(econEvents.length, 8) - 1;
                 return (
-                  <div key={i} style={{
-                    paddingBottom: !isLast ? "12px" : "0",
-                    borderBottom: !isLast ? "1px solid rgba(255,255,255,0.04)" : "none",
+                  <div key={i} className="flex flex-col gap-1" style={{
+                    paddingBottom: i < Math.min(econEvents.length, 8) - 1 ? "12px" : "0",
+                    borderBottom: i < Math.min(econEvents.length, 8) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
                   }}>
-                    {/* Tappable header row */}
-                    <button
-                      className="w-full text-left"
-                      onClick={() => setExpandedIdx(isExpanded ? null : i)}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className="text-[12px] font-semibold text-slate-100 leading-snug flex-1">{plainLabel}</p>
-                        <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
-                          {beatMiss && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                              style={{ background: `${beatMiss.color}18`, color: beatMiss.color }}>
-                              {beatMiss.label}
-                            </span>
-                          )}
-                          {driver && (
-                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
-                              style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}>
-                              {driver}
-                            </span>
-                          )}
-                          {isHigh && !driver && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                              style={{ background: "rgba(251,191,36,0.1)", color: "#fbbf24" }}>
-                              High Impact
-                            </span>
-                          )}
-                          {ctx && (
-                            <ChevronDown
-                              size={11}
-                              className="text-slate-600 transition-transform"
-                              style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
-                            />
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {hasTime && (
-                          <span className="text-[10px]" style={{ color: isHigh ? "#fbbf24" : "#64748b" }}>
-                            {formatEconTime(ev.time)} ET
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[12px] font-semibold text-slate-100 leading-snug flex-1">{plainLabel}</p>
+                      <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                        {beatMiss && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ background: `${beatMiss.color}18`, color: beatMiss.color }}>
+                            {beatMiss.label}
                           </span>
                         )}
-                        {ev.actual != null && (
-                          <span className="text-[10px] text-slate-400">
-                            Released: <span className="text-slate-200">{ev.actual}{ev.unit ? ` ${ev.unit}` : ""}</span>
-                            {ev.estimate != null && <span className="text-slate-600"> · Forecast was {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>}
+                        {driver && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                            style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}>
+                            {driver}
                           </span>
                         )}
-                        {ev.actual == null && ev.estimate != null && (
-                          <span className="text-[10px] text-slate-500">Forecast: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>
-                        )}
-                        {ctx && !isExpanded && (
-                          <span className="text-[10px]" style={{ color: "#475569" }}>Tap for context</span>
+                        {isHigh && !driver && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ background: "rgba(251,191,36,0.1)", color: "#fbbf24" }}>
+                            High Impact
+                          </span>
                         )}
                       </div>
-                    </button>
-
-                    {/* Expanded context panel */}
-                    {ctx && isExpanded && (
-                      <div className="mt-3 rounded-xl p-3 space-y-3"
-                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: "#94a3b8" }}>What is this</p>
-                          <p className="text-[11px] text-slate-300 leading-relaxed">{ctx.what}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: "#f97316" }}>What to watch for</p>
-                          <p className="text-[11px] text-slate-300 leading-relaxed">{ctx.watch}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: "#94a3b8" }}>Sectors in focus</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {ctx.sectors.map((s, j) => (
-                              <span key={j} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                                style={{ background: "rgba(99,102,241,0.1)", color: "#818cf8" }}>
-                                {s}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {hasTime && (
+                        <span className="text-[10px]" style={{ color: isHigh ? "#fbbf24" : "#64748b" }}>
+                          {formatEconTime(ev.time)} ET
+                        </span>
+                      )}
+                      {ev.actual != null && (
+                        <span className="text-[10px] text-slate-400">
+                          Released: <span className="text-slate-200">{ev.actual}{ev.unit ? ` ${ev.unit}` : ""}</span>
+                          {ev.estimate != null && <span className="text-slate-600"> · Forecast was {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>}
+                        </span>
+                      )}
+                      {ev.actual == null && ev.estimate != null && (
+                        <span className="text-[10px] text-slate-500">Forecast: {ev.estimate}{ev.unit ? ` ${ev.unit}` : ""}</span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -1716,6 +1604,8 @@ export default function TodayTab({
             data={data}
             story={story}
             tapeSnapshot={tapeSnapshot}
+            clock={clock}
+            morningBrief={morningBrief}
             onAskAbout={onAskAbout}
             onGoToForces={onGoToForces}
           />
@@ -1751,7 +1641,7 @@ export default function TodayTab({
         )}
 
         {/* ── D: Top movers ────────────────────────────────────────────── */}
-        <MoversSection />
+        <MoversSection session={clock.session} />
 
         {/* ── E: Analyst moves on your themes ──────────────────────────── */}
         <AnalystMovesSection
@@ -1769,10 +1659,13 @@ export default function TodayTab({
         {/* ── Disclaimer ─────────────────────────────────────────────────── */}
         <div className="rounded-xl p-4 text-center"
           style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            {data.data_entitlement_note ?? "Market intelligence only. Not financial advice. No trade execution."}
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Market intelligence only. Not financial advice. No trade execution.
           </p>
-          <p className="text-[10px] text-slate-500 mt-1">
+          {data.data_entitlement_note && (
+            <p className="text-[10px] text-slate-500 mt-1">{data.data_entitlement_note}</p>
+          )}
+          <p className="text-[10px] text-slate-700 mt-1">
             v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
           </p>
         </div>
