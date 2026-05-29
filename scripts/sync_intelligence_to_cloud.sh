@@ -31,6 +31,7 @@ rsync -av --delete \
   "$REPO_DIR/data/intelligence/thematic_roster.json" \
   "$REPO_DIR/data/intelligence/theme_taxonomy.json" \
   "$REPO_DIR/data/intelligence/transmission_rules.json" \
+  "$REPO_DIR/data/intelligence/counter_thesis_cache.json" \
   "root@$DO_HOST:$DO_DATA_DIR/intelligence/" \
   >> "$LOG_FILE" 2>&1
 

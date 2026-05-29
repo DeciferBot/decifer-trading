@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.decifer.counter-thesis-refresh.plist
+
+  Runs FMP verification for the counter-thesis engine after US market close
+  and writes the result to data/intelligence/counter_thesis_cache.json.
+
+  The intelligence-sync plist (16:50 Dubai) handles the pre-open cache.
+  This plist handles the post-close refresh so the page shows verified data
+  for the full overnight period.
+
+  Schedule (post-close):
+    01:00 Dubai time (UTC+4) = 21:00 UTC = 17:00 ET (30 min after NYSE close)
+    Monday–Friday
+
+  The cache is also refreshed by run_intelligence_pipeline.py (Step 6) at
+  16:45 Dubai (pre-open). Both writes go to the same cache file.
+  The intelligence-sync.plist rsyncs the cache to DigitalOcean at 16:50 Dubai.
+  The post-close refresh is rsynced by a second sync triggered here.
+
+  INSTALL:
+    cp ops/launchd/com.decifer.counter-thesis-refresh.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.decifer.counter-thesis-refresh.plist
+
+  KICKSTART (run immediately):
+    launchctl kickstart -p gui/$(id -u)/com.decifer.counter-thesis-refresh
+
+  VIEW LOGS:
+    tail -f /tmp/decifer-counter-thesis-refresh.log
+
+  UNINSTALL:
+    launchctl unload ~/Library/LaunchAgents/com.decifer.counter-thesis-refresh.plist
+    rm ~/Library/LaunchAgents/com.decifer.counter-thesis-refresh.plist
+-->
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>com.decifer.counter-thesis-refresh</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>
+      cd "/Users/amitchopra/Desktop/decifer trading" &amp;&amp;
+      /usr/local/bin/python3.11 -c "
+from counter_thesis_engine import build_and_cache_counter_thesis
+import json
+d = build_and_cache_counter_thesis()
+print('counter-thesis refreshed:', d['data_freshness'], len(d['structural_conflicts']), 'conflicts')
+" &amp;&amp;
+      bash scripts/sync_intelligence_to_cloud.sh
+    </string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/amitchopra/Desktop/decifer trading</string>
+
+  <!-- 01:00 Monday–Friday Dubai local time = 21:00 UTC = 17:00 ET (post NYSE close) -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>1</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>1</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>1</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>1</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>1</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/decifer-counter-thesis-refresh.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/decifer-counter-thesis-refresh.err</string>
+
+  <key>KeepAlive</key>
+  <false/>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+</dict>
+</plist>
