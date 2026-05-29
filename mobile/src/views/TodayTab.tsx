@@ -12,6 +12,7 @@ import {
   TrendingDown,
   CalendarDays,
   BarChart2,
+  ChevronDown,
 } from "lucide-react";
 import type { MarketNowPayload, TtgSymbolCard } from "@/lib/customerApi";
 import { fetchTtgThemes, fetchTtgThemeDetail } from "@/lib/customerApi";
@@ -34,6 +35,7 @@ import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory"
 import type { TapeEntry } from "@/app/api/market-tape/route";
 import type { MarketMoversPayload, Mover } from "@/app/api/market-movers/route";
 import type { MorningBriefPayload, EconEvent, EarningsItem, AnalystItem } from "@/app/api/morning-brief/route";
+import type { NewsItem } from "@/app/api/market-news/route";
 import { fetchUniverseSymbols } from "@/lib/customerApi";
 
 // ── Regime colour palette ─────────────────────────────────────────────────────
@@ -1214,6 +1216,159 @@ function WhereLookingSection({
   );
 }
 
+// ── News section ──────────────────────────────────────────────────────────────
+
+const POSITIVE_WORDS = ["beat", "surges", "surge", "rally", "rallies", "gain", "gains", "rises", "jumps", "record", "upgrade", "upgraded", "strong", "bullish", "outperform", "tops", "exceed", "exceeds", "boosts"];
+const NEGATIVE_WORDS = ["miss", "misses", "falls", "drops", "drop", "cuts", "cut", "weak", "loss", "losses", "downgrade", "downgraded", "bearish", "concern", "warning", "warns", "slump", "slumps", "disappoints", "trails", "lowers"];
+
+function newsItemSentiment(title: string): "positive" | "negative" | "neutral" {
+  const lower = title.toLowerCase();
+  const pos = POSITIVE_WORDS.some(w => lower.includes(w));
+  const neg = NEGATIVE_WORDS.some(w => lower.includes(w));
+  if (pos && !neg) return "positive";
+  if (neg && !pos) return "negative";
+  return "neutral";
+}
+
+function formatNewsAge(minutesAgo: number): string {
+  if (minutesAgo < 60) return `${minutesAgo}m`;
+  const h = Math.floor(minutesAgo / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+function NewsSection({ ttgSymbolMap }: { ttgSymbolMap: Map<string, { theme_label: string }> }) {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/market-news")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.news) setNews(d.news); })
+      .catch(() => {});
+  }, []);
+
+  if (news.length === 0) return null;
+
+  // Sort: TTG-connected symbols first, then by recency
+  const sorted = [...news].sort((a, b) => {
+    const aInTtg = a.symbol ? ttgSymbolMap.has(a.symbol) : false;
+    const bInTtg = b.symbol ? ttgSymbolMap.has(b.symbol) : false;
+    if (aInTtg && !bInTtg) return -1;
+    if (!aInTtg && bInTtg) return 1;
+    return a.minutesAgo - b.minutesAgo;
+  });
+
+  const displayed = expanded ? sorted : sorted.slice(0, 6);
+
+  // Sentiment counts
+  const posCount = news.filter(n => newsItemSentiment(n.title) === "positive").length;
+  const negCount = news.filter(n => newsItemSentiment(n.title) === "negative").length;
+  const neutCount = news.length - posCount - negCount;
+
+  return (
+    <section>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: "#f97316" }}>
+          Market news
+        </p>
+        <div className="flex items-center gap-2">
+          {posCount > 0 && (
+            <span className="text-[10px] font-semibold" style={{ color: "#34d399" }}>
+              {posCount}▲
+            </span>
+          )}
+          {negCount > 0 && (
+            <span className="text-[10px] font-semibold" style={{ color: "#f87171" }}>
+              {negCount}▼
+            </span>
+          )}
+          {neutCount > 0 && (
+            <span className="text-[10px] font-semibold text-slate-600">
+              {neutCount}–
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* News list */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: "#141b26", border: "1px solid rgba(255,255,255,0.07)" }}>
+        {displayed.map((item, i) => {
+          const sentiment = newsItemSentiment(item.title);
+          const sentColor = sentiment === "positive" ? "#34d399" : sentiment === "negative" ? "#f87171" : "#475569";
+          const sentIcon = sentiment === "positive" ? "▲" : sentiment === "negative" ? "▼" : "–";
+          const themeInfo = item.symbol ? ttgSymbolMap.get(item.symbol) : null;
+          const isLast = i === displayed.length - 1;
+
+          return (
+            <div
+              key={i}
+              className="px-4 py-3"
+              style={{ borderBottom: !isLast || !expanded ? "1px solid rgba(255,255,255,0.04)" : "none" }}
+            >
+              <div className="flex items-start gap-2.5">
+                {/* Sentiment indicator */}
+                <span
+                  className="text-[11px] font-black shrink-0 mt-0.5 w-4 text-center"
+                  style={{ color: sentColor }}
+                >
+                  {sentIcon}
+                </span>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  {/* Meta row: age + ticker + theme */}
+                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                    <span className="text-[10px]" style={{ color: "#475569" }}>
+                      {formatNewsAge(item.minutesAgo)}
+                    </span>
+                    {item.symbol && (
+                      <span
+                        className="text-[9px] font-black px-1.5 py-0.5 rounded"
+                        style={{ background: "rgba(255,255,255,0.06)", color: "#e2e8f0" }}
+                      >
+                        {item.symbol}
+                      </span>
+                    )}
+                    {themeInfo && (
+                      <span
+                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                        style={{ background: "rgba(249,115,22,0.1)", color: "#fb923c" }}
+                      >
+                        {themeInfo.theme_label}
+                      </span>
+                    )}
+                  </div>
+                  {/* Headline */}
+                  <p className="text-[12px] text-slate-200 leading-snug">{item.title}</p>
+                  {/* Source */}
+                  <p className="text-[10px] text-slate-600 mt-0.5">{item.source}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Show more / less toggle */}
+        {news.length > 6 && (
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="w-full px-4 py-3 flex items-center justify-center gap-1 text-[11px] font-semibold transition-all active:scale-[0.98]"
+            style={{ color: "#64748b", borderTop: "1px solid rgba(255,255,255,0.04)" }}
+          >
+            <ChevronDown
+              size={12}
+              style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}
+            />
+            {expanded ? "Show less" : `Show ${news.length - 6} more`}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 // ── Today's Agenda ────────────────────────────────────────────────────────────
@@ -1656,16 +1811,16 @@ export default function TodayTab({
           onAskAbout={onAskAbout}
         />
 
+        {/* ── G: Market news ────────────────────────────────────────────── */}
+        <NewsSection ttgSymbolMap={ttgData?.symbolMap ?? new Map()} />
+
         {/* ── Disclaimer ─────────────────────────────────────────────────── */}
         <div className="rounded-xl p-4 text-center"
           style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            Market intelligence only. Not financial advice. No trade execution.
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            {data.data_entitlement_note ?? "Market intelligence only. Not financial advice. No trade execution."}
           </p>
-          {data.data_entitlement_note && (
-            <p className="text-[10px] text-slate-500 mt-1">{data.data_entitlement_note}</p>
-          )}
-          <p className="text-[10px] text-slate-700 mt-1">
+          <p className="text-[10px] text-slate-600 mt-1">
             v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
           </p>
         </div>
