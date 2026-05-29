@@ -164,17 +164,25 @@ function deriveTapeSnapshot(tape: TapeEntry[]): TapeSnapshot {
   const by: Record<string, TapeEntry> = {};
   for (const t of tape) by[t.sym] = t;
   return {
-    spy_pct:   by["SPY"]?.changePct ?? null,
-    qqq_pct:   by["QQQ"]?.changePct ?? null,
-    dia_pct:   by["DIA"]?.changePct ?? null,
-    iwm_pct:   by["IWM"]?.changePct ?? null,
-    tlt_pct:   by["TLT"]?.changePct ?? null,
-    gld_pct:   by["GLD"]?.changePct ?? null,
-    uso_pct:   by["USO"]?.changePct ?? null,
-    dxy_pct:   by["UUP"]?.changePct   ?? null,
+    spy_pct:   by["SPY"]?.changePct  ?? null,
+    qqq_pct:   by["QQQ"]?.changePct  ?? null,
+    dia_pct:   by["DIA"]?.changePct  ?? null,
+    iwm_pct:   by["IWM"]?.changePct  ?? null,
+    tlt_pct:   by["TLT"]?.changePct  ?? null,
+    gld_pct:   by["GLD"]?.changePct  ?? null,
+    uso_pct:   by["USO"]?.changePct  ?? null,
+    dxy_pct:   by["UUP"]?.changePct  ?? null,
     es_pct:    by["ESUSD"]?.changePct ?? null,
     nq_pct:    by["NQUSD"]?.changePct ?? null,
-    vix_level: by["VIX"]?.level       ?? null,
+    vix_level: by["VIX"]?.level      ?? null,
+    xlf_pct:   by["XLF"]?.changePct  ?? null,
+    xlk_pct:   by["XLK"]?.changePct  ?? null,
+    xle_pct:   by["XLE"]?.changePct  ?? null,
+    xlv_pct:   by["XLV"]?.changePct  ?? null,
+    xli_pct:   by["XLI"]?.changePct  ?? null,
+    xlu_pct:   by["XLU"]?.changePct  ?? null,
+    xlb_pct:   by["XLB"]?.changePct  ?? null,
+    xlre_pct:  by["XLRE"]?.changePct ?? null,
   };
 }
 
@@ -397,6 +405,40 @@ function ForceStorySheet({
   );
 }
 
+// ── Regime label → plain-English description ─────────────────────────────────
+
+const REGIME_DESCRIPTIONS: Record<string, string> = {
+  "MOMENTUM BULL":  "Broad market momentum is strong — risk appetite is high.",
+  "STRONG RALLY":   "Markets are rallying broadly — equities are in demand.",
+  "BULLISH":        "Conditions favour buyers — growth themes are constructive.",
+  "RELIEF RALLY":   "A short-term bounce is underway — may not signal a full trend change.",
+  "RANGE BOUND":    "Markets are directionless — no dominant force has emerged.",
+  "RISK-OFF":       "Investors are pulling back from risk — defensive names may outperform.",
+  "FEAR ELEVATED":  "Volatility is high and market stress is elevated — smaller positions are prudent.",
+  "DISTRIBUTION":   "Sellers are active — smart money may be reducing exposure.",
+  "BEARISH":        "Conditions favour sellers — downside momentum is in control.",
+  "TECH SELLOFF":   "Technology and growth stocks are under pressure.",
+  "SELLOFF":        "Broad selling is underway — risk assets are falling.",
+  "TRENDING BEAR":  "The market is in a sustained downtrend — caution is warranted.",
+  "CAPITULATION":   "Extreme fear — markets may be near a bottom, but risk is very high.",
+};
+
+function regimeDescription(label: string | undefined, fallback: string): string {
+  if (!label) return fallback;
+  // Try exact match on the technical part of the label first (e.g. "FEAR ELEVATED")
+  const upper = label.toUpperCase().split("—")[0].trim();
+  if (REGIME_DESCRIPTIONS[upper]) return REGIME_DESCRIPTIONS[upper];
+  // Substring match for broad direction embedded in intelligence-layer labels
+  const lower = label.toLowerCase();
+  if (lower.includes("risk-on") || lower.includes("bull") || lower.includes("rally"))
+    return "Growth and cyclical themes are gaining — risk appetite is constructive.";
+  if (lower.includes("risk-off") || lower.includes("bear") || lower.includes("selloff") || lower.includes("fear"))
+    return "Investors are pulling back from risk — defensive names may outperform.";
+  if (lower.includes("mixed") || lower.includes("range") || lower.includes("distribution"))
+    return "Conflicting forces are active — no clear directional bias has emerged.";
+  return fallback;
+}
+
 // ── Hero header ───────────────────────────────────────────────────────────────
 
 interface HeroHeaderProps {
@@ -420,7 +462,7 @@ function HeroHeader({
   freshnessState,
   onRefresh,
 }: HeroHeaderProps) {
-  const ms = buildCustomerMarketStory(data, story);
+  const ms = buildCustomerMarketStory(data, story, tapeSnapshot);
   const c  = regimeColors(ms.regime.state);
 
   const isMktOpen = clock.session === "open";
@@ -502,21 +544,26 @@ function HeroHeader({
         {/* ── Divider ── */}
         <div className="mb-4" style={{ height: "1px", background: `${c.border}20` }} />
 
-        {/* ── Row 2: regime badge + refresh ── */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: sessionDot }} />
-            <span
-              className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
-              style={{ background: c.badge, color: c.text }}
-            >
-              {ms.regime.label}
-            </span>
+        {/* ── Row 2: regime badge + plain-English description + refresh ── */}
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: sessionDot }} />
+              <span
+                className="text-[10px] font-bold px-2.5 py-0.5 rounded-full tracking-wide"
+                style={{ background: c.badge, color: c.text }}
+              >
+                {data.market_regime_label ?? ms.regime.label}
+              </span>
+            </div>
+            <p className="text-[11px] leading-snug ml-4" style={{ color: `${c.text}99` }}>
+              {regimeDescription(data.market_regime_label, ms.regime.description)}
+            </p>
           </div>
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-1 text-[10px] text-slate-600 transition-all active:scale-95"
+            className="flex items-center gap-1 text-[10px] text-slate-600 transition-all active:scale-95 ml-3 mt-0.5 flex-shrink-0"
           >
             <RefreshCw size={9} className={isRefreshing ? "animate-spin" : ""} />
             {isRefreshing ? "…" : freshnessTimeCopy}
@@ -575,10 +622,52 @@ function HeroHeader({
                 )}
               </div>
               <p className="text-[12px] text-slate-200 mt-3">{ms.macro_label}</p>
+              {ms.regime_explanation && (
+                <p className="text-[12px] leading-relaxed mt-2" style={{ color: "#94a3b8" }}>
+                  {ms.regime_explanation}
+                </p>
+              )}
             </div>
           );
         })()}
       </div>
+
+      {/* ── Sector strip ── */}
+      {(() => {
+        const sectors: Array<{ label: string; pct: number | null }> = [
+          { label: "Financials",  pct: tapeSnapshot.xlf_pct  },
+          { label: "Tech",        pct: tapeSnapshot.xlk_pct  },
+          { label: "Energy",      pct: tapeSnapshot.xle_pct  },
+          { label: "Health Care", pct: tapeSnapshot.xlv_pct  },
+          { label: "Industrials", pct: tapeSnapshot.xli_pct  },
+          { label: "Utilities",   pct: tapeSnapshot.xlu_pct  },
+          { label: "Materials",   pct: tapeSnapshot.xlb_pct  },
+          { label: "Real Estate", pct: tapeSnapshot.xlre_pct },
+        ];
+        const hasAny = sectors.some(s => s.pct != null);
+        if (!hasAny) return null;
+        const pctC = (v: number | null) =>
+          v == null ? "#475569" : v > 0 ? "#34d399" : v < 0 ? "#f87171" : "#64748b";
+        const pctS = (v: number | null) => (v != null && v > 0 ? "+" : "");
+        return (
+          <div className="overflow-x-auto" style={{ borderTop: `1px solid ${c.border}20` }}>
+            <div className="flex gap-px py-2 px-4" style={{ minWidth: "max-content" }}>
+              {sectors.map(s => (
+                <div
+                  key={s.label}
+                  className="flex flex-col items-center px-3 py-1.5 rounded"
+                  style={{ background: "rgba(255,255,255,0.03)", minWidth: "72px" }}
+                >
+                  <p className="text-[9px] text-slate-500 uppercase tracking-wide mb-0.5 whitespace-nowrap">{s.label}</p>
+                  <p className="text-[12px] font-bold leading-none" style={{ color: pctC(s.pct) }}>
+                    {s.pct != null ? `${pctS(s.pct)}${s.pct.toFixed(2)}%` : "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ height: "1px", background: `${c.border}25` }} />
     </div>
@@ -606,7 +695,7 @@ function MarketNarrative({
   onAskAbout?: (ctx: string) => void;
   onGoToForces?: () => void;
 }) {
-  const ms2 = buildCustomerMarketStory(data, story);
+  const ms2 = buildCustomerMarketStory(data, story, tapeSnapshot);
   const isOpen = clock.session === "open";
   const spy = tapeSnapshot.spy_pct;
   const qqq = tapeSnapshot.qqq_pct;

@@ -12,17 +12,28 @@ export interface TapeEntry {
   level: number | null;
 }
 
+export type SectorTapeType = "sector";
+
 const ETF_TAPE: Array<{ sym: string; label: string; type: TapeType }> = [
-  { sym: "SPY", label: "S&P 500",    type: "equity"    },
-  { sym: "QQQ", label: "Nasdaq",     type: "equity"    },
-  { sym: "DIA", label: "Dow",        type: "equity"    },
-  { sym: "IWM", label: "Small Caps", type: "equity"    },
-  { sym: "TLT", label: "Bonds",      type: "rates"     },
-  { sym: "GLD", label: "Gold",       type: "safe_haven"},
-  { sym: "USO", label: "Oil",        type: "commodity" },
-  { sym: "UUP", label: "US Dollar",  type: "dollar"    },
-  { sym: "ESUSD", label: "S&P Futures",    type: "equity" as TapeType },
-  { sym: "NQUSD", label: "Nasdaq Futures", type: "equity" as TapeType },
+  { sym: "SPY",   label: "S&P 500",        type: "equity"    },
+  { sym: "QQQ",   label: "Nasdaq",         type: "equity"    },
+  { sym: "DIA",   label: "Dow",            type: "equity"    },
+  { sym: "IWM",   label: "Small Caps",     type: "equity"    },
+  { sym: "TLT",   label: "Bonds",          type: "rates"     },
+  { sym: "GLD",   label: "Gold",           type: "safe_haven"},
+  { sym: "USO",   label: "Oil",            type: "commodity" },
+  { sym: "UUP",   label: "US Dollar",      type: "dollar"    },
+  { sym: "ESUSD", label: "S&P Futures",    type: "equity"    },
+  { sym: "NQUSD", label: "Nasdaq Futures", type: "equity"    },
+  // Sector ETFs
+  { sym: "XLF",   label: "Financials",     type: "equity"    },
+  { sym: "XLK",   label: "Technology",     type: "equity"    },
+  { sym: "XLE",   label: "Energy",         type: "equity"    },
+  { sym: "XLV",   label: "Health Care",    type: "equity"    },
+  { sym: "XLI",   label: "Industrials",    type: "equity"    },
+  { sym: "XLU",   label: "Utilities",      type: "equity"    },
+  { sym: "XLB",   label: "Materials",      type: "equity"    },
+  { sym: "XLRE",  label: "Real Estate",    type: "equity"    },
 ];
 
 export async function GET() {

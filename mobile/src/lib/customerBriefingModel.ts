@@ -53,6 +53,7 @@ export function buildCustomerRegime(
 export interface CustomerMarketStory {
   regime: CustomerMarketRegime;
   macro_label: string;
+  regime_explanation: string | null;
   headline: string;
   summary: string;
   supporting_bullets: string[];
@@ -131,9 +132,103 @@ function buildSupportingBullets(
   return bullets.slice(0, 3);
 }
 
+// ── Regime explanation — the WHY behind the badge ─────────────────────────────
+
+// Plain-English explanations for when a negative force is active but price action
+// looks constructive (or vice versa). These explain the *tension*, not just the label.
+const NEGATIVE_DRIVER_EXPLANATIONS: Record<string, string> = {
+  geopolitical_risk_rising:
+    "Defence stocks are outpacing the broader market — investors are hedging geopolitical risk even as equities hold up. That divergence is the risk-off signal, not the headline index level.",
+  oil_supply_shock:
+    "Oil is falling sharply, pointing to a potential supply disruption or de-escalation in a conflict zone. Energy names are under pressure regardless of the broader market direction.",
+  credit_stress_rising:
+    "Credit spreads are widening — corporate borrowing conditions are tightening. That can be an early stress signal even when equity indices look calm.",
+  yields_rising:
+    "Bond yields are climbing, raising the cost of capital. That's a structural headwind for growth stocks even if the market is resilient near-term.",
+  smh_tactical_weakness:
+    "Semiconductor momentum is fading near-term despite the broader AI narrative — the sector is digesting recent gains.",
+  reits_falling_yield:
+    "Rising long-term yields are compressing REIT dividend spreads, putting pressure on real estate valuations.",
+};
+
+const POSITIVE_DRIVER_EXPLANATIONS: Record<string, string> = {
+  risk_on_rotation:
+    "Capital is rotating into growth and cyclical names — a sign of improving confidence even as some structural headwinds remain.",
+  futures_risk_on:
+    "Equity futures pointed higher overnight, suggesting institutional buyers positioned constructively heading into the session.",
+  yields_falling:
+    "Falling yields are reducing the discount rate on future earnings, which supports long-duration growth stocks and rate-sensitive sectors.",
+  ai_capex_growth:
+    "Hyperscaler AI infrastructure commitments are driving sustained demand for power, semiconductors, and data centre capacity.",
+  ai_compute_demand:
+    "AI compute demand is accelerating — GPU and data centre capacity remain in short supply relative to what model training requires.",
+  small_cap_risk_on:
+    "Risk appetite is broadening to smaller companies — a sign the rally has wider participation than mega-cap names alone.",
+  credit_stress_easing:
+    "Credit spreads are tightening, reducing perceived default risk and improving broader borrowing conditions.",
+  gold_safe_haven_bid:
+    "Gold demand is elevated as investors seek a store of value amid macro uncertainty or currency risk.",
+};
+
+const NEGATIVE_DRIVER_SET = new Set(Object.keys(NEGATIVE_DRIVER_EXPLANATIONS));
+const POSITIVE_DRIVER_SET = new Set(Object.keys(POSITIVE_DRIVER_EXPLANATIONS));
+
+export function buildRegimeExplanation(
+  payload: MarketNowPayload,
+  story: CustomerStory,
+  tape?: TapeSnapshot,
+): string | null {
+  // 1. Known conflicts from the backend are the highest-quality authored copy — use them first.
+  const conflict = (payload.known_conflicts ?? [])[0];
+  if (conflict && conflict.length > 10) {
+    return conflict.length > 240 ? conflict.slice(0, 237) + "…" : conflict;
+  }
+
+  const drivers = payload.key_drivers ?? [];
+  const state = story.market_state;
+  const spyUp = tape?.spy_pct != null && tape.spy_pct > 0.1;
+  const spyDown = tape?.spy_pct != null && tape.spy_pct < -0.1;
+
+  // 2. Regime-tape contradiction: label says risk-off but price action is constructive.
+  if (state === "risk-off" && spyUp) {
+    const negDriver = drivers.find(d => NEGATIVE_DRIVER_SET.has(d));
+    if (negDriver) return NEGATIVE_DRIVER_EXPLANATIONS[negDriver];
+    return "Markets are up today but a structural headwind is active — the risk-off signal is coming from under the surface, not the headline index.";
+  }
+
+  // 3. Label says risk-on but price is falling — explain what's supporting the call.
+  if (state === "risk-on" && spyDown) {
+    const posDriver = drivers.find(d => POSITIVE_DRIVER_SET.has(d));
+    if (posDriver) return POSITIVE_DRIVER_EXPLANATIONS[posDriver];
+    return "Structural risk-on signals are active even as equities pull back — the underlying driver may reflect institutional positioning ahead of price.";
+  }
+
+  // 4. Mixed: both positive and negative forces are in play — explain the tension.
+  if (state === "mixed") {
+    const negDriver = drivers.find(d => NEGATIVE_DRIVER_SET.has(d));
+    const posDriver = drivers.find(d => POSITIVE_DRIVER_SET.has(d));
+    if (negDriver && posDriver) {
+      const neg = NEGATIVE_DRIVER_EXPLANATIONS[negDriver];
+      const pos = POSITIVE_DRIVER_EXPLANATIONS[posDriver];
+      // First sentence of positive driver + lead-in to negative
+      return `${pos.split(".")[0]}. At the same time, ${neg.charAt(0).toLowerCase() + neg.slice(1)}`;
+    }
+    if (negDriver) return NEGATIVE_DRIVER_EXPLANATIONS[negDriver];
+    if (posDriver) return POSITIVE_DRIVER_EXPLANATIONS[posDriver];
+  }
+
+  // 5. Reinforcing — explain the top driver briefly.
+  const topDriver = drivers[0];
+  if (topDriver && POSITIVE_DRIVER_EXPLANATIONS[topDriver]) return POSITIVE_DRIVER_EXPLANATIONS[topDriver];
+  if (topDriver && NEGATIVE_DRIVER_EXPLANATIONS[topDriver]) return NEGATIVE_DRIVER_EXPLANATIONS[topDriver];
+
+  return null;
+}
+
 export function buildCustomerMarketStory(
   payload: MarketNowPayload,
   story: CustomerStory,
+  tape?: TapeSnapshot,
 ): CustomerMarketStory {
   const regime = buildCustomerRegime(story.market_state);
   const macro_label = resolveMacroLabel(
@@ -150,6 +245,7 @@ export function buildCustomerMarketStory(
   return {
     regime,
     macro_label,
+    regime_explanation: buildRegimeExplanation(payload, story, tape),
     headline: story.headline,
     summary: story.summary,
     supporting_bullets: buildSupportingBullets(story, payload),
@@ -508,6 +604,15 @@ export interface TapeSnapshot {
   es_pct:    number | null;  // ESUSD — S&P futures
   nq_pct:    number | null;  // NQUSD — Nasdaq futures
   vix_level: number | null;
+  // Sector ETFs
+  xlf_pct:   number | null;  // Financials
+  xlk_pct:   number | null;  // Technology
+  xle_pct:   number | null;  // Energy
+  xlv_pct:   number | null;  // Health Care
+  xli_pct:   number | null;  // Industrials
+  xlu_pct:   number | null;  // Utilities
+  xlb_pct:   number | null;  // Materials
+  xlre_pct:  number | null;  // Real Estate
 }
 
 // ── Narrative Paragraph ────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ import {
   buildCustomerForces,
   buildConnectionTree,
   buildContextualSuggestions,
+  buildRegimeExplanation,
   containsProhibitedTerm,
   resolveForceThemeLabel,
   normalizeForceId,
@@ -505,6 +506,14 @@ function makeTape(overrides: Partial<TapeSnapshot> = {}): TapeSnapshot {
     es_pct:    null,
     nq_pct:    null,
     vix_level: null,
+    xlf_pct:   null,
+    xlk_pct:   null,
+    xle_pct:   null,
+    xlv_pct:   null,
+    xli_pct:   null,
+    xlu_pct:   null,
+    xlb_pct:   null,
+    xlre_pct:  null,
     ...overrides,
   };
 }
@@ -974,5 +983,103 @@ describe("CustomerBottomNav — M14B", () => {
   it("Ask is the center item", () => {
     const center = NAV_ITEMS.find(n => n.center);
     expect(center?.id).toBe("ask");
+  });
+});
+
+// ── buildRegimeExplanation ────────────────────────────────────────────────────
+
+describe("buildRegimeExplanation", () => {
+  const tape = (spy: number | null) => ({
+    spy_pct: spy, qqq_pct: null, dia_pct: null, iwm_pct: null,
+    tlt_pct: null, gld_pct: null, uso_pct: null, dxy_pct: null,
+    es_pct: null, nq_pct: null, vix_level: null,
+    xlf_pct: null, xlk_pct: null, xle_pct: null, xlv_pct: null, xli_pct: null,
+    xlu_pct: null, xlb_pct: null, xlre_pct: null,
+  });
+
+  it("surfaces known_conflicts verbatim when present (highest priority)", () => {
+    const payload = makePayload({
+      key_drivers: ["geopolitical_risk_rising", "risk_on_rotation"],
+      known_conflicts: ["Defence is still leading but oil is falling on de-escalation hopes."],
+    });
+    const result = buildRegimeExplanation(payload, makeStory({ market_state: "risk-off" }), tape(0.5));
+    expect(result).toBe("Defence is still leading but oil is falling on de-escalation hopes.");
+  });
+
+  it("truncates very long known_conflicts to 240 chars with ellipsis", () => {
+    const long = "A".repeat(250);
+    const payload = makePayload({ known_conflicts: [long] });
+    const result = buildRegimeExplanation(payload, makeStory());
+    expect(result).not.toBeNull();
+    expect(result!.length).toBeLessThanOrEqual(240);
+    expect(result!.endsWith("…")).toBe(true);
+  });
+
+  it("risk-off regime + positive SPY → explains the negative driver", () => {
+    const payload = makePayload({ key_drivers: ["geopolitical_risk_rising"] });
+    const result = buildRegimeExplanation(payload, makeStory({ market_state: "risk-off" }), tape(0.3));
+    expect(result).not.toBeNull();
+    expect(result!.toLowerCase()).toMatch(/defence|geopolit/);
+  });
+
+  it("risk-off + positive SPY + oil_supply_shock → explains oil", () => {
+    const payload = makePayload({ key_drivers: ["oil_supply_shock"] });
+    const result = buildRegimeExplanation(payload, makeStory({ market_state: "risk-off" }), tape(0.2));
+    expect(result).not.toBeNull();
+    expect(result!.toLowerCase()).toMatch(/oil|energy/);
+  });
+
+  it("risk-off + flat SPY (within threshold) → does not trigger contradiction path", () => {
+    const payload = makePayload({ key_drivers: ["geopolitical_risk_rising"] });
+    // spy_pct = 0.05 is below threshold of 0.1 — should not trigger contradiction
+    const result = buildRegimeExplanation(payload, makeStory({ market_state: "risk-off" }), tape(0.05));
+    // Falls through to reinforcing path — geopolitical is in NEGATIVE_DRIVER_EXPLANATIONS so still returned
+    expect(result).not.toBeNull();
+  });
+
+  it("risk-on + negative SPY → explains the positive driver", () => {
+    const payload = makePayload({ key_drivers: ["risk_on_rotation"] });
+    const result = buildRegimeExplanation(payload, makeStory({ market_state: "risk-on" }), tape(-0.5));
+    expect(result).not.toBeNull();
+    expect(result!.toLowerCase()).toMatch(/rotation|growth|cyclical/);
+  });
+
+  it("mixed state with both positive and negative drivers → surfaces tension", () => {
+    const payload = makePayload({ key_drivers: ["risk_on_rotation", "geopolitical_risk_rising"] });
+    const result = buildRegimeExplanation(payload, makeStory({ market_state: "mixed" }), tape(null));
+    expect(result).not.toBeNull();
+    expect(result!.toLowerCase()).toMatch(/rotation|growth/);
+    expect(result!.toLowerCase()).toMatch(/defence|geopolit/);
+  });
+
+  it("no drivers, no tape, no conflicts → returns null", () => {
+    const result = buildRegimeExplanation(makePayload(), makeStory({ market_state: "monitoring" }));
+    expect(result).toBeNull();
+  });
+
+  it("top positive driver with no tape → returns reinforcing explanation", () => {
+    const payload = makePayload({ key_drivers: ["ai_capex_growth"] });
+    const result = buildRegimeExplanation(payload, makeStory({ market_state: "risk-on" }));
+    expect(result).not.toBeNull();
+    expect(result!.toLowerCase()).toMatch(/hyperscaler|infrastructure|ai/i);
+  });
+
+  it("explanation never contains prohibited terms", () => {
+    const scenarios = [
+      { drivers: ["geopolitical_risk_rising", "risk_on_rotation"], state: "mixed" as const, spy: 0.3 },
+      { drivers: ["oil_supply_shock"], state: "risk-off" as const, spy: 0.5 },
+      { drivers: ["risk_on_rotation", "futures_risk_on"], state: "risk-on" as const, spy: -0.4 },
+    ];
+    for (const s of scenarios) {
+      const payload = makePayload({ key_drivers: s.drivers });
+      const result = buildRegimeExplanation(payload, makeStory({ market_state: s.state }), tape(s.spy));
+      if (result) expect(containsProhibitedTerm(result)).toBe(false);
+    }
+  });
+
+  it("buildCustomerMarketStory includes regime_explanation field", () => {
+    const payload = makePayload({ key_drivers: ["geopolitical_risk_rising"] });
+    const ms = buildCustomerMarketStory(payload, makeStory({ market_state: "risk-off" }), tape(0.3));
+    expect("regime_explanation" in ms).toBe(true);
   });
 });
