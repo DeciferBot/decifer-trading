@@ -398,6 +398,17 @@ export async function GET() {
     .toISOString()
     .slice(0, 10);
 
+  // Quick probe to diagnose production fetch failures
+  let _probe: unknown = null;
+  try {
+    const probeUrl = `${STABLE}/historical-price-eod/full?symbol=SPY&from=${fromDate}&apikey=${FMP_KEY}`;
+    const pr = await fetch(probeUrl, { cache: "no-store" });
+    const pbody = await pr.text();
+    _probe = { status: pr.status, len: pbody.length, sample: pbody.slice(0, 120) };
+  } catch (e) {
+    _probe = { error: String(e) };
+  }
+
   const [closesResult, vixResult] = await Promise.allSettled([
     fetchCloses(fromDate),
     fetchVix(fromDate),
@@ -442,7 +453,7 @@ export async function GET() {
     ts: new Date().toISOString(),
   };
 
-  return NextResponse.json(payload, {
-    headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=60" },
+  return NextResponse.json({ ...payload, _probe, _fromDate: fromDate }, {
+    headers: { "Cache-Control": "no-store" },
   });
 }
