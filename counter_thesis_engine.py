@@ -235,18 +235,29 @@ _LIBRARY: list[dict[str, Any]] = [
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _fetch_fmp_metrics(symbols: list[str]) -> dict[str, dict]:
-    """Pull key_metrics_ttm and revenue_growth for each symbol via fmp_client."""
+    """Pull key_metrics_ttm and revenue_growth for each symbol concurrently via fmp_client."""
     try:
         import fmp_client
-        results: dict[str, dict] = {}
-        for sym in symbols:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _fetch_one(sym: str) -> tuple[str, dict]:
             try:
                 metrics = fmp_client.get_key_metrics_ttm(sym) or {}
                 growth = fmp_client.get_revenue_growth(sym) or {}
-                results[sym] = {"metrics": metrics, "growth": growth}
+                return sym, {"metrics": metrics, "growth": growth}
             except Exception as e:
                 log.debug("FMP fetch failed for %s: %s", sym, e)
-                results[sym] = {}
+                return sym, {}
+
+        results: dict[str, dict] = {}
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(_fetch_one, sym): sym for sym in symbols}
+            for future in as_completed(futures, timeout=20):
+                try:
+                    sym, data = future.result()
+                    results[sym] = data
+                except Exception:
+                    results[futures[future]] = {}
         return results
     except ImportError:
         log.warning("fmp_client not available — using empty metrics")
