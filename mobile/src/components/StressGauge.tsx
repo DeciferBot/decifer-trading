@@ -1,6 +1,6 @@
 "use client";
 
-import type { MarketStressPayload } from "@/app/api/market-stress/route";
+import type { MarketStressPayload, StructuralRisk, StructuralRiskLevel } from "@/app/api/market-stress/route";
 
 // ── SVG helpers ───────────────────────────────────────────────────────────────
 // All angles are clockwise degrees from north (12 o'clock)
@@ -81,6 +81,77 @@ function DimBar({
       >
         {label}
       </span>
+    </div>
+  );
+}
+
+// ── Structural Risk panel ─────────────────────────────────────────────────────
+
+const STATUS_COLOR: Record<StructuralRiskLevel, string> = {
+  normal:   "#10b981",
+  watch:    "#eab308",
+  elevated: "#f97316",
+  critical: "#ef4444",
+};
+
+const STATUS_DOT_BG: Record<StructuralRiskLevel, string> = {
+  normal:   "rgba(16,185,129,0.15)",
+  watch:    "rgba(234,179,8,0.15)",
+  elevated: "rgba(249,115,22,0.15)",
+  critical: "rgba(239,68,68,0.15)",
+};
+
+function StructuralRiskPanel({ risk }: { risk: StructuralRisk }) {
+  return (
+    <div
+      className="mx-4 mb-4 rounded-xl overflow-hidden"
+      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}
+    >
+      {/* Header */}
+      <div className="px-3 pt-3 pb-2 flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+          Structural Risk
+        </p>
+        <span
+          className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+          style={{ background: `${risk.overall_color}18`, color: risk.overall_color }}
+        >
+          {risk.overall}
+        </span>
+      </div>
+
+      {/* Items */}
+      <div className="px-3 pb-2 space-y-2">
+        {risk.items.map((item, i) => (
+          <div key={i} className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ background: STATUS_COLOR[item.status] }}
+              />
+              <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                {item.label}
+              </span>
+            </div>
+            <span
+              className="text-[10px] font-medium text-right truncate"
+              style={{ color: STATUS_COLOR[item.status] }}
+            >
+              {item.reading}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Context */}
+      <div
+        className="px-3 py-2"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+      >
+        <p className="text-[10px] text-slate-500 leading-relaxed italic">
+          {risk.context}
+        </p>
+      </div>
     </div>
   );
 }
@@ -319,14 +390,19 @@ export default function StressGauge({ data }: { data: MarketStressPayload }) {
 
       {/* ── Explanation ── */}
       <div
-        className="mx-4 mb-4 px-3 py-2.5 rounded-xl"
+        className="mx-4 mb-3 px-3 py-2.5 rounded-xl"
         style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
       >
         <p className="text-[11px] text-slate-300 leading-relaxed">{explanation}</p>
         <p className="text-[10px] text-slate-600 mt-1.5">
-          {confirmation_count} of 5 dimensions confirming · shadow mode only
+          {confirmation_count} of 8 dimensions confirming · shadow mode only
         </p>
       </div>
+
+      {/* ── Structural Risk panel ── */}
+      {data.structural_risk && (
+        <StructuralRiskPanel risk={data.structural_risk} />
+      )}
     </div>
   );
 }

@@ -21,12 +21,29 @@ export interface StressDimension {
   confirming: boolean;
 }
 
+export type StructuralRiskLevel = "normal" | "watch" | "elevated" | "critical";
+export type StructuralRiskOverall = "low" | "moderate" | "elevated" | "high";
+
+export interface StructuralRiskItem {
+  label: string;
+  reading: string;
+  status: StructuralRiskLevel;
+}
+
+export interface StructuralRisk {
+  overall: StructuralRiskOverall;
+  overall_color: string;
+  items: StructuralRiskItem[];
+  context: string;
+}
+
 export interface MarketStressPayload {
   market_stress_score: number;  // 0–10
   stress_label: StressLabel;
   stress_color: string;
   confidence: "high" | "medium" | "low";
   confirmation_count: number;
+  structural_risk: StructuralRisk;
   dimensions: {
     // Tier 1 — Core Stress (max 2.0 each)
     credit: StressDimension;
@@ -488,6 +505,102 @@ function scoreNewsVelocity(articles: NewsArticle[]): StressDimension {
   };
 }
 
+// ── Structural Risk — background conditions regardless of active stress ────────
+
+function statusColor(s: StructuralRiskLevel): string {
+  if (s === "critical") return "#ef4444";
+  if (s === "elevated") return "#f97316";
+  if (s === "watch")    return "#eab308";
+  return "#10b981";
+}
+
+function overallColor(o: StructuralRiskOverall): string {
+  if (o === "high")     return "#ef4444";
+  if (o === "elevated") return "#f97316";
+  if (o === "moderate") return "#eab308";
+  return "#10b981";
+}
+
+function computeStructuralRisk(
+  closes: ClosesMap,
+  vixLevel: number | null,
+  vixCloses: number[],
+  hygLqdSpreadZ: number | null,
+): StructuralRisk {
+  const items: StructuralRiskItem[] = [];
+
+  // 1. Valuation stretch — SPY % above its 50-day SMA
+  const spy = closes["SPY"];
+  if (spy && spy.length >= 52) {
+    const sma50 = spy.slice(-50).reduce((s, v) => s + v, 0) / 50;
+    const current = spy[spy.length - 1];
+    const pctAbove = (current / sma50 - 1) * 100;
+    let status: StructuralRiskLevel = "normal";
+    if (pctAbove > 12) status = "critical";
+    else if (pctAbove > 7)  status = "elevated";
+    else if (pctAbove > 3)  status = "watch";
+    items.push({
+      label: "Valuation stretch",
+      reading: `SPY ${pctAbove >= 0 ? "+" : ""}${pctAbove.toFixed(1)}% above 50d avg`,
+      status,
+    });
+  } else {
+    items.push({ label: "Valuation stretch", reading: "Insufficient data", status: "normal" });
+  }
+
+  // 2. Complacency — VIX vs its period average
+  if (vixLevel != null && vixCloses.length >= 20) {
+    const vixAvg = meanOf(vixCloses);
+    const pctBelowAvg = (vixAvg - vixLevel) / vixAvg * 100; // positive = VIX below avg = complacent
+    let status: StructuralRiskLevel = "normal";
+    if (pctBelowAvg > 30) status = "critical";
+    else if (pctBelowAvg > 20) status = "elevated";
+    else if (pctBelowAvg > 10) status = "watch";
+    const dir = pctBelowAvg > 0
+      ? `${pctBelowAvg.toFixed(0)}% below ${vixAvg.toFixed(1)} avg`
+      : `${Math.abs(pctBelowAvg).toFixed(0)}% above avg`;
+    items.push({
+      label: "Complacency",
+      reading: `VIX ${vixLevel.toFixed(1)} — ${dir}`,
+      status,
+    });
+  } else {
+    items.push({ label: "Complacency", reading: "VIX data unavailable", status: "normal" });
+  }
+
+  // 3. Credit thinness — HY-IG spread approaching threshold
+  if (hygLqdSpreadZ != null) {
+    let status: StructuralRiskLevel = "normal";
+    if (hygLqdSpreadZ <= -2.0)      status = "critical";
+    else if (hygLqdSpreadZ <= -1.5) status = "elevated";
+    else if (hygLqdSpreadZ <= -1.0) status = "watch";
+    items.push({
+      label: "Credit thinness",
+      reading: `HY-IG spread z=${hygLqdSpreadZ.toFixed(1)} (threshold −1.5)`,
+      status,
+    });
+  } else {
+    items.push({ label: "Credit thinness", reading: "Spread data unavailable", status: "normal" });
+  }
+
+  const elevated = items.filter(i => i.status === "elevated" || i.status === "critical").length;
+  const watch    = items.filter(i => i.status === "watch").length;
+
+  let overall: StructuralRiskOverall = "low";
+  if (elevated >= 2) overall = "high";
+  else if (elevated === 1) overall = "elevated";
+  else if (watch >= 2) overall = "moderate";
+  else if (watch === 1) overall = "moderate";
+
+  const context =
+    overall === "high"     ? "Multiple structural vulnerabilities present. Stress signals carry amplified downside potential." :
+    overall === "elevated" ? "One structural vulnerability confirmed. Any stress signal warrants close attention." :
+    overall === "moderate" ? "Background conditions are mildly stretched. Monitor for deterioration." :
+    "Background conditions are within normal range.";
+
+  return { overall, overall_color: overallColor(overall), items, context };
+}
+
 // BONUS
 
 function liquidationBonus(closes: ClosesMap): number {
@@ -579,6 +692,25 @@ export async function GET() {
   const news_velocity   = scoreNewsVelocity(articles);
   const liqBonus        = liquidationBonus(closes);
 
+  // Structural risk uses credit's HY-IG z-score (already computed inside scoreCredit)
+  // Re-derive it here cleanly from the raw closes for the structural panel.
+  let hygLqdSpreadZ: number | null = null;
+  const hyg = closes["HYG"], lqd = closes["LQD"];
+  if (hyg && lqd) {
+    const minL = Math.min(hyg.length, lqd.length);
+    const spreads: number[] = [];
+    for (let i = 5; i < minL; i++) {
+      if (hyg[i - 5] !== 0 && lqd[i - 5] !== 0)
+        spreads.push((hyg[i] / hyg[i - 5] - 1) - (lqd[i] / lqd[i - 5] - 1));
+    }
+    if (spreads.length > 10) {
+      const cur = spreads[spreads.length - 1];
+      hygLqdSpreadZ = zScore(cur, spreads.slice(0, -1));
+    }
+  }
+
+  const structural_risk = computeStructuralRisk(closes, vixLevel, vixCloses, hygLqdSpreadZ);
+
   const dimensions = {
     credit, volatility, breadth, stress_confirmation,
     trend, carry, copper_gold, news_velocity,
@@ -602,6 +734,7 @@ export async function GET() {
   const payload: MarketStressPayload = {
     market_stress_score,
     stress_label,
+    structural_risk,
     stress_color,
     confidence,
     confirmation_count,
