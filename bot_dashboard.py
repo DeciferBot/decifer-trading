@@ -501,6 +501,7 @@ def _get_news_payload() -> dict:
 
     # ── Primary: FMP (article-specific images, stable API) ─────────────────────
     articles = []
+    _universe_set: set[str] = set()
     try:
         from fmp_client import get_fmp_news_articles as _fmp_articles
         from scanner import CORE_SYMBOLS, MOMENTUM_FALLBACK
@@ -508,7 +509,16 @@ def _get_news_payload() -> dict:
         open_syms = [p.get("symbol", "") for p in dash.get("positions", [])]
         favs = list(dash.get("favourites", []))
         syms = list(dict.fromkeys([s for s in open_syms if s] + favs + MOMENTUM_FALLBACK + CORE_SYMBOLS))[:50]
-        articles = _fmp_articles(syms, limit=50)
+        _universe_set = set(syms)
+        raw_articles = _fmp_articles(syms, limit=50)
+        # FMP tags articles with symbols from article content, not just the requested list.
+        # Keep only articles whose symbols intersect the universe, or articles with no symbols
+        # (broad macro/market-moving content like Fed, oil, geopolitics typically has no tags).
+        articles = [
+            a for a in raw_articles
+            if not a.get("symbols") or _universe_set.intersection(a.get("symbols", []))
+        ]
+        log.debug("FMP news: %d raw → %d after universe filter", len(raw_articles), len(articles))
     except Exception as _e:
         log.debug("FMP articles fetch failed: %s", _e)
 
@@ -521,14 +531,24 @@ def _get_news_payload() -> dict:
             open_syms = [p.get("symbol", "") for p in dash.get("positions", [])]
             favs = list(dash.get("favourites", []))
             av_syms = list(dict.fromkeys([s for s in open_syms if s] + favs + MOMENTUM_FALLBACK + CORE_SYMBOLS))[:50]
-            articles = _av_articles(av_syms, limit=50)
+            if not _universe_set:
+                _universe_set = set(av_syms)
+            raw_av = _av_articles(av_syms, limit=50)
+            articles = [
+                a for a in raw_av
+                if not a.get("symbols") or _universe_set.intersection(a.get("symbols", []))
+            ]
         except Exception as _e:
             log.debug("AV articles fetch failed: %s", _e)
 
     # ── Tertiary: Alpaca/Benzinga ───────────────────────────────────────────────
     if not articles:
-        articles = _fetch_alpaca_news()
-        articles = [a for a in articles if a.get("headline", "").strip()]
+        raw_alpaca = _fetch_alpaca_news()
+        articles = [
+            a for a in raw_alpaca
+            if a.get("headline", "").strip()
+            and (not a.get("symbols") or not _universe_set or _universe_set.intersection(a.get("symbols", [])))
+        ]
 
     # Enrich with sentiment from the last scan cycle's per-symbol data
     news_data = dash.get("news_data", {})
