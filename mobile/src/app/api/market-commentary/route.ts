@@ -51,11 +51,14 @@ export async function GET(): Promise<NextResponse<MarketCommentaryPayload>> {
     timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
 
-  const [tapeRes, intelRes, econRes] = await Promise.allSettled([
+  const [tapeRes, intelRes, econRes, newsRes] = await Promise.allSettled([
     fetch(`${INTEL}/api/market-data/tape`,  { next: { revalidate: 300 } }),
     fetch(`${INTEL}/api/market-now`,        { next: { revalidate: 600 } }),
     FMP
       ? fetch(`${BASE}/economic-calendar?from=${today}&to=${today}&apikey=${FMP}`, { next: { revalidate: 600 } })
+      : Promise.reject("no FMP key"),
+    FMP
+      ? fetch(`${BASE}/news/general-latest?limit=20&apikey=${FMP}`, { next: { revalidate: 300 } })
       : Promise.reject("no FMP key"),
   ]);
 
@@ -106,6 +109,25 @@ export async function GET(): Promise<NextResponse<MarketCommentaryPayload>> {
     } catch { /* ignore */ }
   }
 
+  // Parse recent news headlines (last 6 hours)
+  type NewsRaw = { title?: string; text?: string; publishedDate?: string; site?: string };
+  let recentNews: string[] = [];
+  if (newsRes.status === "fulfilled" && newsRes.value.ok) {
+    try {
+      const arr: NewsRaw[] = await newsRes.value.json();
+      const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+      const SKIP = new Set(["youtube.com", "youtu.be", "rumble.com", "tiktok.com", "vimeo.com"]);
+      recentNews = (Array.isArray(arr) ? arr : [])
+        .filter(n => {
+          if (!n.title || SKIP.has(n.site ?? "")) return false;
+          const pub = new Date((n.publishedDate ?? "").replace(" ", "T") + "Z").getTime();
+          return pub >= cutoff;
+        })
+        .slice(0, 8)
+        .map(n => `- ${n.title?.trim() ?? ""}${n.text ? ` — ${n.text.trim().slice(0, 120)}` : ""}`);
+    } catch { /* ignore */ }
+  }
+
   // ── 2. Build context block for Claude ─────────────────────────────────────
   const isWeekend = [0, 6].includes(new Date().getDay());
   const nyHour = parseInt(new Intl.DateTimeFormat("en-US", {
@@ -133,12 +155,22 @@ export async function GET(): Promise<NextResponse<MarketCommentaryPayload>> {
   const drivers: string[] = Array.isArray(intel.key_drivers) ? intel.key_drivers as string[] : [];
   const mood: string = typeof intel.market_mood === "string" ? intel.market_mood : "";
   const whatChanged: string[] = Array.isArray(intel.what_changed) ? intel.what_changed as string[] : [];
+  const knownConflicts: string[] = Array.isArray(intel.known_conflicts) ? intel.known_conflicts as string[] : [];
+  const keyEvents: Array<{ headline?: string; summary?: string }> = Array.isArray(intel.key_events)
+    ? intel.key_events as Array<{ headline?: string; summary?: string }>
+    : [];
 
   const intelBlock = [
     `Market mood: ${mood || "Unknown"}`,
     `Active drivers: ${drivers.slice(0, 5).join("; ") || "None"}`,
-    ...(whatChanged.length ? [`Recent context: ${whatChanged[0]}`] : []),
+    ...(whatChanged.length ? whatChanged.slice(0, 3).map(w => `What changed: ${w}`) : []),
+    ...(knownConflicts.length ? knownConflicts.slice(0, 3).map(c => `Conflict/tension: ${c}`) : []),
+    ...(keyEvents.length ? keyEvents.slice(0, 3).map(e => `Key event: ${e.headline ?? ""}${e.summary ? ` — ${e.summary}` : ""}`) : []),
   ].join("\n");
+
+  const newsBlock = recentNews.length > 0
+    ? recentNews.join("\n")
+    : "No recent headlines available.";
 
   const econBlock = econRaw.length === 0 ? "No significant economic releases scheduled today."
     : econRaw.map(e => {
@@ -156,6 +188,7 @@ Your audience is an intelligent non-professional investor who wants to understan
 Rules:
 - Never use words like: trade, buy, sell, long, short, position, portfolio, alpha, thesis, execute, broker, order
 - Write like a sharp financial journalist, not a chatbot
+- Ground the summary in actual news events from the headlines — cite specific events (e.g. "Trump's call with Iranian officials", "Fed's Waller signalled caution on cuts") not vague generalities
 - Be specific about numbers but explain what they mean
 - If equities AND bonds AND gold all moved the same direction, call that out — it's unusual
 - Do not pad or repeat yourself
@@ -170,6 +203,9 @@ ${tapeBlock}
 INTELLIGENCE CONTEXT:
 ${intelBlock}
 
+RECENT NEWS HEADLINES (last 6 hours — use these to add specific, real context):
+${newsBlock}
+
 TODAY'S ECONOMIC CALENDAR (upcoming, not yet released):
 ${econBlock}
 
@@ -179,7 +215,7 @@ Write a JSON response with exactly this shape:
   "watch": [
     {
       "event": "<plain English event name, no jargon>",
-      "commentary": "<2-3 sentences: what this release measures in plain English, what the forecast implies vs last time, and specifically why this number matters *today* given the current market backdrop. Name the stakes: what does a beat or a miss mean for rates, stocks, or the themes currently driving markets.>"
+      "commentary": "<2-3 sentences: what this release measures in plain English, what the forecast implies vs last time, and specifically why this number matters *today* given the current market backdrop and recent news. Name the stakes: what does a beat or a miss mean for rates, stocks, or the themes currently in the headlines.>"
     }
   ]
 }
@@ -200,9 +236,16 @@ Return only the JSON object. No markdown, no explanation outside the JSON.`;
     const json = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     const parsed = JSON.parse(json) as { summary: string; watch: Array<{ event: string; commentary: string }> };
 
-    // Enrich watch items with time/impact/est/prev from raw econ data
-    const enriched: WatchItem[] = (parsed.watch ?? []).map((w, i) => {
-      const src = econRaw[i];
+    // Enrich watch items with time/impact/est/prev from raw econ data.
+    // Match by event name similarity (not array index) — LLM may reorder or rename events.
+    const enriched: WatchItem[] = (parsed.watch ?? []).map(w => {
+      const wLower = w.event.toLowerCase();
+      const src = econRaw.find(e =>
+        e.event && (
+          e.event.toLowerCase().includes(wLower.slice(0, 8)) ||
+          wLower.includes((e.event ?? "").toLowerCase().slice(0, 8))
+        )
+      ) ?? econRaw.find((_, i) => i === (parsed.watch ?? []).indexOf(w));
       return {
         event: w.event,
         impact: src?.impact ?? "Medium",
@@ -226,21 +269,68 @@ Return only the JSON object. No markdown, no explanation outside the JSON.`;
       prev: e.previous != null ? `${e.previous}${e.unit ?? ""}` : "",
       commentary: `${e.impact === "High" ? "High-impact release" : "Medium-impact release"}.${e.estimate != null ? ` Forecast: ${e.estimate}${e.unit ?? ""}.` : ""}${e.previous != null ? ` Previous: ${e.previous}${e.unit ?? ""}.` : ""}`,
     }));
-    // Build a real fallback from tape data rather than showing a loading message
-    let fallbackSummary: string;
-    if (mood) {
-      fallbackSummary = `${mood}. Active drivers: ${drivers.slice(0, 2).join(", ") || "none"}.`;
-    } else {
-      const tapeParts: string[] = [];
-      if (tape.spy_pct != null) tapeParts.push(`S&P 500 ${fmt(tape.spy_pct)}`);
-      if (tape.qqq_pct != null) tapeParts.push(`Nasdaq ${fmt(tape.qqq_pct)}`);
-      if (tape.tlt_pct != null) tapeParts.push(`bonds ${fmt(tape.tlt_pct)}`);
-      if (tape.gld_pct != null) tapeParts.push(`gold ${fmt(tape.gld_pct)}`);
-      if (tape.uso_pct != null) tapeParts.push(`oil ${fmt(tape.uso_pct)}`);
-      fallbackSummary = tapeParts.length > 0
-        ? `Markets today: ${tapeParts.join(", ")}.${econRaw.length > 0 ? ` ${econRaw.length} economic release${econRaw.length > 1 ? "s" : ""} scheduled.` : ""}`
-        : "Market data is currently unavailable. Check back shortly.";
+    // Build a real fallback from tape + intel data rather than a terse 1-liner
+    const fallbackSentences: string[] = [];
+
+    // 1. Equity lead
+    if (tape.spy_pct != null) {
+      const spyDir = tape.spy_pct >= 0.5 ? "rising" : tape.spy_pct <= -0.5 ? "falling" : "holding steady";
+      const techNote = tape.qqq_pct != null && Math.abs(tape.qqq_pct - tape.spy_pct) > 0.4
+        ? tape.qqq_pct > tape.spy_pct
+          ? ` Tech is leading — Nasdaq at ${fmt(tape.qqq_pct, 1)}.`
+          : ` Tech is lagging — Nasdaq at ${fmt(tape.qqq_pct, 1)}.`
+        : "";
+      fallbackSentences.push(`The S&P 500 is ${spyDir} at ${fmt(tape.spy_pct)}.${techNote}`);
+    } else if (tape.es_pct != null) {
+      const futDir = tape.es_pct >= 0.15 ? "pointing to a higher open" : tape.es_pct <= -0.15 ? "pointing lower" : "flat overnight";
+      fallbackSentences.push(`S&P futures are ${fmt(tape.es_pct, 2)} — ${futDir}.`);
     }
+
+    // 2. Cross-asset colour
+    const crossAsset: string[] = [];
+    if (tape.tlt_pct != null && Math.abs(tape.tlt_pct) > 0.3) {
+      crossAsset.push(tape.tlt_pct > 0
+        ? `bonds are rallying ${fmt(tape.tlt_pct, 1)}, reflecting rate-cut expectations`
+        : `bonds are selling off ${fmt(Math.abs(tape.tlt_pct), 1)}, with yields pushing higher`);
+    }
+    if (tape.gld_pct != null && Math.abs(tape.gld_pct) > 0.5) {
+      crossAsset.push(tape.gld_pct > 0
+        ? `gold is up ${fmt(tape.gld_pct, 1)} on safe-haven demand`
+        : `gold is down ${fmt(Math.abs(tape.gld_pct), 1)}, a sign of improving risk appetite`);
+    }
+    if (tape.uso_pct != null && Math.abs(tape.uso_pct) > 0.6) {
+      crossAsset.push(tape.uso_pct < 0
+        ? `oil is off ${fmt(Math.abs(tape.uso_pct), 1)}, easing energy-driven inflation pressure`
+        : `oil is up ${fmt(tape.uso_pct, 1)}, keeping supply-side cost pressure alive`);
+    }
+    if (crossAsset.length > 0) {
+      fallbackSentences.push(`Across asset classes, ${crossAsset.join(" and ")}.`);
+    }
+
+    // 3. Driver context
+    if (drivers.length > 0) {
+      const driverStr = drivers.slice(0, 2).map(d => d.toLowerCase().replace(/_/g, " ")).join(" and ");
+      fallbackSentences.push(`The primary forces in the market right now are ${driverStr}.`);
+    } else if (mood) {
+      fallbackSentences.push(`The overall tone is ${mood.toLowerCase()}.`);
+    }
+
+    // 4. Conflict/tension note
+    if (knownConflicts.length > 0) {
+      fallbackSentences.push(`Worth watching: ${knownConflicts[0]}`);
+    }
+
+    // 5. Econ calendar note
+    if (econRaw.length > 0) {
+      const highImpact = econRaw.filter(e => e.impact === "High");
+      if (highImpact.length > 0) {
+        fallbackSentences.push(`${highImpact.length} high-impact economic release${highImpact.length > 1 ? "s" : ""} scheduled today — ${highImpact.map(e => e.event).join(", ")}.`);
+      }
+    }
+
+    const fallbackSummary = fallbackSentences.length > 0
+      ? fallbackSentences.join(" ")
+      : "Market data is currently unavailable. Check back shortly.";
     return NextResponse.json({ summary: fallbackSummary, watch: fallbackWatch, ts, source: "fallback" });
   }
 }
