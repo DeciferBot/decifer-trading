@@ -129,35 +129,81 @@ async function fetchVix(fromDate: string): Promise<{ closes: number[]; level: nu
 
 function scoreCredit(closes: ClosesMap): StressDimension {
   const hyg = closes["HYG"];
-  if (!hyg) {
-    return { score: 0, maxScore: 2, z_score: null, data_quality: "unavailable", signal: "HYG unavailable", confirming: false };
+  const lqd = closes["LQD"];
+  const ief = closes["IEF"];
+
+  if (!hyg || !lqd) {
+    return { score: 0, maxScore: 2, z_score: null, data_quality: "unavailable", signal: "HYG/LQD unavailable", confirming: false };
   }
 
-  const hyg5d = ret5d(hyg);
-  const hygHist = all5dRets(hyg);
-  const hygZ = hyg5d != null ? zScore(hyg5d, hygHist) : null;
+  // Primary: HYG−LQD spread = pure HY credit quality signal, duration-adjusted.
+  // HY underperforming IG means HY spreads widening relative to IG — credit stress.
+  const minLen = Math.min(hyg.length, lqd.length);
+  const hygLqdSpreads: number[] = [];
+  for (let i = 5; i < minLen; i++) {
+    if (hyg[i - 5] !== 0 && lqd[i - 5] !== 0) {
+      hygLqdSpreads.push((hyg[i] / hyg[i - 5] - 1) - (lqd[i] / lqd[i - 5] - 1));
+    }
+  }
+  const hygLqdCurrent = hygLqdSpreads.length > 0 ? hygLqdSpreads[hygLqdSpreads.length - 1] : null;
+  const hygLqdZ = hygLqdCurrent != null && hygLqdSpreads.length > 10
+    ? zScore(hygLqdCurrent, hygLqdSpreads.slice(0, -1))
+    : null;
+
+  // Secondary: LQD−IEF spread = IG credit spread (investment grade vs risk-free)
+  let lqdIefZ: number | null = null;
+  if (ief) {
+    const minLen2 = Math.min(lqd.length, ief.length);
+    const lqdIefSpreads: number[] = [];
+    for (let i = 5; i < minLen2; i++) {
+      if (lqd[i - 5] !== 0 && ief[i - 5] !== 0) {
+        lqdIefSpreads.push((lqd[i] / lqd[i - 5] - 1) - (ief[i] / ief[i - 5] - 1));
+      }
+    }
+    const lqdIefCurrent = lqdIefSpreads.length > 0 ? lqdIefSpreads[lqdIefSpreads.length - 1] : null;
+    lqdIefZ = lqdIefCurrent != null && lqdIefSpreads.length > 10
+      ? zScore(lqdIefCurrent, lqdIefSpreads.slice(0, -1))
+      : null;
+  }
 
   let score = 0;
   let confirming = false;
 
-  if (hygZ != null && hygZ <= -1.5) {
+  // HY-IG spread widening: primary signal
+  if (hygLqdZ != null && hygLqdZ <= -1.5) {
     score += 1.0;
     confirming = true;
-    if (hygZ <= -2.0) score += 0.5; // severity
+    if (hygLqdZ <= -2.0) score += 0.5; // severity
   }
 
-  // LQD underperforms IEF → credit spread widening confirmation
-  const lqd5d = closes["LQD"] ? ret5d(closes["LQD"]!) : null;
-  const ief5d = closes["IEF"] ? ret5d(closes["IEF"]!) : null;
-  if (lqd5d != null && ief5d != null && lqd5d < ief5d - 0.005) {
+  // IG spread widening: secondary confirmation (co-movement = systemic)
+  if (lqdIefZ != null && lqdIefZ <= -1.5) {
+    score += 0.75;
+    confirming = true;
+  }
+
+  // Absolute HY breakdown (HYG also falling in absolute terms, not just relative)
+  const hyg5d = ret5d(hyg);
+  const hygAbsZ = hyg5d != null ? zScore(hyg5d, all5dRets(hyg)) : null;
+  if (hygAbsZ != null && hygAbsZ <= -1.5) {
     score += 0.5;
+    confirming = true;
   }
 
   score = clamp(score, 0, 2);
-  const pct = hyg5d != null ? `HYG ${(hyg5d * 100).toFixed(1)}%` : "HYG n/a";
-  const zStr = hygZ != null ? ` (z=${hygZ.toFixed(1)})` : "";
 
-  return { score, maxScore: 2, z_score: hygZ, data_quality: "proxy", signal: `${pct}${zStr}`, confirming };
+  const spreadStr = hygLqdCurrent != null ? `HYG-LQD ${(hygLqdCurrent * 100).toFixed(2)}%` : "spread n/a";
+  const zStr = hygLqdZ != null ? ` (z=${hygLqdZ.toFixed(1)})` : "";
+  const igStr = lqdIefZ != null ? `, LQD-IEF z=${lqdIefZ.toFixed(1)}` : "";
+
+  return {
+    score,
+    maxScore: 2,
+    z_score: hygLqdZ,
+    data_quality: "proxy",
+    signal: `${spreadStr}${zStr}${igStr}`,
+    confirming,
+  };
 }
 
 function scoreVolatility(
