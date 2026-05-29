@@ -1,109 +1,99 @@
-OVERNIGHT RESEARCH NOTES — 2026-05-28
-Generated: 2026-05-28 06:09 ET
+OVERNIGHT RESEARCH NOTES — 2026-05-29
+Generated: 2026-05-29 06:12 ET
 
 PRE-MARKET / AFTER-HOURS TONE:
-  SPY   $749.50  -0.15%  (flat)
-  QQQ   $727.15  -0.43%  (gap-down)
-  IWM   $289.74  -0.27%  (gap-down)
+  SPY   $755.46  +0.67%  (gap-up)
+  QQQ   $736.20  +0.93%  (gap-up)
+  IWM   $291.71  +0.46%  (gap-up)
   ---  sector ETFs  ---
-  XLF   $51.39  -0.89%  (gap-down)
-  XLK   $183.74  -0.76%  (gap-down)
-  XLE   $57.25  -1.04%  (gap-down)
-  XLV   $148.68  +0.11%  (flat)
-  XLI   $174.30  +0.00%  (flat)
-  XLU   $45.16  -0.38%  (gap-down)
-  XLB   $51.18  +0.37%  (gap-up)
-  XLRE  $44.63  -0.18%  (gap-down)
+  XLF   $51.32  -0.19%  (gap-down)
+  XLK   $188.82  +2.38%  (gap-up)
+  XLE   $56.67  -0.56%  (gap-down)
+  XLV   $150.92  +1.43%  (gap-up)
+  XLI   $173.84  -0.26%  (gap-down)
+  XLU   $44.72  -0.93%  (gap-down)
+  XLB   $51.36  +0.35%  (gap-up)
+  XLRE  $44.41  -0.49%  (gap-down)
 
 PRE-MARKET MOVERS (>1.5% gap vs yesterday's close):
-  NBIS   $  233.80  +12.37%  (gap-up)
-  IREN   $   66.66  +11.51%  (gap-up)
-  APP    $  572.00  +11.23%  (gap-up)
-  QCOM   $  228.16  -8.30%  (gap-down)
-  MRVL   $  191.90  -7.86%  (gap-down)
-  NOW    $  107.59  +7.68%  (gap-up)
-  SOXS   $    6.76  +7.55%  (gap-up)
-  SOXL   $  210.06  -6.97%  (gap-down)
-  ARM    $  300.51  -6.45%  (gap-down)
-  MSTR   $  150.80  -5.71%  (gap-down)
-  GDX    $   83.95  -5.14%  (gap-down)
-  DDOG   $  234.50  +4.85%  (gap-up)
-  SLV    $   66.49  -4.63%  (gap-down)
-  INTC   $  118.31  -4.22%  (gap-down)
-  META   $  636.30  +3.91%  (gap-up)
+  ARM    $  345.14  +14.02%  (gap-up)
+  NOW    $  116.38  +13.96%  (gap-up)
+  ORCL   $  210.75  +10.36%  (gap-up)
+  PLTR   $  146.10  +10.26%  (gap-up)
+  NBIS   $  228.50  +9.66%  (gap-up)
+  NET    $  227.96  +8.96%  (gap-up)
+  QCOM   $  253.87  +8.77%  (gap-up)
+  SHOP   $  115.20  +8.07%  (gap-up)
+  RKLB   $  140.00  -6.81%  (gap-down)
+  CRCL   $  108.33  +5.54%  (gap-up)
+  SOXL   $  229.98  +5.51%  (gap-up)
+  SOXS   $    6.17  -5.44%  (gap-down)
+  APP    $  598.52  +5.40%  (gap-up)
+  SNDK   $ 1673.93  +5.28%  (gap-up)
+  AMD    $  521.09  +5.16%  (gap-up)
 
-YESTERDAY'S PERFORMANCE:
-  Trades: 2 (1W/1L)  Win rate: 50%  P&L: $+3,992.45
-  Best:  ASML LONG +$5,715.50  (tp_hit / TRENDING_UP)
-  Worst: VRT LONG $-1,723.05  (sl_hit / TRENDING_UP)
-  By regime:
-    TRENDING_UP: 2 trades  50% WR  $+3,992.45
-  By dimension (non-zero entry scores):
-    trend             2 trades  50% WR  $+3,992
-    flow              2 trades  50% WR  $+3,992
-    mtf               2 trades  50% WR  $+3,992
+Yesterday's performance: no closed trades on 2026-05-28
 
 ECONOMIC CALENDAR — Next 5 Days:
-  Thu May 28: EIA Gasoline Stocks Change (May/22) [MEDIUM]
-  Thu May 28: EIA Crude Oil Stocks Change (May/22) [MEDIUM]
-  Thu May 28: New Home Sales (Apr) [MEDIUM]
-  Thu May 28: Fed Williams Speech [MEDIUM]
-  Thu May 28: Initial Jobless Claims (May/23) [MEDIUM]
-  Thu May 28: Corporate Profits QoQ (Q1) [MEDIUM]
-  Thu May 28: Core PCE Price Index MoM (Apr) [HIGH]
-  Thu May 28: Durable Goods Orders Ex Transp MoM (Apr) [MEDIUM]
-  Thu May 28: Personal Income MoM (Apr) [HIGH]
-  Thu May 28: PCE Price Index YoY (Apr) [MEDIUM]
-  Thu May 28: Durable Goods Orders MoM (Apr) [HIGH]
-  Thu May 28: Fed Jefferson Speech [MEDIUM]
   Fri May 29: CFTC S&P 500 speculative net positions [MEDIUM]
   Fri May 29: CFTC Nasdaq 100 speculative net positions [MEDIUM]
   Fri May 29: CFTC Gold Speculative net positions [MEDIUM]
   Fri May 29: CFTC Crude Oil speculative net positions [MEDIUM]
   Fri May 29: Chicago PMI (May) [MEDIUM]
   Fri May 29: Fed Bowman Speech [MEDIUM]
-  Fri May 29: Retail Inventories Ex Autos MoM (Apr) [MEDIUM]
+  Fri May 29: Wholesale Inventories MoM (Apr) [MEDIUM]
   Fri May 29: Goods Trade Balance (Apr) [MEDIUM]
   Fri May 29: Goods Trade Balance Adv (Apr) [MEDIUM]
-  Fri May 29: Wholesale Inventories MoM (Apr) [MEDIUM]
+  Fri May 29: Retail Inventories Ex Autos MoM (Apr) [MEDIUM]
+  Fri May 29: Fed Kashkari Speech [MEDIUM]
   Sat May 30: No high-impact events
   Sun May 31: Fed Waller Speech [MEDIUM]
-  Mon Jun 1: ISM Manufacturing PMI (May) [HIGH]
   Mon Jun 1: ISM Manufacturing Employment (May) [MEDIUM]
+  Mon Jun 1: ISM Manufacturing PMI (May) [HIGH]
   Tue Jun 2: API Crude Oil Stock Change (May/29) [MEDIUM]
   Tue Jun 2: JOLTs Job Openings (Apr) [HIGH]
   Tue Jun 2: Fed Hammack Speech [MEDIUM]
+  Tue Jun 2: Fed Kashkari Speech [MEDIUM]
+  Wed Jun 3: Beige Book [MEDIUM]
+  Wed Jun 3: EIA Gasoline Stocks Change (May/29) [MEDIUM]
+  Wed Jun 3: EIA Crude Oil Stocks Change (May/29) [MEDIUM]
+  Wed Jun 3: Factory Orders MoM (Apr) [MEDIUM]
+  Wed Jun 3: ISM Non-Manufacturing Employment (May) [MEDIUM]
+  Wed Jun 3: ISM Non-Manufacturing PMI (May) [HIGH]
+  Wed Jun 3: ISM Non-Manufacturing Prices (May) [HIGH]
+  Wed Jun 3: ISM Services PMI (May) [HIGH]
+  Wed Jun 3: ADP Employment Change (May) [MEDIUM]
+  Wed Jun 3: MBA 30-Year Mortgage Rate (May/29) [MEDIUM]
 
 EARNINGS — Next 5 Days:  (Alpha Vantage — dates only)
   Mon Jun 1: CRDO  
   Tue Jun 2: PANW  
+  Wed Jun 3: AVGO  
 
 Analyst changes: none in last 24h for tracked universe
 
-MARKET NEWS — Last 16h (FMP, 44 articles):
-  ▼ [META]   5h ago   I got laid off from Meta as a low performer. I wish people told me to budget, downsize, an
-  ▲ [CRM]    5h ago   Salesforce beats on every metric but the existential AI question lingers
-  ▲ [CRM]    6h ago   Salesforce beats on every metric but the existential AI question lingers
-  ▲ [NBIS]   7h ago   Nebius Stock Surges on Backing From This Big AI Investor
-  ▲ [AVGO]   9h ago   Broadcom: The Dual Moat Is Still Undervalued
-  ▼ [GOOGL]  14h ago  US charges Google engineer with insider trading on Polymarket
-  ▲ [CRM]    15h ago  Salesforce Q1 Earnings Call Highlights
-  ▼ [CRM]    15h ago  Salesforce Stock Slips as Earnings Top Estimates but Outlook Disappoints
-  ▼ [CRM]    16h ago  Salesforce CEO Marc Benioff outlines his plan to turn around his struggling stock
-  ▲ [CRM]    16h ago  Salesforce (CRM) Surpasses Q1 Earnings and Revenue Estimates
-  ─ [META]   5h ago   Meta launches paid subscriptions for Instagram, Facebook, WhatsApp
-  ─ [META]   5h ago   Meta's AI Push Seeks To Outpace Reddit And Other Competitors
+MARKET NEWS — Last 16h (FMP, 29 articles):
+  ▲ [GOOGL]  5h ago   Your AI bill is out of control. Google has been waiting for this moment.
+  ▼ [CRM]    10h ago  Veeva Systems: Patience Required
+  ▼ [SMH]    10h ago  Huawei bets on speed over shrinking transistors to sidestep US chip sanctions
+  ─ [NVDA]   4h ago   In China, AMD CEO Lisa Su is understated while Nvidia's Huang is more razzmatazz
+  ─ [AMD]    4h ago   In China, AMD CEO Lisa Su is understated while Nvidia's Huang is more razzmatazz
+  ─ [NVDA]   6h ago   At Computex, Nvidia and Taiwan's expanding role in AI infrastructure set to take centre st
+  ─ [NBIS]   6h ago   The Smartest AI Money Is Buying Nebius
+  ─ [NVDA]   7h ago   71.6% of Nvidia's Portfolio Is Invested in These 2 Top Artificial Intelligence (AI) Stocks
+  ─ [NVDA]   7h ago   Ark Investment's Cathie Wood Just Trimmed Her AMD Stake to Add This Inference Stock. Shoul
+  ─ [AMD]    7h ago   Ark Investment's Cathie Wood Just Trimmed Her AMD Stake to Add This Inference Stock. Shoul
+  ─ [NVDA]   7h ago   Nvidia is quietly betting $7B on this emerging tech for next phase of AI growth
+  ─ [NVDA]   9h ago   Nvidia is investing billions into this emerging technology that could change the AI indust
 
-Net bias: bullish  (6 bullish / 4 bearish / 34 neutral)
+Net bias: bearish  (1 bullish / 2 bearish / 26 neutral)
   AVOID (bearish catalyst):
-    META   — I got laid off from Meta as a low performer. I wish people t
-    GOOGL  — US charges Google engineer with insider trading on Polymarke
-    CRM    — Salesforce Stock Slips as Earnings Top Estimates but Outlook
+    CRM    — Veeva Systems: Patience Required
+    SMH    — Huawei bets on speed over shrinking transistors to sidestep
   FAVOR (bullish catalyst):
-    NBIS   — Nebius Stock Surges on Backing From This Big AI Investor
-    AVGO   — Broadcom: The Dual Moat Is Still Undervalued
+    GOOGL  — Your AI bill is out of control. Google has been waiting for
 
 MACRO (daily):
-  10Y-2Y Spread: 0.48%  (as of 2026-05-27)  prior: 0.49
-  10Y Treasury: 4.50%  (as of 2026-05-26)
-  WTI Crude: 112.25$/bbl  (as of 2026-05-18)  prior: 108.99
+  10Y-2Y Spread: 0.46%  (as of 2026-05-28)  prior: 0.48
+  10Y Treasury: 4.48%  (as of 2026-05-27)  prior: 4.50
+  WTI Crude: 97.63$/bbl  (as of 2026-05-26)

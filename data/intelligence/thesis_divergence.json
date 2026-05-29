@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-29T04:25:50Z",
+  "generated_at": "2026-05-29T18:32:23Z",
   "total_candidates": 57,
   "eligible_checked": 42,
   "intact_count": 35,
@@ -10,48 +10,23 @@
     {
       "symbol": "ZS",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": -25.46,
-      "lag_pp": 31.69,
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": -19.25,
+      "lag_pp": 25.12,
       "thesis_intact": false,
-      "reason": "DIVERGING \u2014 proxy SMH=+6.23% candidate=-25.46% lag=31.69pp > 5.0pp",
+      "reason": "DIVERGING \u2014 proxy SMH=+5.87% candidate=-19.25% lag=25.12pp > 5.0pp",
       "rules": [
         "ai_capex_growth_to_cybersecurity"
       ]
     },
     {
-      "symbol": "NVDA",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": -4.13,
-      "lag_pp": 10.35,
-      "thesis_intact": false,
-      "reason": "DIVERGING \u2014 proxy SMH=+6.23% candidate=-4.13% lag=10.35pp > 5.0pp",
-      "rules": [
-        "ai_capex_growth_to_semiconductors"
-      ]
-    },
-    {
-      "symbol": "DE",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": -3.83,
-      "lag_pp": 10.06,
-      "thesis_intact": false,
-      "reason": "DIVERGING \u2014 proxy SMH=+6.23% candidate=-3.83% lag=10.06pp > 5.0pp",
-      "rules": [
-        "ai_capex_growth_to_infrastructure_reshoring",
-        "geopolitical_risk_to_infrastructure_reshoring"
-      ]
-    },
-    {
       "symbol": "COST",
       "proxy_sensor": "HYG",
-      "proxy_5d_pct": 0.46,
-      "candidate_5d_pct": -7.34,
-      "lag_pp": 7.8,
+      "proxy_5d_pct": 0.55,
+      "candidate_5d_pct": -9.27,
+      "lag_pp": 9.82,
       "thesis_intact": false,
-      "reason": "DIVERGING \u2014 proxy HYG=+0.46% candidate=-7.34% lag=7.80pp > 5.0pp",
+      "reason": "DIVERGING \u2014 proxy HYG=+0.55% candidate=-9.27% lag=9.82pp > 5.0pp",
       "rules": [
         "credit_stress_to_quality_cash_flow"
       ]
@@ -59,84 +34,23 @@
     {
       "symbol": "VRT",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": -0.47,
-      "lag_pp": 6.7,
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": -3.89,
+      "lag_pp": 9.76,
       "thesis_intact": false,
-      "reason": "DIVERGING \u2014 proxy SMH=+6.23% candidate=-0.47% lag=6.70pp > 5.0pp",
+      "reason": "DIVERGING \u2014 proxy SMH=+5.87% candidate=-3.89% lag=9.76pp > 5.0pp",
       "rules": [
         "ai_capex_growth_to_data_centre_power"
       ]
     },
     {
-      "symbol": "FTNT",
+      "symbol": "NVDA",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": -0.23,
-      "lag_pp": 6.46,
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": -0.98,
+      "lag_pp": 6.84,
       "thesis_intact": false,
-      "reason": "DIVERGING \u2014 proxy SMH=+6.23% candidate=-0.23% lag=6.46pp > 5.0pp",
-      "rules": [
-        "ai_capex_growth_to_cybersecurity"
-      ]
-    },
-    {
-      "symbol": "ADBE",
-      "proxy_sensor": "IEF",
-      "proxy_5d_pct": 0.85,
-      "candidate_5d_pct": -4.71,
-      "lag_pp": 5.56,
-      "thesis_intact": false,
-      "reason": "DIVERGING \u2014 proxy IEF=+0.85% candidate=-4.71% lag=5.56pp > 5.0pp",
-      "rules": [
-        "yields_falling_to_software_cloud"
-      ]
-    },
-    {
-      "symbol": "CAT",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 1.73,
-      "lag_pp": 4.5,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+1.73% lag=4.50pp \u2264 5.0pp",
-      "rules": [
-        "ai_capex_growth_to_infrastructure_reshoring",
-        "geopolitical_risk_to_infrastructure_reshoring"
-      ]
-    },
-    {
-      "symbol": "CEG",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 1.8,
-      "lag_pp": 4.43,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+1.80% lag=4.43pp \u2264 5.0pp",
-      "rules": [
-        "ai_capex_growth_to_data_centre_power"
-      ]
-    },
-    {
-      "symbol": "NOC",
-      "proxy_sensor": "ITA",
-      "proxy_5d_pct": 5.5,
-      "candidate_5d_pct": 1.29,
-      "lag_pp": 4.21,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy ITA=+5.50% candidate=+1.29% lag=4.21pp \u2264 5.0pp",
-      "rules": [
-        "geopolitical_risk_to_defence"
-      ]
-    },
-    {
-      "symbol": "AVGO",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 2.11,
-      "lag_pp": 4.12,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+2.11% lag=4.12pp \u2264 5.0pp",
+      "reason": "DIVERGING \u2014 proxy SMH=+5.87% candidate=-0.98% lag=6.84pp > 5.0pp",
       "rules": [
         "ai_capex_growth_to_semiconductors"
       ]
@@ -144,119 +58,96 @@
     {
       "symbol": "PWR",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 2.84,
-      "lag_pp": 3.39,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+2.84% lag=3.39pp \u2264 5.0pp",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": -0.33,
+      "lag_pp": 6.19,
+      "thesis_intact": false,
+      "reason": "DIVERGING \u2014 proxy SMH=+5.87% candidate=-0.33% lag=6.19pp > 5.0pp",
       "rules": [
         "ai_capex_growth_to_data_centre_power"
       ]
     },
     {
-      "symbol": "RTX",
-      "proxy_sensor": "ITA",
-      "proxy_5d_pct": 5.5,
-      "candidate_5d_pct": 2.35,
-      "lag_pp": 3.15,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy ITA=+5.50% candidate=+2.35% lag=3.15pp \u2264 5.0pp",
-      "rules": [
-        "geopolitical_risk_to_defence"
-      ]
-    },
-    {
-      "symbol": "CRM",
-      "proxy_sensor": "IEF",
-      "proxy_5d_pct": 0.85,
-      "candidate_5d_pct": -2.18,
-      "lag_pp": 3.04,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy IEF=+0.85% candidate=-2.18% lag=3.04pp \u2264 5.0pp",
-      "rules": [
-        "yields_falling_to_software_cloud"
-      ]
-    },
-    {
-      "symbol": "CRWD",
+      "symbol": "CEG",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 3.21,
-      "lag_pp": 3.02,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+3.21% lag=3.02pp \u2264 5.0pp",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 0.36,
+      "lag_pp": 5.5,
+      "thesis_intact": false,
+      "reason": "DIVERGING \u2014 proxy SMH=+5.87% candidate=+0.36% lag=5.50pp > 5.0pp",
       "rules": [
-        "ai_capex_growth_to_cybersecurity"
+        "ai_capex_growth_to_data_centre_power"
       ]
     },
     {
-      "symbol": "GD",
-      "proxy_sensor": "ITA",
-      "proxy_5d_pct": 5.5,
-      "candidate_5d_pct": 2.71,
-      "lag_pp": 2.79,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy ITA=+5.50% candidate=+2.71% lag=2.79pp \u2264 5.0pp",
+      "symbol": "CAT",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 0.43,
+      "lag_pp": 5.44,
+      "thesis_intact": false,
+      "reason": "DIVERGING \u2014 proxy SMH=+5.87% candidate=+0.43% lag=5.44pp > 5.0pp",
       "rules": [
-        "geopolitical_risk_to_defence"
-      ]
-    },
-    {
-      "symbol": "LMT",
-      "proxy_sensor": "ITA",
-      "proxy_5d_pct": 5.5,
-      "candidate_5d_pct": 2.8,
-      "lag_pp": 2.71,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy ITA=+5.50% candidate=+2.80% lag=2.71pp \u2264 5.0pp",
-      "rules": [
-        "geopolitical_risk_to_defence"
+        "ai_capex_growth_to_infrastructure_reshoring",
+        "geopolitical_risk_to_infrastructure_reshoring"
       ]
     },
     {
       "symbol": "ASML",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 3.59,
-      "lag_pp": 2.64,
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 1.4,
+      "lag_pp": 4.47,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+3.59% lag=2.64pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+1.40% lag=4.47pp \u2264 5.0pp",
       "rules": [
         "ai_capex_growth_to_semiconductors"
       ]
     },
     {
-      "symbol": "PANW",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 4.5,
-      "lag_pp": 1.72,
+      "symbol": "LMT",
+      "proxy_sensor": "ITA",
+      "proxy_5d_pct": 5.28,
+      "candidate_5d_pct": 1.52,
+      "lag_pp": 3.76,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+4.50% lag=1.72pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy ITA=+5.28% candidate=+1.52% lag=3.76pp \u2264 5.0pp",
       "rules": [
-        "ai_capex_growth_to_cybersecurity"
+        "geopolitical_risk_to_defence"
       ]
     },
     {
-      "symbol": "BRK.B",
-      "proxy_sensor": "HYG",
-      "proxy_5d_pct": 0.46,
-      "candidate_5d_pct": -0.72,
-      "lag_pp": 1.19,
+      "symbol": "NOC",
+      "proxy_sensor": "ITA",
+      "proxy_5d_pct": 5.28,
+      "candidate_5d_pct": 1.6,
+      "lag_pp": 3.68,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy HYG=+0.46% candidate=-0.72% lag=1.19pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy ITA=+5.28% candidate=+1.60% lag=3.68pp \u2264 5.0pp",
       "rules": [
-        "credit_stress_to_quality_cash_flow"
+        "geopolitical_risk_to_defence"
       ]
     },
     {
-      "symbol": "URI",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 5.57,
-      "lag_pp": 0.66,
+      "symbol": "RTX",
+      "proxy_sensor": "ITA",
+      "proxy_5d_pct": 5.28,
+      "candidate_5d_pct": 1.74,
+      "lag_pp": 3.54,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+5.57% lag=0.66pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy ITA=+5.28% candidate=+1.74% lag=3.54pp \u2264 5.0pp",
+      "rules": [
+        "geopolitical_risk_to_defence"
+      ]
+    },
+    {
+      "symbol": "DE",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 2.73,
+      "lag_pp": 3.13,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+2.73% lag=3.13pp \u2264 5.0pp",
       "rules": [
         "ai_capex_growth_to_infrastructure_reshoring",
         "geopolitical_risk_to_infrastructure_reshoring"
@@ -265,204 +156,144 @@
     {
       "symbol": "TSM",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 5.79,
-      "lag_pp": 0.44,
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 3.05,
+      "lag_pp": 2.81,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+5.79% lag=0.44pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+3.05% lag=2.81pp \u2264 5.0pp",
       "rules": [
         "ai_capex_growth_to_semiconductors"
       ]
     },
     {
-      "symbol": "EQIX",
-      "proxy_sensor": "IEF",
-      "proxy_5d_pct": 0.85,
-      "candidate_5d_pct": 0.41,
-      "lag_pp": 0.44,
+      "symbol": "GD",
+      "proxy_sensor": "ITA",
+      "proxy_5d_pct": 5.28,
+      "candidate_5d_pct": 2.79,
+      "lag_pp": 2.49,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy IEF=+0.85% candidate=+0.41% lag=0.44pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy ITA=+5.28% candidate=+2.79% lag=2.49pp \u2264 5.0pp",
       "rules": [
-        "yields_falling_to_reits"
+        "geopolitical_risk_to_defence"
       ]
     },
     {
-      "symbol": "ETN",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 5.86,
-      "lag_pp": 0.37,
+      "symbol": "EQIX",
+      "proxy_sensor": "IEF",
+      "proxy_5d_pct": 0.94,
+      "candidate_5d_pct": -1.41,
+      "lag_pp": 2.35,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+5.86% lag=0.37pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy IEF=+0.94% candidate=-1.41% lag=2.35pp \u2264 5.0pp",
       "rules": [
-        "ai_capex_growth_to_data_centre_power"
+        "yields_falling_to_reits"
       ]
     },
     {
       "symbol": "PLD",
       "proxy_sensor": "IEF",
-      "proxy_5d_pct": 0.85,
-      "candidate_5d_pct": 0.66,
-      "lag_pp": 0.19,
+      "proxy_5d_pct": 0.94,
+      "candidate_5d_pct": -1.21,
+      "lag_pp": 2.15,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy IEF=+0.85% candidate=+0.66% lag=0.19pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy IEF=+0.94% candidate=-1.21% lag=2.15pp \u2264 5.0pp",
       "rules": [
         "yields_falling_to_reits"
+      ]
+    },
+    {
+      "symbol": "BRK.B",
+      "proxy_sensor": "HYG",
+      "proxy_5d_pct": 0.55,
+      "candidate_5d_pct": -1.03,
+      "lag_pp": 1.58,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy HYG=+0.55% candidate=-1.03% lag=1.58pp \u2264 5.0pp",
+      "rules": [
+        "credit_stress_to_quality_cash_flow"
+      ]
+    },
+    {
+      "symbol": "ETN",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 4.79,
+      "lag_pp": 1.07,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+4.79% lag=1.07pp \u2264 5.0pp",
+      "rules": [
+        "ai_capex_growth_to_data_centre_power"
+      ]
+    },
+    {
+      "symbol": "AVGO",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 5.25,
+      "lag_pp": 0.61,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+5.25% lag=0.61pp \u2264 5.0pp",
+      "rules": [
+        "ai_capex_growth_to_semiconductors"
+      ]
+    },
+    {
+      "symbol": "FTNT",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 6.02,
+      "lag_pp": -0.16,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+6.02% lag=-0.16pp \u2264 5.0pp",
+      "rules": [
+        "ai_capex_growth_to_cybersecurity"
       ]
     },
     {
       "symbol": "AMT",
       "proxy_sensor": "IEF",
-      "proxy_5d_pct": 0.85,
-      "candidate_5d_pct": 1.45,
-      "lag_pp": -0.59,
+      "proxy_5d_pct": 0.94,
+      "candidate_5d_pct": 1.83,
+      "lag_pp": -0.89,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy IEF=+0.85% candidate=+1.45% lag=-0.59pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy IEF=+0.94% candidate=+1.83% lag=-0.89pp \u2264 5.0pp",
       "rules": [
         "yields_falling_to_reits"
       ]
     },
     {
-      "symbol": "GE",
+      "symbol": "URI",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 6.88,
-      "lag_pp": -0.65,
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 7.01,
+      "lag_pp": -1.15,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+6.88% lag=-0.65pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+7.01% lag=-1.15pp \u2264 5.0pp",
       "rules": [
         "ai_capex_growth_to_infrastructure_reshoring",
         "geopolitical_risk_to_infrastructure_reshoring"
       ]
     },
     {
-      "symbol": "MSFT",
-      "proxy_sensor": "HYG",
-      "proxy_5d_pct": 0.46,
-      "candidate_5d_pct": 1.41,
-      "lag_pp": -0.95,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy HYG=+0.46% candidate=+1.41% lag=-0.95pp \u2264 5.0pp",
-      "rules": [
-        "credit_stress_to_quality_cash_flow"
-      ]
-    },
-    {
       "symbol": "AAPL",
       "proxy_sensor": "HYG",
-      "proxy_5d_pct": 0.46,
-      "candidate_5d_pct": 3.39,
-      "lag_pp": -2.93,
+      "proxy_5d_pct": 0.55,
+      "candidate_5d_pct": 1.76,
+      "lag_pp": -1.21,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy HYG=+0.46% candidate=+3.39% lag=-2.93pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy HYG=+0.55% candidate=+1.76% lag=-1.21pp \u2264 5.0pp",
       "rules": [
         "credit_stress_to_quality_cash_flow"
-      ]
-    },
-    {
-      "symbol": "XOM",
-      "proxy_sensor": "USO",
-      "proxy_5d_pct": -9.35,
-      "candidate_5d_pct": -5.96,
-      "lag_pp": -3.39,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy USO=-9.35% candidate=-5.96% lag=-3.39pp \u2264 5.0pp",
-      "rules": [
-        "oil_supply_shock_to_energy"
-      ]
-    },
-    {
-      "symbol": "NOW",
-      "proxy_sensor": "IEF",
-      "proxy_5d_pct": 0.85,
-      "candidate_5d_pct": 5.26,
-      "lag_pp": -4.4,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy IEF=+0.85% candidate=+5.26% lag=-4.40pp \u2264 5.0pp",
-      "rules": [
-        "yields_falling_to_software_cloud"
-      ]
-    },
-    {
-      "symbol": "CVX",
-      "proxy_sensor": "USO",
-      "proxy_5d_pct": -9.35,
-      "candidate_5d_pct": -4.34,
-      "lag_pp": -5.01,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy USO=-9.35% candidate=-4.34% lag=-5.01pp \u2264 5.0pp",
-      "rules": [
-        "oil_supply_shock_to_energy"
-      ]
-    },
-    {
-      "symbol": "DDOG",
-      "proxy_sensor": "IEF",
-      "proxy_5d_pct": 0.85,
-      "candidate_5d_pct": 6.13,
-      "lag_pp": -5.27,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy IEF=+0.85% candidate=+6.13% lag=-5.27pp \u2264 5.0pp",
-      "rules": [
-        "yields_falling_to_software_cloud"
-      ]
-    },
-    {
-      "symbol": "SLB",
-      "proxy_sensor": "USO",
-      "proxy_5d_pct": -9.35,
-      "candidate_5d_pct": -3.77,
-      "lag_pp": -5.58,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy USO=-9.35% candidate=-3.77% lag=-5.58pp \u2264 5.0pp",
-      "rules": [
-        "oil_supply_shock_to_energy"
-      ]
-    },
-    {
-      "symbol": "OXY",
-      "proxy_sensor": "USO",
-      "proxy_5d_pct": -9.35,
-      "candidate_5d_pct": -2.63,
-      "lag_pp": -6.72,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy USO=-9.35% candidate=-2.63% lag=-6.72pp \u2264 5.0pp",
-      "rules": [
-        "oil_supply_shock_to_energy"
       ]
     },
     {
       "symbol": "WDC",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 15.57,
-      "lag_pp": -9.34,
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 7.31,
+      "lag_pp": -1.44,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+15.57% lag=-9.34pp \u2264 5.0pp",
-      "rules": [
-        "ai_capex_to_memory_storage"
-      ]
-    },
-    {
-      "symbol": "AMD",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 15.75,
-      "lag_pp": -9.53,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+15.75% lag=-9.53pp \u2264 5.0pp",
-      "rules": [
-        "ai_capex_growth_to_semiconductors"
-      ]
-    },
-    {
-      "symbol": "STX",
-      "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 17.26,
-      "lag_pp": -11.03,
-      "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+17.26% lag=-11.03pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+7.31% lag=-1.44pp \u2264 5.0pp",
       "rules": [
         "ai_capex_to_memory_storage"
       ]
@@ -470,35 +301,204 @@
     {
       "symbol": "SNDK",
       "proxy_sensor": "SMH",
-      "proxy_5d_pct": 6.23,
-      "candidate_5d_pct": 17.89,
-      "lag_pp": -11.66,
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 7.48,
+      "lag_pp": -1.62,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy SMH=+6.23% candidate=+17.89% lag=-11.66pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+7.48% lag=-1.62pp \u2264 5.0pp",
       "rules": [
         "ai_capex_to_memory_storage"
       ]
     },
     {
+      "symbol": "GE",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 7.61,
+      "lag_pp": -1.75,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+7.61% lag=-1.75pp \u2264 5.0pp",
+      "rules": [
+        "ai_capex_growth_to_infrastructure_reshoring",
+        "geopolitical_risk_to_infrastructure_reshoring"
+      ]
+    },
+    {
+      "symbol": "STX",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 7.72,
+      "lag_pp": -1.85,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+7.72% lag=-1.85pp \u2264 5.0pp",
+      "rules": [
+        "ai_capex_to_memory_storage"
+      ]
+    },
+    {
+      "symbol": "ADBE",
+      "proxy_sensor": "IEF",
+      "proxy_5d_pct": 0.94,
+      "candidate_5d_pct": 4.78,
+      "lag_pp": -3.84,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy IEF=+0.94% candidate=+4.78% lag=-3.84pp \u2264 5.0pp",
+      "rules": [
+        "yields_falling_to_software_cloud"
+      ]
+    },
+    {
+      "symbol": "XOM",
+      "proxy_sensor": "USO",
+      "proxy_5d_pct": -10.4,
+      "candidate_5d_pct": -6.11,
+      "lag_pp": -4.29,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy USO=-10.40% candidate=-6.11% lag=-4.29pp \u2264 5.0pp",
+      "rules": [
+        "oil_supply_shock_to_energy"
+      ]
+    },
+    {
+      "symbol": "PANW",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 10.21,
+      "lag_pp": -4.35,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+10.21% lag=-4.35pp \u2264 5.0pp",
+      "rules": [
+        "ai_capex_growth_to_cybersecurity"
+      ]
+    },
+    {
+      "symbol": "MSFT",
+      "proxy_sensor": "HYG",
+      "proxy_5d_pct": 0.55,
+      "candidate_5d_pct": 5.71,
+      "lag_pp": -5.16,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy HYG=+0.55% candidate=+5.71% lag=-5.16pp \u2264 5.0pp",
+      "rules": [
+        "credit_stress_to_quality_cash_flow"
+      ]
+    },
+    {
+      "symbol": "CVX",
+      "proxy_sensor": "USO",
+      "proxy_5d_pct": -10.4,
+      "candidate_5d_pct": -4.52,
+      "lag_pp": -5.89,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy USO=-10.40% candidate=-4.52% lag=-5.89pp \u2264 5.0pp",
+      "rules": [
+        "oil_supply_shock_to_energy"
+      ]
+    },
+    {
+      "symbol": "SLB",
+      "proxy_sensor": "USO",
+      "proxy_5d_pct": -10.4,
+      "candidate_5d_pct": -4.03,
+      "lag_pp": -6.37,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy USO=-10.40% candidate=-4.03% lag=-6.37pp \u2264 5.0pp",
+      "rules": [
+        "oil_supply_shock_to_energy"
+      ]
+    },
+    {
+      "symbol": "OXY",
+      "proxy_sensor": "USO",
+      "proxy_5d_pct": -10.4,
+      "candidate_5d_pct": -3.94,
+      "lag_pp": -6.46,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy USO=-10.40% candidate=-3.94% lag=-6.46pp \u2264 5.0pp",
+      "rules": [
+        "oil_supply_shock_to_energy"
+      ]
+    },
+    {
+      "symbol": "CRWD",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 12.46,
+      "lag_pp": -6.59,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+12.46% lag=-6.59pp \u2264 5.0pp",
+      "rules": [
+        "ai_capex_growth_to_cybersecurity"
+      ]
+    },
+    {
+      "symbol": "AMD",
+      "proxy_sensor": "SMH",
+      "proxy_5d_pct": 5.87,
+      "candidate_5d_pct": 12.7,
+      "lag_pp": -6.84,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy SMH=+5.87% candidate=+12.70% lag=-6.84pp \u2264 5.0pp",
+      "rules": [
+        "ai_capex_growth_to_semiconductors"
+      ]
+    },
+    {
       "symbol": "IREN",
       "proxy_sensor": "NVDA",
-      "proxy_5d_pct": -4.13,
-      "candidate_5d_pct": 21.51,
-      "lag_pp": -25.64,
+      "proxy_5d_pct": -0.98,
+      "candidate_5d_pct": 7.19,
+      "lag_pp": -8.17,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy NVDA=-4.13% candidate=+21.51% lag=-25.64pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy NVDA=-0.98% candidate=+7.19% lag=-8.17pp \u2264 5.0pp",
       "rules": [
         "ai_compute_demand_to_ai_compute_infrastructure"
       ]
     },
     {
+      "symbol": "CRM",
+      "proxy_sensor": "IEF",
+      "proxy_5d_pct": 0.94,
+      "candidate_5d_pct": 9.15,
+      "lag_pp": -8.21,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy IEF=+0.94% candidate=+9.15% lag=-8.21pp \u2264 5.0pp",
+      "rules": [
+        "yields_falling_to_software_cloud"
+      ]
+    },
+    {
+      "symbol": "DDOG",
+      "proxy_sensor": "IEF",
+      "proxy_5d_pct": 0.94,
+      "candidate_5d_pct": 11.45,
+      "lag_pp": -10.5,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy IEF=+0.94% candidate=+11.45% lag=-10.50pp \u2264 5.0pp",
+      "rules": [
+        "yields_falling_to_software_cloud"
+      ]
+    },
+    {
+      "symbol": "NOW",
+      "proxy_sensor": "IEF",
+      "proxy_5d_pct": 0.94,
+      "candidate_5d_pct": 24.14,
+      "lag_pp": -23.2,
+      "thesis_intact": true,
+      "reason": "OK \u2014 proxy IEF=+0.94% candidate=+24.14% lag=-23.20pp \u2264 5.0pp",
+      "rules": [
+        "yields_falling_to_software_cloud"
+      ]
+    },
+    {
       "symbol": "SMCI",
       "proxy_sensor": "NVDA",
-      "proxy_5d_pct": -4.13,
-      "candidate_5d_pct": 23.43,
-      "lag_pp": -27.56,
+      "proxy_5d_pct": -0.98,
+      "candidate_5d_pct": 37.87,
+      "lag_pp": -38.84,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy NVDA=-4.13% candidate=+23.43% lag=-27.56pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy NVDA=-0.98% candidate=+37.87% lag=-38.84pp \u2264 5.0pp",
       "rules": [
         "ai_compute_demand_to_ai_compute_infrastructure"
       ]
@@ -506,11 +506,11 @@
     {
       "symbol": "DELL",
       "proxy_sensor": "NVDA",
-      "proxy_5d_pct": -4.13,
-      "candidate_5d_pct": 30.51,
-      "lag_pp": -34.64,
+      "proxy_5d_pct": -0.98,
+      "candidate_5d_pct": 63.76,
+      "lag_pp": -64.74,
       "thesis_intact": true,
-      "reason": "OK \u2014 proxy NVDA=-4.13% candidate=+30.51% lag=-34.64pp \u2264 5.0pp",
+      "reason": "OK \u2014 proxy NVDA=-0.98% candidate=+63.76% lag=-64.74pp \u2264 5.0pp",
       "rules": [
         "ai_compute_demand_to_ai_compute_infrastructure"
       ]

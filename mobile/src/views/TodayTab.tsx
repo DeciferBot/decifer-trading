@@ -650,21 +650,19 @@ function HeroHeader({
           v == null ? "#475569" : v > 0 ? "#34d399" : v < 0 ? "#f87171" : "#64748b";
         const pctS = (v: number | null) => (v != null && v > 0 ? "+" : "");
         return (
-          <div className="overflow-x-auto" style={{ borderTop: `1px solid ${c.border}20` }}>
-            <div className="flex gap-px py-2 px-4" style={{ minWidth: "max-content" }}>
-              {sectors.map(s => (
-                <div
-                  key={s.label}
-                  className="flex flex-col items-center px-3 py-1.5 rounded"
-                  style={{ background: "rgba(255,255,255,0.03)", minWidth: "72px" }}
-                >
-                  <p className="text-[9px] text-slate-500 uppercase tracking-wide mb-0.5 whitespace-nowrap">{s.label}</p>
-                  <p className="text-[12px] font-bold leading-none" style={{ color: pctC(s.pct) }}>
-                    {s.pct != null ? `${pctS(s.pct)}${s.pct.toFixed(2)}%` : "—"}
-                  </p>
-                </div>
-              ))}
-            </div>
+          <div className="px-4 py-2.5 flex flex-wrap gap-1.5" style={{ borderTop: `1px solid ${c.border}20` }}>
+            {sectors.map(s => (
+              <div
+                key={s.label}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}
+              >
+                <span className="text-[10px] text-slate-400 whitespace-nowrap">{s.label}</span>
+                <span className="text-[11px] font-bold leading-none" style={{ color: pctC(s.pct) }}>
+                  {s.pct != null ? `${pctS(s.pct)}${s.pct.toFixed(2)}%` : "—"}
+                </span>
+              </div>
+            ))}
           </div>
         );
       })()}
