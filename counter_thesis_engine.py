@@ -566,7 +566,7 @@ def build_counter_thesis_report(use_fmp: bool = True) -> CounterThesisReport:
 
     # Fetch FMP data once for all symbols
     fmp_data: dict[str, dict] = {}
-    data_freshness = "unavailable"
+    data_freshness = "curated"
     if use_fmp and all_symbols:
         fmp_data = _fetch_fmp_metrics(list(all_symbols))
         data_freshness = "live" if any(fmp_data.values()) else "unavailable"

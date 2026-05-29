@@ -1022,7 +1022,7 @@ async function loadData() {
     document.getElementById('meta-bar').innerHTML = `
       <span>Generated: ${formatTs(data.generated_at)}</span>
       <span class="sep">·</span>
-      <span>Data: <strong style="color:${data.data_freshness === 'live' ? '#2ecc71' : '#f1c40f'}">${data.data_freshness}</strong></span>
+      <span>Data: <strong style="color:${data.data_freshness === 'live' ? '#2ecc71' : data.data_freshness === 'curated' ? '#aaa' : '#f1c40f'}">${data.data_freshness}</strong></span>
       <span class="sep">·</span>
       <span>${(data.structural_conflicts || []).length} active conflicts · ${(data.dormant_conflicts || []).length} dormant</span>
       <span class="sep">·</span>
