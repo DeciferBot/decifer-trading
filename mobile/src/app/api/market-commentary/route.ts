@@ -3,8 +3,31 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Human-readable labels for raw driver IDs (mirrors FORCE_LABELS in customerBriefingModel.ts)
+const DRIVER_LABELS: Record<string, string> = {
+  ai_capex_growth:          "AI infrastructure spending",
+  ai_compute_demand:        "AI compute demand",
+  yields_rising:            "rising bond yields",
+  yields_falling:           "falling bond yields",
+  oil_supply_shock:         "oil supply pressure",
+  geopolitical_risk_rising: "geopolitical risk",
+  risk_on_rotation:         "risk-on rotation",
+  risk_off:                 "risk-off sentiment",
+  gold_safe_haven_bid:      "gold safe-haven demand",
+  credit_stress_easing:     "easing credit stress",
+  small_cap_risk_on:        "small-cap risk-on",
+  defence_rearmament:       "defence rearmament spending",
+  futures_risk_on:          "positive futures positioning",
+  futures_risk_off:         "negative futures positioning",
+};
+
+function driverLabel(raw: string): string {
+  return DRIVER_LABELS[raw] ?? raw.toLowerCase().replace(/_/g, " ");
+}
+
 // 10-minute Vercel cache — commentary refreshes often enough but LLM calls are expensive
 export const revalidate = 600;
+export const maxDuration = 30; // LLM call needs >10s default
 
 export interface MarketCommentaryPayload {
   summary: string;           // 3-4 sentence briefing: yesterday + cross-asset + overnight
@@ -309,18 +332,13 @@ Return only the JSON object. No markdown, no explanation outside the JSON.`;
 
     // 3. Driver context
     if (drivers.length > 0) {
-      const driverStr = drivers.slice(0, 2).map(d => d.toLowerCase().replace(/_/g, " ")).join(" and ");
+      const driverStr = drivers.slice(0, 2).map(driverLabel).join(" and ");
       fallbackSentences.push(`The primary forces in the market right now are ${driverStr}.`);
     } else if (mood) {
       fallbackSentences.push(`The overall tone is ${mood.toLowerCase()}.`);
     }
 
-    // 4. Conflict/tension note
-    if (knownConflicts.length > 0) {
-      fallbackSentences.push(`Worth watching: ${knownConflicts[0]}`);
-    }
-
-    // 5. Econ calendar note
+    // 4. Econ calendar note (conflict/tension is surfaced by the caution box in the UI, not here)
     if (econRaw.length > 0) {
       const highImpact = econRaw.filter(e => e.impact === "High");
       if (highImpact.length > 0) {
