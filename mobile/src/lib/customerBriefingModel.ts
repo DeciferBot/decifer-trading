@@ -95,17 +95,28 @@ function sanitiseMacroLabel(raw: string): string {
   return text.replace(/\s{2,}/g, " ").trim();
 }
 
+function isRiskDirectionText(text: string): boolean {
+  const lower = text.toLowerCase();
+  return lower.startsWith("risk-on") || lower.startsWith("risk-off") ||
+    lower.startsWith("neutral —") || lower.startsWith("assessing market");
+}
+
 function resolveMacroLabel(
   key_drivers: string[],
   market_mood: string | undefined,
   market_state: string,
 ): string {
-  if (market_mood && market_mood.length < 120) {
+  // Driver-based label is always more specific than a generic risk direction phrase.
+  // Check drivers first so we don't fall through to a market_mood that says
+  // "Risk-off..." when the regime badge already shows the risk direction.
+  const topDriver = key_drivers[0];
+  if (topDriver && MACRO_LABELS[topDriver]) return MACRO_LABELS[topDriver];
+
+  // Only use market_mood if it adds context beyond a plain risk-direction label.
+  if (market_mood && market_mood.length < 120 && !isRiskDirectionText(market_mood)) {
     const sanitised = sanitiseMacroLabel(market_mood);
     if (sanitised.length > 10) return sanitised;
   }
-  const topDriver = key_drivers[0];
-  if (topDriver && MACRO_LABELS[topDriver]) return MACRO_LABELS[topDriver];
   if (market_state === "risk-on") return "Risk appetite is constructive today";
   if (market_state === "risk-off") return "Risk appetite is cautious today";
   if (market_state === "mixed") return "Conflicting forces are active today";

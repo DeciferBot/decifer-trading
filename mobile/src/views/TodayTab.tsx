@@ -39,6 +39,23 @@ import type { MarketCommentaryPayload } from "@/app/api/market-commentary/route"
 import type { NewsItem } from "@/app/api/market-news/route";
 import { fetchUniverseSymbols } from "@/lib/customerApi";
 
+// Maps the verbose backend regime label to a compact classification name.
+const REGIME_SHORT_NAME: Record<string, string> = {
+  "Risk-on — equities trending higher": "Trending Up",
+  "Risk-off — equities declining":      "Trending Down",
+  "Risk-off — bear market in progress": "Bear Market",
+  "Risk-on — bounce underway":          "Relief Rally",
+  "Neutral — choppy, no clear direction": "Choppy",
+  "Risk-off — extreme volatility":      "Panic",
+  "Neutral — markets consolidating":    "Range Bound",
+  "Risk-off — extreme fear, capitulation": "Capitulation",
+};
+
+function regimeShortName(label: string | undefined): string | null {
+  if (!label) return null;
+  return REGIME_SHORT_NAME[label] ?? null;
+}
+
 // ── Regime colour palette ─────────────────────────────────────────────────────
 
 function regimeColors(state: string) {
@@ -553,8 +570,17 @@ function HeroHeader({
                 className="text-[10px] font-bold px-2.5 py-0.5 rounded-full tracking-wide"
                 style={{ background: c.badge, color: c.text }}
               >
-                {data.market_regime_label ?? ms.regime.label}
+                {ms.regime.label}
               </span>
+              {(() => {
+                const short = regimeShortName(data.market_regime_label);
+                return short ? (
+                  <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full tracking-wide"
+                    style={{ background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>
+                    {short}
+                  </span>
+                ) : null;
+              })()}
             </div>
             <p className="text-[11px] leading-snug ml-4" style={{ color: `${c.text}99` }}>
               {regimeDescription(data.market_regime_label, ms.regime.description)}
@@ -1741,18 +1767,29 @@ function NewsSection({ ttgSymbolMap }: { ttgSymbolMap: Map<string, { theme_label
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  {/* Meta row: age + ticker + theme */}
+                  {/* Meta row: age + logo + ticker + theme */}
                   <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                     <span className="text-[10px]" style={{ color: "#475569" }}>
                       {formatNewsAge(item.minutesAgo)}
                     </span>
                     {item.symbol && (
-                      <span
-                        className="text-[9px] font-black px-1.5 py-0.5 rounded"
-                        style={{ background: "rgba(255,255,255,0.06)", color: "#e2e8f0" }}
-                      >
-                        {item.symbol}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <img
+                          src={`https://financialmodelingprep.com/image-stock/${item.symbol}.png`}
+                          alt={item.symbol}
+                          width={16}
+                          height={16}
+                          className="rounded-sm shrink-0"
+                          style={{ objectFit: "contain", background: "rgba(255,255,255,0.08)" }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                        <span
+                          className="text-[9px] font-black px-1.5 py-0.5 rounded"
+                          style={{ background: "rgba(255,255,255,0.06)", color: "#e2e8f0" }}
+                        >
+                          {item.symbol}
+                        </span>
+                      </div>
                     )}
                     {themeInfo && (
                       <span
