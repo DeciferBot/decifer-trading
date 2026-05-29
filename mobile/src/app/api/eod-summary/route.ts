@@ -117,11 +117,32 @@ async function fetchTape(): Promise<EodTape> {
   return tape;
 }
 
+// Minimum market cap for movers — excludes micro-cap / low-float junk that dominates raw % gainers.
+const MIN_MOVER_MARKET_CAP = 1_000_000_000; // $1B
+
+async function fetchMarketCaps(symbols: string[]): Promise<Record<string, number>> {
+  if (!symbols.length || !FMP_KEY) return {};
+  try {
+    // FMP profile supports comma-separated symbols; returns array or single object.
+    const syms = symbols.join(",");
+    const res = await fetch(`${BASE}/profile?symbol=${syms}&apikey=${FMP_KEY}`, { cache: "no-store" });
+    if (!res.ok) return {};
+    const raw = await res.json();
+    const rows: Array<{ symbol: string; mktCap?: number; marketCap?: number }> = Array.isArray(raw) ? raw : [raw];
+    const map: Record<string, number> = {};
+    for (const r of rows) {
+      const cap = r.mktCap ?? r.marketCap;
+      if (r.symbol && typeof cap === "number") map[r.symbol] = cap;
+    }
+    return map;
+  } catch { return {}; }
+}
+
 async function fetchMovers(): Promise<{ gainers: EodMover[]; losers: EodMover[]; text: string }> {
   const empty = { gainers: [], losers: [], text: "" };
   if (!FMP_KEY) return empty;
 
-  type RawMover = { symbol: string; name: string; changesPercentage: number | string; price?: number };
+  type RawMover = { symbol: string; name: string; changesPercentage: number | string; price?: number; marketCap?: number };
 
   const parseMover = (r: RawMover): EodMover => {
     const rawPct = typeof r.changesPercentage === "string"
@@ -140,22 +161,34 @@ async function fetchMovers(): Promise<{ gainers: EodMover[]; losers: EodMover[];
     fetch(`${BASE}/biggest-losers?apikey=${FMP_KEY}`, { cache: "no-store" }),
   ]);
 
-  let gainers: EodMover[] = [];
-  let losers: EodMover[] = [];
+  let rawGainers: RawMover[] = [];
+  let rawLosers: RawMover[] = [];
 
   if (gainersRes.status === "fulfilled" && gainersRes.value.ok) {
-    try {
-      const raw: RawMover[] = await gainersRes.value.json();
-      gainers = raw.slice(0, 5).map(parseMover);
-    } catch { /* graceful */ }
+    try { rawGainers = await gainersRes.value.json(); } catch { /* graceful */ }
+  }
+  if (losersRes.status === "fulfilled" && losersRes.value.ok) {
+    try { rawLosers = await losersRes.value.json(); } catch { /* graceful */ }
   }
 
-  if (losersRes.status === "fulfilled" && losersRes.value.ok) {
-    try {
-      const raw: RawMover[] = await losersRes.value.json();
-      losers = raw.slice(0, 5).map(parseMover);
-    } catch { /* graceful */ }
-  }
+  // Fetch market caps for the top-30 candidates from each list, then filter >= $1B.
+  const candidateSymbols = [
+    ...rawGainers.slice(0, 30).map(r => r.symbol),
+    ...rawLosers.slice(0, 30).map(r => r.symbol),
+  ].filter((s, i, a) => s && a.indexOf(s) === i);
+
+  const mcapMap = await fetchMarketCaps(candidateSymbols);
+
+  const meetsCapThreshold = (r: RawMover): boolean => {
+    // Use market cap from gainers response if available, else from profile fetch, else price floor fallback.
+    const cap = r.marketCap ?? mcapMap[r.symbol];
+    if (typeof cap === "number") return cap >= MIN_MOVER_MARKET_CAP;
+    // Fallback: price >= $15 as rough proxy when market cap data is unavailable.
+    return (r.price ?? 0) >= 15;
+  };
+
+  const gainers = rawGainers.filter(meetsCapThreshold).slice(0, 5).map(parseMover);
+  const losers = rawLosers.filter(meetsCapThreshold).slice(0, 5).map(parseMover);
 
   const lines: string[] = [];
   if (gainers.length)

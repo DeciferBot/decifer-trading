@@ -22,6 +22,157 @@ const EOD_EMAIL_TO: string[] = (process.env.EOD_EMAIL_TO ?? "amit@decifer.io")
   .map((e) => e.trim())
   .filter(Boolean);
 
+// ── TTG symbol → theme map (compiled from data/intelligence/theme_graph/) ─────
+// Short labels used in email chips. Update when TTG roster changes.
+
+const TTG_THEME_SHORT: Record<string, string> = {
+  "ai_energy_nuclear": "AI Energy",
+  "glp1_metabolic_health": "GLP-1",
+  "defence_rearmament": "Defence",
+  "cybersecurity_digital_resilience": "Cybersecurity",
+  "reshoring_industrial_capex": "Reshoring",
+  "housing_rate_sensitivity": "Housing",
+  "water_infrastructure": "Water Infra",
+  "critical_minerals_copper": "Copper",
+  "gold_real_assets": "Gold",
+  "digital_assets_infrastructure": "Crypto Infra",
+};
+
+interface ThemeEntry { theme_id: string; exposure: string }
+
+const TTG_SYMBOL_MAP: Record<string, ThemeEntry> = {
+  NVDA: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  AMD: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  AVGO: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  MRVL: { theme_id: "ai_energy_nuclear", exposure: "supply_chain" },
+  ANET: { theme_id: "ai_energy_nuclear", exposure: "supply_chain" },
+  SMCI: { theme_id: "ai_energy_nuclear", exposure: "supply_chain" },
+  DELL: { theme_id: "ai_energy_nuclear", exposure: "supply_chain" },
+  VRT: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  ETN: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  PWR: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  EME: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  HUBB: { theme_id: "ai_energy_nuclear", exposure: "supply_chain" },
+  CEG: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  VST: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  NEE: { theme_id: "ai_energy_nuclear", exposure: "2nd_order" },
+  CCJ: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  UEC: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  UUUU: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  DNN: { theme_id: "ai_energy_nuclear", exposure: "2nd_order" },
+  URA: { theme_id: "ai_energy_nuclear", exposure: "etf" },
+  URNM: { theme_id: "ai_energy_nuclear", exposure: "etf" },
+  LEU: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  BWXT: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  GEV: { theme_id: "ai_energy_nuclear", exposure: "direct" },
+  SMR: { theme_id: "ai_energy_nuclear", exposure: "2nd_order" },
+  NLR: { theme_id: "ai_energy_nuclear", exposure: "etf" },
+  LLY: { theme_id: "glp1_metabolic_health", exposure: "direct" },
+  NVO: { theme_id: "glp1_metabolic_health", exposure: "direct" },
+  WST: { theme_id: "glp1_metabolic_health", exposure: "direct" },
+  TMO: { theme_id: "glp1_metabolic_health", exposure: "supply_chain" },
+  DHR: { theme_id: "glp1_metabolic_health", exposure: "supply_chain" },
+  BDX: { theme_id: "glp1_metabolic_health", exposure: "supply_chain" },
+  DXCM: { theme_id: "glp1_metabolic_health", exposure: "2nd_order" },
+  PODD: { theme_id: "glp1_metabolic_health", exposure: "headwind" },
+  UNH: { theme_id: "glp1_metabolic_health", exposure: "2nd_order" },
+  MDLZ: { theme_id: "glp1_metabolic_health", exposure: "headwind" },
+  HSY: { theme_id: "glp1_metabolic_health", exposure: "headwind" },
+  KO: { theme_id: "glp1_metabolic_health", exposure: "headwind" },
+  MCD: { theme_id: "glp1_metabolic_health", exposure: "headwind" },
+  AMGN: { theme_id: "glp1_metabolic_health", exposure: "2nd_order" },
+  LMT: { theme_id: "defence_rearmament", exposure: "direct" },
+  RTX: { theme_id: "defence_rearmament", exposure: "direct" },
+  NOC: { theme_id: "defence_rearmament", exposure: "direct" },
+  GD: { theme_id: "defence_rearmament", exposure: "direct" },
+  LHX: { theme_id: "defence_rearmament", exposure: "direct" },
+  AVAV: { theme_id: "defence_rearmament", exposure: "direct" },
+  KTOS: { theme_id: "defence_rearmament", exposure: "direct" },
+  HII: { theme_id: "defence_rearmament", exposure: "direct" },
+  RKLB: { theme_id: "defence_rearmament", exposure: "2nd_order" },
+  PLTR: { theme_id: "defence_rearmament", exposure: "supply_chain" },
+  ITA: { theme_id: "defence_rearmament", exposure: "etf" },
+  XAR: { theme_id: "defence_rearmament", exposure: "etf" },
+  PANW: { theme_id: "cybersecurity_digital_resilience", exposure: "direct" },
+  CRWD: { theme_id: "cybersecurity_digital_resilience", exposure: "direct" },
+  FTNT: { theme_id: "cybersecurity_digital_resilience", exposure: "direct" },
+  ZS: { theme_id: "cybersecurity_digital_resilience", exposure: "direct" },
+  NET: { theme_id: "cybersecurity_digital_resilience", exposure: "direct" },
+  OKTA: { theme_id: "cybersecurity_digital_resilience", exposure: "direct" },
+  CYBR: { theme_id: "cybersecurity_digital_resilience", exposure: "direct" },
+  CIBR: { theme_id: "cybersecurity_digital_resilience", exposure: "etf" },
+  HACK: { theme_id: "cybersecurity_digital_resilience", exposure: "etf" },
+  AMAT: { theme_id: "reshoring_industrial_capex", exposure: "direct" },
+  LRCX: { theme_id: "reshoring_industrial_capex", exposure: "direct" },
+  KLAC: { theme_id: "reshoring_industrial_capex", exposure: "direct" },
+  ASML: { theme_id: "reshoring_industrial_capex", exposure: "direct" },
+  ROK: { theme_id: "reshoring_industrial_capex", exposure: "direct" },
+  HON: { theme_id: "reshoring_industrial_capex", exposure: "supply_chain" },
+  NUE: { theme_id: "reshoring_industrial_capex", exposure: "supply_chain" },
+  VMC: { theme_id: "reshoring_industrial_capex", exposure: "supply_chain" },
+  PAVE: { theme_id: "reshoring_industrial_capex", exposure: "etf" },
+  DHI: { theme_id: "housing_rate_sensitivity", exposure: "direct" },
+  LEN: { theme_id: "housing_rate_sensitivity", exposure: "direct" },
+  PHM: { theme_id: "housing_rate_sensitivity", exposure: "direct" },
+  NVR: { theme_id: "housing_rate_sensitivity", exposure: "direct" },
+  BLDR: { theme_id: "housing_rate_sensitivity", exposure: "supply_chain" },
+  OC: { theme_id: "housing_rate_sensitivity", exposure: "supply_chain" },
+  HD: { theme_id: "housing_rate_sensitivity", exposure: "2nd_order" },
+  LOW: { theme_id: "housing_rate_sensitivity", exposure: "2nd_order" },
+  RKT: { theme_id: "housing_rate_sensitivity", exposure: "direct" },
+  FNF: { theme_id: "housing_rate_sensitivity", exposure: "supply_chain" },
+  ITB: { theme_id: "housing_rate_sensitivity", exposure: "etf" },
+  XHB: { theme_id: "housing_rate_sensitivity", exposure: "etf" },
+  AWK: { theme_id: "water_infrastructure", exposure: "direct" },
+  WTRG: { theme_id: "water_infrastructure", exposure: "direct" },
+  XYL: { theme_id: "water_infrastructure", exposure: "direct" },
+  PNR: { theme_id: "water_infrastructure", exposure: "direct" },
+  ITRI: { theme_id: "water_infrastructure", exposure: "direct" },
+  ECL: { theme_id: "water_infrastructure", exposure: "direct" },
+  PHO: { theme_id: "water_infrastructure", exposure: "etf" },
+  FIW: { theme_id: "water_infrastructure", exposure: "etf" },
+  FCX: { theme_id: "critical_minerals_copper", exposure: "direct" },
+  COPX: { theme_id: "critical_minerals_copper", exposure: "etf" },
+  SCCO: { theme_id: "critical_minerals_copper", exposure: "direct" },
+  TECK: { theme_id: "critical_minerals_copper", exposure: "supply_chain" },
+  ALB: { theme_id: "critical_minerals_copper", exposure: "direct" },
+  SQM: { theme_id: "critical_minerals_copper", exposure: "direct" },
+  MP: { theme_id: "critical_minerals_copper", exposure: "direct" },
+  ICOP: { theme_id: "critical_minerals_copper", exposure: "etf" },
+  LIT: { theme_id: "critical_minerals_copper", exposure: "etf" },
+  NEM: { theme_id: "gold_real_assets", exposure: "direct" },
+  GOLD: { theme_id: "gold_real_assets", exposure: "direct" },
+  AEM: { theme_id: "gold_real_assets", exposure: "direct" },
+  FNV: { theme_id: "gold_real_assets", exposure: "direct" },
+  WPM: { theme_id: "gold_real_assets", exposure: "direct" },
+  RGLD: { theme_id: "gold_real_assets", exposure: "direct" },
+  GDX: { theme_id: "gold_real_assets", exposure: "etf" },
+  GDXJ: { theme_id: "gold_real_assets", exposure: "etf" },
+  IAU: { theme_id: "gold_real_assets", exposure: "etf" },
+  IBIT: { theme_id: "digital_assets_infrastructure", exposure: "etf" },
+  FBTC: { theme_id: "digital_assets_infrastructure", exposure: "etf" },
+  GBTC: { theme_id: "digital_assets_infrastructure", exposure: "etf" },
+  COIN: { theme_id: "digital_assets_infrastructure", exposure: "direct" },
+  HOOD: { theme_id: "digital_assets_infrastructure", exposure: "2nd_order" },
+  MSTR: { theme_id: "digital_assets_infrastructure", exposure: "direct" },
+  MARA: { theme_id: "digital_assets_infrastructure", exposure: "direct" },
+  RIOT: { theme_id: "digital_assets_infrastructure", exposure: "direct" },
+  CLSK: { theme_id: "digital_assets_infrastructure", exposure: "2nd_order" },
+  BLOK: { theme_id: "digital_assets_infrastructure", exposure: "etf" },
+};
+
+function getThemeLabel(symbol: string): string | null {
+  const entry = TTG_SYMBOL_MAP[symbol];
+  if (!entry) return null;
+  return TTG_THEME_SHORT[entry.theme_id] ?? null;
+}
+
+function buildThemeChip(symbol: string): string {
+  const label = getThemeLabel(symbol);
+  if (!label) return "";
+  return `<span style="display:inline-block;background:#1c2a1c;border:1px solid #2d4a2d;color:#86efac;font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;letter-spacing:0.3px;margin-top:2px;">${label}</span>`;
+}
+
 // ── Tape formatting ───────────────────────────────────────────────────────────
 
 function fmtPct(v: number | null): string {
@@ -31,8 +182,8 @@ function fmtPct(v: number | null): string {
 
 function tapeColor(v: number | null, isVix = false): string {
   if (v === null) return "#6b7280";
-  if (isVix) return v > 20 ? "#ef4444" : v > 15 ? "#f59e0b" : "#22c55e";
-  return v >= 0 ? "#22c55e" : "#ef4444";
+  if (isVix) return v > 20 ? "#ef4444" : v > 15 ? "#f59e0b" : "#4ade80";
+  return v >= 0 ? "#4ade80" : "#ef4444";
 }
 
 // ── Category icons ────────────────────────────────────────────────────────────
@@ -64,11 +215,15 @@ function extractCategory(text: string): { icon: string; cleanText: string } {
 
 // ── Ticker highlighter ────────────────────────────────────────────────────────
 
-function highlightTickers(text: string): string {
-  return text.replace(
-    /\$([A-Z]{1,5})\b/g,
-    '<strong style="color:#f97316;font-weight:700;">$$$1</strong>'
-  );
+function highlightTickers(text: string, withTheme = false): string {
+  return text.replace(/\$([A-Z]{1,5})\b/g, (_match, sym) => {
+    const bold = `<strong style="color:#f97316;font-weight:700;">$${sym}</strong>`;
+    if (!withTheme) return bold;
+    const label = getThemeLabel(sym);
+    if (!label) return bold;
+    const chip = `<span style="display:inline-block;background:#1c2a1c;border:1px solid #2d4a2d;color:#86efac;font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;letter-spacing:0.3px;margin-left:3px;vertical-align:middle;">${label}</span>`;
+    return bold + chip;
+  });
 }
 
 // ── Tape cell builder ─────────────────────────────────────────────────────────
@@ -93,7 +248,8 @@ function buildMoverRows(movers: EodMover[], color: string, sign: string): string
         <table cellpadding="0" cellspacing="0" width="100%"><tr>
           <td style="vertical-align:middle;">
             <div style="color:#f97316;font-weight:700;font-size:12px;font-family:'Courier New',Courier,monospace;letter-spacing:0.5px;">${m.symbol}</div>
-            <div style="color:#374151;font-size:10px;overflow:hidden;white-space:nowrap;max-width:90px;text-overflow:ellipsis;">${m.name.slice(0, 20)}</div>
+            <div style="color:#6b7280;font-size:10px;overflow:hidden;white-space:nowrap;max-width:90px;text-overflow:ellipsis;">${m.name.slice(0, 20)}</div>
+            ${buildThemeChip(m.symbol)}
           </td>
           <td align="right" style="vertical-align:middle;white-space:nowrap;padding-left:8px;">
             <div style="color:${color};font-size:15px;font-weight:700;line-height:1.2;">${pctStr}</div>
@@ -139,7 +295,7 @@ function buildMoversSection(gainers: EodMover[], losers: EodMover[]): string {
 
 function buildItemRow(text: string, index: number): string {
   const { icon, cleanText } = extractCategory(text);
-  const highlighted = highlightTickers(cleanText);
+  const highlighted = highlightTickers(cleanText, true);
   return `
   <tr>
     <td style="padding:14px 0;border-bottom:1px solid #1f2937;vertical-align:top;">
@@ -148,7 +304,7 @@ function buildItemRow(text: string, index: number): string {
           <div style="width:22px;height:22px;background:#1f2937;border-radius:50%;text-align:center;line-height:22px;color:#f97316;font-weight:700;font-size:11px;">${index}</div>
         </td>
         <td style="width:20px;vertical-align:top;padding-top:1px;padding-left:6px;font-size:14px;line-height:22px;">${icon}</td>
-        <td style="color:#d1d5db;font-size:14px;line-height:1.55;padding-left:8px;">${highlighted}</td>
+        <td style="color:#d1d5db;font-size:14px;line-height:1.6;padding-left:8px;">${highlighted}</td>
       </tr></table>
     </td>
   </tr>`;
@@ -212,7 +368,7 @@ function renderWatchSection(raw: string): string {
         <tr>
           <td style="padding:5px 0;border-bottom:1px solid #111827;vertical-align:middle;">
             <div style="color:#f97316;font-weight:700;font-size:12px;font-family:'Courier New',monospace;">${sym}</div>
-            <div style="color:#4b5563;font-size:10px;">${name}</div>
+            <div style="color:#6b7280;font-size:10px;">${name}</div>
           </td>
           <td style="padding:5px 8px;border-bottom:1px solid #111827;vertical-align:middle;">
             <span style="background:#1f2937;color:#9ca3af;font-size:10px;padding:2px 6px;border-radius:3px;font-weight:600;white-space:nowrap;">${timingLabel}</span>
@@ -360,8 +516,8 @@ export function buildHtml(payload: EodSummaryPayload): string {
       <!-- Footer -->
       <tr>
         <td style="background:#030712;border-radius:0 0 12px 12px;padding:20px 32px;border-top:1px solid #111827;">
-          <div style="color:#374151;font-size:12px;line-height:1.6;">Generated ${generatedStr} &nbsp;·&nbsp; Decifer Trading &nbsp;·&nbsp; Paper account only</div>
-          <div style="color:#1f2937;font-size:11px;margin-top:4px;">Data: FMP &amp; Alpaca &nbsp;·&nbsp; Synthesis: Claude Sonnet &nbsp;·&nbsp; Not financial advice.</div>
+          <div style="color:#6b7280;font-size:12px;line-height:1.6;">Generated ${generatedStr} &nbsp;·&nbsp; Decifer Trading &nbsp;·&nbsp; Paper account only</div>
+          <div style="color:#4b5563;font-size:11px;margin-top:4px;">Data: FMP &amp; Alpaca &nbsp;·&nbsp; Synthesis: Claude Sonnet &nbsp;·&nbsp; Not financial advice.</div>
         </td>
       </tr>
 
