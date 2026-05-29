@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.decifer.intelligence-sync.plist
+
+  Syncs fresh intelligence data from the Mac to the DigitalOcean droplet after
+  the intelligence pipeline runs each day.
+
+  Schedule: Monday–Friday 16:50 Dubai time — 5 minutes after the pipeline (16:45).
+  Worker  : scripts/sync_intelligence_to_cloud.sh (rsync to root@206.189.135.189)
+
+  INSTALL:
+    cp ops/launchd/com.decifer.intelligence-sync.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.decifer.intelligence-sync.plist
+
+  KICKSTART (run immediately):
+    launchctl kickstart -p gui/$(id -u)/com.decifer.intelligence-sync
+
+  VIEW LOGS:
+    tail -f /tmp/decifer-intelligence-sync.log
+
+  UNINSTALL:
+    launchctl unload ~/Library/LaunchAgents/com.decifer.intelligence-sync.plist
+    rm ~/Library/LaunchAgents/com.decifer.intelligence-sync.plist
+-->
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>com.decifer.intelligence-sync</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>scripts/sync_intelligence_to_cloud.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/amitchopra/Desktop/decifer trading</string>
+
+  <!-- 16:50 Monday–Friday Dubai local time — 5 min after intelligence pipeline -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>50</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/decifer-intelligence-sync.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/decifer-intelligence-sync.err</string>
+
+  <key>KeepAlive</key>
+  <false/>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+</dict>
+</plist>
