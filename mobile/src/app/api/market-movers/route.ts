@@ -41,7 +41,7 @@ async function filterByMarketCap(movers: Mover[]): Promise<Mover[]> {
   const symbols = movers.map(m => m.symbol).join(",");
   try {
     const res = await fetch(
-      `https://financialmodelingprep.com/stable/batch-quote-short?symbols=${symbols}&apikey=${FMP_KEY}`,
+      `https://financialmodelingprep.com/stable/batch-quote?symbols=${symbols}&apikey=${FMP_KEY}`,
       { next: { revalidate: 300 } }
     );
     if (!res.ok) return movers;

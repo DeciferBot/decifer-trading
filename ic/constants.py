@@ -60,19 +60,19 @@ EQUAL_WEIGHTS: dict = {d: 1.0 / _N for d in DIMENSIONS}
 #
 # Sum = 1.00 (verified).
 BASELINE_WEIGHTS: dict = {
-    "trend":            0.12,
+    "trend":            0.13,
     "momentum":         0.10,
     "squeeze":          0.09,
-    "flow":             0.07,
+    "flow":             0.08,
     "breakout":         0.09,
-    "mtf":              0.07,
+    "mtf":              0.08,
     "news":             0.15,
     "social":           0.12,
     "reversion":        0.07,
     "iv_skew":          0.05,
     "pead":             0.00,
     "short_squeeze":    0.04,
-    "overnight_drift":  0.03,
+    "overnight_drift":  0.00,  # BLOCKED CRITICAL: negative IC in both candidate and execution
     "analyst_revision": 0.00,
     "insider_buying":   0.00,
 }

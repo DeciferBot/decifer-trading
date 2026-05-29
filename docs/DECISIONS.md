@@ -6,6 +6,32 @@
 
 ---
 
+## 2026-05-30 — Signal dimension scorer fixes: momentum, flow, breakout, MTF, overnight_drift weight
+
+### Decision
+
+Four dimension scorers corrected to score signal initiation rather than confirmation. `BASELINE_WEIGHTS["overnight_drift"]` set to 0.00.
+
+**Momentum**: Added exhaustion zone (MFI > 72 or < 28 → max 3 pts). Removed score-8 path for `mfi_dist > 15` without RSI slope confirmation (was 8, now 4). RSI slope confirmation is now required for scores above 4.
+
+**Flow**: Replaced absolute VWAP distance threshold (`abs_vwap > 0.3% → +4`) with SD-normalized distance (`vwap_sds < 0.5 → +4`). Near VWAP (accumulation zone) now scores high; far from VWAP (chase zone) scores low. Uses `vwap_sd_pct` already computed by `compute_indicators()`.
+
+**Breakout**: Pre-breakout proximity now scores higher (5–7 pts) than confirmed intraday breach (2–4 pts). Gap-day breach retains original 6–10 pts. `_gap_mult > 1.0` is the gap indicator already in scope.
+
+**MTF**: Daily EMA alignment now gated by daily ADX. ADX 20–40 (building trend) → 8 pts; ADX > 40 (mature/extended) → 5 pts; ADX < 20 (early) → 5 pts. Weekly+daily confirmation → 10 pts (unchanged).
+
+**overnight_drift BASELINE weight**: Set to 0.00 (was 0.03). Dimension is already BLOCKED CRITICAL in walk-forward calibration (negative IC in both candidate p=0.009 and execution sources). The 0.03 weight redistributed to trend (0.12→0.13), flow (0.07→0.08), mtf (0.07→0.08). Sum = 1.00.
+
+### Reasoning
+
+Execution IC report (`data/signal_validation_report.json`) showed all four dimensions producing negative IC on the full 177-trade sample, but the quantile breakdown revealed the dimensions *work at the top score end* — the IC was being dragged negative by mid-range scores (e.g. momentum bucket 3: score 7–8, pnl −9.5% vs bucket 5: score ≥10, pnl +45.8%). The root cause was the same for all four: the scorers measured *confirmed* signal state (already extended) rather than *initiating* signal state (early in the move). Each fix targets the specific indicator causing this: exhaustion thresholds for momentum, SD normalization for flow, proximity-first for breakout, ADX maturity gating for MTF. 22 new tests added to `tests/test_signals.py`.
+
+### Constraints
+
+These are scorer changes, not weight changes. IC weights are still accumulated and governed by the existing IC calculator. BASELINE_WEIGHTS is the only baseline file changed.
+
+---
+
 ## 2026-05-26 — yfinance carve-out for ES=F / NQ=F futures (v4.49.0)
 
 ### Decision

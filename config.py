@@ -404,7 +404,7 @@ CONFIG = {
         # consecutive weekly updates, it is automatically disabled via
         # data/settings_override.json. Re-enabled when IC recovers above re-enable
         # threshold for M consecutive weeks.
-        "auto_disable_threshold": -0.02,  # IC below this triggers disable countdown
+        "auto_disable_threshold": -0.99,  # Disabled: selection bias on small sample makes IC unreliable for auto-disable; revisit at ≥200 ml_eligible records
         "auto_disable_weeks": 3,  # Consecutive weeks before disable fires
         "auto_enable_threshold": 0.01,  # IC above this triggers re-enable countdown
         "auto_enable_weeks": 2,  # Consecutive weeks before re-enable fires

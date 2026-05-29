@@ -36,11 +36,11 @@ from typing import Any
 # Evidence: Sprint 7H.3 calibration — 75/35 is the minimum that eliminates all governed-but-excluded
 # symbols and gives every active EIL theme ≥1 single-name representative.
 # Observation gate for this policy: ≥10 successful publisher runs OR ≥3 distinct UTC sessions.
-QUOTA_POLICY_VERSION = "75_35"
+QUOTA_POLICY_VERSION = "90_50"
 
-_TOTAL_MAX = 75
+_TOTAL_MAX = 90
 _STRUCTURAL_MIN = 8
-_STRUCTURAL_MAX = 35
+_STRUCTURAL_MAX = 50
 _CATALYST_MAX = 30
 _CATALYST_MIN = 10
 _ATTENTION_MAX = 20   # shared: attention + current_source_unclassified — scaled with total cap

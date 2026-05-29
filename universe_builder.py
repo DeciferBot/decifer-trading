@@ -46,17 +46,17 @@ _FAVOURITES_PATH = "data/favourites.json"
 # Quota limits — Sprint 7I: promoted to 75/35 production candidate policy.
 # See quota_allocator.QUOTA_POLICY_VERSION and Sprint 7H.3 calibration report.
 _QUOTA = {
-    "structural_position": {"min": 8,  "max": 35, "protected": True},
+    "structural_position": {"min": 8,  "max": 50, "protected": True},
     "catalyst_swing":       {"min": 10, "max": 30, "protected": False},
     "attention":            {"max": 20, "capped": True},
     "etf_proxy":            {"max": 15, "capped": True},
     "held":                 {"protected": True},
     "manual_conviction":    {"protected": True},
 }
-_TOTAL_MAX = 75
+_TOTAL_MAX = 90
 _ATTENTION_MAX = 20
 _ETF_PROXY_MAX = 15
-_STRUCTURAL_MAX = 35
+_STRUCTURAL_MAX = 50
 _CATALYST_MAX = 30
 
 _VALID_ROUTES = {"position", "swing", "intraday_swing", "watchlist", "held", "manual_conviction", "do_not_touch"}

@@ -599,3 +599,183 @@ class TestGetCatalystLookup:
         assert "MSFT" not in result, "MSFT (score 3.0) is below threshold and must be excluded"
         assert result["AAPL"] == pytest.approx(8.5)
         assert result["NVDA"] == pytest.approx(9.0)
+
+
+# ---------------------------------------------------------------------------
+# Dimension scorer behaviour — grounded in quantile IC data
+# ---------------------------------------------------------------------------
+
+
+def _mk_5m(**kwargs):
+    """Minimal sig_5m dict with safe defaults."""
+    base = {
+        "signal": "HOLD", "bull_aligned": False, "bear_aligned": False,
+        "mfi": 50.0, "rsi_slope": 0.0, "squeeze_on": False, "squeeze_intensity": 0.0,
+        "bb_position": 0.5, "vwap_dist": 0.0, "vwap_sd_pct": 1.0, "obv_slope": 0.0,
+        "donch_breakout": 0, "donch_high": 105.0, "donch_low": 95.0, "price": 100.0,
+        "vol_ratio": 1.0, "variance_ratio": 1.0, "ou_halflife": 999.0, "zscore": 0.0,
+        "adf_pvalue": 1.0, "adx": 25.0,
+    }
+    base.update(kwargs)
+    return base
+
+
+class TestMomentumScorer:
+    """Momentum dimension: initiation zone scores high, exhaustion zone scores low."""
+
+    def _momentum_pts(self, mfi, rsi_slope):
+        sig = _mk_5m(mfi=mfi, rsi_slope=rsi_slope)
+        result = signals.compute_confluence(sig, None, None)
+        return result["score_breakdown"]["momentum"]
+
+    def test_sweet_spot_mfi_57_rising_scores_high(self):
+        # MFI 57 (dist=7 > 5), rising slope = early initiation = should score 8
+        pts = self._momentum_pts(57, 2.0)
+        assert pts >= 7, f"Expected ≥7 for MFI=57 rising, got {pts}"
+
+    def test_sweet_spot_mfi_62_rising_scores_high(self):
+        # MFI 62 with slope = building, not extended
+        pts = self._momentum_pts(62, 1.5)
+        assert pts >= 7, f"Expected ≥7 for MFI=62 rising, got {pts}"
+
+    def test_exhaustion_mfi_80_scores_low(self):
+        # MFI 80 = overbought, late entry — should score ≤3
+        pts = self._momentum_pts(80, 1.0)
+        assert pts <= 3, f"Expected ≤3 for exhausted MFI=80, got {pts}"
+
+    def test_exhaustion_mfi_20_scores_low(self):
+        # MFI 20 = oversold, late short entry — should score ≤3
+        pts = self._momentum_pts(20, -1.0)
+        assert pts <= 3, f"Expected ≤3 for exhausted MFI=20, got {pts}"
+
+    def test_no_slope_confirmation_scores_lower_than_with_slope(self):
+        # mfi_dist > 15 without slope should score lower than with slope
+        with_slope = self._momentum_pts(68, 1.0)
+        without_slope = self._momentum_pts(68, -0.5)  # slope in wrong direction
+        assert with_slope > without_slope, (
+            f"Slope confirmation should raise score: with={with_slope}, without={without_slope}"
+        )
+
+    def test_mfi_at_neutral_scores_zero(self):
+        pts = self._momentum_pts(50, 0.0)
+        assert pts == 0, f"Expected 0 for MFI=50 flat, got {pts}"
+
+
+class TestFlowScorer:
+    """Flow dimension: near VWAP scores high; far from VWAP (extended) scores low."""
+
+    def _flow_pts(self, vwap_dist, vwap_sd_pct=1.0, obv_slope=0.0):
+        sig = _mk_5m(vwap_dist=vwap_dist, vwap_sd_pct=vwap_sd_pct, obv_slope=obv_slope)
+        result = signals.compute_confluence(sig, None, None)
+        return result["score_breakdown"]["flow"]
+
+    def test_near_vwap_scores_higher_than_extended(self):
+        near = self._flow_pts(vwap_dist=0.05, vwap_sd_pct=1.0)   # 0.05 SDs from VWAP
+        extended = self._flow_pts(vwap_dist=2.5, vwap_sd_pct=1.0)  # 2.5 SDs from VWAP
+        assert near >= extended, f"Near VWAP ({near}) should score ≥ extended ({extended})"
+
+    def test_very_extended_vwap_does_not_get_full_vwap_pts(self):
+        # 3 SDs from VWAP — VWAP portion should be 0
+        pts = self._flow_pts(vwap_dist=3.0, vwap_sd_pct=1.0, obv_slope=0.0)
+        # Only OBV can contribute — VWAP adds nothing. OBV=0 → flow=0
+        assert pts == 0, f"Expected 0 for 3-SD VWAP with no OBV, got {pts}"
+
+    def test_near_vwap_with_obv_scores_high(self):
+        # Near VWAP + confirming OBV = maximum flow score
+        pts = self._flow_pts(vwap_dist=0.1, vwap_sd_pct=1.0, obv_slope=50000.0)
+        assert pts >= 7, f"Expected ≥7 for near VWAP + OBV, got {pts}"
+
+    def test_sd_normalization_consistent(self):
+        # 0.3% in 1.0 SD stock vs 0.3% in 0.1 SD stock — latter is far more extended
+        low_vol_pts = self._flow_pts(vwap_dist=0.3, vwap_sd_pct=0.1)   # 3 SDs
+        high_vol_pts = self._flow_pts(vwap_dist=0.3, vwap_sd_pct=1.0)  # 0.3 SDs
+        assert high_vol_pts >= low_vol_pts, (
+            f"Same distance means more extension in low-vol: high_vol={high_vol_pts}, low_vol={low_vol_pts}"
+        )
+
+
+class TestBreakoutScorer:
+    """Breakout dimension: pre-breakout proximity scores high; intraday chase scores low."""
+
+    def _breakout_pts(self, donch_breakout=0, vol_ratio=1.0, gap_mult=1.0,
+                      price=100.0, donch_high=105.0, donch_low=95.0):
+        sig = _mk_5m(donch_breakout=donch_breakout, vol_ratio=vol_ratio,
+                     price=price, donch_high=donch_high, donch_low=donch_low)
+        result = signals.compute_confluence(sig, None, None, gap_boost_mult=gap_mult)
+        return result["score_breakdown"]["breakout"]
+
+    def test_gap_day_breach_scores_high(self):
+        # Gap-day confirmed breakout with volume = legitimate
+        pts = self._breakout_pts(donch_breakout=1, vol_ratio=2.5, gap_mult=1.3)
+        assert pts >= 7, f"Expected ≥7 for gap-day breakout, got {pts}"
+
+    def test_intraday_confirmed_breach_scores_lower(self):
+        # Non-gap confirmed breakout with same volume = entering after the fact
+        pts = self._breakout_pts(donch_breakout=1, vol_ratio=2.5, gap_mult=1.0)
+        assert pts <= 4, f"Expected ≤4 for intraday chase breakout, got {pts}"
+
+    def test_gap_beats_intraday_same_vol(self):
+        gap_pts = self._breakout_pts(donch_breakout=1, vol_ratio=2.0, gap_mult=1.3)
+        intraday_pts = self._breakout_pts(donch_breakout=1, vol_ratio=2.0, gap_mult=1.0)
+        assert gap_pts > intraday_pts, (
+            f"Gap ({gap_pts}) should beat intraday ({intraday_pts}) for same breach"
+        )
+
+    def test_pre_breakout_proximity_with_volume_scores(self):
+        # Price within 0.3% of channel high with volume = setup forming
+        pts = self._breakout_pts(donch_breakout=0, vol_ratio=2.0,
+                                 price=104.7, donch_high=105.0)  # 0.28% away
+        assert pts >= 4, f"Expected ≥4 for near-channel setup with volume, got {pts}"
+
+    def test_no_breakout_no_volume_scores_zero(self):
+        pts = self._breakout_pts(donch_breakout=0, vol_ratio=1.0)
+        assert pts == 0, f"Expected 0 for no breakout, no volume, got {pts}"
+
+
+class TestMTFScorer:
+    """MTF dimension: fresh trend (moderate ADX) scores higher than mature trend (high ADX)."""
+
+    def _mtf_pts(self, bull_aligned=True, adx=25.0, weekly_bull=False):
+        sig_5m = _mk_5m()
+        sig_1d = {"bull_aligned": bull_aligned, "bear_aligned": not bull_aligned,
+                  "adx": adx, "signal": "BUY" if bull_aligned else "SELL"}
+        sig_1w = {"bull_aligned": weekly_bull, "bear_aligned": not weekly_bull,
+                  "adx": adx, "signal": "BUY" if weekly_bull else "SELL"} if weekly_bull is not None else None
+        result = signals.compute_confluence(sig_5m, sig_1d, sig_1w)
+        return result["score_breakdown"]["mtf"]
+
+    def test_building_trend_adx25_scores_8(self):
+        pts = self._mtf_pts(bull_aligned=True, adx=25.0, weekly_bull=False)
+        assert pts == 8, f"Expected 8 for ADX=25 daily bull, got {pts}"
+
+    def test_mature_trend_adx45_scores_5(self):
+        pts = self._mtf_pts(bull_aligned=True, adx=45.0, weekly_bull=False)
+        assert pts == 5, f"Expected 5 for ADX=45 mature trend, got {pts}"
+
+    def test_building_beats_mature(self):
+        building = self._mtf_pts(bull_aligned=True, adx=25.0, weekly_bull=False)
+        mature = self._mtf_pts(bull_aligned=True, adx=50.0, weekly_bull=False)
+        assert building > mature, f"Building ({building}) should beat mature ({mature})"
+
+    def test_weekly_daily_confirm_scores_10(self):
+        pts = self._mtf_pts(bull_aligned=True, adx=25.0, weekly_bull=True)
+        assert pts == 10, f"Expected 10 for weekly+daily confirm, got {pts}"
+
+    def test_no_daily_data_scores_zero(self):
+        result = signals.compute_confluence(_mk_5m(), None, None)
+        assert result["score_breakdown"]["mtf"] == 0
+
+
+class TestBaselineWeightsOvernightDrift:
+    """overnight_drift must have zero BASELINE weight (BLOCKED CRITICAL)."""
+
+    def test_overnight_drift_baseline_weight_is_zero(self):
+        from ic.constants import BASELINE_WEIGHTS
+        assert BASELINE_WEIGHTS["overnight_drift"] == 0.0, (
+            "overnight_drift is BLOCKED CRITICAL — must have zero baseline weight"
+        )
+
+    def test_baseline_weights_sum_to_one(self):
+        from ic.constants import BASELINE_WEIGHTS
+        total = sum(BASELINE_WEIGHTS.values())
+        assert abs(total - 1.0) < 0.001, f"BASELINE_WEIGHTS sum {total:.4f} ≠ 1.0"

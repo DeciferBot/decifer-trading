@@ -2341,10 +2341,11 @@ def compute_confluence(
         score += trend_pts
         dim_directions.append((trend_dir, trend_pts))
 
-    # ── 2. MOMENTUM (0-10) — MFI distance from 50 (symmetric) ──
-    # MFI > 65 and MFI < 35 both score 10. The distance from the
-    # neutral 50 line measures directional pressure strength.
-    # Direction = which side of 50.
+    # ── 2. MOMENTUM (0-10) — MFI + RSI slope ──
+    # Scores INITIATION of momentum, not confirmation of an extended move.
+    # Exhaustion zone (MFI > 72 or < 28): stock has already run — score low.
+    # Sweet spot: MFI 50–65 (longs) or 35–50 (shorts) turning with slope.
+    # RSI slope confirmation is required for scores above 4.
     mfi = sig_5m.get("mfi", 50)
     rs = sig_5m.get("rsi_slope", 0)
 
@@ -2353,17 +2354,21 @@ def compute_confluence(
     if _enabled("momentum"):
         mfi_dist = abs(mfi - 50)  # 0-50 range
         rsi_confirms = (mfi > 50 and rs > 0) or (mfi < 50 and rs < 0)
+        exhausted = mfi > 72 or mfi < 28  # overbought/oversold extremes = late entry
 
-        if mfi_dist > 15 and rsi_confirms:
-            momentum = 10  # Strong directional pressure + RSI confirming
-        elif mfi_dist > 15:
-            momentum = 8  # Strong pressure, RSI not confirming
+        if exhausted:
+            # Extreme zone — momentum has run, reversion risk rises
+            momentum = 3 if rsi_confirms else 1
+        elif mfi_dist > 15 and rsi_confirms:
+            momentum = 10  # Strong momentum building with slope confirm — best case
         elif mfi_dist > 5 and rsi_confirms:
-            momentum = 8  # Moderate pressure + RSI confirming
+            momentum = 8   # Moderate momentum turning — sweet spot (early initiation)
+        elif mfi_dist > 15:
+            momentum = 4   # Strong distance but slope not confirming — stalling
         elif mfi_dist > 5:
-            momentum = 5  # Moderate pressure
+            momentum = 3   # Moderate distance, no confirmation
         elif mfi_dist > 0:
-            momentum = 2  # Weak but non-neutral
+            momentum = 1   # Barely off neutral
         mom_dir = +1 if mfi > 50 else (-1 if mfi < 50 else 0)
         momentum = round(momentum * _rmult["momentum"])
         score += momentum
@@ -2401,22 +2406,27 @@ def compute_confluence(
         dim_directions.append((squeeze_dir, squeeze_score))
 
     # ── 4. FLOW (0-10) — VWAP + OBV (symmetric) ──
-    # Score measures the STRENGTH of institutional flow, not its direction.
-    # VWAP distance from price = strength; OBV slope = confirmation.
-    # Direction = above/below VWAP + OBV slope.
+    # VWAP proximity scores ACCUMULATION near institutional anchor.
+    # Being far from VWAP = stock has already moved = late entry.
+    # Distance normalized by each stock's typical intraday VWAP spread
+    # so a 0.3% premium in a low-vol stock (3 SDs) is penalized while
+    # a 0.3% premium in a high-vol stock (0.3 SDs) is not.
     vwap_d = sig_5m.get("vwap_dist", 0)
     obv_s = sig_5m.get("obv_slope", 0)
+    vwap_sd = sig_5m.get("vwap_sd_pct", 1.0)  # SD of price deviation from VWAP in %
 
     flow_score = 0
     flow_dir = 0
     if _enabled("flow"):
-        abs_vwap = abs(vwap_d)
-        if abs_vwap > 0.3:
-            flow_score += 4  # Solidly away from VWAP
-        elif abs_vwap > 0:
-            flow_score += 2  # Slightly away
-        elif abs_vwap > -0.01:  # essentially at VWAP
-            flow_score += 1
+        # Normalize VWAP distance: 0 = at VWAP, 1 = 1 typical SD away
+        vwap_sds = abs(vwap_d) / max(vwap_sd, 0.1)
+        if vwap_sds < 0.5:
+            flow_score += 4  # Near VWAP — institutional accumulation zone
+        elif vwap_sds < 1.0:
+            flow_score += 2  # Moderate extension — still actionable
+        elif vwap_sds < 2.0:
+            flow_score += 1  # Extended — minimal contribution
+        # > 2 SDs from VWAP: too extended, no VWAP contribution
 
         # OBV confirms direction
         if abs(obv_s) > 0:
@@ -2438,9 +2448,10 @@ def compute_confluence(
         score += flow_score
         dim_directions.append((flow_dir, flow_score))
 
-    # ── 5. BREAKOUT (0-10) — Donchian channel breach (symmetric) ──
-    # Donchian high break and low break score identically.
-    # Volume confirmation applies to both.
+    # ── 5. BREAKOUT (0-10) — Donchian channel (symmetric) ──
+    # Pre-breakout tension scores higher than confirmed intraday breach.
+    # Confirmed breach = entering after the fact for intraday moves.
+    # Gap-day breach (_gap_mult > 1.0) is a legitimate entry — gap-and-go.
     donch = sig_5m.get("donch_breakout")
     if donch is None:
         donch = 1 if sig_5m.get("dc_upper_break") else (-1 if sig_5m.get("dc_lower_break") else 0)
@@ -2451,46 +2462,73 @@ def compute_confluence(
     breakout_score = 0
     breakout_dir = 0
     if _enabled("breakout"):
-        if donch != 0:  # Channel breach in either direction
-            breakout_score = 6
-            breakout_dir = donch  # +1 for high break, -1 for low break
-            if vr >= 2.0:
-                breakout_score = 10
-            elif vr >= 1.5:
-                breakout_score = 8
-        else:
-            # No channel break — volume alone is directionally neutral
-            if vr >= 2.0:
-                breakout_score = 4
-            elif vr >= 1.5:
+        is_gap_day = _gap_mult > 1.0  # gap_boost_mult > 1 signals a gap open
+        if donch != 0:  # Channel breach already happened
+            breakout_dir = donch
+            if is_gap_day:
+                # Gap-day breach: legitimate entry at channel confirmation
+                breakout_score = 6
+                if vr >= 2.0:
+                    breakout_score = 10
+                elif vr >= 1.5:
+                    breakout_score = 8
+            else:
+                # Intraday confirmed breach: entering after the move
                 breakout_score = 2
-        # Phase 4: OPEN_BUFFER gap-boost. A Donchian breach on a gap day is the
-        # cleanest gap-and-go confirmation — the signal is doing exactly what
-        # this boost is meant to reward.
-        breakout_score = round(min(breakout_score, 10) * _rmult["breakout"] * _gap_mult)
+                if vr >= 2.0:
+                    breakout_score = 4
+                elif vr >= 1.5:
+                    breakout_score = 3
+        else:
+            # Not yet breached — score pre-breakout proximity and volume
+            donch_h = sig_5m.get("donch_high", 0)
+            donch_l = sig_5m.get("donch_low", 0)
+            price = sig_5m.get("price", 0)
+            if price > 0 and donch_h > 0 and donch_l > 0:
+                dist_high = (donch_h - price) / donch_h   # positive = approaching upper
+                dist_low = (price - donch_l) / donch_l    # positive = approaching lower (shorts)
+                if dist_high < 0.005 and vr >= 1.5:
+                    breakout_score = 7  # Within 0.5% of upper channel with volume
+                    breakout_dir = +1
+                elif dist_low < 0.005 and vr >= 1.5:
+                    breakout_score = 7  # Within 0.5% of lower channel with volume
+                    breakout_dir = -1
+                elif min(dist_high, dist_low) < 0.01 and vr >= 1.2:
+                    breakout_score = 5
+                    breakout_dir = +1 if dist_high < dist_low else -1
+                elif vr >= 2.0:
+                    breakout_score = 4  # Volume surge without channel proximity
+                elif vr >= 1.5:
+                    breakout_score = 2
+        # Regime multiplier only — gap logic already handled above
+        breakout_score = round(min(breakout_score, 10) * _rmult["breakout"])
         score += breakout_score
         dim_directions.append((breakout_dir, breakout_score))
 
     # ── 6. MTF (0-10) — Multi-TimeFrame alignment ─────────────────────
-    # Scores based on how many higher timeframes confirm the 5m direction.
-    # No daily data → 0 pts (cannot confirm). Both daily+weekly confirm → 10 pts.
+    # ADX gates trend maturity: high ADX = extended trend = late entry.
+    # Fresh/building trend (ADX 20–40) scores higher than mature trend (ADX > 40).
+    # Weekly+daily confirmation = highest conviction regardless of ADX.
     mtf_score = 0
     mtf_dir = 0
     if _enabled("mtf"):
         if sig_1d is not None:
             d_bull = sig_1d.get("bull_aligned", False)
             d_bear = sig_1d.get("bear_aligned", False)
-            if d_bull:
-                mtf_score = 8
-                mtf_dir = +1
-            elif d_bear:
-                mtf_score = 8
-                mtf_dir = -1
+            d_adx = sig_1d.get("adx", 0)
+            if d_bull or d_bear:
+                mtf_dir = +1 if d_bull else -1
+                if d_adx > 40:
+                    mtf_score = 5  # Mature trend — aligned but extended
+                elif d_adx >= 20:
+                    mtf_score = 8  # Trend building — standard confirmation
+                else:
+                    mtf_score = 5  # Early alignment — ADX not yet confirmed
             if sig_1w is not None:
                 w_bull = sig_1w.get("bull_aligned", False)
                 w_bear = sig_1w.get("bear_aligned", False)
                 if (w_bull and d_bull) or (w_bear and d_bear):
-                    mtf_score = 10  # Full weekly+daily confirmation
+                    mtf_score = 10  # Full weekly+daily confirmation — highest quality
         # Phase 4: OPEN_BUFFER gap-boost also applies to MTF when the dimension
         # is enabled — higher-timeframe confirmation on a gapper is exactly
         # what we want to amplify.
