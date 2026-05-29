@@ -166,42 +166,52 @@ function scoreCredit(closes: ClosesMap): StressDimension {
       : null;
   }
 
+  // HYG absolute return — needed to filter duration artifact.
+  // HYG duration ~3.8y vs LQD ~8.9y: when rates fall, LQD rises more than HYG
+  // purely from duration. That makes HYG-LQD spread negative with no credit stress.
+  // Credit stress is real only when HYG is also actually selling off (negative absolute return),
+  // OR when HYG-LQD spread is extreme AND HYG is not riding a rate rally.
+  const hyg5d = ret5d(hyg);
+  const hygAbsZ = hyg5d != null ? zScore(hyg5d, all5dRets(hyg)) : null;
+  const hygActuallyFalling = hyg5d != null && hyg5d < 0;
+
   let score = 0;
   let confirming = false;
 
-  // HY-IG spread widening: primary signal
-  if (hygLqdZ != null && hygLqdZ <= -1.5) {
+  // Condition A: HYG absolute breakdown — HY selling off regardless of rates
+  if (hygAbsZ != null && hygAbsZ <= -1.5) {
     score += 1.0;
     confirming = true;
-    if (hygLqdZ <= -2.0) score += 0.5; // severity
+    if (hygAbsZ <= -2.0) score += 0.5; // severity
   }
 
-  // IG spread widening: secondary confirmation (co-movement = systemic)
+  // Condition B: HYG-LQD spread highly negative AND HYG is actually negative
+  // (eliminates false signal when rates rally and LQD benefits more from duration)
+  if (hygLqdZ != null && hygLqdZ <= -1.5 && hygActuallyFalling) {
+    score += 0.5;
+    confirming = true;
+  }
+
+  // Condition C: IG spread widening (LQD underperforms risk-free) — systemic credit pressure
   if (lqdIefZ != null && lqdIefZ <= -1.5) {
     score += 0.75;
     confirming = true;
   }
 
-  // Absolute HY breakdown (HYG also falling in absolute terms, not just relative)
-  const hyg5d = ret5d(hyg);
-  const hygAbsZ = hyg5d != null ? zScore(hyg5d, all5dRets(hyg)) : null;
-  if (hygAbsZ != null && hygAbsZ <= -1.5) {
-    score += 0.5;
-    confirming = true;
-  }
-
   score = clamp(score, 0, 2);
 
-  const spreadStr = hygLqdCurrent != null ? `HYG-LQD ${(hygLqdCurrent * 100).toFixed(2)}%` : "spread n/a";
-  const zStr = hygLqdZ != null ? ` (z=${hygLqdZ.toFixed(1)})` : "";
+  const absStr = hyg5d != null ? `HYG ${(hyg5d * 100).toFixed(1)}%` : "HYG n/a";
+  const absZStr = hygAbsZ != null ? ` (z=${hygAbsZ.toFixed(1)})` : "";
+  const spreadStr = hygLqdCurrent != null ? `, HY-IG spread ${(hygLqdCurrent * 100).toFixed(2)}%` : "";
+  const spreadZStr = hygLqdZ != null ? ` (z=${hygLqdZ.toFixed(1)})` : "";
   const igStr = lqdIefZ != null ? `, LQD-IEF z=${lqdIefZ.toFixed(1)}` : "";
 
   return {
     score,
     maxScore: 2,
-    z_score: hygLqdZ,
+    z_score: hygAbsZ,
     data_quality: "proxy",
-    signal: `${spreadStr}${zStr}${igStr}`,
+    signal: `${absStr}${absZStr}${spreadStr}${spreadZStr}${igStr}`,
     confirming,
   };
 }
