@@ -1,9 +1,11 @@
 "use client";
-// Forces tab — M13B.
+// Forces tab — M13B + stress gauge.
 // Active and dormant market forces. Connection tree per active force.
 // No broker/execution/order language. No buy/sell/hold.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import StressGauge from "@/components/StressGauge";
+import type { MarketStressPayload } from "@/app/api/market-stress/route";
 import {
   ChevronDown,
   ChevronUp,
@@ -288,6 +290,14 @@ export default function ForcesTab({
   onGoToNames,
 }: Props) {
   const [dormantOpen, setDormantOpen] = useState(false);
+  const [stressData, setStressData] = useState<MarketStressPayload | null>(null);
+
+  useEffect(() => {
+    fetch("/api/market-stress")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: MarketStressPayload | null) => { if (d) setStressData(d); })
+      .catch(() => {});
+  }, []);
 
   const treeByForce = Object.fromEntries(
     connectionTree.map(n => [n.force_id, n]),
@@ -309,6 +319,24 @@ export default function ForcesTab({
             : "No forces are confirmed active right now. Structural themes remain available below."}
         </p>
       </div>
+
+      {/* ── Stress gauge ──────────────────────────────────────────────────── */}
+      {stressData && <StressGauge data={stressData} />}
+      {!stressData && (
+        <div
+          className="rounded-2xl px-4 py-5 flex items-center gap-3"
+          style={{ background: "#0c1520", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          <div
+            className="w-8 h-8 rounded-full shrink-0 animate-pulse"
+            style={{ background: "rgba(249,115,22,0.12)" }}
+          />
+          <div className="space-y-1.5 flex-1">
+            <div className="h-2.5 rounded-full w-2/3 animate-pulse" style={{ background: "rgba(255,255,255,0.06)" }} />
+            <div className="h-2 rounded-full w-1/2 animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />
+          </div>
+        </div>
+      )}
 
       {/* ── No data fallback ──────────────────────────────────────────────── */}
       {hasNoData && (
