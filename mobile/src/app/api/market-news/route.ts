@@ -52,15 +52,12 @@ export async function GET(request: Request) {
       ? `https://financialmodelingprep.com/stable/news/stock?symbols=${symbolList.join(",")}&limit=30&apikey=${FMP_KEY}`
       : `https://financialmodelingprep.com/stable/news/stock-latest?limit=20&apikey=${FMP_KEY}`;
 
-  const generalUrl = symbolList.length === 0
-    ? `https://financialmodelingprep.com/stable/news/general-latest?limit=10&apikey=${FMP_KEY}`
-    : null;
+  // Always fetch macro/general news — this covers Trump, Fed, Iran, oil, war, macro drivers.
+  const generalUrl = `https://financialmodelingprep.com/stable/news/general-latest?limit=15&apikey=${FMP_KEY}`;
 
   const [stockRes, generalRes] = await Promise.allSettled([
     fetch(stockUrl, { next: { revalidate: 180 } }),
-    generalUrl
-      ? fetch(generalUrl, { next: { revalidate: 300 } })
-      : Promise.resolve(new Response("[]", { status: 200 })),
+    fetch(generalUrl, { next: { revalidate: 300 } }),
   ]);
 
   const now = Date.now();
