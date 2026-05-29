@@ -180,12 +180,13 @@ export default function MarketView() {
     }
   }, []);
 
-  // eslint-disable-next-line react-compiler/react-compiler
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     load();
     const t = setInterval(load, 60_000);
     return () => clearInterval(t);
   }, [load]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
 

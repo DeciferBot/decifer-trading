@@ -559,7 +559,7 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
   const [ttgSymbols, setTtgSymbols] = useState<TtgSymbolCard[]>([]);
 
   // Fetch TTG data when user drills into a theme detail.
-  // eslint-disable-next-line react-compiler/react-compiler
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!selectedTheme) { setTtgSymbols([]); return; }
     const ttgId = getTtgIdForMarketNow(selectedTheme) ?? selectedTheme;
@@ -567,6 +567,7 @@ export default function ThemeMapTab({ data, selectedTheme, onThemeSelect, onName
       .then(d => setTtgSymbols(d?.symbols ?? []))
       .catch(() => setTtgSymbols([]));
   }, [selectedTheme]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const themes: ThemeItem[] = data.themes?.length
     ? data.themes

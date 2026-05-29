@@ -1063,7 +1063,7 @@ function MoversSection({ session }: { session?: MarketSession }) {
   const gainers = data.gainers.slice(0, 5);
   const losers  = data.losers.slice(0, 5);
 
-  // eslint-disable-next-line react-compiler/react-compiler
+  /* eslint-disable react-hooks/purity */
   const freshnessLabel = data.ts
     ? (() => {
         const diffMs = Date.now() - new Date(data.ts).getTime();
@@ -1073,6 +1073,7 @@ function MoversSection({ session }: { session?: MarketSession }) {
         return `Updated ${Math.floor(mins / 60)}h ago`;
       })()
     : null;
+  /* eslint-enable react-hooks/purity */
 
   const sectionTitle =
     session === "open"        ? "Today's biggest moves" :

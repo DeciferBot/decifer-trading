@@ -284,12 +284,13 @@ export function useCustomerBriefing(): CustomerBriefingState {
     }
   }, []);
 
-  // eslint-disable-next-line react-compiler/react-compiler
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     load(false);
     const t = setInterval(() => load(false), 5 * 60_000);
     return () => clearInterval(t);
   }, [load]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // TTG themes fetch — separate from the main data interval; once on mount
   useEffect(() => {
@@ -308,7 +309,7 @@ export function useCustomerBriefing(): CustomerBriefingState {
   const forcesResult = data ? buildCustomerForces(data) : { active: [], dormant: [] };
   const connectionTree = data ? buildConnectionTree(data, ttgThemes) : [];
 
-  // eslint-disable-next-line react-compiler/react-compiler
+  /* eslint-disable react-hooks/refs */
   return {
     data,
     loading,
@@ -326,4 +327,5 @@ export function useCustomerBriefing(): CustomerBriefingState {
     connectionTree,
     refresh,
   };
+  /* eslint-enable react-hooks/refs */
 }

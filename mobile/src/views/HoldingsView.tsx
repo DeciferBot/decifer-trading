@@ -114,7 +114,7 @@ export default function HoldingsView() {
     finally { setLoading(false); }
   }, []);
 
-  // eslint-disable-next-line react-compiler/react-compiler
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); const t = setInterval(load, 15_000); return () => clearInterval(t); }, [load]);
 
   if (loading) return (
