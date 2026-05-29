@@ -491,6 +491,590 @@ def market_data_tape() -> Response:
 
 
 # ---------------------------------------------------------------------------
+# Counter-Thesis Intelligence
+# ---------------------------------------------------------------------------
+
+@app.route("/api/counter-thesis", methods=["GET", "OPTIONS"])
+def counter_thesis() -> Response:
+    """
+    Structural counter-thesis analysis for active drivers.
+
+    Returns curated counter-thesis claims verified against FMP fundamental data.
+    View-only intelligence — not connected to execution or scoring.
+
+    Query params:
+        fmp=false   — skip FMP verification, return library entries only (fast)
+    """
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    try:
+        from counter_thesis_engine import build_counter_thesis_dict
+        use_fmp = request.args.get("fmp", "true").lower() != "false"
+        data = build_counter_thesis_dict(use_fmp=use_fmp)
+        return _json_response(data)
+    except Exception as exc:
+        log.error("/api/counter-thesis: %s", exc)
+        return _error("Counter-thesis analysis temporarily unavailable.", 503)
+
+
+# ---------------------------------------------------------------------------
+# Root view — HTML landing page for intelligence.decifertrading.com
+# ---------------------------------------------------------------------------
+
+_COUNTER_THESIS_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decifer Intelligence — Structural Analysis</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #181818;
+    --border: #222222;
+    --text: #e8e8e8;
+    --muted: #777;
+    --orange: #e87d2e;
+    --orange-dim: #b85f1e;
+    --green: #2ecc71;
+    --red: #e74c3c;
+    --yellow: #f1c40f;
+    --blue: #3498db;
+    --radius: 8px;
+    --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+    --mono: 'SF Mono', 'Fira Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .logo {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--orange);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--muted); font-weight: 400; }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 24px 64px; }
+  .page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .page-subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 32px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .active-drivers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+  .driver-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--orange);
+    font-weight: 500;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .card:hover { border-color: #333; }
+  .card-header {
+    padding: 18px 20px 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .card-theme {
+    font-size: 11px;
+    color: var(--orange);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .card-claim {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  .badge {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .badge-verified { background: rgba(231,76,60,0.15); color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
+  .badge-partial { background: rgba(241,196,15,0.12); color: #f1c40f; border: 1px solid rgba(241,196,15,0.25); }
+  .badge-unverified { background: rgba(119,119,119,0.12); color: #777; border: 1px solid rgba(119,119,119,0.2); }
+  .verdict-line {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .confidence-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    width: 60px;
+    overflow: hidden;
+  }
+  .confidence-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--orange);
+  }
+  .card-body {
+    padding: 0 20px 20px;
+    display: none;
+  }
+  .card-body.open { display: block; }
+  .card-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0 0 18px;
+  }
+  .plain-english {
+    font-size: 14px;
+    color: #ccc;
+    line-height: 1.7;
+    margin-bottom: 18px;
+  }
+  .evidence-section {
+    margin-bottom: 18px;
+  }
+  .evidence-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .evidence-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  .evidence-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .evidence-symbol {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    font-family: var(--mono);
+    margin-bottom: 2px;
+  }
+  .evidence-metric {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .evidence-value {
+    font-size: 18px;
+    font-weight: 700;
+    font-family: var(--mono);
+    margin-bottom: 4px;
+  }
+  .evidence-value.supports { color: var(--green); }
+  .evidence-value.counter { color: var(--red); }
+  .evidence-value.neutral { color: var(--text); }
+  .evidence-interp {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+  .bull-box {
+    background: rgba(46,204,113,0.05);
+    border: 1px solid rgba(46,204,113,0.15);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .bull-box-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 6px;
+  }
+  .bull-box-text { font-size: 13px; color: #bbb; line-height: 1.6; }
+  .source-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .source-box-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .source-box-text { font-size: 13px; color: #999; }
+  .no-evidence {
+    color: var(--muted);
+    font-size: 13px;
+    font-style: italic;
+    padding: 10px 0;
+  }
+  .dormant-section { opacity: 0.55; }
+  .dormant-section .section-label { color: #555; }
+  .toggle-icon {
+    font-size: 12px;
+    color: var(--muted);
+    transition: transform 0.2s;
+    margin-left: 8px;
+  }
+  .toggle-icon.open { transform: rotate(180deg); }
+  .meta-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 28px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .meta-bar .sep { color: var(--border); }
+  .loading {
+    text-align: center;
+    padding: 80px 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .loading-dot { animation: pulse 1s infinite; }
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    font-size: 11px;
+    color: #444;
+    text-align: center;
+  }
+  .api-link {
+    color: var(--orange-dim);
+    text-decoration: none;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .api-link:hover { color: var(--orange); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Decifer <span>/ Intelligence</span></div>
+  <div class="header-right">
+    <div class="status-dot"></div>
+    <span id="freshness-label">Loading...</span>
+    <span class="sep">|</span>
+    <a href="/api/counter-thesis?fmp=false" class="api-link">/api/counter-thesis</a>
+  </div>
+</header>
+
+<main>
+  <div class="page-title">Structural Analysis</div>
+  <div class="page-subtitle">Counter-thesis intelligence for active market drivers — verified against FMP fundamental data</div>
+
+  <div id="loading" class="loading">
+    <span class="loading-dot">Fetching intelligence...</span>
+  </div>
+
+  <div id="content" style="display:none">
+    <div class="section-label">Active Market Drivers</div>
+    <div id="active-drivers" class="active-drivers"></div>
+
+    <div id="meta-bar" class="meta-bar"></div>
+
+    <div class="section-label">Active Structural Conflicts</div>
+    <div id="structural-conflicts"></div>
+
+    <div class="dormant-section" style="margin-top:40px">
+      <div class="section-label">Dormant (Driver Not Active)</div>
+      <div id="dormant-conflicts"></div>
+    </div>
+  </div>
+
+  <div id="error-state" style="display:none; text-align:center; padding:80px 0; color:#555;">
+    Intelligence API unavailable. Check server status at <a href="/health" style="color:#e87d2e">/health</a>
+  </div>
+</main>
+
+<footer>
+  View-only intelligence &nbsp;·&nbsp; Not connected to execution or scoring &nbsp;·&nbsp;
+  <a href="/api/counter-thesis" class="api-link">/api/counter-thesis</a> &nbsp;|&nbsp;
+  <a href="/health" class="api-link">/health</a>
+</footer>
+
+<script>
+const STATUS_LABELS = {
+  verified: ['VERIFIED', 'badge-verified'],
+  partial: ['PARTIAL', 'badge-partial'],
+  unverified: ['UNVERIFIED', 'badge-unverified'],
+  refuted: ['REFUTED', 'badge-unverified'],
+};
+
+function formatTs(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('en-US', {timeZone:'America/New_York', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) + ' ET';
+  } catch { return iso; }
+}
+
+function formatDriverId(id) {
+  return id.replace(/_/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
+}
+
+function confidenceColor(c) {
+  if (c >= 0.7) return '#e74c3c';
+  if (c >= 0.45) return '#f1c40f';
+  return '#555';
+}
+
+function renderEvidence(evidence) {
+  if (!evidence || !evidence.length) {
+    return '<div class="no-evidence">No FMP data available — claim not yet quantitatively verified.</div>';
+  }
+  const items = evidence.map(e => {
+    const cls = e.supports_thesis === false ? 'counter' : e.supports_thesis === true ? 'supports' : 'neutral';
+    const val = e.value !== null ? `${e.value}${e.unit}` : 'N/A';
+    return `<div class="evidence-item">
+      <div class="evidence-symbol">${e.symbol}</div>
+      <div class="evidence-metric">${e.metric}</div>
+      <div class="evidence-value ${cls}">${val}</div>
+      <div class="evidence-interp">${e.interpretation}</div>
+    </div>`;
+  }).join('');
+  return `<div class="evidence-grid">${items}</div>`;
+}
+
+function renderCard(item, idx) {
+  const [badgeText, badgeClass] = STATUS_LABELS[item.verification_status] || ['UNKNOWN', 'badge-unverified'];
+  const confPct = Math.round(item.confidence * 100);
+  const bodyId = `body-${idx}`;
+
+  return `<div class="card">
+    <div class="card-header" onclick="toggleCard('${bodyId}', this)">
+      <div class="card-top">
+        <div>
+          <div class="card-theme">${item.theme_label}</div>
+          <div class="card-claim">${item.claim}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <span class="badge ${badgeClass}">${badgeText}</span>
+          <span class="toggle-icon" id="icon-${bodyId}">▼</span>
+        </div>
+      </div>
+      <div class="verdict-line">
+        <div class="confidence-bar">
+          <div class="confidence-fill" style="width:${confPct}%;background:${confidenceColor(item.confidence)}"></div>
+        </div>
+        <span>${confPct}% confidence</span>
+        <span style="margin-left:4px">·</span>
+        <span>${item.verdict_summary}</span>
+      </div>
+    </div>
+    <div class="card-body" id="${bodyId}">
+      <div class="card-divider"></div>
+      <div class="plain-english">${item.plain_english}</div>
+
+      ${item.evidence && item.evidence.length ? `
+      <div class="evidence-section">
+        <div class="evidence-label">FMP Verification Data</div>
+        ${renderEvidence(item.evidence)}
+      </div>` : ''}
+
+      <div class="two-col">
+        <div class="bull-box">
+          <div class="bull-box-label">Bull Counter</div>
+          <div class="bull-box-text">${item.bull_counter || 'No bull counter defined.'}</div>
+        </div>
+        <div class="source-box">
+          <div class="source-box-label">Source</div>
+          <div class="source-box-text">${item.source_attribution}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleCard(bodyId, header) {
+  const body = document.getElementById(bodyId);
+  const icon = document.getElementById('icon-' + bodyId);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  icon.classList.toggle('open', !isOpen);
+}
+
+async function loadData() {
+  try {
+    const r = await fetch('/api/counter-thesis');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+
+    // Active drivers
+    const driversEl = document.getElementById('active-drivers');
+    if (data.active_drivers && data.active_drivers.length) {
+      driversEl.innerHTML = data.active_drivers.map(d =>
+        `<span class="driver-chip">${formatDriverId(d)}</span>`
+      ).join('');
+    } else {
+      driversEl.innerHTML = '<span style="color:#555;font-size:13px">No active drivers detected</span>';
+    }
+
+    // Meta bar
+    document.getElementById('meta-bar').innerHTML = `
+      <span>Generated: ${formatTs(data.generated_at)}</span>
+      <span class="sep">·</span>
+      <span>Data: <strong style="color:${data.data_freshness === 'live' ? '#2ecc71' : '#f1c40f'}">${data.data_freshness}</strong></span>
+      <span class="sep">·</span>
+      <span>${(data.structural_conflicts || []).length} active conflicts · ${(data.dormant_conflicts || []).length} dormant</span>
+      <span class="sep">·</span>
+      <span style="color:#555">${data.note || ''}</span>
+    `;
+    document.getElementById('freshness-label').textContent = `Data: ${data.data_freshness}`;
+
+    // Structural conflicts
+    const scEl = document.getElementById('structural-conflicts');
+    if (data.structural_conflicts && data.structural_conflicts.length) {
+      scEl.innerHTML = data.structural_conflicts.map((item, i) => renderCard(item, i)).join('');
+    } else {
+      scEl.innerHTML = '<div style="color:#555;font-size:13px;padding:20px 0">No structural conflicts for currently active drivers.</div>';
+    }
+
+    // Dormant
+    const dcEl = document.getElementById('dormant-conflicts');
+    if (data.dormant_conflicts && data.dormant_conflicts.length) {
+      dcEl.innerHTML = data.dormant_conflicts.map((item, i) => renderCard(item, 1000 + i)).join('');
+    }
+
+  } catch (err) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error-state').style.display = 'block';
+    console.error('Counter-thesis fetch failed:', err);
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>"""
+
+
+@app.route("/", methods=["GET"])
+def root_view() -> Response:
+    """
+    HTML landing page at intelligence.decifertrading.com/
+
+    Renders the counter-thesis structural analysis view.
+    Fetches /api/counter-thesis client-side to keep the page fast.
+    """
+    return Response(_COUNTER_THESIS_HTML, status=200, mimetype="text/html")
+
+
+@app.route("/view", methods=["GET"])
+def view_redirect() -> Response:
+    """Alias for /"""
+    return Response(_COUNTER_THESIS_HTML, status=200, mimetype="text/html")
+
+
+# ---------------------------------------------------------------------------
 # Catch-all for undefined routes — never expose 404 with stack traces
 # ---------------------------------------------------------------------------
 
