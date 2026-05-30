@@ -48,7 +48,9 @@ _NOISE_DIMS = frozenset({"fx_momentum", "fx_macro"})
 # ── Eligibility ───────────────────────────────────────────────────────────────
 
 def _load_eligible() -> tuple[list[dict], int]:
-    all_records = training_store.load()
+    import sys as _sys
+    _ts = _sys.modules.get("training_store", training_store)
+    all_records = _ts.load()
     eligible, n_excluded = [], 0
     for r in all_records:
         if r.get("ml_eligible") is False:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,6 +16,11 @@ import market_data_provider as mdp
 # Fixtures
 # ---------------------------------------------------------------------------
 
+def _ts(minutes_ago: int = 30) -> str:
+    """Return a publishedDate string that is `minutes_ago` minutes in the past."""
+    return (datetime.now(UTC) - timedelta(minutes=minutes_ago)).strftime("%Y-%m-%d %H:%M:%S")
+
+
 SAMPLE_GAINERS = [
     {"symbol": "AAPL", "name": "Apple", "price": 200.0, "changesPercentage": 3.5},
     {"symbol": "NVDA", "name": "Nvidia", "price": 600.0, "changesPercentage": 5.2},
@@ -24,17 +30,17 @@ SAMPLE_LOSERS = [
     {"symbol": "XOM", "name": "Exxon", "price": 110.0, "changesPercentage": -4.1},
 ]
 SAMPLE_NEWS_STOCK = [
-    {"title": "Nvidia Reports Record Revenue", "text": "Full text here", "publishedDate": "2026-05-27 10:00:00",
+    {"title": "Nvidia Reports Record Revenue", "text": "Full text here", "publishedDate": _ts(30),
      "site": "reuters.com", "symbol": "NVDA"},
-    {"title": "Apple Launches New Product", "text": "Details...", "publishedDate": "2026-05-27 09:00:00",
+    {"title": "Apple Launches New Product", "text": "Details...", "publishedDate": _ts(60),
      "site": "techcrunch.com", "symbol": "AAPL"},
 ]
 SAMPLE_NEWS_GENERAL = [
-    {"title": "Fed Holds Rates Steady", "text": "Commentary.", "publishedDate": "2026-05-27 08:00:00",
+    {"title": "Fed Holds Rates Steady", "text": "Commentary.", "publishedDate": _ts(90),
      "site": "wsj.com", "symbol": None},
-    {"title": "Duplicate Article", "text": "dup", "publishedDate": "2026-05-27 07:00:00",
+    {"title": "Duplicate Article", "text": "dup", "publishedDate": _ts(120),
      "site": "bloomberg.com", "symbol": None},
-    {"title": "Duplicate Article", "text": "dup2", "publishedDate": "2026-05-27 06:00:00",
+    {"title": "Duplicate Article", "text": "dup2", "publishedDate": _ts(150),
      "site": "ft.com", "symbol": None},  # duplicate — should be filtered
 ]
 SAMPLE_ETF_QUOTES = [

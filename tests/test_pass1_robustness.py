@@ -53,7 +53,7 @@ def test_system_prompt_divergence_flags_not_stock_veto():
 # ── 3: _format_review_line handles pnl_pct=None without TypeError ─────────────
 
 def test_format_review_line_pnl_none_does_not_raise():
-    from market_intelligence import _format_review_line
+    from market_intelligence import _format_review_block
     p = {
         "symbol": "AAPL",
         "trade_type": "INTRADAY",
@@ -65,12 +65,12 @@ def test_format_review_line_pnl_none_does_not_raise():
         "current_conviction_band": "LOW",
         "earnings_days_away": 30,
     }
-    result = _format_review_line(p)
-    assert "n/a" in result, "_format_review_line must render pnl_pct=None as 'n/a'"
+    result = _format_review_block(p)
+    assert "n/a" in result, "_format_review_block must render pnl_pct=None as 'n/a'"
 
 
 def test_format_review_line_pnl_valid_renders_percentage():
-    from market_intelligence import _format_review_line
+    from market_intelligence import _format_review_block
     p = {
         "symbol": "TSLA",
         "trade_type": "SWING",
@@ -82,8 +82,8 @@ def test_format_review_line_pnl_valid_renders_percentage():
         "current_conviction_band": "MEDIUM",
         "earnings_days_away": 10,
     }
-    result = _format_review_line(p)
-    assert "-4.15%" in result, "_format_review_line must render valid pnl_pct as percentage"
+    result = _format_review_block(p)
+    assert "-4.15%" in result, "_format_review_block must render valid pnl_pct as percentage"
 
 
 # ── 4: _fallback_decision emits ERROR log ─────────────────────────────────────
