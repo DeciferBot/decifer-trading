@@ -161,3 +161,4 @@ chief_icon.png
 
 # Quarantined files — excluded from scans and version control
 quarantine/
+data/api_cache/
