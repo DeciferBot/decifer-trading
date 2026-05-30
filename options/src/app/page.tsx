@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getFeed, getLeaderboard, getSymbol } from "@/lib/api";
+import { getFeed, getLeaderboard, getSymbol, getCompanyInfo } from "@/lib/api";
 import type { FlowEvent, LeaderboardRow, SymbolResponse } from "@/lib/types";
+import type { CompanyInfo } from "@/app/api/company-info/route";
 import { DriverTag, ScoreBar, SideBadge, SignalBadge } from "@/components/SignalBadge";
 import { Header } from "@/components/Header";
 import { SymbolLogo } from "@/components/SymbolLogo";
@@ -170,7 +171,11 @@ function ExpansionPill({ label, value, active }: { label: string; value: number 
   );
 }
 
-function LeaderRow({ row, onSymbolClick }: { row: LeaderboardRow; onSymbolClick: (s: string) => void }) {
+function LeaderRow({ row, info, onSymbolClick }: {
+  row: LeaderboardRow;
+  info?: CompanyInfo;
+  onSymbolClick: (s: string) => void;
+}) {
   const primaryFlag = (row.flags ?? [])[0] ?? null;
 
   return (
@@ -183,15 +188,30 @@ function LeaderRow({ row, onSymbolClick }: { row: LeaderboardRow; onSymbolClick:
       onMouseEnter={(e) => (e.currentTarget.style.background = "#0d0d0d")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
-      {/* Row 1: logo + symbol + side + score */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+      {/* Row 1: logo + symbol + company name + side + score */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: info?.brief ? 4 : 6 }}>
         <SymbolLogo symbol={row.underlying} size={32} />
-        <span style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--mono)", width: 56, flexShrink: 0 }}>
-          {row.underlying}
-        </span>
-        <SideBadge side={row.dominant_side} />
-        <div style={{ flex: 1 }} />
-        <ScoreBar score={row.top_score} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--mono)", flexShrink: 0 }}>
+              {row.underlying}
+            </span>
+            {info?.name && (
+              <span style={{ fontSize: 12, color: "var(--muted2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {info.name}
+              </span>
+            )}
+          </div>
+          {info?.brief && (
+            <div style={{ fontSize: 11, color: "#666", marginTop: 2, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+              {info.brief}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+          <SideBadge side={row.dominant_side} />
+          <ScoreBar score={row.top_score} />
+        </div>
       </div>
 
       {/* Row 2: expansion pills */}
@@ -296,6 +316,7 @@ export default function OptionsPage() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [companyMap, setCompanyMap] = useState<Record<string, CompanyInfo>>({});
 
   const refresh = useCallback(async () => {
     const [lbData, feedData] = await Promise.all([
@@ -305,7 +326,20 @@ export default function OptionsPage() {
 
     if (!lbData && !feedData) { setUnavailable(true); return; }
     setUnavailable(false);
-    if (lbData) { setLeaderboard(lbData.leaderboard); setLastUpdated(lbData.ts); }
+    if (lbData) {
+      setLeaderboard(lbData.leaderboard);
+      setLastUpdated(lbData.ts);
+      // Fetch company info for visible symbols (fire-and-forget, non-blocking)
+      const syms = lbData.leaderboard.map((r) => r.underlying);
+      getCompanyInfo(syms).then((d) => {
+        if (!d?.results) return;
+        setCompanyMap((prev) => {
+          const next = { ...prev };
+          for (const c of d.results) next[c.symbol] = c;
+          return next;
+        });
+      });
+    }
     if (feedData) { setFeed(feedData.events); setLastUpdated(feedData.ts); }
   }, [signal, side]);
 
@@ -338,14 +372,19 @@ export default function OptionsPage() {
 
           {!unavailable && tab === "leaderboard" && (
             <>
-              <div style={{ paddingTop: 16, paddingBottom: 8, fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                Hottest symbols — last 30 min
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingTop: 16, paddingBottom: 8 }}>
+                <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  Hottest symbols — last 30 min
+                </span>
+                <span style={{ fontSize: 10, color: "#444" }}>
+                  Score = flow intensity (0–100) · 100 = max volume expansion + strong directional skew
+                </span>
               </div>
               {leaderboard.length === 0 && (
                 <div style={{ color: "var(--muted)", fontSize: 13, padding: "24px 0" }}>No unusual flow detected yet.</div>
               )}
               {leaderboard.map((row) => (
-                <LeaderRow key={row.underlying} row={row} onSymbolClick={setSelectedSymbol} />
+                <LeaderRow key={row.underlying} row={row} info={companyMap[row.underlying]} onSymbolClick={setSelectedSymbol} />
               ))}
             </>
           )}

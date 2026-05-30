@@ -31,3 +31,14 @@ export const getLeaderboard = (params?: { limit?: number; driver?: string }) => 
 
 export const getSymbol = (ticker: string) =>
   fetchApi<SymbolResponse>(`/api/options/symbol/${ticker.toUpperCase()}`);
+
+// Company info is a local Next.js route — no BASE prefix
+export async function getCompanyInfo(symbols: string[]) {
+  try {
+    const res = await fetch(`/api/company-info?symbols=${symbols.slice(0, 50).join(",")}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json() as Promise<{ results: import("../app/api/company-info/route").CompanyInfo[] }>;
+  } catch {
+    return null;
+  }
+}
