@@ -59,12 +59,18 @@ from mobile_api import (
 )
 from saas_intelligence_output import SaaSPayloadValidationError, validate_customer_payload
 from theme_graph_api import bp as theme_graph_bp
+from v1_api import v1_bp
+from options_flow_api import bp as options_flow_bp
+from v1_drivers_api import v1_drivers_bp
 
 log = logging.getLogger("decifer.intelligence_api")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = Flask(__name__)
 app.register_blueprint(theme_graph_bp)
+app.register_blueprint(v1_bp)
+app.register_blueprint(options_flow_bp)
+app.register_blueprint(v1_drivers_bp)
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 

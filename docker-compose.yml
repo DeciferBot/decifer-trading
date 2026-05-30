@@ -181,6 +181,58 @@ services:
       retries: 3
       start_period: 15s
 
+  # ── Options Flow Monitor ──────────────────────────────────────────────────────
+  # Real-time OPRA stream processor. Streams option trades for the committed
+  # universe (1,000 symbols), detects unusual flow (sweeps, clusters, cross-expiry),
+  # and writes data/options_flow/live_events.json + leaderboard.json.
+  #
+  # The intelligence-api reads these files (read-only volume mount) and serves them
+  # via /api/options/feed, /api/options/leaderboard, /api/options/symbol/<ticker>.
+  #
+  # Start (DigitalOcean, after intelligence-api is running):
+  #   docker compose --profile options up -d options-flow-monitor
+  #
+  # Stop:
+  #   docker compose --profile options stop options-flow-monitor
+  #
+  # Logs:
+  #   docker compose --profile options logs -f options-flow-monitor
+  #
+  # NEVER run this on the Mac execution node — it has no IBKR dependency but
+  # runs indefinitely and is intended for the DO cloud server only.
+  options-flow-monitor:
+    profiles: [options]
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.intelligence
+    image: decifer-intelligence:latest
+    command: python3 options_flow_monitor.py
+    restart: unless-stopped
+    volumes:
+      - decifer-data:/app/data   # read-write — monitor writes data/options_flow/
+      - ./logs:/app/logs
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DECIFER_RUNTIME_MODE=intelligence_cloud
+      - DECIFER_EXECUTION_ENABLED=false
+    healthcheck:
+      test:
+        - "CMD"
+        - "python3"
+        - "-c"
+        - |
+          import json, time, sys, os
+          p = "data/options_flow/live_events.json"
+          if not os.path.exists(p):
+            sys.exit(1)
+          age = time.time() - os.path.getmtime(p)
+          sys.exit(0 if age < 300 else 1)
+      interval: 5m
+      timeout: 10s
+      retries: 2
+      start_period: 120s
+
 # ── Named volume ──────────────────────────────────────────────────────────────
 # On first deploy, seed data/ via rsync from dev machine before compose up.
 # Then: chown -R 1000:1000 /opt/decifer/data /opt/decifer/logs
