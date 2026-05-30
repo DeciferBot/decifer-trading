@@ -148,6 +148,19 @@ def compute_thesis_divergence(
         return {}
 
     evidence = driver_state.get("evidence", {})
+
+    # Guard: if no 5d_ret values are populated, the driver resolver ran without
+    # market data. Writing an all-None output would overwrite a valid file.
+    populated_sensors = sum(
+        1 for k, v in evidence.items() if k.endswith("_5d_ret") and v is not None
+    )
+    if populated_sensors == 0:
+        log.warning(
+            "thesis_divergence: evidence block has no populated 5d_ret values "
+            "— skipping write to preserve existing output"
+        )
+        return {}
+
     candidates = candidate_feed.get("candidates", [])
 
     # Eligible: tailwind beneficiaries with at least one transmission rule fired

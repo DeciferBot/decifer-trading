@@ -250,3 +250,61 @@ def test_debug_artifact_written(tmp_path):
 def test_empty_feed_returns_empty_dict(tmp_path):
     result, _ = _run_divergence(tmp_path, [], _BASE_EVIDENCE, {})
     assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# Staleness guard — empty evidence must not overwrite existing output
+# ---------------------------------------------------------------------------
+
+def test_empty_evidence_skips_write_preserves_existing_file(tmp_path):
+    """When all 5d_ret values are None, the module must not overwrite an existing file."""
+    out_path = str(tmp_path / "out.json")
+    # Write a valid existing artifact
+    valid_artifact = {"generated_at": "2026-05-29T20:02:00Z", "intact_count": 5, "detail": []}
+    with open(out_path, "w") as f:
+        json.dump(valid_artifact, f)
+
+    empty_evidence: dict = {}  # no 5d_ret keys at all
+    candidates = [_candidate("VRT", "direct_beneficiary", ["ai_capex_growth_to_data_centre_power"])]
+
+    feed_path   = str(tmp_path / "feed.json")
+    driver_path = str(tmp_path / "driver.json")
+    with open(feed_path, "w") as f:
+        json.dump(_make_feed(candidates), f)
+    with open(driver_path, "w") as f:
+        json.dump(_make_driver_state(empty_evidence), f)
+
+    with patch.object(td, "_fetch_candidate_returns", return_value={"VRT": None}):
+        result = td.compute_thesis_divergence(feed_path, driver_path, out_path)
+
+    assert result == {}
+    # Existing file must be preserved — not overwritten with garbage
+    with open(out_path) as f:
+        on_disk = json.load(f)
+    assert on_disk["intact_count"] == 5
+
+
+def test_all_5d_ret_none_skips_write(tmp_path):
+    """Evidence block with all None values (not absent) also triggers the guard."""
+    out_path = str(tmp_path / "out.json")
+    valid_artifact = {"generated_at": "2026-05-29T18:00:00Z", "diverging_count": 3, "detail": []}
+    with open(out_path, "w") as f:
+        json.dump(valid_artifact, f)
+
+    all_none_evidence = {k: None for k in _BASE_EVIDENCE}
+    candidates = [_candidate("AVGO", "direct_beneficiary", ["ai_capex_growth_to_semiconductors"])]
+
+    feed_path   = str(tmp_path / "feed.json")
+    driver_path = str(tmp_path / "driver.json")
+    with open(feed_path, "w") as f:
+        json.dump(_make_feed(candidates), f)
+    with open(driver_path, "w") as f:
+        json.dump(_make_driver_state(all_none_evidence), f)
+
+    with patch.object(td, "_fetch_candidate_returns", return_value={"AVGO": None}):
+        result = td.compute_thesis_divergence(feed_path, driver_path, out_path)
+
+    assert result == {}
+    with open(out_path) as f:
+        on_disk = json.load(f)
+    assert on_disk["diverging_count"] == 3
