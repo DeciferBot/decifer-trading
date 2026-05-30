@@ -158,17 +158,26 @@ def _score_symbol(symbol: str) -> dict | None:
     score = min(score, 10)
 
     return {
-        "symbol": symbol,
+        "underlying": symbol,
         "anomaly_score": score,
+        "top_score": score * 10,        # normalised 0–100 for leaderboard API compat
         "flags": flags,
         "call_volume": int(flow.call_volume),
         "put_volume": int(flow.put_volume),
+        "call_sweep_count": 0,          # REST scan has no sweep data (stream only)
+        "put_sweep_count": 0,
+        "cluster_count": 0,
+        "cross_expiry_count": 0,
+        "total_contracts": int(flow.call_volume + flow.put_volume),
         "call_trade_count": int(flow.call_trade_count),
         "call_expansion": call_exp,
         "put_expansion": put_exp,
         "unusual_calls": unusual_calls,
         "unusual_puts": unusual_puts,
         "unusual": unusual_calls or unusual_puts,
+        "dominant_side": "CALL" if flow.call_volume > flow.put_volume else "PUT",
+        "driver_tags": [],              # populated by scan_universe annotate pass
+        "last_event_ts": flow.provider_timestamp,
         "oi_available": False,
         "provider": flow.provider,
         "data_ts": flow.provider_timestamp,
@@ -214,11 +223,13 @@ def scan_universe(write: bool = True) -> dict:
     log.info("options_flow_scanner: scanning %d TTG symbols …", len(symbols))
     rows = scan_symbols(symbols)
 
-    # Annotate with driver_active and theme_ids
+    # Annotate with driver_active, theme_ids, and driver_tags
+    from options_flow_engine import DRIVER_TAGS
     for row in rows:
-        sym = row["symbol"]
+        sym = row["underlying"]
         sym_themes = theme_map.get(sym, [])
         row["theme_ids"] = sym_themes
+        row["driver_tags"] = DRIVER_TAGS.get(sym, [])
         # driver_active = any theme driver is currently active
         row["driver_active"] = any(
             d in active_drivers
