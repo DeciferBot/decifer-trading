@@ -264,16 +264,17 @@
         "MCD",
         "NKE",
         "LOW",
-        "SBUX"
+        "SBUX",
+        "EAT"
       ],
       "etf_proxies": [
         "XLY"
       ],
       "route_bias": "swing_only",
       "minimum_liquidity_class": "high",
-      "max_candidates": 6,
-      "notes": "Consumer discretionary names benefiting from risk-on rotation and consumer confidence. AMZN (retail + AWS), HD (home improvement), MCD (resilient fast food), NKE (aspirational brand, consumer confidence proxy), LOW (Lowe's \u2014 direct complement to HD, same home improvement thesis; $120.1B FMP-verified), SBUX (Starbucks \u2014 consumer discretionary restaurant spend proxy, turnaround catalyst under CEO Brian Niccol; $113.5B FMP-verified). XLY as Consumer Discretionary SPDR ETF proxy.",
-      "last_reviewed": "2026-05-29",
+      "max_candidates": 7,
+      "notes": "Consumer discretionary names benefiting from risk-on rotation and consumer confidence. AMZN (retail + AWS), HD (home improvement), MCD (resilient fast food), NKE (aspirational brand, consumer confidence proxy), LOW (Lowe's \u2014 direct complement to HD, same home improvement thesis; $120.1B FMP-verified), SBUX (Starbucks \u2014 consumer discretionary restaurant spend proxy, turnaround catalyst under CEO Brian Niccol; $113.5B FMP-verified). XLY as Consumer Discretionary SPDR ETF proxy. EAT (Brinker International \u2014 Chili's/Maggiano's; casual dining operator with high consumer spending leverage; benefits from risk-on rotation and real-wage growth; restaurant-specific alpha vs mega-cap retail names).",
+      "last_reviewed": "2026-05-30",
       "source_label": "intelligence_first_static_rule"
     },
     {
@@ -284,16 +285,17 @@
         "DAL",
         "ABNB",
         "RCL",
-        "HLT"
+        "HLT",
+        "H"
       ],
       "etf_proxies": [
         "JETS"
       ],
       "route_bias": "swing_only",
       "minimum_liquidity_class": "high",
-      "max_candidates": 6,
-      "notes": "Travel and hospitality names for risk-on rotation. BKNG (Booking Holdings \u2014 online travel, strong FCF), MAR (Marriott \u2014 hotel operator, RevPAR leverage), DAL (Delta \u2014 airline, operational leverage), ABNB (Airbnb \u2014 platform model, asset-light), RCL (Royal Caribbean \u2014 cruise line, high leisure spend leverage, capacity expansion; $76.8B FMP-verified), HLT (Hilton \u2014 asset-light hotel operator, global RevPAR exposure; $74.9B FMP-verified). JETS as US Global Jets ETF proxy. Note: blocked if oil_supply_shock fires.",
-      "last_reviewed": "2026-05-29",
+      "max_candidates": 7,
+      "notes": "Travel and hospitality names for risk-on rotation. BKNG (Booking Holdings \u2014 online travel, strong FCF), MAR (Marriott \u2014 hotel operator, RevPAR leverage), DAL (Delta \u2014 airline, operational leverage), ABNB (Airbnb \u2014 platform model, asset-light), RCL (Royal Caribbean \u2014 cruise line, high leisure spend leverage, capacity expansion; $76.8B FMP-verified), HLT (Hilton \u2014 asset-light hotel operator, global RevPAR exposure; $74.9B FMP-verified). JETS as US Global Jets ETF proxy. Note: blocked if oil_supply_shock fires. H (Hyatt Hotels \u2014 luxury/upscale hotel operator, RevPAR leverage on business and leisure travel recovery; distinct from Marriott/Hilton on upscale mix and Asia-Pacific exposure).",
+      "last_reviewed": "2026-05-30",
       "source_label": "intelligence_first_static_rule"
     },
     {
@@ -303,16 +305,17 @@
         "LLY",
         "ABBV",
         "TMO",
-        "MRK"
+        "MRK",
+        "TFX"
       ],
       "etf_proxies": [
         "XLV"
       ],
       "route_bias": "position_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 5,
-      "notes": "Large-cap defensive healthcare for risk-off rotation. UNH (UnitedHealth \u2014 managed care, resilient earnings), LLY (Eli Lilly \u2014 GLP-1/obesity franchise, earnings momentum), ABBV (AbbVie \u2014 diversified pharma, dividend), TMO (Thermo Fisher \u2014 healthcare infrastructure, defensive revenue), MRK (Merck \u2014 diversified pharma, Keytruda oncology franchise, resilient earnings across cycles; $292.3B FMP-verified). XLV as Health Care SPDR ETF proxy. JNJ covered in defensive_quality.",
-      "last_reviewed": "2026-05-29",
+      "max_candidates": 6,
+      "notes": "Large-cap defensive healthcare for risk-off rotation. UNH (UnitedHealth \u2014 managed care, resilient earnings), LLY (Eli Lilly \u2014 GLP-1/obesity franchise, earnings momentum), ABBV (AbbVie \u2014 diversified pharma, dividend), TMO (Thermo Fisher \u2014 healthcare infrastructure, defensive revenue), MRK (Merck \u2014 diversified pharma, Keytruda oncology franchise, resilient earnings across cycles; $292.3B FMP-verified). XLV as Health Care SPDR ETF proxy. JNJ covered in defensive_quality. TFX (Teleflex \u2014 medical devices: catheters, vascular access, anesthesia; defensive recurring-revenue device maker; benefits from risk-off rotation into non-cyclical healthcare spend).",
+      "last_reviewed": "2026-05-30",
       "source_label": "intelligence_first_static_rule"
     },
     {
@@ -360,16 +363,17 @@
         "URI",
         "AMAT",
         "CMI",
-        "VMC"
+        "VMC",
+        "PCOR"
       ],
       "etf_proxies": [
         "XLI"
       ],
       "route_bias": "position_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 7,
-      "notes": "Industrial infrastructure and reshoring beneficiaries. CAT (Caterpillar \u2014 heavy machinery), DE (Deere \u2014 agriculture and construction equipment), GE (GE Aerospace \u2014 jet engines), URI (United Rentals \u2014 equipment rental, construction proxy), AMAT (Applied Materials \u2014 semiconductor fab equipment for US foundry buildout), CMI (Cummins \u2014 power generation and industrial engines, infrastructure buildout beneficiary; $89.5B FMP-verified), VMC (Vulcan Materials \u2014 crushed stone and aggregates, direct construction activity proxy; $36.8B FMP-verified). XLI as Industrial Select Sector SPDR ETF proxy.",
-      "last_reviewed": "2026-05-29",
+      "max_candidates": 8,
+      "notes": "Industrial infrastructure and reshoring beneficiaries. CAT (Caterpillar \u2014 heavy machinery), DE (Deere \u2014 agriculture and construction equipment), GE (GE Aerospace \u2014 jet engines), URI (United Rentals \u2014 equipment rental, construction proxy), AMAT (Applied Materials \u2014 semiconductor fab equipment for US foundry buildout), CMI (Cummins \u2014 power generation and industrial engines, infrastructure buildout beneficiary; $89.5B FMP-verified), VMC (Vulcan Materials \u2014 crushed stone and aggregates, direct construction activity proxy; $36.8B FMP-verified). XLI as Industrial Select Sector SPDR ETF proxy. PCOR (Procore Technologies \u2014 construction project management software; infrastructure and reshoring capex drives SaaS subscription growth; direct beneficiary of US infrastructure bill spend and onshoring buildout).",
+      "last_reviewed": "2026-05-30",
       "source_label": "intelligence_first_static_rule"
     },
     {
@@ -437,6 +441,23 @@
       "max_candidates": 2,
       "notes": "Small-cap exposure for risk-on and credit-easing environments. IWM (iShares Russell 2000 ETF) and IJR (iShares Core S&P Small-Cap ETF) as liquid ETF proxies only. No individual small-cap selection \u2014 individual selection requires additional intelligence layer not yet built. Distinct from the small_caps headwind theme which fires under credit stress.",
       "last_reviewed": "2026-05-21",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "housing_rate_sensitivity",
+      "core_symbols": [
+        "LPX",
+        "FERG",
+        "CSL"
+      ],
+      "etf_proxies": [
+        "XHB"
+      ],
+      "route_bias": "swing_only",
+      "minimum_liquidity_class": "mid",
+      "max_candidates": 6,
+      "notes": "Building products and distribution names that directly benefit when yields fall and housing affordability improves. LPX (Louisiana-Pacific \u2014 structural panels and siding; housing starts leverage), FERG (Ferguson Enterprises \u2014 HVAC and plumbing distribution; largest US distributor, margin leverage on volume), CSL (Carlisle Companies \u2014 roofing systems and insulation; replacement and new construction demand). XHB as SPDR S&P Homebuilders ETF proxy. Activated by yields_falling driver.",
+      "last_reviewed": "2026-05-30",
       "source_label": "intelligence_first_static_rule"
     }
   ],
