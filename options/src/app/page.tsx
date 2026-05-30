@@ -5,6 +5,7 @@ import { getFeed, getLeaderboard, getSymbol } from "@/lib/api";
 import type { FlowEvent, LeaderboardRow, SymbolResponse } from "@/lib/types";
 import { DriverTag, ScoreBar, SideBadge, SignalBadge } from "@/components/SignalBadge";
 import { Header } from "@/components/Header";
+import { SymbolLogo } from "@/components/SymbolLogo";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -40,7 +41,10 @@ function SymbolPanel({ ticker, onClose }: { ticker: string; onClose: () => void 
       overflowY: "auto", zIndex: 30,
     }}>
       <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontWeight: 700, fontSize: 16, fontFamily: "var(--mono)" }}>{ticker}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <SymbolLogo symbol={ticker} size={36} />
+          <span style={{ fontWeight: 700, fontSize: 18, fontFamily: "var(--mono)" }}>{ticker}</span>
+        </div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 18 }}>✕</button>
       </div>
 
@@ -54,14 +58,31 @@ function SymbolPanel({ ticker, onClose }: { ticker: string; onClose: () => void 
         <div style={{ padding: 16 }}>
           {data.summary && (
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 14, marginBottom: 16 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <SideBadge side={data.summary.dominant_side} />
+                <ScoreBar score={data.summary.top_score} />
+              </div>
+              {/* Expansion ratios */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                <ExpansionPill label="Calls" value={data.summary.call_expansion} active={data.summary.unusual_calls} />
+                <ExpansionPill label="Puts" value={data.summary.put_expansion} active={data.summary.unusual_puts} />
+              </div>
+              {/* Volume breakdown */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                <Stat label="Call volume" value={data.summary.call_volume != null ? fmtContracts(data.summary.call_volume) : "—"} />
+                <Stat label="Put volume" value={data.summary.put_volume != null ? fmtContracts(data.summary.put_volume) : "—"} />
                 <Stat label="Call sweeps" value={String(data.summary.call_sweep_count)} />
                 <Stat label="Put sweeps" value={String(data.summary.put_sweep_count)} />
-                <Stat label="Clusters" value={String(data.summary.cluster_count)} />
-                <Stat label="Total contracts" value={fmtContracts(data.summary.total_contracts)} />
               </div>
-              <ScoreBar score={data.summary.top_score} />
-              <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {/* Flags */}
+              {(data.summary.flags ?? []).length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  {(data.summary.flags ?? []).map((f, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "#ccc", marginBottom: 3 }}>· {f}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {(data.summary.driver_tags ?? []).map((t) => <DriverTag key={t} tag={t} />)}
               </div>
             </div>
@@ -101,6 +122,7 @@ function EventRow({ event: e, compact, onSymbolClick }: {
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+          <SymbolLogo symbol={e.underlying} size={compact ? 20 : 26} />
           {!compact && onSymbolClick ? (
             <button
               onClick={() => onSymbolClick(e.underlying)}
@@ -134,32 +156,67 @@ function EventRow({ event: e, compact, onSymbolClick }: {
 
 // ── Leaderboard Row ───────────────────────────────────────────────────────────
 
+function ExpansionPill({ label, value, active }: { label: string; value: number | null | undefined; active?: boolean }) {
+  if (!value) return null;
+  const color = active ? (value >= 3 ? "#e74c3c" : value >= 2 ? "#e87d2e" : "#f1c40f") : "var(--muted)";
+  return (
+    <span style={{
+      fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600,
+      color, background: `${color}18`, border: `1px solid ${color}33`,
+      borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap",
+    }}>
+      {label} {value.toFixed(1)}×
+    </span>
+  );
+}
+
 function LeaderRow({ row, onSymbolClick }: { row: LeaderboardRow; onSymbolClick: (s: string) => void }) {
+  const primaryFlag = (row.flags ?? [])[0] ?? null;
+
   return (
     <div
       onClick={() => onSymbolClick(row.underlying)}
       style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "11px 14px", cursor: "pointer",
+        padding: "13px 0", cursor: "pointer",
         borderBottom: "1px solid var(--border)",
-        transition: "background 0.1s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#141414")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "#0d0d0d")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
-      <span style={{ fontWeight: 700, fontSize: 13, fontFamily: "var(--mono)", width: 60, flexShrink: 0 }}>
-        {row.underlying}
-      </span>
-      <SideBadge side={row.dominant_side} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 3 }}>
-          {row.call_sweep_count}C / {row.put_sweep_count}P sweeps · {fmtContracts(row.total_contracts)} contracts
-        </div>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-          {(row.driver_tags ?? []).slice(0, 2).map((t) => <DriverTag key={t} tag={t} />)}
-        </div>
+      {/* Row 1: logo + symbol + side + score */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <SymbolLogo symbol={row.underlying} size={32} />
+        <span style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--mono)", width: 56, flexShrink: 0 }}>
+          {row.underlying}
+        </span>
+        <SideBadge side={row.dominant_side} />
+        <div style={{ flex: 1 }} />
+        <ScoreBar score={row.top_score} />
       </div>
-      <ScoreBar score={row.top_score} />
+
+      {/* Row 2: expansion pills */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 5, paddingLeft: 0 }}>
+        <ExpansionPill label="C" value={row.call_expansion} active={row.unusual_calls} />
+        <ExpansionPill label="P" value={row.put_expansion} active={row.unusual_puts} />
+        {row.call_volume != null && row.put_volume != null && (
+          <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--mono)" }}>
+            {fmtContracts(row.call_volume)}C · {fmtContracts(row.put_volume)}P
+          </span>
+        )}
+        {row.total_contracts > 0 && (row.call_volume == null) && (
+          <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--mono)" }}>
+            {fmtContracts(row.total_contracts)} contracts
+          </span>
+        )}
+      </div>
+
+      {/* Row 3: signal description + driver tags */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        {primaryFlag && (
+          <span style={{ fontSize: 11, color: "#aaa" }}>{primaryFlag}</span>
+        )}
+        {(row.driver_tags ?? []).slice(0, 2).map((t) => <DriverTag key={t} tag={t} />)}
+      </div>
     </div>
   );
 }

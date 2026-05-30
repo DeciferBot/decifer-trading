@@ -165,11 +165,9 @@ def options_symbol(ticker: str) -> Response:
     if not ticker or not ticker.isalpha() or len(ticker) > 6:
         return _ok({"status": "error", "message": "Invalid ticker."}, 400)
 
-    data = _load_json(_EVENTS_PATH)
-    if data is None:
-        return _unavailable("Options flow data not yet available.")
-
-    events = [e for e in data.get("events", []) if e.get("underlying") == ticker]
+    # Events from stream (may not exist yet if only REST scanner has run)
+    events_data = _load_json(_EVENTS_PATH)
+    events = [e for e in (events_data or {}).get("events", []) if e.get("underlying") == ticker]
 
     leaderboard_data = _load_json(_LEADERBOARD_PATH)
     summary = None
@@ -178,6 +176,10 @@ def options_symbol(ticker: str) -> Response:
             if row.get("underlying") == ticker:
                 summary = row
                 break
+
+    # Return unavailable only if neither source has data
+    if events_data is None and leaderboard_data is None:
+        return _unavailable("Options flow data not yet available.")
 
     return _ok({
         "status": "ok",
