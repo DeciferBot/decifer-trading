@@ -631,6 +631,33 @@ def main():
                 "(dual-schedule prevention). "
                 "Verify: launchctl list | grep decifer.universe",
             )
+            # Startup staleness guard: launchd StartCalendarInterval silently skips
+            # when the machine is asleep at the scheduled time (Sunday 23:00).
+            # If the committed universe is older than 8 days, refresh immediately on
+            # startup to self-heal without waiting for the next scheduled Sunday.
+            try:
+                import json as _json, time as _time
+                _stale_days = CONFIG.get("committed_universe_stale_days", 8)
+                _cu_age_days = None
+                if os.path.exists(_COMMITTED_PATH := os.path.join("data", "committed_universe.json")):
+                    with open(_COMMITTED_PATH) as _f:
+                        _cu = _json.load(_f)
+                    _refreshed = _cu.get("refreshed_at")
+                    if _refreshed:
+                        from datetime import datetime as _dt, UTC as _UTC
+                        _age = (_dt.now(_UTC) - _dt.fromisoformat(_refreshed)).days
+                        _cu_age_days = _age
+                if _cu_age_days is not None and _cu_age_days >= _stale_days:
+                    clog(
+                        "WARN",
+                        f"⚠️  Committed universe is {_cu_age_days}d old (>{_stale_days}d threshold) "
+                        f"— launchd likely missed its Sunday run. Refreshing now in background.",
+                    )
+                    import threading as _thr
+                    from universe_committed import refresh_committed_universe as _rcu
+                    _thr.Thread(target=_rcu, name="universe-catchup-refresh", daemon=True).start()
+            except Exception as _uc_err:
+                clog("WARN", f"⏰ Universe staleness check failed (non-fatal): {_uc_err}")
         else:
             try:
                 from universe_committed import refresh_committed_universe
