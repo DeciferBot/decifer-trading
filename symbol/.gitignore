@@ -1,5 +1,3 @@
-options/.next/
-node_modules/
 .vercel
 node_modules/
 .next/
