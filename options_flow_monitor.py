@@ -97,13 +97,9 @@ async def _on_trade(trade) -> None:
     if size <= 0:
         return
 
-    with _lock:
-        ask = _quote_cache.get(sym)
-    is_sweep = (
-        size >= SWEEP_SIZE_THRESHOLD
-        and ask is not None
-        and price >= ask - 0.01
-    )
+    # Sweep = large single print (ask unavailable from OPRA wildcard stream)
+    ask = None
+    is_sweep = size >= SWEEP_SIZE_THRESHOLD
 
     fp = FlowPrint(
         ts=datetime.now(tz=timezone.utc),
@@ -263,7 +259,8 @@ def main() -> None:
         try:
             stream = OptionDataStream(api_key, secret_key, feed=OptionsFeed.OPRA)
             stream.subscribe_trades(_on_trade, "*")
-            stream.subscribe_quotes(_on_quote, "*")
+            # Note: wildcard quote subscription is not permitted on OPRA feed (413).
+            # Sweep detection uses size >= MIN_SWEEP_SIZE only (no ask comparison).
             log.info("options_flow_monitor: starting OPRA stream (universe=%d symbols)", len(_universe))
             stream.run()
         except Exception as exc:
