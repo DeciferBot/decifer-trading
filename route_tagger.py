@@ -24,8 +24,6 @@ _VALID_ROUTES = frozenset({
 
 _HELD_SOURCE_LABELS = frozenset({"held_position", "held_positions"})
 _MANUAL_SOURCE_LABELS = frozenset({"favourites_manual_conviction", "manual_conviction"})
-_DAILY_PROMOTED_SOURCE_LABELS = frozenset({"tier_b_daily_promoted", "tier_b"})
-_CORE_FLOOR_SOURCE_LABELS = frozenset({"tier_a_core_floor", "tier_a"})
 _CATALYST_SOURCE_LABELS = frozenset({
     "catalyst_watchlist_read_only", "catalyst_engine", "catalyst",
 })
@@ -78,11 +76,9 @@ def assign_route(ctx: RouteContext) -> RouteDecision:
       4. Direct beneficiary (structural) → route_hint[0] (position or swing per theme)
       5. Second-order beneficiary → route_hint[0] (typically swing)
       6. Catalyst adapter → swing
-      7. Daily promoted source (legacy scanner attention) → intraday_swing
-      8. Core floor / unclassified source → watchlist
-      9. Pressure candidate (headwind monitoring) → watchlist (never executable)
-     10. do_not_touch → do_not_touch
-     11. Fallback → watchlist
+      7. Pressure candidate (headwind monitoring) → watchlist (never executable)
+      8. do_not_touch → do_not_touch
+      9. Fallback → watchlist
     """
     labels = set(ctx.source_labels or [])
 
@@ -171,33 +167,7 @@ def assign_route(ctx: RouteContext) -> RouteDecision:
             ],
         )
 
-    # Rule 7 — daily promoted source (legacy scanner attention — intraday only)
-    if labels & _DAILY_PROMOTED_SOURCE_LABELS:
-        return RouteDecision(
-            route="intraday_swing",
-            route_reason="Daily promoted candidate — intraday attention only",
-            route_confidence=0.7,
-            allowed_routes=["intraday_swing", "watchlist"],
-            required_confirmations=[
-                "gap_fill_or_volume_surge_confirmation",
-                "intraday_session_only",
-            ],
-        )
-
-    # Rule 8 — core floor / unclassified source (watchlist monitoring only)
-    if (
-        labels & _CORE_FLOOR_SOURCE_LABELS
-        or ctx.reason_to_care in {"current_source_unclassified", "attention_shadow_only"}
-    ):
-        return RouteDecision(
-            route="watchlist",
-            route_reason="Unclassified current source — watchlist monitoring only",
-            route_confidence=0.6,
-            allowed_routes=["watchlist"],
-            required_confirmations=["intelligence_layer_classification_required"],
-        )
-
-    # Rule 9 — pressure_candidate (headwind monitoring only, never executable)
+    # Rule 7 — pressure_candidate (headwind monitoring only, never executable)
     if ctx.role == "pressure_candidate" or ctx.reason_to_care == "headwind_pressure_watchlist":
         return RouteDecision(
             route="watchlist",
@@ -207,7 +177,7 @@ def assign_route(ctx: RouteContext) -> RouteDecision:
             required_confirmations=["headwind_monitoring_only_no_execution"],
         )
 
-    # Rule 10 — do_not_touch
+    # Rule 8 — do_not_touch
     if "do_not_touch" in labels or ctx.reason_to_care == "do_not_touch":
         return RouteDecision(
             route="do_not_touch",
@@ -217,7 +187,7 @@ def assign_route(ctx: RouteContext) -> RouteDecision:
             required_confirmations=[],
         )
 
-    # Rule 11 — fallback
+    # Rule 9 — fallback
     return RouteDecision(
         route="watchlist",
         route_reason="No routing rule matched — default watchlist fallback",

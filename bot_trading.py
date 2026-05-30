@@ -1642,25 +1642,7 @@ def run_scan():
     except Exception:
         pass
 
-    # Capture per-tier universe composition BEFORE merges for coverage telemetry.
-    # Used below at the pipeline-summary log and written to universe_coverage.jsonl.
-    # Tier A = CORE_SYMBOLS (macro/ETF) + CORE_EQUITIES (mega-cap equities).
-    # Tier B = promoted top-50 from data/daily_promoted.json.
-    # Rest = sector-rotation leaders + constituents (dynamic Tier C adds happen below).
-    try:
-        from scanner import CORE_EQUITIES as _CORE_EQ
-        from scanner import CORE_SYMBOLS as _CORE_SYM
-        from universe_promoter import load_promoted_universe as _load_promoted
-
-        _universe_pre_merge = set(universe)
-        _cov_core = len(set(_CORE_SYM) & _universe_pre_merge)
-        _cov_equities = len(set(_CORE_EQ) & _universe_pre_merge)
-        _promoted_set = set(_load_promoted())
-        _cov_promoted = len(_promoted_set & _universe_pre_merge)
-        _tierA = set(_CORE_SYM) | set(_CORE_EQ)
-        _cov_other = max(0, len(_universe_pre_merge) - len(_tierA & _universe_pre_merge) - _cov_promoted)
-    except Exception:
-        _cov_core = _cov_equities = _cov_promoted = _cov_other = -1
+    _cov_core = _cov_equities = _cov_promoted = _cov_other = -1  # legacy tier telemetry removed
 
     favs = dash.get("favourites", [])
     if favs:

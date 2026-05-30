@@ -1,14 +1,13 @@
 # tests/test_worker_cli.py
 # Classification: test only
 #
-# Validates standalone worker behaviour for universe_committed and universe_promoter.
+# Validates standalone worker behaviour for universe_committed.
+# (universe_promoter removed Sprint 2, 2026-05-30 — daily_promoted.json retired)
 #
-# Spec coverage (per standalone_universe_workers task spec):
+# Spec coverage:
 #   1.  committed worker CLI importable without bot.py
-#   2.  promoter worker CLI importable without bot.py
-#   3.  committed worker run-once path exists and works
-#   4.  promoter worker run-once path exists and works
-#   5.  controlled failure exits non-zero (exit 1)
+#   2.  committed worker run-once path exists and works
+#   3.  controlled failure exits non-zero (exit 1)
 #   6.  evidence JSONL written on success
 #   7.  evidence JSONL written on controlled failure
 #   8.  no order module imported by standalone workers
@@ -128,15 +127,6 @@ def test_universe_committed_does_not_import_bot_modules():
     )
 
 
-def test_universe_promoter_does_not_import_bot_modules():
-    """Importing universe_promoter in a fresh interpreter must not pull in execution modules."""
-    banned = _check_imports("universe_promoter")
-    assert not banned, (
-        f"universe_promoter imported banned modules: {banned}. "
-        "Universe workers must never import execution logic."
-    )
-
-
 # ===========================================================================
 # B. CLI smoke — _main() exits 0 on success
 # ===========================================================================
@@ -150,21 +140,6 @@ def test_committed_main_returns_zero_on_success(tmp_path, monkeypatch):
 
     with patch("universe_committed.get_all_tradable_equities", return_value=_MOCK_ASSETS), \
          patch("universe_committed.fetch_snapshots_batched", return_value=_MOCK_SNAPS):
-        code = _main(["--run-once"])
-
-    assert code == 0, f"Expected exit 0, got {code}"
-
-
-def test_promoter_main_returns_zero_on_success(tmp_path, monkeypatch):
-    """_main() should return 0 when run_promoter succeeds."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-
-    from universe_promoter import _main
-
-    with patch("universe_promoter.load_committed_universe", return_value=_MOCK_COMMITTED), \
-         patch("universe_promoter.fetch_snapshots_batched", return_value=_MOCK_SNAPS), \
-         patch("universe_promoter._catalyst_score_for", return_value=0.0):
         code = _main(["--run-once"])
 
     assert code == 0, f"Expected exit 0, got {code}"
@@ -195,33 +170,6 @@ def test_committed_main_returns_one_on_exception(tmp_path, monkeypatch):
 
     with patch("universe_committed.get_all_tradable_equities",
                side_effect=RuntimeError("simulated Alpaca connection error")):
-        code = _main([])
-
-    assert code == 1
-
-
-def test_promoter_main_returns_one_when_committed_universe_empty(tmp_path, monkeypatch):
-    """Empty committed universe → run_promoter returns [] → _main() returns 1."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-
-    from universe_promoter import _main
-
-    with patch("universe_promoter.load_committed_universe", return_value=[]):
-        code = _main([])
-
-    assert code == 1
-
-
-def test_promoter_main_returns_one_on_exception(tmp_path, monkeypatch):
-    """Exception inside run_promoter → _main() returns 1."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-
-    from universe_promoter import _main
-
-    with patch("universe_promoter.load_committed_universe",
-               side_effect=ConnectionError("simulated API failure")):
         code = _main([])
 
     assert code == 1
@@ -272,47 +220,6 @@ def test_committed_heartbeat_written_on_failure(tmp_path, monkeypatch):
     assert hb["order_placed"] is False
 
 
-def test_promoter_heartbeat_written_on_success(tmp_path, monkeypatch):
-    """Successful promoter run must write data/heartbeats/universe_promoter_worker.json."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-
-    from universe_promoter import _main
-
-    with patch("universe_promoter.load_committed_universe", return_value=_MOCK_COMMITTED), \
-         patch("universe_promoter.fetch_snapshots_batched", return_value=_MOCK_SNAPS), \
-         patch("universe_promoter._catalyst_score_for", return_value=0.0):
-        _main([])
-
-    hb_path = tmp_path / "data" / "heartbeats" / "universe_promoter_worker.json"
-    assert hb_path.exists(), "Heartbeat file not written on success"
-    hb = json.loads(hb_path.read_text())
-    assert hb["status"] == "success"
-    assert hb["worker"] == "universe_promoter_worker"
-    assert hb["count"] > 0
-    assert hb["live_output_changed"] is False
-    assert hb["order_placed"] is False
-    assert hb["last_success_at"] is not None
-
-
-def test_promoter_heartbeat_written_on_failure(tmp_path, monkeypatch):
-    """Failed promoter run must still write heartbeat with status='fail'."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-
-    from universe_promoter import _main
-
-    with patch("universe_promoter.load_committed_universe", return_value=[]):
-        _main([])
-
-    hb_path = tmp_path / "data" / "heartbeats" / "universe_promoter_worker.json"
-    assert hb_path.exists()
-    hb = json.loads(hb_path.read_text())
-    assert hb["status"] == "fail"
-    assert hb["last_success_at"] is None
-    assert hb["order_placed"] is False
-
-
 # ===========================================================================
 # E. Idempotency — running twice is safe
 # ===========================================================================
@@ -336,26 +243,6 @@ def test_committed_is_idempotent(tmp_path, monkeypatch):
     assert payload["count"] == len(_MOCK_ASSETS)
 
 
-def test_promoter_is_idempotent(tmp_path, monkeypatch):
-    """Running promoter twice overwrites daily_promoted.json cleanly."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-
-    from universe_promoter import _main
-
-    for _ in range(2):
-        with patch("universe_promoter.load_committed_universe", return_value=_MOCK_COMMITTED), \
-             patch("universe_promoter.fetch_snapshots_batched", return_value=_MOCK_SNAPS), \
-             patch("universe_promoter._catalyst_score_for", return_value=0.0):
-            code = _main([])
-        assert code == 0
-
-    out = tmp_path / "data" / "daily_promoted.json"
-    assert out.exists()
-    payload = json.loads(out.read_text())
-    assert payload["count"] == len(_MOCK_COMMITTED)
-
-
 # ===========================================================================
 # F. Output artifact is written
 # ===========================================================================
@@ -376,25 +263,6 @@ def test_committed_writes_output_artifact(tmp_path, monkeypatch):
     payload = json.loads(out.read_text())
     assert "refreshed_at" in payload
     assert payload["count"] == len(_MOCK_ASSETS)
-
-
-def test_promoter_writes_output_artifact(tmp_path, monkeypatch):
-    """data/daily_promoted.json must exist after a successful promoter run."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-
-    from universe_promoter import _main
-
-    with patch("universe_promoter.load_committed_universe", return_value=_MOCK_COMMITTED), \
-         patch("universe_promoter.fetch_snapshots_batched", return_value=_MOCK_SNAPS), \
-         patch("universe_promoter._catalyst_score_for", return_value=0.0):
-        _main([])
-
-    out = tmp_path / "data" / "daily_promoted.json"
-    assert out.exists()
-    payload = json.loads(out.read_text())
-    assert "promoted_at" in payload
-    assert payload["count"] == len(_MOCK_COMMITTED)
 
 
 # ===========================================================================
@@ -490,50 +358,6 @@ def test_committed_evidence_jsonl_written_on_failure(tmp_path, monkeypatch):
     assert latest["success"] is False
     assert latest["failure_reason"] is not None
     assert latest["live_output_changed"] is False
-    assert latest["order_placed"] is False
-
-
-def test_promoter_evidence_jsonl_written_on_success(tmp_path, monkeypatch):
-    """Successful promoter run must append a record to the evidence JSONL."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-
-    from universe_promoter import _main
-
-    with patch("universe_promoter.load_committed_universe", return_value=_MOCK_COMMITTED), \
-         patch("universe_promoter.fetch_snapshots_batched", return_value=_MOCK_SNAPS), \
-         patch("universe_promoter._catalyst_score_for", return_value=0.0):
-        code = _main([])
-
-    assert code == 0
-    records = _load_evidence_records(tmp_path)
-    assert records, "Evidence JSONL not written on success"
-    latest = records[-1]
-    assert latest["worker_name"] == "universe_promoter_worker"
-    assert latest["success"] is True
-    assert latest["failure_reason"] is None
-    assert latest["output_artifact_path"] == "data/daily_promoted.json"
-    assert latest["live_output_changed"] is False
-    assert latest["order_placed"] is False
-
-
-def test_promoter_evidence_jsonl_written_on_failure(tmp_path, monkeypatch):
-    """Failed promoter run must append a failure record to the evidence JSONL."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-
-    from universe_promoter import _main
-
-    with patch("universe_promoter.load_committed_universe", return_value=[]):
-        code = _main([])
-
-    assert code == 1
-    records = _load_evidence_records(tmp_path)
-    assert records, "Evidence JSONL not written on failure"
-    latest = records[-1]
-    assert latest["worker_name"] == "universe_promoter_worker"
-    assert latest["success"] is False
-    assert latest["failure_reason"] is not None
     assert latest["order_placed"] is False
 
 

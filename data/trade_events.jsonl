@@ -1110,3 +1110,6 @@
 {"ts": "2026-05-28T08:27:48.098267+00:00", "event": "POSITION_QTY_CORRECTED", "trade_id": "WDC_20260508_204731_398437", "symbol": "WDC", "corrected_qty": 49, "reason": "reconcile_ibkr"}
 {"ts": "2026-05-28T18:13:29.854016+00:00", "event": "POSITION_CLOSED", "trade_id": "SNX_20260429_172800_821400", "symbol": "SNX", "exit_price": 284.0, "pnl": 7896.24, "exit_reason": "closed_while_bot_down", "hold_minutes": 41800}
 {"ts": "2026-05-29T13:43:47.996470+00:00", "event": "POSITION_CLOSED", "trade_id": "CRDO_20260521_191427_488204", "symbol": "CRDO", "exit_price": 232.5, "pnl": 11556.99, "exit_reason": "tp_hit", "hold_minutes": 0}
+{"ts": "2026-05-29T19:33:44.837942+00:00", "event": "POSITION_CLOSED", "trade_id": "PLD_20260522_134549_288087", "symbol": "PLD", "exit_price": 143.693155, "pnl": -1318.91, "exit_reason": "sl_hit", "hold_minutes": 0}
+{"ts": "2026-05-29T20:01:22.367342+00:00", "event": "POSITION_CLOSED", "trade_id": "ODFL_20260522_174742_856539", "symbol": "ODFL", "exit_price": 220.165, "pnl": 2855.2, "exit_reason": "stale_purge", "hold_minutes": 0}
+{"ts": "2026-05-30T08:27:06.668254+00:00", "event": "ORDER_FILLED", "trade_id": "", "symbol": "CHEAP", "fill_price": 0.0, "fill_qty": 0, "order_id": 12345}

@@ -51,8 +51,6 @@ _APPROVED_SOURCE_LABELS: frozenset[str] = frozenset({
     "economic_intelligence",
     "legacy_theme_tracker_read_only",
     "overnight_research_read_only",
-    "daily_attention_feed",
-    "position_research_universe",
     "catalyst_candidate_feed",
 })
 

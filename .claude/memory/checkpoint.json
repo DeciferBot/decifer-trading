@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-05-29T05:24:48.505Z",
+  "timestamp": "2026-05-30T07:20:36.583Z",
   "branch": "master",
-  "lastCommit": "83ca44e feat(mobile): futures hero, event-driven narrative, session-aware movers",
+  "lastCommit": "bee741d fix(mobile): always fetch macro/general news alongside symbol news",
   "roadmapPhase": null,
   "lastFilesTouched": [
     "claude/memory/checkpoint.json",
+    ".claude/memory/pending-doc-update.json",
     ".claude/memory/session-history.jsonl",
+    ".claude/memory/stop-hook-guard.flag",
     "data/audit_log.jsonl",
     "data/equity_history.json",
+    "data/ic_decision_events.jsonl",
     "data/ic_validation_result.json",
     "data/ic_weights.json",
-    "data/ic_weights_live.json",
-    "data/ic_weights_live_history.jsonl",
-    "data/intelligence/customer_event_tape.json",
-    "data/intelligence/live_driver_state.json"
+    "data/ic_weights_live.json"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 30
+  "sessionCount": 44
 }

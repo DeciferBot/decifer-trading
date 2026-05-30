@@ -132,15 +132,12 @@ def _stage_intelligence() -> dict:
 
 
 def _stage_universe() -> dict:
-    """Stage 2 — Universe Builders (launchd weekly + daily)."""
+    """Stage 2 — Universe Builders (launchd weekly)."""
     artifacts = [
-        _file_age("committed_universe.json",         7 * 86_400,  "Committed universe"),
-        _file_age("daily_promoted.json",             18 * 3600,   "Daily promoted"),
-        _file_age("position_research_universe.json", 8 * 86_400,  "Position research universe"),
+        _file_age("committed_universe.json", 7 * 86_400, "Committed universe"),
     ]
     heartbeats = [
         _file_age("heartbeats/universe_committed_worker.json", 7 * 86_400, "Committed worker heartbeat"),
-        _file_age("heartbeats/universe_promoter_worker.json",  18 * 3600,  "Promoter worker heartbeat"),
     ]
 
     # Content validation — file age proves the job ran; symbol count proves it produced real data.
