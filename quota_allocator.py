@@ -32,30 +32,28 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-# Sprint 7I: promoted from 50/20 (safety validation cap) to 75/35 (production candidate cap).
-# Evidence: Sprint 7H.3 calibration — 75/35 is the minimum that eliminates all governed-but-excluded
-# symbols and gives every active EIL theme ≥1 single-name representative.
-# Observation gate for this policy: ≥10 successful publisher runs OR ≥3 distinct UTC sessions.
-QUOTA_POLICY_VERSION = "90_50"
+# Sprint 2 (2026-05-30): structural max raised 50→70 after Tier A/B/D legacy sources removed.
+# Intelligence feed now has 68 structural candidates — previous 50-cap was silently
+# dropping LPX, FERG, CSL, SNOW, PCOR. Total max stays 90 (unchanged).
+QUOTA_POLICY_VERSION = "90_70"
 
 _TOTAL_MAX = 90
 _STRUCTURAL_MIN = 8
-_STRUCTURAL_MAX = 50
+_STRUCTURAL_MAX = 70
 _CATALYST_MAX = 30
 _CATALYST_MIN = 10
-_ATTENTION_MAX = 20   # shared: attention + current_source_unclassified — scaled with total cap
-_ETF_PROXY_MAX = 15   # scaled with total cap; ETF supply is capped at 9 by EIL feed
+_ATTENTION_MAX = 20
+_ETF_PROXY_MAX = 15
 
 _PROTECTED_GROUPS = frozenset({"held", "manual_conviction"})
 _STRUCTURAL_GROUP = "structural_position"
 _CATALYST_GROUP = "catalyst_swing"
-_ATTENTION_GROUPS = frozenset({"attention", "current_source_unclassified"})
+_ATTENTION_GROUPS = frozenset({"attention"})
 _ETF_GROUP = "etf_proxy"
 
 _VALID_GROUPS = frozenset({
     "held", "manual_conviction", "structural_position",
     "catalyst_swing", "attention", "etf_proxy",
-    "current_source_unclassified",
 })
 
 

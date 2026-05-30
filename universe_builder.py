@@ -1,19 +1,22 @@
 """
-universe_builder.py — shadow universe builder for the Intelligence-First architecture.
+universe_builder.py — Intelligence-First universe assembler.
 
-Single responsibility: combine the economic candidate feed with read-only snapshots
-of current approved sources, apply deterministic route/quota logic, and write
-data/universe_builder/active_opportunity_universe_shadow.json.
+Single responsibility: combine the economic intelligence candidate feed with
+held positions, manual conviction, and catalyst adapter output; apply
+deterministic route/quota logic; write the shadow universe file.
 
-No live bot wiring. No mutations of any existing source file. Shadow only.
-All symbols from approved roster, existing current sources, held positions,
-or manual conviction lists.
+Sources (priority order):
+  1. Manual conviction / favourites  (protected)
+  2. Economic intelligence candidates (from candidate_resolver feed)
+  3. Catalyst adapter (approved symbols only, gated by committed_universe)
 
-File naming note: the output file name ("_shadow") is a legacy internal name.
-This file is an intermediate staging artifact only — it is NEVER read directly
-by the live bot.  run_intelligence_pipeline.py promotes it to the production
-handoff at data/live/active_opportunity_universe.json, which is the only path
-consumed by handoff_reader.load_production_handoff() and bot_trading.py.
+Legacy Tier A / Tier B / Tier D source loaders removed (Sprint 2, 2026-05-30).
+All candidate discovery now flows through the intelligence pipeline.
+
+File naming note: the output file ("_shadow") is an internal staging artifact —
+it is NEVER read directly by the live bot. run_intelligence_pipeline.py promotes
+it to data/live/active_opportunity_universe.json, the only path consumed by
+handoff_reader.load_production_handoff() and bot_trading.py.
 
 Public surface:
     UniverseBuilder          — builds the shadow universe
@@ -38,15 +41,12 @@ _ADAPTER_SNAPSHOT_PATH = "data/intelligence/source_adapter_snapshot.json"
 _THEMATIC_ROSTER_PATH = "data/intelligence/thematic_roster.json"
 _COMMITTED_PATH = "data/committed_universe.json"
 
-# Source files read read-only
-_TIER_B_PATH = "data/daily_promoted.json"
-_TIER_D_PATH = "data/position_research_universe.json"
 _FAVOURITES_PATH = "data/favourites.json"
 
 # Quota limits — Sprint 7I: promoted to 75/35 production candidate policy.
 # See quota_allocator.QUOTA_POLICY_VERSION and Sprint 7H.3 calibration report.
 _QUOTA = {
-    "structural_position": {"min": 8,  "max": 50, "protected": True},
+    "structural_position": {"min": 8,  "max": 70, "protected": True},
     "catalyst_swing":       {"min": 10, "max": 30, "protected": False},
     "attention":            {"max": 20, "capped": True},
     "etf_proxy":            {"max": 15, "capped": True},
@@ -56,7 +56,7 @@ _QUOTA = {
 _TOTAL_MAX = 90
 _ATTENTION_MAX = 20
 _ETF_PROXY_MAX = 15
-_STRUCTURAL_MAX = 50
+_STRUCTURAL_MAX = 70
 _CATALYST_MAX = 30
 
 _VALID_ROUTES = {"position", "swing", "intraday_swing", "watchlist", "held", "manual_conviction", "do_not_touch"}
@@ -64,7 +64,6 @@ _VALID_BUCKET_TYPES = {"structural", "catalyst", "attention", "proxy", "held", "
 _VALID_QUOTA_GROUPS = {
     "structural_position", "catalyst_swing", "attention",
     "etf_proxy", "held", "manual_conviction",
-    "current_source_unclassified",
 }
 
 # Reason-to-care → normalised reason bucket (one of the 5 canonical buckets)
@@ -76,7 +75,6 @@ _REASON_TO_BUCKET: dict[str, str] = {
     "economic_intelligence_candidate":"structural",
     "catalyst_candidate_from_adapter":"catalyst",
     "attention_shadow_only":          "attention",
-    "current_source_unclassified":    "attention",
     "proxy":                          "reference",
     "reference_data_approved_theme":  "reference",
     "headwind_pressure_watchlist":    "reference",
@@ -87,8 +85,6 @@ _SOURCE_LABEL_TO_PRIMARY: dict[str, str] = {
     "favourites_manual_conviction":   "protected_manual_conviction",
     "economic_intelligence":          "economic_intelligence_candidate_feed",
     "intelligence_first_static_rule": "economic_intelligence_candidate_feed",
-    "position_research_universe":     "position_research_universe",
-    "daily_attention_feed":           "daily_attention_feed",
     "reference_data_approved_theme":  "permanent_core_reference_universe",
     "catalyst_candidate_feed":        "catalyst_candidate_feed",
 }
@@ -198,9 +194,7 @@ class ShadowUniverse:
         structural_reason_count = sum(
             1 for c in self.candidates if c.reason_to_care in _STRUCTURAL_REASONS
         )
-        tier_d_structural_count = sum(
-            1 for c in self.candidates if "position_research_universe" in (c.source_labels or [])
-        )
+        tier_d_structural_count = 0  # legacy Tier D removed (Sprint 2)
         structural_watchlist = sum(
             1 for c in self.candidates
             if c.quota.get("group") == "structural_position" and c.route == "watchlist"
@@ -313,29 +307,6 @@ def _read_json(path: str) -> tuple[Any, str | None]:
             return json.load(f), None
     except (json.JSONDecodeError, OSError) as e:
         return None, f"Failed to read {path}: {e}"
-
-
-def _load_tier_a() -> list[str]:
-    """Tier A: hardcoded from scanner.py constants — safe to import read-only."""
-    try:
-        from scanner import CORE_SYMBOLS, CORE_EQUITIES
-        return list(CORE_SYMBOLS) + list(CORE_EQUITIES)
-    except ImportError:
-        return []
-
-
-def _load_tier_b() -> list[str]:
-    data, err = _read_json(_TIER_B_PATH)
-    if err or not isinstance(data, dict):
-        return []
-    return [s["ticker"] for s in (data.get("symbols") or []) if isinstance(s, dict) and s.get("ticker")]
-
-
-def _load_tier_d() -> list[str]:
-    data, err = _read_json(_TIER_D_PATH)
-    if err or not isinstance(data, dict):
-        return []
-    return [s["ticker"] for s in (data.get("symbols") or []) if isinstance(s, dict) and s.get("ticker")]
 
 
 def _load_favourites() -> list[str]:
@@ -474,78 +445,6 @@ def _from_economic_candidate(ec: dict) -> ShadowCandidate | None:
     )
 
 
-def _from_tier_d(symbol: str) -> ShadowCandidate:
-    return ShadowCandidate(
-        symbol=symbol,
-        company_name=None,
-        asset_type="equity",
-        reason_to_care="structural_candidate_source",
-        bucket_id=f"tier_d_{symbol}",
-        bucket_type="structural",
-        route="position",
-        source_labels=["position_research_universe"],
-        macro_rules_fired=[],
-        transmission_direction="none",
-        company_validation_status="not_run_static_bootstrap",
-        thesis_intact=None,
-        why_this_symbol=f"{symbol} is in the Tier D position research universe (structural fundamental discovery)",
-        invalidation=[],
-        eligibility=_eligibility_shadow(symbol),
-        quota={"group": "structural_position", "protected": True},
-        execution_instructions=_execution_instructions_shadow(["position", "watchlist"]),
-        risk_notes=[],
-        live_output_changed=False,
-    )
-
-
-def _from_tier_b(symbol: str) -> ShadowCandidate:
-    return ShadowCandidate(
-        symbol=symbol,
-        company_name=None,
-        asset_type="equity",
-        reason_to_care="attention_shadow_only",
-        bucket_id=f"tier_b_{symbol}",
-        bucket_type="attention",
-        route="watchlist",
-        source_labels=["daily_attention_feed"],
-        macro_rules_fired=[],
-        transmission_direction="none",
-        company_validation_status="not_run_static_bootstrap",
-        thesis_intact=None,
-        why_this_symbol=f"{symbol} appeared in daily promoted universe (gap/volume/catalyst score)",
-        invalidation=[],
-        eligibility=_eligibility_shadow(symbol),
-        quota={"group": "attention", "protected": False},
-        execution_instructions=_execution_instructions_shadow(["intraday_swing", "watchlist"]),
-        risk_notes=[],
-        live_output_changed=False,
-    )
-
-
-def _from_tier_a(symbol: str) -> ShadowCandidate:
-    return ShadowCandidate(
-        symbol=symbol,
-        company_name=None,
-        asset_type="equity",
-        reason_to_care="current_source_unclassified",
-        bucket_id=f"tier_a_{symbol}",
-        bucket_type="attention",
-        route="watchlist",
-        source_labels=["tier_a_core_floor"],
-        macro_rules_fired=[],
-        transmission_direction="none",
-        company_validation_status="not_run_static_bootstrap",
-        thesis_intact=None,
-        why_this_symbol=f"{symbol} is a Tier A always-on core floor symbol",
-        invalidation=[],
-        eligibility=_eligibility_shadow(symbol),
-        quota={"group": "current_source_unclassified", "protected": False},
-        execution_instructions=_execution_instructions_shadow(["swing", "intraday_swing", "watchlist"]),
-        risk_notes=[],
-        live_output_changed=False,
-    )
-
-
 def _from_catalyst_adapter(symbol: str, catalyst_score: float, reason: str) -> ShadowCandidate:
     """Build a catalyst_swing candidate from the catalyst engine adapter."""
     return ShadowCandidate(
@@ -607,12 +506,9 @@ class UniverseBuilder:
     Builds the shadow active opportunity universe.
 
     Priority order (symbols seen earlier win in dedup):
-      1. Held positions (protected, always included — empty in static bootstrap)
-      2. Manual conviction / favourites (protected)
-      3. Economic intelligence candidates (direct_beneficiary → structural_position)
-      4. Position research universe (structural_position, up to structural max)
-      5. Daily promoted source (attention, capped at 15 — legacy scanner layer)
-      6. Core floor source (current_source_unclassified, fills remaining attention slots)
+      1. Manual conviction / favourites (protected)
+      2. Economic intelligence candidates (direct_beneficiary → structural_position)
+      3. Catalyst adapter (approved symbols only, gated by committed_universe + roster)
     """
 
     def __init__(
@@ -642,9 +538,6 @@ class UniverseBuilder:
         pre_exclusion_log: list[dict] = []   # approved-source guard, runs before allocator
 
         # ── Pre-load source data (all pure file reads, no side effects)
-        _preload_tier_a    = _load_tier_a()
-        _preload_tier_b    = _load_tier_b()
-        _preload_tier_d    = _load_tier_d()
         _preload_favs      = _load_favourites()
         _preload_roster    = _load_thematic_roster_symbols()
         _preload_committed = _load_committed_symbols()
@@ -655,7 +548,7 @@ class UniverseBuilder:
         source_files = [self._feed_path, self._snapshot_path]
 
         # ── Build ordered QuotaCandidate list (priority = lower is included first)
-        # Priority: 1=manual, 2=economic, 3=tier_d, 4=catalyst, 5=tier_b, 6=tier_a
+        # Priority: 1=manual, 2=economic, 3=catalyst
         quota_candidates: list[QuotaCandidate] = []
 
         if not _preload_favs:
@@ -714,38 +607,13 @@ class UniverseBuilder:
                 payload=cand,
             ))
 
-        source_files.append(_TIER_D_PATH)
-        for sym in _preload_tier_d:
-            ctx = RouteContext(
-                symbol=sym, reason_to_care="structural_candidate_source",
-                source_labels=["position_research_universe"],
-                role="direct_beneficiary", theme="position_research",
-                driver="fundamental_discovery",
-                is_held=False, is_manual_conviction=False,
-                route_hint=["position", "watchlist"], bucket_type="structural",
-            )
-            decision = assign_route(ctx)
-            cand = _from_tier_d(sym)
-            cand.route = decision.route
-            quota_candidates.append(QuotaCandidate(
-                symbol=sym, quota_group="structural_position",
-                source_labels=["position_research_universe"],
-                route=decision.route, priority=3, is_protected=True,
-                source_name="tier_d_structural",
-                driver="fundamental_discovery",
-                reason_to_care="structural_candidate_source",
-                payload=cand,
-            ))
-
-        # ── Catalyst (priority 4): approved-source guard runs before allocator
+        # ── Catalyst (priority 3): approved-source guard keeps unknown symbols out
         if adapter_snap_available:
             _queued_syms: set[str] = {qc.symbol for qc in quota_candidates}
             _approved_syms: set[str] = (
-                _queued_syms
-                | set(_preload_tier_a)
-                | set(_preload_tier_b)
-                | _preload_roster
-                | _preload_committed
+                _queued_syms       # intelligence candidates already queued
+                | _preload_roster  # thematic roster symbols
+                | _preload_committed  # committed universe (weekly-refresh 1000 symbols)
             )
             cat_adapter = (adapter_snap.get("adapters") or {}).get("catalyst_engine", {})
             if cat_adapter.get("source_status") == "available":
@@ -777,49 +645,10 @@ class UniverseBuilder:
                     quota_candidates.append(QuotaCandidate(
                         symbol=sym, quota_group="catalyst_swing",
                         source_labels=["catalyst_watchlist_read_only"],
-                        route=decision.route, priority=4, is_protected=False,
+                        route=decision.route, priority=3, is_protected=False,
                         source_name="catalyst_engine_adapter",
                         payload=cand,
                     ))
-
-        source_files.append(_TIER_B_PATH)
-        for sym in _preload_tier_b:
-            ctx = RouteContext(
-                symbol=sym, reason_to_care="attention_shadow_only",
-                source_labels=["daily_attention_feed"],
-                role="attention", theme="", driver="",
-                is_held=False, is_manual_conviction=False,
-                route_hint=["intraday_swing", "watchlist"], bucket_type="attention",
-            )
-            decision = assign_route(ctx)
-            cand = _from_tier_b(sym)
-            cand.route = decision.route
-            quota_candidates.append(QuotaCandidate(
-                symbol=sym, quota_group="attention",
-                source_labels=["daily_attention_feed"],
-                route=decision.route, priority=5, is_protected=False,
-                source_name="tier_b_attention",
-                payload=cand,
-            ))
-
-        for sym in _preload_tier_a:
-            ctx = RouteContext(
-                symbol=sym, reason_to_care="current_source_unclassified",
-                source_labels=["tier_a_core_floor"],
-                role="current_source", theme="", driver="",
-                is_held=False, is_manual_conviction=False,
-                route_hint=["watchlist"], bucket_type="attention",
-            )
-            decision = assign_route(ctx)
-            cand = _from_tier_a(sym)
-            cand.route = decision.route
-            quota_candidates.append(QuotaCandidate(
-                symbol=sym, quota_group="current_source_unclassified",
-                source_labels=["tier_a_core_floor"],
-                route=decision.route, priority=6, is_protected=False,
-                source_name="tier_a_core_floor",
-                payload=cand,
-            ))
 
         # ── Allocate via quota_allocator
         result = allocate(quota_candidates)
