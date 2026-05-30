@@ -257,157 +257,22 @@ def get_sector_rotation_bias() -> dict:
 
 
 # ── Position Research Universe (Tier D) cache ─────────────────────────────────
-# Populated on the first get_position_research_universe() call, then refreshed
-# only when the PRU file changes (mtime-based invalidation).
-# Exported so signal_pipeline.py and signal_dispatcher.py can read metadata.
-
-_POSITION_RESEARCH_SYMBOLS: frozenset = frozenset()
-_POSITION_RESEARCH_META: dict = {}  # ticker → full metadata dict
-_pru_file_mtime: float = -1.0       # os.path.getmtime() at last load; -1 = never loaded
-_pru_loaded_at: str = ""            # ISO timestamp of last cache load
-_pru_built_at: str = ""             # built_at from the PRU file
-_pru_symbol_count: int = 0          # symbol count at last load
-# Last-valid snapshot — retained so a transient read error mid-rebuild does not
-# evict the entire Tier D universe for the affected scan cycle.
-_last_valid_pru_syms: frozenset = frozenset()
-_last_valid_pru_meta: dict = {}
-
-
-def get_position_research_universe() -> tuple[frozenset, dict]:
-    """
-    Load Tier D tickers and metadata from position_research_universe.json.
-
-    Uses mtime-based cache invalidation — re-reads the file only when it has
-    changed since the last load.  On a cache hit, returns cached values and
-    logs at DEBUG.  On a cache miss (first load or file changed), logs at INFO
-    with built_at / loaded_at / symbol count and whether it was a refresh.
-
-    Returns (symbol_frozenset, meta_by_ticker_dict).
-    Returns (frozenset(), {}) on missing/stale/malformed file — graceful degradation.
-    Called by get_dynamic_universe() and signal_dispatcher.dispatch_signals().
-    """
-    global _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
-    global _pru_file_mtime, _pru_loaded_at, _pru_built_at, _pru_symbol_count
-    global _last_valid_pru_syms, _last_valid_pru_meta
-
-    if not CONFIG.get("position_research_universe_enabled", True):
-        return frozenset(), {}
-
-    from universe_position import _PRU_PATH, load_position_research_universe
-
-    # ── Mtime check: skip disk read if file unchanged ─────────────────────────
-    try:
-        current_mtime = os.path.getmtime(_PRU_PATH)
-    except OSError:
-        current_mtime = 0.0
-
-    if current_mtime == _pru_file_mtime and _pru_file_mtime >= 0:
-        log.debug(
-            "Tier D: cache reused (built_at=%s loaded_at=%s symbols=%d)",
-            _pru_built_at, _pru_loaded_at, _pru_symbol_count,
-        )
-        return _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
-
-    # ── Cache miss: file changed or first load ────────────────────────────────
-    was_refresh = _pru_file_mtime >= 0  # True if we previously had a valid cache
-    try:
-        tickers, meta_list, built_at_str = load_position_research_universe()
-        if tickers:
-            _POSITION_RESEARCH_SYMBOLS = frozenset(tickers)
-            _POSITION_RESEARCH_META = {
-                m["ticker"]: m for m in meta_list if isinstance(m, dict) and "ticker" in m
-            }
-        else:
-            _POSITION_RESEARCH_SYMBOLS = frozenset()
-            _POSITION_RESEARCH_META = {}
-        _pru_file_mtime = current_mtime
-        _pru_loaded_at = datetime.now(UTC).isoformat()
-        _pru_built_at = built_at_str
-        _pru_symbol_count = len(tickers)
-        # Persist last-known-good so a transient error on the next cycle falls back safely.
-        if _POSITION_RESEARCH_SYMBOLS:
-            _last_valid_pru_syms = _POSITION_RESEARCH_SYMBOLS
-            _last_valid_pru_meta = _POSITION_RESEARCH_META
-
-        action = "REFRESHED (file changed)" if was_refresh else "loaded"
-        log.info(
-            "Tier D: cache %s — built_at=%s loaded_at=%s symbols=%d",
-            action, _pru_built_at, _pru_loaded_at, _pru_symbol_count,
-        )
-    except Exception as exc:
-        if _last_valid_pru_syms:
-            log.warning(
-                "Tier D: load failed (%s) — retaining last valid PRU (%d syms)",
-                exc, len(_last_valid_pru_syms),
-            )
-            _POSITION_RESEARCH_SYMBOLS = _last_valid_pru_syms
-            _POSITION_RESEARCH_META = _last_valid_pru_meta
-        else:
-            log.warning(
-                "Tier D: load failed (%s) — no prior valid PRU, continuing without Tier D", exc
-            )
-            _POSITION_RESEARCH_SYMBOLS = frozenset()
-            _POSITION_RESEARCH_META = {}
-
-    return _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
 
 
 def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
     """
-    Build the per-cycle scan universe from four tiers:
+    Emergency fallback universe — only used when enable_active_opportunity_universe_handoff=False.
+    Normal operation: bot_trading uses the intelligence handoff exclusively.
 
-      Tier A — inline floor (always scanned):
-        CORE_SYMBOLS (15 macro/vol/inverse/crypto/commodity ETFs)
-        + CORE_EQUITIES (41 mega-cap equities)
-
-      Tier B — daily promoted list (top 50 from universe_promoter):
-        Read from data/daily_promoted.json. Refreshed 16:15 ET + 08:00 ET
-        by universe_promoter. Stale files (>18h) are ignored and the bot
-        runs on Tier A only.
-
-      Tier C — dynamic per-cycle adds:
-        Sector-rotation leaders and their constituent stocks.
-        Other Tier C paths (catalyst candidates, held positions, favourites,
-        sympathy, news hits) are unioned in by the caller (bot_trading
-        union logic) — not this function.
-
-      Tier D — Position Research Universe (additive, shadow mode):
-        Fundamental-quality discovery names from the committed Master Universe.
-        Bypasses gap/premarket-volume promoter. Read from
-        data/position_research_universe.json (built weekly).
-        Controlled by position_research_universe_enabled config key.
-
-    Circuit breaker: if VIX is in extreme panic territory, we do not restrict
-    the universe here. Risk gating happens downstream (risk.check_risk_conditions,
-    PM exit triggers). Keeping the universe wide during capitulation lets the
-    scoring engine see the full set of candidates.
-
-    The `ib` parameter is retained for API compatibility.
+    Tier A — inline floor: CORE_SYMBOLS + CORE_EQUITIES
+    Tier C — sector rotation leaders (other paths unioned in by caller)
     """
     # Tier A — always-on floor
     symbols: set[str] = set(CORE_SYMBOLS) | set(CORE_EQUITIES)
     n_core = len(CORE_SYMBOLS)
     n_equities = len(CORE_EQUITIES)
 
-    # Tier B — promoted
-    n_promoted = 0
-    try:
-        from universe_promoter import load_promoted_universe
-
-        promoted = load_promoted_universe()
-        if promoted:
-            before = len(symbols)
-            symbols.update(promoted)
-            n_promoted = len(symbols) - before
-        else:
-            log.warning(
-                "Universe: daily_promoted.json missing/stale — running Tier A only. "
-                "Check universe_promoter schedule (16:15 ET / 08:00 ET)."
-            )
-    except Exception as exc:
-        log.warning(f"Universe: promoter load failed — {exc}. Running Tier A only.")
-
-    # Tier C — sector rotation leaders (other Tier C paths union'd in by caller)
+    # Tier C — sector rotation leaders
     n_sector = 0
     sector_bias = get_sector_rotation_bias()
     if sector_bias.get("available"):
@@ -423,23 +288,6 @@ def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
             n_sector,
         )
 
-    # Tier D — Position Research Universe (shadow mode, additive)
-    n_tier_d = 0
-    n_tier_d_new = 0
-    if CONFIG.get("position_research_universe_enabled", True):
-        tier_d_syms, _meta = get_position_research_universe()
-        if tier_d_syms:
-            n_tier_d = len(tier_d_syms)
-            before = len(symbols)
-            symbols.update(tier_d_syms)
-            n_tier_d_new = len(symbols) - before
-            log.info(
-                "Tier D: %d position research names loaded (%d new, %d already in A/B/C)",
-                n_tier_d, n_tier_d_new, n_tier_d - n_tier_d_new,
-            )
-        else:
-            log.debug("Tier D: no position research universe available this cycle")
-
     _vix = (regime or {}).get("vix", 0)
     _vix_1h = (regime or {}).get("vix_1h_change", 0)
     _is_extreme = _vix > CONFIG.get("vix_panic_min", 35) or _vix_1h > CONFIG.get("vix_spike_pct", 0.20)
@@ -450,8 +298,8 @@ def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
         )
 
     log.info(
-        f"Universe: {len(symbols)} symbols | core={n_core} equities={n_equities} "
-        f"promoted={n_promoted} sector+={n_sector} tier_d={n_tier_d} "
+        f"Universe (fallback mode): {len(symbols)} symbols | "
+        f"core={n_core} equities={n_equities} sector+={n_sector} "
         f"| vix={_vix:.1f} extreme={_is_extreme}"
     )
     return list(symbols)

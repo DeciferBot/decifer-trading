@@ -21,7 +21,6 @@ from pattern_library import record_entry
 from position_sizing import calculate_stops
 from utils.log_rotation import rotate_jsonl_if_needed
 
-_TIER_D_FUNNEL_MAX_BYTES = int(CONFIG.get("tier_d_funnel_max_mb", 10)) * 1_048_576
 from signal_types import Signal
 
 
@@ -35,21 +34,6 @@ def _get_execute_buy_fail_reason(symbol: str) -> str:
     """
     specific = _execute_buy_block_reasons.get(symbol)
     return f"execute_buy_returned_false:{specific}" if specific else "execute_buy_returned_false"
-
-def _lazy_pru_tickers() -> frozenset:
-    """Return PRU ticker frozenset via scanner's mtime-based cache.
-
-    Delegates to scanner.get_position_research_universe() so the set is
-    refreshed automatically when position_research_universe.json changes
-    (weekly rebuild while the bot is running), without any extra cache here.
-    """
-    try:
-        from scanner import get_position_research_universe
-        symbols, _ = get_position_research_universe()
-        return symbols
-    except Exception:
-        return frozenset()
-
 
 @dataclass
 class _FormulaAdvice:
@@ -97,145 +81,6 @@ def _signal_to_candidate(signal: Signal) -> dict:
     if getattr(signal, "scanner_tier", ""):
         cand["scanner_tier"] = signal.scanner_tier
     return cand
-
-
-# ── Tier D context backfill ───────────────────────────────────────────────────
-# Fundamental fields used to assess TradeContext quality for Tier D candidates.
-_TIER_D_FUND_FIELDS = ("fcf_yield", "dcf_upside_pct", "revenue_growth_yoy",
-                       "gross_margin", "analyst_upside_pct")
-
-
-def _backfill_tier_d_contexts(
-    signals: list,
-    context_map: dict,
-    context_failed: set,
-) -> dict[str, dict]:
-    """
-    After the initial context-map build, scan Tier D candidates for missing or
-    no-fundamental TradeContext.  Attempt one fresh build_context() call per
-    affected symbol.
-
-    Returns a mapping  symbol.upper() → backfill_info  for every Tier D candidate
-    that needed attention:
-        {
-          "tier_d_rescued_after_context_build": True,
-          "context_backfilled": True | False,
-          "context_backfill_source": "fresh_fmp" | "failed",
-          "missing_fresh_trade_context_after_rescue": True | False,
-        }
-
-    Side-effect: updates context_map in place if backfill succeeds.
-    Safe: never raises; all errors are logged and included in the returned info.
-    """
-    from trade_context import build_context as _build_ctx
-
-    backfill_info: dict[str, dict] = {}
-
-    for sig in signals:
-        if getattr(sig, "scanner_tier", "") != "D":
-            continue
-        if sig.direction not in ("LONG", "SHORT"):
-            continue
-        sym_upper = sig.symbol.upper()
-        if sym_upper in context_failed:
-            continue  # already excluded from candidates
-
-        ctx = context_map.get(sym_upper)
-        has_fundamentals = (
-            ctx is not None
-            and any(getattr(ctx, f, None) is not None for f in _TIER_D_FUND_FIELDS)
-        )
-        if has_fundamentals:
-            continue  # context is adequately populated — no action needed
-
-        # Context is missing or has no fundamentals — flag and attempt backfill
-        info: dict = {
-            "tier_d_rescued_after_context_build": True,
-            "context_backfilled": False,
-            "context_backfill_source": "failed",
-            "missing_fresh_trade_context_after_rescue": True,
-        }
-        log.info(
-            "dispatch: Tier D %s ctx has no fundamentals (tier_d_rescued_after_context_build=True) "
-            "— attempting backfill",
-            sig.symbol,
-        )
-        try:
-            ctx_retry = _build_ctx(
-                symbol=sig.symbol, direction=sig.direction, signal=sig,
-                current_price=sig.price, regime=sig.regime_context,
-            )
-            has_fund_retry = any(
-                getattr(ctx_retry, f, None) is not None for f in _TIER_D_FUND_FIELDS
-            )
-            if has_fund_retry:
-                context_map[sym_upper] = ctx_retry
-                info["context_backfilled"] = True
-                info["context_backfill_source"] = "fresh_fmp"
-                info["missing_fresh_trade_context_after_rescue"] = False
-                log.info(
-                    "dispatch: Tier D %s context backfilled "
-                    "(context_backfilled=True context_backfill_source=fresh_fmp)",
-                    sig.symbol,
-                )
-            else:
-                log.warning(
-                    "dispatch: Tier D %s backfill produced no fundamentals "
-                    "(context_backfilled=False missing_fresh_trade_context_after_rescue=True)",
-                    sig.symbol,
-                )
-        except Exception as exc:
-            log.warning(
-                "dispatch: Tier D %s backfill failed "
-                "(context_backfill_source=failed missing_fresh_trade_context_after_rescue=True): %s",
-                sig.symbol, exc,
-            )
-
-        # Last resort: PRU snapshot (disk-persisted, survives process restarts).
-        # Fires only when both the initial build and the fresh-FMP retry returned no
-        # fundamentals — covers the 4 fields _compute_fundamental_signals() captured.
-        if not info["context_backfilled"]:
-            try:
-                import scanner as _scanner_mod
-                _, _pru_meta = _scanner_mod.get_position_research_universe()
-                _snap = _pru_meta.get(sig.symbol, {}).get("pru_fmp_snapshot") or {}
-                if _snap:
-                    import dataclasses as _dc
-                    _PRU_MAP = {
-                        "revenue_growth_yoy":   "revenue_growth_yoy",
-                        "revenue_decelerating": "revenue_decelerating",
-                        "gross_margin":         "gross_margin",
-                        "analyst_upside_pct":   "analyst_upside_pct",
-                    }
-                    _base = context_map.get(sym_upper) or ctx
-                    _overrides = {
-                        ctx_attr: _snap[snap_key]
-                        for snap_key, ctx_attr in _PRU_MAP.items()
-                        if _snap.get(snap_key) is not None
-                        and getattr(_base, ctx_attr, None) is None
-                    }
-                    if _overrides:
-                        _patched = _dc.replace(_base, **_overrides)
-                        if any(getattr(_patched, f, None) is not None
-                               for f in _TIER_D_FUND_FIELDS):
-                            context_map[sym_upper] = _patched
-                            info["context_backfilled"] = True
-                            info["context_backfill_source"] = "pru_snapshot"
-                            info["missing_fresh_trade_context_after_rescue"] = False
-                            log.info(
-                                "dispatch: Tier D %s context backfilled from PRU snapshot "
-                                "(context_backfill_source=pru_snapshot fields=%s)",
-                                sig.symbol, list(_overrides.keys()),
-                            )
-            except Exception as _se:
-                log.debug(
-                    "dispatch: Tier D %s PRU snapshot fallback failed: %s",
-                    sig.symbol, _se,
-                )
-
-        backfill_info[sym_upper] = info
-
-    return backfill_info
 
 
 # ── Main dispatch ─────────────────────────────────────────────────────────────
@@ -340,11 +185,6 @@ def dispatch_signals(
         except Exception as _ce:
             log.warning("dispatch: pre-build context failed for %s — excluding from candidates: %s", _sig.symbol, _ce)
             _context_failed.add(_sig.symbol.upper())
-
-    # ── Tier D context backfill ────────────────────────────────────────────────
-    # Detect Tier D candidates with missing or no-fundamental ctx; attempt retry.
-    # Mutates _context_map in place if backfill succeeds.
-    _tier_d_backfill = _backfill_tier_d_contexts(signals, _context_map, _context_failed)
 
     # ── Intelligence classification (gate) ────────────────────
     # Convert signals to candidate dicts, classify the full batch in one call.
@@ -644,54 +484,6 @@ def dispatch_signals(
 
         results.append(result)
 
-    # ── Tier D dispatch-stage funnel record ───────────────────────────────────
-    # Appended to tier_d_funnel.jsonl so the evidence report can show stages 7-11.
-    # Join key: the most recent pipeline record by ts (written seconds earlier).
-    _td_dispatch_syms = [s for s in signals if getattr(s, "scanner_tier", "") == "D"]
-    if _td_dispatch_syms:
-        _td_cls_counts: dict[str, int] = {}
-        for _tds in _td_dispatch_syms:
-            _tdcls = class_map.get(_tds.symbol.upper())
-            _ttype = _tdcls.trade_type if _tdcls else "no_classification"
-            _td_cls_counts[_ttype] = _td_cls_counts.get(_ttype, 0) + 1
-        _td_ctx_failed = sum(
-            1 for s in _td_dispatch_syms if s.symbol.upper() in _context_failed
-        )
-        _td_dispatch_record = {
-            "ts":                    datetime.now(UTC).isoformat(),
-            "stage":                 "dispatch",
-            # Stage 7 — entered dispatch
-            "entered_dispatch":      len(_td_dispatch_syms),
-            # Stage 7b — dropped by context-build failure
-            "dropped_context_fail":  _td_ctx_failed,
-            # Stage 8 — Apex classification breakdown
-            "apex_classification":   _td_cls_counts,
-            # Stage 9 — reached validate_entry (same as entered_dispatch - ctx_fail - AVOID)
-            "reached_validate_entry": len(_td_dispatch_syms) - _td_ctx_failed - _td_cls_counts.get("AVOID", 0),
-            # Stage 10 — executed (POSITION/SWING/INTRADAY passed through entry_gate)
-            "executed": sum(
-                1 for r in results
-                if r.get("success") and getattr(r.get("signal"), "scanner_tier", "") == "D"
-            ),
-        }
-        try:
-            import json as _tdj
-            _funnel_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
-            )
-            rotate_jsonl_if_needed(_funnel_path, _TIER_D_FUNNEL_MAX_BYTES)
-            with open(_funnel_path, "a") as _tdf:
-                _tdf.write(_tdj.dumps(_td_dispatch_record) + "\n")
-        except Exception as _tde:
-            log.debug("Tier D dispatch funnel write failed (non-critical): %s", _tde)
-        log.info(
-            "Tier D funnel [dispatch]: entered=%d ctx_fail=%d apex=%s "
-            "reached_gate=%d executed=%d",
-            len(_td_dispatch_syms), _td_ctx_failed, _td_cls_counts,
-            _td_dispatch_record["reached_validate_entry"],
-            _td_dispatch_record["executed"],
-        )
-
     return results
 
 
@@ -818,7 +610,6 @@ def dispatch(
     portfolio_value: float = 0.0,
     regime: dict | None = None,
     execute: bool = False,
-    pru_members: frozenset | None = None,
 ) -> dict:
     """
     Translate an ApexDecision into order-layer calls.
@@ -971,38 +762,14 @@ def dispatch(
                     )
 
             # Build origin extras from candidate payload for ORDER_INTENT tagging
-            _is_tier_d = payload.get("scanner_tier") == "D"
-            _pru_set   = pru_members if pru_members is not None else _lazy_pru_tickers()
-            _in_pru    = _is_tier_d or (sym in _pru_set)
-            if _is_tier_d:
-                _origin_path = "tier_d_main_path"
-            elif sym in _pru_set:
-                _origin_path = "normal_trade_pru_overlap"
-            else:
-                _origin_path = "normal_path"
-
             _origin_extras = {
                 k: v for k, v in {
-                    "scanner_tier":                      payload.get("scanner_tier"),
-                    "universe_bucket":                   payload.get("universe_bucket"),
-                    "universe_source":                   payload.get("universe_source"),
-                    "primary_archetype":                 payload.get("primary_archetype"),
-                    "discovery_score":                   payload.get("discovery_score"),
-                    "adjusted_discovery_score":          payload.get("adjusted_discovery_score"),
-                    "matched_position_archetypes":       (
-                        payload.get("matched_position_archetypes")
-                        or payload.get("matched_archetypes")
-                    ),
-                    "position_research_universe_member": _in_pru,
-                    "origin_path":                       _origin_path,
-                    "apex_cap_score":                    payload.get("apex_cap_score"),
-                    "selected_band":                     payload.get("selected_band"),
-                    "selected_slot":                     payload.get("selected_slot"),
-                    "tier_d_paper_entry":                True if _is_tier_d else None,
-                    "paper_evaluation_trade":            True if _is_tier_d else None,
-                    "execution_mode":                    "paper",
-                    "tier_d_gate_version":               "phase_1" if _is_tier_d else None,
-                    "apex_path":                         "track_a_main",
+                    "apex_cap_score":   payload.get("apex_cap_score"),
+                    "selected_band":    payload.get("selected_band"),
+                    "selected_slot":    payload.get("selected_slot"),
+                    "origin_path":      "normal_path",
+                    "execution_mode":   "paper",
+                    "apex_path":        "track_a_main",
                     "entry_gate_reason":                 payload.get("entry_gate_reason"),
                     "extension_at_entry":                payload.get("extension_at_entry"),
                     # Sprint 3.6: ML observation identity linkage — these fields

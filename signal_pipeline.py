@@ -24,14 +24,12 @@ from signal_types import SIGNALS_LOG, Signal
 from signals import get_regime_threshold, score_universe
 from utils.log_rotation import rotate_jsonl_if_needed
 
-# Maximum sizes for JSONL logs before rotation; configurable via CONFIG.
+# Maximum size for signals log before rotation; configurable via CONFIG.
 try:
     from config import CONFIG as _CFG
-    _TIER_D_FUNNEL_MAX_BYTES = int(_CFG.get("tier_d_funnel_max_mb", 10)) * 1_048_576
-    _SIGNALS_LOG_MAX_BYTES   = int(_CFG.get("signals_log_max_mb", 20)) * 1_048_576
+    _SIGNALS_LOG_MAX_BYTES = int(_CFG.get("signals_log_max_mb", 20)) * 1_048_576
 except Exception:
-    _TIER_D_FUNNEL_MAX_BYTES = 10 * 1_048_576
-    _SIGNALS_LOG_MAX_BYTES   = 20 * 1_048_576
+    _SIGNALS_LOG_MAX_BYTES = 20 * 1_048_576
 
 log = logging.getLogger("decifer.pipeline")
 
@@ -96,37 +94,6 @@ def _save_threshold_history() -> None:
 _load_threshold_history()
 
 
-def _check_pru_freshness() -> tuple[bool, float, str]:
-    """
-    Return (is_fresh, age_days, status_label) for the Position Research Universe.
-
-    Reads built_at from data/position_research_universe.json.  Returns
-    (True, age, "fresh") when PRU is within nexus_pru_max_age_days, else
-    (False, age, "stale").  Returns (False, -1, "unavailable") on any error.
-
-    Called by the PRU rescue gate in run_signal_pipeline() to enforce Nexus
-    contamination control nexus_pru_rescue_requires_freshness.
-    """
-    try:
-        from config import CONFIG as _fcfg
-        max_age = float(_fcfg.get("nexus_pru_max_age_days", 2))
-        _pru_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                  "data", "position_research_universe.json")
-        with open(_pru_path) as _f:
-            _pru_doc = json.load(_f)
-        built_at_str = _pru_doc.get("built_at")
-        if not built_at_str:
-            return False, -1.0, "unavailable_no_built_at"
-        from datetime import timezone
-        built_dt = datetime.fromisoformat(built_at_str.replace("Z", "+00:00"))
-        if built_dt.tzinfo is None:
-            built_dt = built_dt.replace(tzinfo=timezone.utc)
-        age_days = (datetime.now(UTC) - built_dt).total_seconds() / 86400
-        is_fresh = age_days <= max_age
-        return is_fresh, round(age_days, 2), ("fresh" if is_fresh else "stale")
-    except Exception as _fe:
-        log.debug("PRU freshness check failed (non-critical): %s", _fe)
-        return False, -1.0, "unavailable_error"
 
 
 # Symbols that must always be in the scan universe. Authoritative — computed
@@ -136,11 +103,9 @@ def _check_pru_freshness() -> tuple[bool, float, str]:
 try:
     from scanner import CORE_EQUITIES as _SCANNER_CORE_EQUITIES
     from scanner import CORE_SYMBOLS as _SCANNER_CORE_SYMBOLS
-    from scanner import get_position_research_universe as _get_position_research_universe
 
     _PREFILTER_CORE = frozenset(_SCANNER_CORE_SYMBOLS) | frozenset(_SCANNER_CORE_EQUITIES)
 except Exception:  # pragma: no cover — scanner import failure is fatal elsewhere
-    # Minimal ETF fallback so the module still loads in isolated unit tests.
     _PREFILTER_CORE = frozenset(
         [
             "SPY", "QQQ", "IWM", "VXX",
@@ -150,9 +115,6 @@ except Exception:  # pragma: no cover — scanner import failure is fatal elsewh
             "GLD", "SLV", "USO", "COPX",
         ]
     )
-
-    def _get_position_research_universe():  # pragma: no cover
-        return frozenset(), {}
 
 
 # ── Result type ────────────────────────────────────────────────────────────────
@@ -287,118 +249,22 @@ def _get_edge_gate_adj() -> tuple:
         return 0, "no_data"
 
 
-def _tag_tier_d(all_scored: list, tier_d_meta: dict) -> None:
-    """
-    Tag Tier D metadata onto scored dicts IN PLACE before any gates run.
-    This must be called BEFORE _apply_strategy_threshold so the gate can
-    check scanner_tier == "D" and apply the lower floor.
-    """
-    if not tier_d_meta:
-        return
-    for s in all_scored:
-        sym = s.get("symbol", "")
-        if sym in tier_d_meta:
-            meta = tier_d_meta[sym]
-            s["scanner_tier"] = "D"
-            s["position_research_universe_member"] = True
-            s["discovery_score"] = meta.get("discovery_score", 0)
-            s["adjusted_discovery_score"] = meta.get("adjusted_discovery_score")
-            s["primary_archetype"] = meta.get("primary_archetype")
-            s["universe_bucket"] = meta.get("universe_bucket")
-            s["risk_penalty_pts"] = meta.get("risk_penalty_pts", 0)
-            s["matched_position_archetypes"] = meta.get("matched_position_archetypes", [])
-            s["discovery_signals"] = meta.get("discovery_signals", [])
-            s["universe_entry_reason"] = meta.get("universe_entry_reason", "")
-            s["missing_data_fields"] = meta.get("missing_data_fields", [])
-
-
-def _rescue_tier_d(scored: list, all_scored: list, tier_d_meta: dict) -> list:
-    """
-    After all gates, rescue Tier D candidates that were dropped if they meet
-    any rescue condition:
-      1. signal score >= position_research_min_intraday_score_floor (config: 6), OR
-      2. discovery_score >= position_research_strong_discovery_score (config: 6), OR
-      3. matched_position_archetypes not empty AND position_research_allow_archetype_rescue=True
-
-    Logs each rescue with reason and each drop with exact failure reason.
-    Does not re-add candidates already in scored.
-    """
-    if not tier_d_meta:
-        return scored
-
-    from config import CONFIG as _cfg
-    floor = int(_cfg.get("position_research_min_intraday_score_floor", 6))
-    strong_discovery = int(_cfg.get("position_research_strong_discovery_score", 6))
-    archetype_rescue = bool(_cfg.get("position_research_allow_archetype_rescue", True))
-
-    in_scored = {s.get("symbol") for s in scored}
-    rescued: list[dict] = []
-
-    for s in all_scored:
-        sym = s.get("symbol", "")
-        if sym not in tier_d_meta or sym in in_scored:
-            continue  # not Tier D or already passed gates normally
-
-        meta = tier_d_meta[sym]
-        sig_score = s.get("score", 0)
-        disc_score = meta.get("discovery_score", 0)
-        archetypes = meta.get("matched_position_archetypes", [])
-
-        rescue_reasons = []
-        if sig_score >= floor:
-            rescue_reasons.append(f"signal_score={sig_score}>={floor}")
-        if disc_score >= strong_discovery:
-            rescue_reasons.append(f"discovery_score={disc_score}>={strong_discovery}")
-        if archetype_rescue and archetypes:
-            rescue_reasons.append(f"archetypes={archetypes}")
-
-        if rescue_reasons:
-            log.info(
-                "Tier D rescue: %s signal=%d discovery=%d archetypes=%s reason=%s",
-                sym, sig_score, disc_score, archetypes, "; ".join(rescue_reasons),
-            )
-            rescued.append(s)
-        else:
-            log.debug(
-                "Tier D drop: %s signal=%d (<%d) discovery=%d (<%d) archetypes=%s — all rescue conditions failed",
-                sym, sig_score, floor, disc_score, strong_discovery, archetypes,
-            )
-
-    if rescued:
-        log.info("Tier D: rescued %d candidates after pipeline gates", len(rescued))
-    return scored + rescued
 
 
 def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: str) -> list:
     """
     Filter the scored list by the effective score threshold.
 
-    The effective threshold = base regime threshold
-                             + strategy_mode adjustment
-                             + IC edge gate adjustment (system health)
-
-    Edge gate raises the bar when the signal engine's rolling IC health drops,
-    protecting capital when signals are less predictive than usual.
-
-    Tier D candidates use a lower floor (position_research_min_intraday_score_floor)
-    instead of the regime threshold — they don't need SWING-style intraday momentum.
+    effective threshold = base regime threshold
+                        + strategy_mode adjustment
+                        + IC edge gate adjustment (system health)
     """
-    from config import CONFIG as _cfg
     mode_adj = strategy_mode.get("score_threshold_adj", 0)
     edge_adj, edge_state = _get_edge_gate_adj()
     adj = mode_adj + edge_adj
 
     used_threshold = get_regime_threshold(regime_name)
     effective = used_threshold + adj
-    tier_d_floor = int(_cfg.get("position_research_min_intraday_score_floor", 6))
-
-    # Nexus contamination control: when Nexus handoff is active and PRU rescue is
-    # disabled, do NOT apply a lower floor for Tier D candidates — treat them the same
-    # as any other candidate. The tier_d_floor lower threshold is a PRU-era mechanism
-    # that should not silently modify scoring in Nexus mode.
-    _nexus_pru_rescue_enabled = _cfg.get("nexus_enable_pru_rescue", False)
-    _nexus_handoff_active = _cfg.get("enable_active_opportunity_universe_handoff", False)
-    _pru_threshold_active = not (_nexus_handoff_active and not _nexus_pru_rescue_enabled)
 
     parts = []
     if mode_adj:
@@ -406,55 +272,20 @@ def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: st
     if edge_adj:
         parts.append(f"edge_gate={edge_state}+{edge_adj}")
 
-    # When adj > 0, re-filter non-Tier-D candidates by the raised threshold.
-    # When adj == 0, non-Tier-D candidates pass through unchanged — score_universe() already
-    # filtered by the base threshold; this function only raises the bar further.
-    # Tier D candidates use lower floor only when PRU threshold is allowed (see above).
-    tier_d_present = any(s.get("scanner_tier") == "D" for s in scored)
-
-    if adj > 0 or (tier_d_present and _pru_threshold_active):
-        filtered = []
-        for s in scored:
-            if s.get("scanner_tier") == "D" and _pru_threshold_active:
-                if s["score"] >= tier_d_floor:
-                    filtered.append(s)
-                else:
-                    log.debug(
-                        "Tier D threshold filter: %s score=%d below floor=%d",
-                        s.get("symbol"), s.get("score"), tier_d_floor,
-                    )
-            else:
-                if adj > 0:
-                    if s["score"] >= effective:
-                        filtered.append(s)
-                else:
-                    filtered.append(s)  # adj==0: pass through unchanged
-
-        if not _pru_threshold_active and tier_d_present:
-            log.info(
-                "[nexus_pru_gate] PRU threshold floor disabled in Nexus mode "
-                "(nexus_enable_pru_rescue=False) — Tier D candidates use standard threshold.",
-            )
-
-        if adj > 0:
-            reason = " | ".join(parts)
-            log.info(
-                f"Scored: {len(scored)} → {len(filtered)} after threshold filter "
-                f"(raised {used_threshold}→{effective} [{reason}]; tier_d_floor={tier_d_floor if _pru_threshold_active else 'disabled'})"
-            )
-            if edge_adj:
-                log.warning(
-                    f"EDGE GATE [{edge_state.upper()}]: system IC health low — "
-                    f"score bar raised +{edge_adj} (need {effective} to trade)"
-                )
-        else:
-            log.info(
-                f"Scored: {len(scored)} → {len(filtered)} "
-                f"[{regime_name}] edge={edge_state} tier_d_floor={tier_d_floor if _pru_threshold_active else 'disabled(nexus)'}"
+    if adj > 0:
+        filtered = [s for s in scored if s["score"] >= effective]
+        reason = " | ".join(parts)
+        log.info(
+            f"Scored: {len(scored)} → {len(filtered)} after threshold filter "
+            f"(raised {used_threshold}→{effective} [{reason}])"
+        )
+        if edge_adj:
+            log.warning(
+                f"EDGE GATE [{edge_state.upper()}]: system IC health low — "
+                f"score bar raised +{edge_adj} (need {effective} to trade)"
             )
         return filtered
 
-    # adj==0, no Tier D — fast path: return unchanged (score_universe already filtered)
     if edge_state not in ("healthy", "disabled", "no_data"):
         log.warning(f"EDGE GATE [{edge_state.upper()}]: system IC health low (adj={edge_adj})")
     log.info(f"Scored: {len(scored)} above threshold ({used_threshold}) [{regime_name}] edge={edge_state}")
@@ -543,12 +374,6 @@ def _apply_persistence_gate(scored: list, all_scored: list, persistence_scans: i
     bypassed = []
     for s in scored:
         sym = s["symbol"]
-        # Tier D candidates bypass the persistence gate — they don't build intraday
-        # momentum history and should not be held back waiting for N consecutive scans.
-        if s.get("scanner_tier") == "D":
-            passed.append(s)
-            bypassed.append(sym)
-            continue
         if s.get("score", 0) >= bypass_score:
             passed.append(s)
             bypassed.append(sym)
@@ -575,95 +400,6 @@ def _apply_persistence_gate(scored: list, all_scored: list, persistence_scans: i
     return passed
 
 
-def _apply_tier_d_scoring_cap(
-    filtered: list[str],
-    regime_name: str,
-) -> tuple[list[str], dict]:
-    """
-    Stage Tier D names before score_universe() to prevent PRU bloat.
-
-    Splits ``filtered`` into non-Tier-D (never trimmed) and Tier D names
-    (ranked by cheap PRU metadata fields, then capped).  Applies a global
-    symbols-to-score ceiling of ``max_symbols_to_score`` by trimming from
-    the bottom of the ranked Tier D list only.
-
-    Returns ``(new_filtered, counters)`` where ``counters`` is logged as
-    stage="scoring_cap" in tier_d_funnel.jsonl.
-    """
-    from config import CONFIG as _cap_cfg
-    max_tier_d   = _cap_cfg.get("tier_d_pre_scoring_max", 60)
-    min_tier_d   = _cap_cfg.get("tier_d_pre_scoring_min", 40)
-    global_cap   = _cap_cfg.get("max_symbols_to_score",  140)
-
-    pru_syms, pru_meta = _get_position_research_universe()
-    pru_sym_set = frozenset(pru_syms)
-
-    non_tier_d: list[str] = []
-    tier_d_pool: list[str] = []
-    for sym in filtered:
-        if sym in pru_sym_set:
-            tier_d_pool.append(sym)
-        else:
-            non_tier_d.append(sym)
-
-    tier_d_pool_count = len(tier_d_pool)
-
-    if tier_d_pool_count == 0:
-        counters = {
-            "total_normal_symbols":            len(non_tier_d),
-            "tier_d_discovery_pool_count":     0,
-            "tier_d_selected_for_scoring":     0,
-            "total_symbols_before_global_cap": len(non_tier_d),
-            "total_symbols_after_global_cap":  len(non_tier_d),
-            "tier_d_removed_before_scoring":   0,
-            "symbols_removed_by_global_cap":   0,
-        }
-        return filtered, counters
-
-    def _rank(sym: str) -> float:
-        m = pru_meta.get(sym, {})
-        return (
-            (m.get("adjusted_discovery_score") or 0) * 2
-            + min((m.get("discovery_score") or 0), 20)
-            + len(m.get("matched_position_archetypes") or []) * 3
-            + int(bool(m.get("priority_overlap"))) * 5
-        )
-
-    tier_d_pool.sort(key=_rank, reverse=True)
-
-    # Select between min_tier_d and max_tier_d names.
-    n_select = max(min(max_tier_d, tier_d_pool_count), min(min_tier_d, tier_d_pool_count))
-    tier_d_selected = tier_d_pool[:n_select]
-
-    total_before_cap = len(non_tier_d) + len(tier_d_selected)
-    symbols_removed_by_cap = 0
-
-    if total_before_cap > global_cap:
-        available_for_tier_d = max(0, global_cap - len(non_tier_d))
-        tier_d_selected = tier_d_selected[:available_for_tier_d]
-        symbols_removed_by_cap = total_before_cap - (len(non_tier_d) + len(tier_d_selected))
-
-    new_filtered = non_tier_d + tier_d_selected
-    tier_d_removed = tier_d_pool_count - len(tier_d_selected)
-
-    log.info(
-        "Tier D scoring cap [%s]: pool=%d selected=%d removed=%d | "
-        "normal=%d total_before=%d total_after=%d cap_trimmed=%d",
-        regime_name,
-        tier_d_pool_count, len(tier_d_selected), tier_d_removed,
-        len(non_tier_d), total_before_cap, len(new_filtered), symbols_removed_by_cap,
-    )
-
-    counters = {
-        "total_normal_symbols":            len(non_tier_d),
-        "tier_d_discovery_pool_count":     tier_d_pool_count,
-        "tier_d_selected_for_scoring":     len(tier_d_selected),
-        "total_symbols_before_global_cap": total_before_cap,
-        "total_symbols_after_global_cap":  len(new_filtered),
-        "tier_d_removed_before_scoring":   tier_d_removed,
-        "symbols_removed_by_global_cap":   symbols_removed_by_cap,
-    }
-    return new_filtered, counters
 
 
 def _scored_to_signals(
@@ -800,32 +536,7 @@ def run_signal_pipeline(
     # Resolve regime_name early — needed by the scoring cap and VIX gate below.
     regime_name = regime.get("regime", "UNKNOWN")
 
-    # 1c. Staged Tier D pre-scoring cap — rank PRU discovery names by cheap metadata
-    #     fields and trim to MAX_TIER_D_TO_SCORE BEFORE the expensive news fetch and
-    #     bar fetch in score_universe().  News is fetched only for the capped universe.
-    filtered, _scoring_cap_counters = _apply_tier_d_scoring_cap(filtered, regime_name)
-    try:
-        import json as _scj
-        _funnel_path_sc = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
-        )
-        rotate_jsonl_if_needed(_funnel_path_sc, _TIER_D_FUNNEL_MAX_BYTES)
-        with open(_funnel_path_sc, "a") as _scf:
-            _scf.write(
-                _scj.dumps(
-                    {
-                        "ts":     datetime.now(UTC).isoformat(),
-                        "regime": regime_name,
-                        "stage":  "scoring_cap",
-                        **_scoring_cap_counters,
-                    }
-                )
-                + "\n"
-            )
-    except Exception as _sce:
-        log.debug("Tier D scoring_cap funnel write failed (non-critical): %s", _sce)
-
-    # 2. News sentiment (always) — runs on capped universe (~140 symbols, not 232)
+    # 2. News sentiment (always)
     log.info("Fetching news sentiment (Yahoo RSS + keyword scoring)...")
     news_sentiment = _fetch_news(filtered)
 
@@ -890,21 +601,6 @@ def run_signal_pipeline(
         except Exception:
             pass  # Non-critical; fall through to normal zero-signal handling
 
-    # 4c. Tier D tagging — attach Position Research Universe metadata to scored dicts
-    # MUST run before _apply_strategy_threshold so the gate can apply the lower Tier D floor.
-    _tier_d_syms, _tier_d_meta = _get_position_research_universe()
-    if _tier_d_meta:
-        _tag_tier_d(all_scored, _tier_d_meta)
-        # also tag the above-threshold subset
-        _tag_tier_d(scored, _tier_d_meta)
-        n_tagged = sum(1 for s in all_scored if s.get("scanner_tier") == "D")
-        log.info("Tier D: tagged %d/%d scored symbols with PRU metadata", n_tagged, len(all_scored))
-
-    # Funnel attrition counters — updated at each stage below
-    _td_pru_loaded   = len(_tier_d_syms)
-    _td_in_universe  = _td_pru_loaded  # all PRU symbols enter the universe; no drop here
-    _td_all_scored   = sum(1 for s in all_scored if s.get("scanner_tier") == "D")
-    _td_above_thresh = sum(1 for s in scored    if s.get("scanner_tier") == "D")
 
     # 4b. FX track — score major currency pairs (disabled by default)
     try:
@@ -926,76 +622,14 @@ def run_signal_pipeline(
 
     # 5. Strategy-mode threshold adjustment
     scored = _apply_strategy_threshold(scored, strategy_mode, regime_name)
-    _td_passed_strategy = sum(1 for s in scored if s.get("scanner_tier") == "D")
 
     # 5b. Short quality gate — raise bar for SHORT signals when IC is unproven
     scored = _apply_short_quality_gate(scored, regime_name)
 
-    # 5c. Score persistence gate — require signal above threshold for N consecutive scans.
-    # Prevents single-scan DAR spikes from triggering entries.
-    # Catalyst/sentinel entries are routed through signal_dispatcher separately and bypass this.
-    # Tier D candidates bypass this gate (checked inside _apply_persistence_gate).
+    # 5c. Score persistence gate — require signal above threshold for N consecutive scans
     from config import CONFIG as _cfg
     _persistence = _cfg.get("score_persistence_scans", 2)
     scored = _apply_persistence_gate(scored, all_scored, _persistence)
-    _td_passed_persistence = sum(1 for s in scored if s.get("scanner_tier") == "D")
-
-    # 5d. Tier D post-gate rescue — candidates that were dropped by strategy threshold
-    # or persistence gate may be rescued if they meet discovery_score or archetype criteria.
-    #
-    # Nexus contamination control: rescue is gated by nexus_enable_pru_rescue (default False).
-    # When disabled, PRU cannot lower thresholds or bring back filtered candidates.
-    # PRU tagging and funnel evidence remain active regardless of this gate.
-    # When enabled, freshness is also checked: PRU must be within nexus_pru_max_age_days.
-    from config import CONFIG as _rescue_cfg
-    _nexus_pru_rescue_enabled = _rescue_cfg.get("nexus_enable_pru_rescue", False)
-    _nexus_handoff_active_rescue = _rescue_cfg.get("enable_active_opportunity_universe_handoff", False)
-    _pru_rescue_allowed = True
-    _pru_rescue_blocked_reason = None
-    _pru_freshness_status = "unchecked"
-    _pru_age_days = -1.0
-
-    if _nexus_handoff_active_rescue:
-        if not _nexus_pru_rescue_enabled:
-            _pru_rescue_allowed = False
-            _pru_rescue_blocked_reason = "nexus_pru_rescue_disabled"
-            _pru_freshness_status = "not_checked_rescue_disabled"
-        elif _rescue_cfg.get("nexus_pru_rescue_requires_freshness", True):
-            _pru_is_fresh, _pru_age_days, _pru_freshness_status = _check_pru_freshness()
-            if not _pru_is_fresh:
-                _pru_rescue_allowed = False
-                _pru_rescue_blocked_reason = f"pru_stale_age={_pru_age_days:.1f}d_max={_rescue_cfg.get('nexus_pru_max_age_days', 2)}d"
-
-    _td_pre_rescue_in_scored = {s.get("symbol") for s in scored if s.get("scanner_tier") == "D"}
-    _td_rescue_pool = sum(
-        1 for s in all_scored
-        if s.get("scanner_tier") == "D" and s.get("symbol") not in _td_pre_rescue_in_scored
-    )
-    _pru_rescue_applied_count = 0
-    _pru_rescue_blocked_count = 0
-
-    if _tier_d_meta and _pru_rescue_allowed:
-        scored = _rescue_tier_d(scored, all_scored, _tier_d_meta)
-        _pru_rescue_applied_count = sum(
-            1 for s in scored
-            if s.get("scanner_tier") == "D" and s.get("symbol") not in _td_pre_rescue_in_scored
-        )
-    elif _tier_d_meta and not _pru_rescue_allowed:
-        _pru_rescue_blocked_count = _td_rescue_pool
-        log.info(
-            "[nexus_pru_gate] PRU rescue blocked — %s "
-            "nexus_enable_pru_rescue=%s pru_freshness=%s pru_age_days=%.1f "
-            "rescue_pool_blocked=%d",
-            _pru_rescue_blocked_reason,
-            _nexus_pru_rescue_enabled,
-            _pru_freshness_status,
-            _pru_age_days,
-            _pru_rescue_blocked_count,
-        )
-
-    _td_pipeline_output = sum(1 for s in scored if s.get("scanner_tier") == "D")
-    _td_rescued = _td_pipeline_output - len(_td_pre_rescue_in_scored)
-    _td_dropped_final = _td_rescue_pool - _td_rescued
 
     # 6. IC audit log — generate scan_id once for cross-log correlation, then write.
     _scan_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
@@ -1076,68 +710,6 @@ def run_signal_pipeline(
     # 9. Sensor payloads — module not yet implemented; reserved for future enrichment.
     sensor_payloads = []
 
-    # 10. Tier D funnel record — written here so dispatch can append stage 7-11 counts
-    #     using the same ts as a join key.
-    _td_funnel: dict = {
-        "ts":                      datetime.now(UTC).isoformat(),
-        "regime":                  regime_name,
-        "stage":                   "pipeline",
-        # Stage 1 — PRU file
-        "pru_loaded":              _td_pru_loaded,
-        # Stage 2 — dynamic universe
-        "in_universe":             _td_in_universe,
-        # Stage 3 — score_universe (all_scored = scored on any dimension)
-        "scored_all":              _td_all_scored,
-        # Stage 3b — above regime threshold (would pass without Tier D rescue)
-        "above_regime_threshold":  _td_above_thresh,
-        # Stage 4 — strategy threshold gate (Tier D uses floor=6, not regime threshold)
-        "passed_strategy_threshold": _td_passed_strategy,
-        # Stage 5 — persistence gate (Tier D bypasses; count = same as strategy threshold)
-        "passed_persistence":      _td_passed_persistence,
-        # Stage 6 — rescue: rescue pool size and outcome
-        "rescue_pool":             _td_rescue_pool,
-        "rescued":                 _td_rescued,
-        "dropped_final":           _td_dropped_final,
-        # Stage 6b — final pipeline output (reaches dispatch)
-        "pipeline_output":         _td_pipeline_output,
-        # Drop diagnosis helpers
-        "drop_at_strategy_threshold":     _td_above_thresh - _td_passed_strategy,
-        "drop_at_all_scored":             _td_pru_loaded - _td_all_scored,
-        # Scoring-cap context — how many Tier D entered scoring after the pre-scoring cap
-        "tier_d_selected_for_scoring":    _scoring_cap_counters.get("tier_d_selected_for_scoring", _td_pru_loaded),
-        "tier_d_removed_before_scoring":  _scoring_cap_counters.get("tier_d_removed_before_scoring", 0),
-        # After score adjuster (apex_cap_score.py bonus) — same as pipeline_output at this stage
-        "tier_d_count_after_score_adjuster": _td_pipeline_output,
-        # Nexus PRU rescue governance fields (fix/nexus-contamination-controls)
-        "nexus_enable_pru_rescue":       _nexus_pru_rescue_enabled,
-        "nexus_handoff_active":          _nexus_handoff_active_rescue,
-        "pru_rescue_allowed":            _pru_rescue_allowed,
-        "pru_rescue_blocked_reason":     _pru_rescue_blocked_reason,
-        "pru_freshness_status":          _pru_freshness_status,
-        "pru_age_days":                  _pru_age_days,
-        "pru_rescue_applied_count":      _pru_rescue_applied_count,
-        "pru_rescue_blocked_count":      _pru_rescue_blocked_count,
-    }
-    if _td_pru_loaded > 0:
-        try:
-            import json as _tj
-            _funnel_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
-            )
-            rotate_jsonl_if_needed(_funnel_path, _TIER_D_FUNNEL_MAX_BYTES)
-            with open(_funnel_path, "a") as _ff:
-                _ff.write(_tj.dumps(_td_funnel) + "\n")
-        except Exception as _fe:
-            log.debug("Tier D funnel write failed (non-critical): %s", _fe)
-        log.info(
-            "Tier D funnel [pipeline]: pru=%d universe=%d scored_all=%d "
-            "above_thresh=%d strategy=%d persistence=%d rescue_pool=%d "
-            "rescued=%d dropped=%d output=%d",
-            _td_pru_loaded, _td_in_universe, _td_all_scored, _td_above_thresh,
-            _td_passed_strategy, _td_passed_persistence, _td_rescue_pool,
-            _td_rescued, _td_dropped_final, _td_pipeline_output,
-        )
-
     return SignalPipelineResult(
         signals=signals,
         scored=scored,
@@ -1147,7 +719,7 @@ def run_signal_pipeline(
         regime_name=regime_name,
         sensor_payloads=sensor_payloads,
         status="OK",
-        tier_d_funnel=_td_funnel,
+        tier_d_funnel={},
         scan_id=_scan_id,
         rank_map=_rank_map_all,
         ranking_total=_ranking_total,

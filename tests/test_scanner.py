@@ -114,14 +114,12 @@ def low_volume_data():
 
 
 class TestScannerFilters:
-    """Tests get_dynamic_universe Tier-A floor behaviour."""
+    """Tests get_dynamic_universe fallback mode (Tier A + C only)."""
 
     def test_universe_includes_core_floor(self):
         """Tier-A floor (CORE_SYMBOLS + CORE_EQUITIES) is always present in the universe."""
         ib = MagicMock()
-        # Force promoter to return empty so we exercise pure Tier-A.
-        with patch("universe_promoter.load_promoted_universe", return_value=[]):
-            result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_UP", "vix": 15.0})
+        result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_UP", "vix": 15.0})
         for sym in scanner.CORE_SYMBOLS:
             assert sym in result
         for sym in scanner.CORE_EQUITIES:
@@ -131,20 +129,10 @@ class TestScannerFilters:
         """EXTREME_STRESS no longer prunes the universe — risk gating happens downstream."""
         ib = MagicMock()
         extreme_regime = {"regime": "PANIC", "vix": 40.0, "vix_1h_change": 0.05}
-        with patch("universe_promoter.load_promoted_universe", return_value=[]):
-            result = scanner.get_dynamic_universe(ib, regime=extreme_regime)
+        result = scanner.get_dynamic_universe(ib, regime=extreme_regime)
         for sym in scanner.CORE_SYMBOLS:
             assert sym in result
         for sym in scanner.CORE_EQUITIES:
-            assert sym in result
-
-    def test_promoted_symbols_unioned_into_universe(self):
-        """Tier-B promoted symbols are added on top of Tier-A floor."""
-        ib = MagicMock()
-        promoted = ["ZZZA", "ZZZB", "ZZZC"]
-        with patch("universe_promoter.load_promoted_universe", return_value=promoted):
-            result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_UP", "vix": 15.0})
-        for sym in promoted:
             assert sym in result
 
 
