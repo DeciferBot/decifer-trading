@@ -2072,8 +2072,18 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 log.warning(f"Multiple {symbol} positions: {_matches} — closing {_trade_key}")
         info = active_trades[_trade_key]
         if info.get("status") == "EXITING":
-            log.info(f"Exit already in flight for {symbol} ({_trade_key}) — skipping duplicate")
-            return False
+            _exiting_since = info.get("_exiting_since")
+            _stale_secs = CONFIG.get("exiting_stale_timeout_secs", 3600)  # default 60 min
+            if _exiting_since is not None and (time.time() - _exiting_since) > _stale_secs:
+                log.warning(
+                    "execute_sell %s: EXITING state is stale (%.0f min elapsed, limit=%d min) "
+                    "— clearing lock and retrying exit",
+                    symbol, (time.time() - _exiting_since) / 60, _stale_secs // 60,
+                )
+                _safe_update_trade(_trade_key, {"status": "ACTIVE"})
+            else:
+                log.info(f"Exit already in flight for {symbol} ({_trade_key}) — skipping duplicate")
+                return False
         # Options positions must go through execute_sell_option — it owns the retry
         # logic, bid-step-down, pending_exits queue, blacklist, and pre-cancel of
         # opposing open orders. The stock MarketOrder path here has none of that and

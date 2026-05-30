@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from config import CONFIG
 from market_intelligence import classify_signals
 from options import find_best_contract
-from orders_core import execute_buy, execute_short
+from orders_core import execute_buy, execute_short, _block_reason as _execute_buy_block_reasons
 from orders_options import execute_buy_option
 from pattern_library import record_entry
 from position_sizing import calculate_stops
@@ -23,6 +23,18 @@ from utils.log_rotation import rotate_jsonl_if_needed
 
 _TIER_D_FUNNEL_MAX_BYTES = int(CONFIG.get("tier_d_funnel_max_mb", 10)) * 1_048_576
 from signal_types import Signal
+
+
+def _get_execute_buy_fail_reason(symbol: str) -> str:
+    """Return a specific block reason for ic_decision_events logging.
+
+    _execute_buy_block_reasons is the live dict written by execute_buy() before
+    returning False — it captures the gate that fired (e.g. cooldown_block,
+    thesis_failure_block, correlation_block). Surfacing it here makes every
+    order_failed event debuggable without log diving.
+    """
+    specific = _execute_buy_block_reasons.get(symbol)
+    return f"execute_buy_returned_false:{specific}" if specific else "execute_buy_returned_false"
 
 def _lazy_pru_tickers() -> frozenset:
     """Return PRU ticker frozenset via scanner's mtime-based cache.
@@ -1081,7 +1093,7 @@ def dispatch(
                     candidate_source=_ide_payload.get("candidate_source"),
                     ranking_position=_ide_payload.get("ranking_position"),
                     ranking_total=_ide_payload.get("ranking_total"),
-                    reason=None if ok else "execute_buy_returned_false",
+                    reason=None if ok else _get_execute_buy_fail_reason(sym),
                     trade_id=_trade_id if ok else None,
                 )
             except Exception as _ide_exc:

@@ -1469,3 +1469,76 @@ class TestDeferredTrimOnUnfilledLimitSell:
         assert pos.get("status") == "ACTIVE", "status must return to ACTIVE after confirmed trim"
         assert pos.get("pending_trim_order_id") is None
         mock_trim_event.assert_called_once(), "POSITION_TRIMMED must be written on confirmed fill"
+
+
+# ---------------------------------------------------------------------------
+# Stale-EXITING timeout (audit fix 2026-05-30)
+# ---------------------------------------------------------------------------
+class TestStaleExitingTimeout:
+    """
+    execute_sell must clear a stale EXITING lock and retry when _exiting_since
+    is older than exiting_stale_timeout_secs (default 3600s).
+    Regression guard: a position stuck in EXITING for >60 min was permanently
+    un-closeable, causing the PM engine to SAFETY_BLOCKED on every cycle.
+    """
+
+    TRADE_KEY = "IREN"
+
+    def _stock_pos(self):
+        return {
+            "symbol": "IREN",
+            "instrument": "stock",
+            "direction": "LONG",
+            "qty": 100,
+            "entry": 57.0,
+            "status": "EXITING",
+            "trade_type": "SWING",
+            "metadata_status": "OK",
+        }
+
+    def test_fresh_exiting_is_blocked(self):
+        """A position that just entered EXITING (seconds ago) must still block."""
+        import time, sys
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        pos = self._stock_pos()
+        pos["_exiting_since"] = time.time() - 30  # 30 seconds ago
+        _om.active_trades[self.TRADE_KEY] = pos
+
+        result = _om.execute_sell(MagicMock(), self.TRADE_KEY, reason="test")
+        assert result is False
+        assert _om.active_trades[self.TRADE_KEY]["status"] == "EXITING"
+
+    def test_stale_exiting_is_cleared_and_retried(self):
+        """A position stuck in EXITING for >3600s must have the lock cleared."""
+        import time, sys
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        pos = self._stock_pos()
+        pos["_exiting_since"] = time.time() - 7200  # 2 hours ago — stale
+        _om.active_trades[self.TRADE_KEY] = pos
+
+        # After the stale check clears ACTIVE, execute_sell will proceed to the
+        # market-hours guard. Patch it to return False so we don't need IBKR wired.
+        with patch("orders_core.is_equities_extended_hours", return_value=False):
+            result = _om.execute_sell(MagicMock(), self.TRADE_KEY, reason="test")
+
+        # The status should have been cleared from EXITING (either ACTIVE or the
+        # market-closed revert). Critically it must NOT remain as EXITING.
+        final_status = _om.active_trades.get(self.TRADE_KEY, {}).get("status")
+        assert final_status != "EXITING", (
+            f"Stale EXITING lock was not cleared — status={final_status!r}"
+        )
+
+    def test_exiting_without_timestamp_is_blocked(self):
+        """EXITING with no _exiting_since must be treated as fresh (blocked)."""
+        import sys
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        pos = self._stock_pos()
+        # Deliberately omit _exiting_since
+        pos.pop("_exiting_since", None)
+        _om.active_trades[self.TRADE_KEY] = pos
+
+        result = _om.execute_sell(MagicMock(), self.TRADE_KEY, reason="test")
+        assert result is False
