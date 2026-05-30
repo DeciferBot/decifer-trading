@@ -24,6 +24,79 @@ function fmtContracts(n: number) {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
+function scoreLabel(score: number): { text: string; color: string } {
+  if (score >= 100) return { text: "Max unusual", color: "#e74c3c" };
+  if (score >= 80)  return { text: "High activity", color: "#e87d2e" };
+  if (score >= 60)  return { text: "Elevated", color: "#f1c40f" };
+  return { text: "Moderate", color: "#888" };
+}
+
+function plainSignal(row: LeaderboardRow): string {
+  const ce = row.call_expansion ?? 0;
+  const pe = row.put_expansion ?? 0;
+  const cv = row.call_volume ?? 0;
+  const pv = row.put_volume ?? 0;
+  const uc = row.unusual_calls ?? false;
+  const up = row.unusual_puts ?? false;
+  const callRatio = pv > 10 ? cv / pv : null;
+  const putRatio  = cv > 10 ? pv / cv : null;
+
+  // Both sides unusual — determine if one clearly dominates
+  if (uc && up) {
+    const callDominant = ce >= pe * 1.5;
+    const putDominant  = pe >= ce * 1.5;
+    if (callDominant && callRatio && callRatio >= 3) {
+      return `Both calls and puts jumped, but calls are leading by a wide margin (${ce.toFixed(1)}× vs ${pe.toFixed(1)}×, ratio ${callRatio.toFixed(1)}:1). Bullish tilt — the put activity looks like hedging rather than a directional bet.`;
+    }
+    if (callDominant) {
+      return `Unusual activity on both sides, with calls leading (${ce.toFixed(1)}× vs puts at ${pe.toFixed(1)}×). Likely bullish positioning with some hedging mixed in.`;
+    }
+    if (putDominant && putRatio && putRatio >= 3) {
+      return `Both calls and puts spiked, but puts are overwhelming calls (${pe.toFixed(1)}× vs ${ce.toFixed(1)}×, ratio ${putRatio.toFixed(1)}:1). Someone is betting on downside or protecting a large position.`;
+    }
+    if (putDominant) {
+      return `Unusual activity on both sides, with puts leading (${pe.toFixed(1)}× vs calls at ${ce.toFixed(1)}×). Could be defensive positioning or a bearish bet.`;
+    }
+    // Balanced both sides — classic event-driven
+    return `Call and put volume both spiked together (calls ${ce.toFixed(1)}×, puts ${pe.toFixed(1)}×). When both sides move at once it usually signals a known upcoming event — earnings, FDA decision, or macro announcement.`;
+  }
+
+  // Calls only unusual
+  if (uc) {
+    if (ce >= 4) {
+      const ratioNote = callRatio && callRatio >= 5 ? ` Only ${fmtContracts(pv)} puts traded vs ${fmtContracts(cv)} calls — very one-sided.` : "";
+      return `Very heavy call buying — ${ce.toFixed(1)}× yesterday's volume.${ratioNote} Someone is making a large bet this goes up.`;
+    }
+    if (ce >= 2) {
+      return `Call buying picked up significantly — ${ce.toFixed(1)}× yesterday's volume. Traders are positioning for upside.`;
+    }
+    return `Mild increase in call activity — ${ce.toFixed(1)}× yesterday's normal level.`;
+  }
+
+  // Puts only unusual
+  if (up) {
+    if (pe >= 4) {
+      return `Very heavy put buying — ${pe.toFixed(1)}× yesterday's volume. Someone is either betting on a drop or protecting a large long position.`;
+    }
+    if (pe >= 2) {
+      return `Put buying picked up significantly — ${pe.toFixed(1)}× yesterday's volume. Traders are positioning for downside or hedging.`;
+    }
+    return `Mild increase in put activity — ${pe.toFixed(1)}× yesterday's normal level.`;
+  }
+
+  return "Volume expansion detected — above normal activity but below the unusual threshold.";
+}
+
+function simpleBrief(info: CompanyInfo | undefined): string {
+  if (!info?.brief) return "";
+  const b = info.brief;
+  // Strip the company name from the start of the description — it's already shown
+  const name = info.name ?? "";
+  const stripped = b.startsWith(name) ? b.slice(name.length).replace(/^\s*[,.]?\s*/, "") : b;
+  // Capitalise first letter
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
 // ── Symbol Detail Panel ───────────────────────────────────────────────────────
 
 function SymbolPanel({ ticker, onClose }: { ticker: string; onClose: () => void }) {
@@ -176,66 +249,59 @@ function LeaderRow({ row, info, onSymbolClick }: {
   info?: CompanyInfo;
   onSymbolClick: (s: string) => void;
 }) {
-  const primaryFlag = (row.flags ?? [])[0] ?? null;
+  const brief = simpleBrief(info);
+  const signal = plainSignal(row);
+  const { text: scoreText, color: scoreColor } = scoreLabel(row.top_score);
 
   return (
     <div
       onClick={() => onSymbolClick(row.underlying)}
-      style={{
-        padding: "13px 0", cursor: "pointer",
-        borderBottom: "1px solid var(--border)",
-      }}
+      style={{ padding: "14px 0", cursor: "pointer", borderBottom: "1px solid var(--border)" }}
       onMouseEnter={(e) => (e.currentTarget.style.background = "#0d0d0d")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
-      {/* Row 1: logo + symbol + company name + side + score */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: info?.brief ? 4 : 6 }}>
-        <SymbolLogo symbol={row.underlying} size={32} />
+      {/* Row 1: logo + name + side + score label */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
+        <SymbolLogo symbol={row.underlying} size={34} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
             <span style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--mono)", flexShrink: 0 }}>
               {row.underlying}
             </span>
             {info?.name && (
-              <span style={{ fontSize: 12, color: "var(--muted2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 12, color: "#999", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {info.name}
               </span>
             )}
           </div>
-          {info?.brief && (
-            <div style={{ fontSize: 11, color: "#666", marginTop: 2, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-              {info.brief}
+          {/* What the company does — plain English */}
+          {brief && (
+            <div style={{ fontSize: 11, color: "#555", lineHeight: 1.45, marginBottom: 6 }}>
+              {brief}
             </div>
           )}
+          {/* Plain-English signal interpretation */}
+          <div style={{ fontSize: 12, color: "#ccc", lineHeight: 1.5, marginBottom: 8 }}>
+            {signal}
+          </div>
+          {/* Data line: expansion pills + raw volume */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <ExpansionPill label="Calls" value={row.call_expansion} active={row.unusual_calls} />
+            <ExpansionPill label="Puts" value={row.put_expansion} active={row.unusual_puts} />
+            {row.call_volume != null && row.put_volume != null && (
+              <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "var(--mono)" }}>
+                {fmtContracts(row.call_volume)}C · {fmtContracts(row.put_volume)}P
+              </span>
+            )}
+            {(row.driver_tags ?? []).slice(0, 1).map((t) => <DriverTag key={t} tag={t} />)}
+          </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+        {/* Score column */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0, minWidth: 80 }}>
           <SideBadge side={row.dominant_side} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: scoreColor }}>{scoreText}</span>
           <ScoreBar score={row.top_score} />
         </div>
-      </div>
-
-      {/* Row 2: expansion pills */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 5, paddingLeft: 0 }}>
-        <ExpansionPill label="C" value={row.call_expansion} active={row.unusual_calls} />
-        <ExpansionPill label="P" value={row.put_expansion} active={row.unusual_puts} />
-        {row.call_volume != null && row.put_volume != null && (
-          <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--mono)" }}>
-            {fmtContracts(row.call_volume)}C · {fmtContracts(row.put_volume)}P
-          </span>
-        )}
-        {row.total_contracts > 0 && (row.call_volume == null) && (
-          <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--mono)" }}>
-            {fmtContracts(row.total_contracts)} contracts
-          </span>
-        )}
-      </div>
-
-      {/* Row 3: signal description + driver tags */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        {primaryFlag && (
-          <span style={{ fontSize: 11, color: "#aaa" }}>{primaryFlag}</span>
-        )}
-        {(row.driver_tags ?? []).slice(0, 2).map((t) => <DriverTag key={t} tag={t} />)}
       </div>
     </div>
   );
@@ -377,7 +443,7 @@ export default function OptionsPage() {
                   Hottest symbols — last 30 min
                 </span>
                 <span style={{ fontSize: 10, color: "#444" }}>
-                  Score = flow intensity (0–100) · 100 = max volume expansion + strong directional skew
+                  Score = how unusual today&apos;s options activity is vs. yesterday
                 </span>
               </div>
               {leaderboard.length === 0 && (
