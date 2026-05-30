@@ -2720,6 +2720,7 @@ def run_scan():
         from guardrails import screen_open_positions as _screen_track_a
         from guardrails import flag_positions_for_review as _flag_track_a
         from apex_cap_score import compute_apex_cap_score as _compute_apex_cap_score
+        from apex_cap_score import stratify_apex_shortlist as _stratify_apex
 
         _cut_candidates_raw = _fc_track_a(
             [c for c in (pipeline.all_scored or []) if c.get("symbol")],
@@ -2790,17 +2791,17 @@ def run_scan():
             key=lambda c: c.get("apex_cap_score", c.get("score", 0)),
             reverse=True,
         )
-        _core = _cut_all_sorted[:_CORE_LIMIT]
-        _expanded = [
-            c for c in _cut_all_sorted[_CORE_LIMIT:_CAP_LIMIT]
-            if c.get("apex_cap_score", c.get("score", 0)) >= _EXPANDED_FLOOR
-        ]
-        _cut_candidates = _core + _expanded
+        _core, _theme_lift, _expanded = _stratify_apex(
+            _cut_all_sorted, _handoff_governance_map,
+            core_limit=_CORE_LIMIT, cap_limit=_CAP_LIMIT, expanded_floor=_EXPANDED_FLOOR,
+        )
+        _cut_candidates = _core + _theme_lift + _expanded
 
         # Symbol sets used throughout logging below
-        _selected_syms_set   = {c.get("symbol") for c in _cut_candidates}
-        _core_syms_set       = {c.get("symbol") for c in _core}
-        _expanded_syms_set   = {c.get("symbol") for c in _expanded}
+        _selected_syms_set    = {c.get("symbol") for c in _cut_candidates}
+        _core_syms_set        = {c.get("symbol") for c in _core}
+        _theme_lift_syms_set  = {c.get("symbol") for c in _theme_lift}
+        _expanded_syms_set    = {c.get("symbol") for c in _expanded}
 
         # Attach band/slot to each candidate dict so _format_candidate_line()
         # can surface them in the Apex prompt without a separate lookup.
@@ -2808,6 +2809,9 @@ def run_scan():
             _rsym = _rc.get("symbol")
             if _rsym in _core_syms_set:
                 _rc["selected_band"] = "core"
+                _rc["selected_slot"] = _rank_i
+            elif _rsym in _theme_lift_syms_set:
+                _rc["selected_band"] = "theme_lift"
                 _rc["selected_slot"] = _rank_i
             elif _rsym in _expanded_syms_set:
                 _rc["selected_band"] = "expanded"
@@ -2835,7 +2839,7 @@ def run_scan():
                  f"→ capped to {_CAP_LIMIT} "
                  f"raw_cutline={_raw_cutline_log} adj_cutline={_adj_cutline_log:.2f} "
                  f"tier_d_before={len(_td_before_log)} tier_d_selected={len(_td_after_log)} "
-                 f"(core={len(_td_in_core_syms)} expanded={len(_td_in_expanded_syms)}) "
+                 f"(core={len(_td_in_core_syms)} theme_lift={len(_theme_lift)} expanded={len(_td_in_expanded_syms)}) "
                  f"tier_d_dropped={len(_td_dropped_log)} "
                  f"tier_d_recovered={len(_td_recovered_log)} non_td_displaced={len(_non_td_displ_log)}")
             for _rc in _td_recovered_log[:5]:
