@@ -1,0 +1,40 @@
+{
+  "schema_version": "sprint3_v1",
+  "created_at_utc": "2026-05-31T13:25:27.462839+00:00",
+  "total_observations": 24954,
+  "source_files": [
+    "ml_observations.jsonl",
+    "trade_events.jsonl",
+    "training_records.jsonl",
+    "closed_trade_training_ledger.jsonl"
+  ],
+  "joined_exact": 17,
+  "joined_fallback": 18,
+  "no_match": 24919,
+  "trade_taken": 35,
+  "order_filled": 35,
+  "position_closed": 19,
+  "ml_eligible": 7,
+  "win_count": 5,
+  "loss_count": 12,
+  "breakeven_count": 0,
+  "outcome_label_null": 24937,
+  "date_range": {
+    "earliest": "2026-05-20",
+    "latest": "2026-05-29"
+  },
+  "regime_distribution": {
+    "TRENDING_UP": 8618,
+    "RANGE_BOUND": 16336
+  },
+  "candidate_source_distribution": {
+    "unknown": 4398,
+    "scanner": 1238,
+    "handoff_reader": 19318
+  },
+  "direction_distribution": {
+    "LONG": 19402,
+    "SHORT": 5448,
+    "NEUTRAL": 104
+  }
+}

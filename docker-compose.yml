@@ -247,7 +247,12 @@ services:
         - "python3"
         - "-c"
         - |
-          import json, time, sys, os
+          import time, sys, os
+          from datetime import datetime, timezone
+          # Market is closed on weekends — OPRA streams nothing, no file is expected.
+          now = datetime.now(timezone.utc)
+          if now.weekday() >= 5:
+            sys.exit(0)
           p = "data/options_flow/live_events.json"
           if not os.path.exists(p):
             sys.exit(1)

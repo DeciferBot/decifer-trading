@@ -1113,3 +1113,4 @@
 {"ts": "2026-05-29T19:33:44.837942+00:00", "event": "POSITION_CLOSED", "trade_id": "PLD_20260522_134549_288087", "symbol": "PLD", "exit_price": 143.693155, "pnl": -1318.91, "exit_reason": "sl_hit", "hold_minutes": 0}
 {"ts": "2026-05-29T20:01:22.367342+00:00", "event": "POSITION_CLOSED", "trade_id": "ODFL_20260522_174742_856539", "symbol": "ODFL", "exit_price": 220.165, "pnl": 2855.2, "exit_reason": "stale_purge", "hold_minutes": 0}
 {"ts": "2026-05-30T08:27:06.668254+00:00", "event": "ORDER_FILLED", "trade_id": "", "symbol": "CHEAP", "fill_price": 0.0, "fill_qty": 0, "order_id": 12345}
+{"ts": "2026-05-30T09:16:56.490346+00:00", "event": "ORDER_FILLED", "trade_id": "", "symbol": "CHEAP", "fill_price": 0.0, "fill_qty": 0, "order_id": 12345}

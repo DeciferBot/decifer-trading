@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-05-30T08:35:48Z",
-  "total_candidates": 77,
+  "generated_at": "2026-05-31T13:32:10Z",
+  "total_candidates": 287,
   "eligible_checked": 68,
   "intact_count": 0,
   "diverging_count": 0,
-  "unknown_count": 77,
+  "unknown_count": 287,
   "threshold_pp": 5.0,
   "detail": [
     {

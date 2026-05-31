@@ -82,6 +82,208 @@ def _derive_regime_from_drivers(active_drivers: list[str]) -> str:
     return "RANGE_BOUND"
 
 
+def _ttg_candidate_to_feed_entry(ttg: dict, now_str: str) -> dict:
+    """Convert a TTG shadow candidate dict into an economic_candidate_feed candidate entry."""
+    route_hint = ttg.get("route_hint", "swing")
+    if isinstance(route_hint, str):
+        route_hints = [route_hint]
+    else:
+        route_hints = list(route_hint) if route_hint else ["swing"]
+    return {
+        "symbol":                    ttg["symbol"],
+        "included_by":               "theme_transmission_graph",
+        "theme":                     ttg.get("theme_id", "ttg_theme"),
+        "driver":                    "",
+        "role":                      "direct_beneficiary",
+        "reason":                    ttg.get("reason_to_care", ""),
+        "reason_to_care":            ttg.get("reason_to_care", ""),
+        "route_hint":                route_hints,
+        "confidence":                float(ttg.get("confidence", 0.70)),
+        "fresh_until":               now_str,
+        "risk_flags":                [],
+        "confirmation_required":     [],
+        "source_labels":             ["theme_transmission_graph"],
+        "transmission_rules_fired":  [],
+        "market_confirmation_required": [
+            "price_and_volume_confirmation_by_trading_bot",
+            "live_spread_and_risk_check_at_execution_only",
+        ],
+        "generated_at":              now_str,
+        "mode":                      "intelligence_advisory_feed",
+        "live_output_changed":       False,
+        "candidate_source":          "theme_transmission_graph",
+        "bucket_id":                 ttg.get("bucket_id", ""),
+        "exposure_type":             ttg.get("exposure_type", ""),
+        "driver_active":             ttg.get("driver_active", False),
+    }
+
+
+def _inject_ttg_into_feed(feed_path: str) -> int:
+    """
+    Load evidence-gated TTG candidates and merge them into the candidate feed.
+
+    Rules:
+    - Only include TTG candidates where status != 'needs_review'
+    - Intelligence-layer candidates already in the feed win on dedup
+    - Returns count of TTG candidates injected
+    """
+    try:
+        from theme_graph import get_shadow_candidates
+    except Exception as _e:
+        log.warning("TTG inject: import failed (non-fatal): %s", _e)
+        return 0
+
+    try:
+        ttg_raw = get_shadow_candidates()
+    except Exception as _e:
+        log.warning("TTG inject: get_shadow_candidates failed (non-fatal): %s", _e)
+        return 0
+
+    # Filter out suppressed (needs_review / non-active) symbols
+    # get_shadow_candidates() already applies the evidence gate; status='needs_review' is
+    # excluded by _evidence_gate (only 'active' and 'monitor_only' pass).
+    # We additionally drop any that leaked through with status='needs_review'.
+    eligible = [t for t in ttg_raw if t.get("status") != "needs_review"]
+
+    if not eligible:
+        log.info("TTG inject: 0 eligible TTG candidates after filter")
+        return 0
+
+    try:
+        with open(feed_path, encoding="utf-8") as f:
+            feed_data = json.load(f)
+    except Exception as _e:
+        log.warning("TTG inject: failed to read feed at %s: %s", feed_path, _e)
+        return 0
+
+    existing_symbols: set[str] = {
+        c["symbol"] for c in feed_data.get("candidates", [])
+        if isinstance(c, dict) and c.get("symbol")
+    }
+
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    now_str = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    fresh_until = (now + timedelta(hours=48)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    injected = 0
+    for ttg in eligible:
+        sym = ttg.get("symbol", "").strip()
+        if not sym or sym in existing_symbols:
+            continue
+        entry = _ttg_candidate_to_feed_entry(ttg, fresh_until)
+        feed_data["candidates"].append(entry)
+        existing_symbols.add(sym)
+        injected += 1
+
+    if injected > 0:
+        tmp = feed_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(feed_data, f, indent=2)
+        os.replace(tmp, feed_path)
+
+    log.info("TTG inject: %d candidates injected into %s", injected, feed_path)
+    return injected
+
+
+def _pru_candidate_to_feed_entry(pru_symbol: dict, now_str: str) -> dict:
+    """Convert a PRU symbol metadata dict into an economic_candidate_feed candidate entry."""
+    ticker = pru_symbol.get("ticker", "")
+    archetype = pru_symbol.get("primary_archetype", "")
+    reason = (
+        f"{ticker} — Position Research Universe: {archetype}. "
+        f"{pru_symbol.get('universe_entry_reason', '')}"
+    )
+    return {
+        "symbol":                    ticker,
+        "included_by":               "position_research_universe",
+        "theme":                     "position_research_universe",
+        "driver":                    "",
+        "role":                      "direct_beneficiary",
+        "reason":                    reason,
+        "reason_to_care":            reason,
+        "route_hint":                ["position", "swing", "watchlist"],
+        "confidence":                0.65,
+        "fresh_until":               now_str,
+        "risk_flags":                [],
+        "confirmation_required":     [],
+        "source_labels":             ["position_research_universe"],
+        "transmission_rules_fired":  [],
+        "market_confirmation_required": [
+            "price_and_volume_confirmation_by_trading_bot",
+            "live_spread_and_risk_check_at_execution_only",
+        ],
+        "generated_at":              now_str,
+        "mode":                      "intelligence_advisory_feed",
+        "live_output_changed":       False,
+        "candidate_source":          "position_research_universe",
+        "scanner_tier":              "D",
+        "primary_archetype":         archetype,
+        "universe_bucket":           pru_symbol.get("universe_bucket", ""),
+    }
+
+
+def _inject_pru_into_feed(feed_path: str) -> int:
+    """
+    Load PRU symbols and merge them into the candidate feed.
+
+    Rules:
+    - Loads data/position_research_universe.json (graceful if missing/stale)
+    - Intelligence-layer + TTG candidates already in the feed win on dedup
+    - Returns count of PRU candidates injected
+    """
+    try:
+        from universe_position import load_position_research_universe
+    except Exception as _e:
+        log.warning("PRU inject: import failed (non-fatal): %s", _e)
+        return 0
+
+    try:
+        _tickers, pru_symbols, built_at = load_position_research_universe()
+    except Exception as _e:
+        log.warning("PRU inject: load failed (non-fatal): %s", _e)
+        return 0
+
+    if not pru_symbols:
+        log.info("PRU inject: no PRU symbols available (missing or stale)")
+        return 0
+
+    try:
+        with open(feed_path, encoding="utf-8") as f:
+            feed_data = json.load(f)
+    except Exception as _e:
+        log.warning("PRU inject: failed to read feed at %s: %s", feed_path, _e)
+        return 0
+
+    existing_symbols: set[str] = {
+        c["symbol"] for c in feed_data.get("candidates", [])
+        if isinstance(c, dict) and c.get("symbol")
+    }
+
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    fresh_until = (now + timedelta(hours=48)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    injected = 0
+    for pru_sym in pru_symbols:
+        ticker = pru_sym.get("ticker", "").strip()
+        if not ticker or ticker in existing_symbols:
+            continue
+        entry = _pru_candidate_to_feed_entry(pru_sym, fresh_until)
+        feed_data["candidates"].append(entry)
+        existing_symbols.add(ticker)
+        injected += 1
+
+    if injected > 0:
+        tmp = feed_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(feed_data, f, indent=2)
+        os.replace(tmp, feed_path)
+
+    log.info("PRU inject: %d candidates injected from PRU (built_at=%s)", injected, built_at)
+    return injected
+
+
 def _write_manifest(
     universe_path: str,
     candidate_count: int,
@@ -191,6 +393,24 @@ def run() -> None:
     except Exception as _td_err:
         log.warning("thesis_divergence step failed (non-fatal): %s", _td_err)
         print(f"      [WARN] thesis_divergence skipped: {_td_err}")
+
+    # Step 3.6 — TTG injection (fail-soft)
+    print("[3.6/5] Injecting Theme Transmission Graph candidates into feed...")
+    try:
+        _ttg_count = _inject_ttg_into_feed("data/intelligence/economic_candidate_feed.json")
+        print(f"      {_ttg_count} TTG candidates injected")
+    except Exception as _ttg_err:
+        log.warning("TTG inject failed (non-fatal): %s", _ttg_err)
+        print(f"      [WARN] TTG inject skipped: {_ttg_err}")
+
+    # Step 3.7 — PRU injection (fail-soft)
+    print("[3.7/5] Injecting Position Research Universe candidates into feed...")
+    try:
+        _pru_count = _inject_pru_into_feed("data/intelligence/economic_candidate_feed.json")
+        print(f"      {_pru_count} PRU candidates injected")
+    except Exception as _pru_err:
+        log.warning("PRU inject failed (non-fatal): %s", _pru_err)
+        print(f"      [WARN] PRU inject skipped: {_pru_err}")
 
     # Step 4 — build shadow universe, promote to live
     print("[4/5] Building universe + promoting to live handoff...")

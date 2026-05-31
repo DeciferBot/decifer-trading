@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-05-30T07:20:36.583Z",
+  "timestamp": "2026-05-31T12:37:21.859Z",
   "branch": "master",
-  "lastCommit": "bee741d fix(mobile): always fetch macro/general news alongside symbol news",
+  "lastCommit": "6b101d3 fix(cloud): pass verify_intelligence_cloud_deploy 14/14 + fix stale test patch",
   "roadmapPhase": null,
   "lastFilesTouched": [
     "claude/memory/checkpoint.json",
     ".claude/memory/pending-doc-update.json",
     ".claude/memory/session-history.jsonl",
     ".claude/memory/stop-hook-guard.flag",
-    "data/audit_log.jsonl",
-    "data/equity_history.json",
     "data/ic_decision_events.jsonl",
     "data/ic_validation_result.json",
     "data/ic_weights.json",
-    "data/ic_weights_live.json"
+    "data/ic_weights_live.json",
+    "data/ic_weights_live_history.jsonl",
+    "data/intelligence/counter_thesis_cache.json"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 44
+  "sessionCount": 51
 }
