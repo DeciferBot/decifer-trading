@@ -1,6 +1,6 @@
 {
   "refreshed_at": "2026-05-31T19:00:32.264460+00:00",
-  "count": 1000,
+  "count": 1003,
   "threshold_dollar_volume": 157207041.0,
   "symbols": [
     {
@@ -8999,6 +8999,33 @@
       "dollar_volume": 157207041.0,
       "price": 78.03,
       "prev_volume": 2014700,
+      "exchange": "NYSE",
+      "fractionable": true,
+      "shortable": true
+    },
+    {
+      "symbol": "BKSY",
+      "dollar_volume": 120309858.97,
+      "price": 48.47,
+      "prev_volume": 2482151,
+      "exchange": "NYSE",
+      "fractionable": true,
+      "shortable": true
+    },
+    {
+      "symbol": "IRDM",
+      "dollar_volume": 141202299.48,
+      "price": 51.78,
+      "prev_volume": 2726966,
+      "exchange": "NASDAQ",
+      "fractionable": true,
+      "shortable": true
+    },
+    {
+      "symbol": "SPIR",
+      "dollar_volume": 30657583.84,
+      "price": 22.84,
+      "prev_volume": 1342276,
       "exchange": "NYSE",
       "fractionable": true,
       "shortable": true
