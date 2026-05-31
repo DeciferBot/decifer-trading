@@ -34,6 +34,21 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3001,
       "cwd": "options"
+    },
+    {
+      "name": "macro-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "-p", "3002"],
+      "port": 3002,
+      "cwd": "macro"
+    },
+    {
+      "name": "map-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3010,
+      "autoPort": true,
+      "cwd": "map"
     }
   ]
 }
