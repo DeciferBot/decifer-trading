@@ -1,7 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
   <rect width="40" height="40" rx="8" fill="#0A0A0A"/>
-  <!-- < left chevron, lower -->
-  <polyline points="24,28 13,22 24,16" stroke="#f97316" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- > right chevron, upper — offset up by 5px to suggest dialogue -->
-  <polyline points="16,23 27,17 16,11" stroke="#f97316" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- [ left bracket, lower -->
+  <path d="M13,17 L13,29 M13,17 L18,17 M13,29 L18,29"
+        stroke="#f97316" stroke-width="2.8" stroke-linecap="square" fill="none"/>
+  <!-- ] right bracket, upper -->
+  <path d="M27,11 L27,23 M27,11 L22,11 M27,23 L22,23"
+        stroke="#f97316" stroke-width="2.8" stroke-linecap="square" fill="none"/>
 </svg>

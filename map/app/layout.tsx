@@ -9,6 +9,10 @@ export const metadata: Metadata = {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     apple: "/favicon.svg",
   },
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    apple: "/favicon.svg",
+  },
   openGraph: {
     title: "Market Map — Decifer",
     description: "Exploratory market intelligence graph. Find hot spots, trace connections, discover what's moving.",
