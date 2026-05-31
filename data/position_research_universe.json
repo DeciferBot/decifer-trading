@@ -1,62 +1,9 @@
 {
-  "built_at": "2026-05-31T19:51:07.998629+00:00",
+  "built_at": "2026-05-31T19:58:03.801389+00:00",
   "count": 150,
   "symbols": [
     {
-      "ticker": "CODX",
-      "discovery_score": 17,
-      "adjusted_discovery_score": 17,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA",
-        "Breakout"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows",
-        "base_building_after_drawdown"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1,
-        "base_building_after_drawdown": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 190.3,
-        "revenue_decelerating": true,
-        "gross_margin": 9.49,
-        "analyst_upside_pct": 2019.6919381049956,
-        "consensus_score": 3.4,
-        "debt_to_equity": 0.12656165750657164
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "ONDS",
+      "ticker": "APLD",
       "discovery_score": 15,
       "adjusted_discovery_score": 15,
       "risk_penalty_pts": 0,
@@ -91,19 +38,20 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 66.46,
-        "revenue_decelerating": false,
-        "gross_margin": 44.85,
-        "analyst_upside_pct": 33.180076628352474,
+        "revenue_growth_yoy": 139.29,
+        "revenue_decelerating": true,
+        "gross_margin": 27.07,
+        "analyst_upside_pct": 35.39635438745232,
         "consensus_score": 4.0,
-        "debt_to_equity": 0.0035763367734198384
+        "debt_to_equity": 1.7881624390265498
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder",
+      "cluster_label": "crypto_btc_proxy"
     },
     {
       "ticker": "DY",
@@ -141,7 +89,7 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 56.11,
+        "revenue_growth_yoy": 34.8,
         "revenue_decelerating": false,
         "gross_margin": 19.61,
         "analyst_upside_pct": 15.223827918194472,
@@ -206,6 +154,57 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
+      "ticker": "CORZ",
+      "discovery_score": 15,
+      "adjusted_discovery_score": 15,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 44.48,
+        "revenue_decelerating": false,
+        "gross_margin": 16.75,
+        "analyst_upside_pct": 19.06376693644406,
+        "consensus_score": 3.86,
+        "debt_to_equity": -1.5743409977590324
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder",
+      "cluster_label": "crypto_btc_proxy"
+    },
+    {
       "ticker": "MOD",
       "discovery_score": 15,
       "adjusted_discovery_score": 15,
@@ -256,7 +255,7 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "BIDU",
+      "ticker": "BBAI",
       "discovery_score": 15,
       "adjusted_discovery_score": 15,
       "risk_penalty_pts": 0,
@@ -291,12 +290,62 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 594.64,
+        "revenue_growth_yoy": 26.14,
         "revenue_decelerating": false,
-        "gross_margin": 42.04,
-        "analyst_upside_pct": 18.64544781643227,
-        "consensus_score": 3.75,
-        "debt_to_equity": 0.35009632234196186
+        "gross_margin": 25.76,
+        "analyst_upside_pct": 19.28429423459244,
+        "consensus_score": 3.25,
+        "debt_to_equity": 0.030502084374466255
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "ROIV",
+      "discovery_score": 15,
+      "adjusted_discovery_score": 15,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 26.06,
+        "revenue_decelerating": false,
+        "gross_margin": 84.44,
+        "analyst_upside_pct": 23.81745502998002,
+        "consensus_score": 3.93,
+        "debt_to_equity": 0.02373077526245922
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -354,103 +403,6 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "RGTI",
-      "discovery_score": 14,
-      "adjusted_discovery_score": 14,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Growth Leader"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 135.55,
-        "revenue_decelerating": false,
-        "gross_margin": -19.84,
-        "analyst_upside_pct": 22.66824085005904,
-        "consensus_score": 3.86,
-        "debt_to_equity": 0.011622726602901312
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Growth Leader",
-      "cluster_label": "quantum"
-    },
-    {
-      "ticker": "RCAT",
-      "discovery_score": 14,
-      "adjusted_discovery_score": 14,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 849.71,
-        "revenue_decelerating": false,
-        "gross_margin": 5.41,
-        "analyst_upside_pct": 46.03717689274613,
-        "consensus_score": 4.0,
-        "debt_to_equity": 0.057778578280046414
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
       "ticker": "P",
@@ -553,7 +505,7 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "TTMI",
+      "ticker": "IQV",
       "discovery_score": 14,
       "adjusted_discovery_score": 14,
       "risk_penalty_pts": 0,
@@ -588,12 +540,12 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 9.25,
-        "revenue_decelerating": false,
-        "gross_margin": 20.48,
-        "analyst_upside_pct": 21.000000000000007,
-        "consensus_score": 3.86,
-        "debt_to_equity": 0.5710019421427565
+        "revenue_growth_yoy": 8.41,
+        "revenue_decelerating": true,
+        "gross_margin": 26.11,
+        "analyst_upside_pct": 22.797870588880954,
+        "consensus_score": 3.84,
+        "debt_to_equity": 0.3337084070085195
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -601,102 +553,6 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "TDG",
-      "discovery_score": 14,
-      "adjusted_discovery_score": 14,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 11.33,
-        "revenue_decelerating": false,
-        "gross_margin": 59.02,
-        "analyst_upside_pct": 24.713904253290103,
-        "consensus_score": 3.56,
-        "debt_to_equity": -3.4038502446288024
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "USAR",
-      "discovery_score": 14,
-      "adjusted_discovery_score": 14,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Growth Leader"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 246.8,
-        "revenue_decelerating": false,
-        "gross_margin": -45.28,
-        "analyst_upside_pct": 27.705627705627705,
-        "consensus_score": 4.0,
-        "debt_to_equity": 0.006051755253840025
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Growth Leader"
     },
     {
       "ticker": "ACHR",
@@ -844,57 +700,6 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "SITM",
-      "discovery_score": 14,
-      "adjusted_discovery_score": 14,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA",
-        "Breakout"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows",
-        "base_building_after_drawdown"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1,
-        "base_building_after_drawdown": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 88.29,
-        "revenue_decelerating": true,
-        "gross_margin": 55.7,
-        "analyst_upside_pct": -7.754166666666672,
-        "consensus_score": 4.0,
-        "debt_to_equity": 0.0025505229607464507
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
       "ticker": "ONON",
       "discovery_score": 14,
       "adjusted_discovery_score": 14,
@@ -990,56 +795,6 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "IFF",
-      "discovery_score": 14,
-      "adjusted_discovery_score": 14,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_5pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_5pct": 2,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 5.87,
-        "revenue_decelerating": false,
-        "gross_margin": 36.35,
-        "analyst_upside_pct": 15.884286653517421,
-        "consensus_score": 3.7,
-        "debt_to_equity": 0.4119688385269122
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
       "ticker": "PLTR",
       "discovery_score": 13,
       "adjusted_discovery_score": 13,
@@ -1088,203 +843,7 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "APP",
-      "discovery_score": 13,
-      "adjusted_discovery_score": 13,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_positive",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_positive": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 11.13,
-        "revenue_decelerating": false,
-        "gross_margin": 88.37,
-        "analyst_upside_pct": 6.688774351770012,
-        "consensus_score": 3.85,
-        "debt_to_equity": 1.486798085706561
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "MDB",
-      "discovery_score": 13,
-      "adjusted_discovery_score": 13,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -1.07,
-        "revenue_decelerating": false,
-        "gross_margin": 71.97,
-        "analyst_upside_pct": 24.06606606606606,
-        "consensus_score": 3.77,
-        "debt_to_equity": 0.010367091885409
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "AMAT",
-      "discovery_score": 13,
-      "adjusted_discovery_score": 13,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 12.81,
-        "revenue_decelerating": false,
-        "gross_margin": 48.96,
-        "analyst_upside_pct": 15.406536646183985,
-        "consensus_score": 3.79,
-        "debt_to_equity": 0.269982015140742
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "SOFI",
-      "discovery_score": 13,
-      "adjusted_discovery_score": 13,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_5pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_5pct": 2,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 5.48,
-        "revenue_decelerating": false,
-        "gross_margin": 76.02,
-        "analyst_upside_pct": 17.260273972602732,
-        "consensus_score": 3.19,
-        "debt_to_equity": 0.17709743182108906
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "APLD",
+      "ticker": "QBTS",
       "discovery_score": 13,
       "adjusted_discovery_score": 13,
       "risk_penalty_pts": 0,
@@ -1319,12 +878,12 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 0.04,
+        "revenue_growth_yoy": 3.85,
         "revenue_decelerating": false,
-        "gross_margin": 27.07,
-        "analyst_upside_pct": 35.39635438745232,
+        "gross_margin": 66.27,
+        "analyst_upside_pct": 20.522263140274518,
         "consensus_score": 4.0,
-        "debt_to_equity": 1.7881624390265498
+        "debt_to_equity": 0.04164546738631553
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -1332,7 +891,7 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme",
-      "cluster_label": "crypto_btc_proxy"
+      "cluster_label": "quantum"
     },
     {
       "ticker": "RDDT",
@@ -1435,59 +994,7 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "FLY",
-      "discovery_score": 13,
-      "adjusted_discovery_score": 13,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA",
-        "Breakout"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows",
-        "base_building_after_drawdown"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1,
-        "base_building_after_drawdown": 2
-      },
-      "missing_data_fields": [
-        "analyst_consensus",
-        "analyst_price_target"
-      ],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 40.24,
-        "revenue_decelerating": false,
-        "gross_margin": 19.16,
-        "analyst_upside_pct": null,
-        "consensus_score": null,
-        "debt_to_equity": 0.04795978582367018
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "WULF",
+      "ticker": "UAL",
       "discovery_score": 13,
       "adjusted_discovery_score": 13,
       "risk_penalty_pts": 0,
@@ -1522,70 +1029,66 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -5.09,
+        "revenue_growth_yoy": -5.12,
         "revenue_decelerating": false,
-        "gross_margin": 3.62,
-        "analyst_upside_pct": 26.985381272224423,
-        "consensus_score": 4.0,
-        "debt_to_equity": -67.45965673953334
+        "gross_margin": 64.24,
+        "analyst_upside_pct": 19.23411662315056,
+        "consensus_score": 3.66,
+        "debt_to_equity": 1.9508062484252962
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme",
-      "cluster_label": "crypto_btc_proxy"
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "HEI",
+      "ticker": "KTOS",
       "discovery_score": 13,
       "adjusted_discovery_score": 13,
       "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
+      "primary_archetype": "Speculative Theme",
       "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
+        "Sector/RS Leader"
       ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
-        "Quality Compounder"
+        "Speculative Theme"
       ],
       "discovery_signals": [
-        "revenue_yoy_gt_10pct",
+        "revenue_yoy_gt_5pct",
         "gross_margin_positive",
         "debt_not_dangerous",
-        "analyst_upside_positive",
+        "analyst_upside_gt_15pct",
         "consensus_not_negative",
         "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
+        "outperforming_sector_1m"
       ],
       "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
+        "revenue_yoy_gt_5pct": 2,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
-        "analyst_upside_positive": 1,
+        "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
         "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
+        "outperforming_sector_1m": 2
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 16.73,
+        "revenue_growth_yoy": 7.51,
         "revenue_decelerating": false,
-        "gross_margin": 40.06,
-        "analyst_upside_pct": 9.032684243781947,
-        "consensus_score": 3.63,
-        "debt_to_equity": 0.47987682996291803
+        "gross_margin": 21.8,
+        "analyst_upside_pct": 70.6853582554517,
+        "consensus_score": 3.83,
+        "debt_to_equity": 0.05436950146627566
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
       "ticker": "WAT",
@@ -1686,34 +1189,34 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "IQV",
+      "ticker": "DXCM",
       "discovery_score": 13,
       "adjusted_discovery_score": 13,
       "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
+      "primary_archetype": "Quality Compounder",
       "secondary_tags": [
         "Sector/RS Leader",
         "Above 50DMA"
       ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
-        "Speculative Theme"
+        "Quality Compounder"
       ],
       "discovery_signals": [
-        "revenue_decline_slowing",
+        "revenue_yoy_gt_10pct",
         "gross_margin_positive",
         "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
+        "analyst_upside_positive",
         "consensus_not_negative",
         "outperforming_spy_1m",
         "outperforming_sector_1m",
         "higher_lows"
       ],
       "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
+        "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
+        "analyst_upside_positive": 1,
         "consensus_not_negative": 1,
         "outperforming_spy_1m": 3,
         "outperforming_sector_1m": 2,
@@ -1721,19 +1224,19 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -4.88,
-        "revenue_decelerating": false,
-        "gross_margin": 26.11,
-        "analyst_upside_pct": 22.797870588880954,
-        "consensus_score": 3.84,
-        "debt_to_equity": 0.3337084070085195
+        "revenue_growth_yoy": 15.05,
+        "revenue_decelerating": true,
+        "gross_margin": 61.84,
+        "analyst_upside_pct": 6.304935537773922,
+        "consensus_score": 3.79,
+        "debt_to_equity": 0.4683283168182894
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
       "ticker": "NTRA",
@@ -1777,56 +1280,6 @@
         "analyst_upside_pct": 17.654409332163453,
         "consensus_score": 3.93,
         "debt_to_equity": 0.13533177228190468
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "AUR",
-      "discovery_score": 13,
-      "adjusted_discovery_score": 13,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 0.0,
-        "revenue_decelerating": false,
-        "gross_margin": 40.75,
-        "analyst_upside_pct": 36.19153978154877,
-        "consensus_score": 3.57,
-        "debt_to_equity": 0.040224032586558045
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -1936,6 +1389,102 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "APTV",
+      "discovery_score": 13,
+      "adjusted_discovery_score": 13,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_5pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_5pct": 2,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 5.41,
+        "revenue_decelerating": true,
+        "gross_margin": 19.13,
+        "analyst_upside_pct": 32.2381022543097,
+        "consensus_score": 3.61,
+        "debt_to_equity": 1.0126719376150763
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "SOUN",
+      "discovery_score": 13,
+      "adjusted_discovery_score": 13,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 51.72,
+        "revenue_decelerating": true,
+        "gross_margin": 37.96,
+        "analyst_upside_pct": 38.88888888888889,
+        "consensus_score": 3.62,
+        "debt_to_equity": 0.013515214927952138
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
       "ticker": "NVT",
@@ -2181,6 +1730,56 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
+      "ticker": "NBIX",
+      "discovery_score": 13,
+      "adjusted_discovery_score": 13,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_positive",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_positive": 1,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 1.12,
+        "revenue_decelerating": false,
+        "gross_margin": 98.17,
+        "analyst_upside_pct": 16.47504737839544,
+        "consensus_score": 3.86,
+        "debt_to_equity": 0.11921112871984504
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+    },
+    {
       "ticker": "DELL",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
@@ -2230,7 +1829,7 @@
       "cluster_label": "ai_infra"
     },
     {
-      "ticker": "ABBV",
+      "ticker": "GE",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
       "risk_penalty_pts": 0,
@@ -2263,12 +1862,12 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -9.72,
+        "revenue_growth_yoy": -2.56,
         "revenue_decelerating": false,
-        "gross_margin": 70.68,
-        "analyst_upside_pct": 18.173663066944737,
-        "consensus_score": 3.66,
-        "debt_to_equity": 2.649478162842285
+        "gross_margin": 34.82,
+        "analyst_upside_pct": 17.65252055065861,
+        "consensus_score": 3.68,
+        "debt_to_equity": 1.1229440106329955
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -2276,103 +1875,6 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "CRDO",
-      "discovery_score": 12,
-      "adjusted_discovery_score": 12,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 51.85,
-        "revenue_decelerating": false,
-        "gross_margin": 67.83,
-        "analyst_upside_pct": -6.425110596165999,
-        "consensus_score": 3.85,
-        "debt_to_equity": 0.006823568354133246
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder",
-      "cluster_label": "ai_infra"
-    },
-    {
-      "ticker": "LUNR",
-      "discovery_score": 12,
-      "adjusted_discovery_score": 12,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 316.95,
-        "revenue_decelerating": false,
-        "gross_margin": 25.7,
-        "analyst_upside_pct": -3.203503111315973,
-        "consensus_score": 3.73,
-        "debt_to_equity": -1.3018768262187768
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
       "ticker": "D",
@@ -2407,7 +1909,7 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 25.68,
+        "revenue_growth_yoy": 26.2,
         "revenue_decelerating": false,
         "gross_margin": 49.41,
         "analyst_upside_pct": 4.018524051389301,
@@ -2518,6 +2020,153 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
+      "ticker": "AXON",
+      "discovery_score": 12,
+      "adjusted_discovery_score": 12,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_positive",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_positive": 1,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 1.33,
+        "revenue_decelerating": false,
+        "gross_margin": 59.32,
+        "analyst_upside_pct": 45.62927329012717,
+        "consensus_score": 3.81,
+        "debt_to_equity": 0.517292174868206
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "FLY",
+      "discovery_score": 14,
+      "adjusted_discovery_score": 12,
+      "risk_penalty_pts": -2,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA",
+        "Breakout"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows",
+        "base_building_after_drawdown"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1,
+        "base_building_after_drawdown": 2
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 40.24,
+        "revenue_decelerating": false,
+        "gross_margin": 19.16,
+        "analyst_upside_pct": -15.17761033369215,
+        "consensus_score": 3.71,
+        "debt_to_equity": 0.04795978582367018
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "FCX",
+      "discovery_score": 12,
+      "adjusted_discovery_score": 12,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_positive",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_positive": 1,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 10.67,
+        "revenue_decelerating": false,
+        "gross_margin": 27.8,
+        "analyst_upside_pct": 8.21374045801526,
+        "consensus_score": 3.51,
+        "debt_to_equity": 0.5332478851576519
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
+    },
+    {
       "ticker": "NVO",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
@@ -2566,13 +2215,12 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "FCX",
+      "ticker": "TDG",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
       "risk_penalty_pts": 0,
       "primary_archetype": "Quality Compounder",
       "secondary_tags": [
-        "Sector/RS Leader",
         "Above 50DMA"
       ],
       "universe_bucket": "core_research",
@@ -2581,93 +2229,44 @@
       ],
       "discovery_signals": [
         "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_positive",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_positive": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 12.24,
-        "revenue_decelerating": false,
-        "gross_margin": 27.8,
-        "analyst_upside_pct": 8.21374045801526,
-        "consensus_score": 3.51,
-        "debt_to_equity": 0.5332478851576519
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "CCL",
-      "discovery_score": 12,
-      "adjusted_discovery_score": 12,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
         "gross_margin_positive",
         "debt_not_dangerous",
         "analyst_upside_gt_15pct",
         "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m"
+        "outperforming_spy_1m"
       ],
       "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
+        "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
         "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
+        "outperforming_spy_1m": 3
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -2.61,
+        "revenue_growth_yoy": 11.33,
         "revenue_decelerating": false,
-        "gross_margin": 37.55,
-        "analyst_upside_pct": 29.31712549159815,
-        "consensus_score": 3.55,
-        "debt_to_equity": 2.041823344332745
+        "gross_margin": 59.02,
+        "analyst_upside_pct": 24.713904253290103,
+        "consensus_score": 3.56,
+        "debt_to_equity": -3.4038502446288024
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "MNST",
+      "ticker": "FICO",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
       "risk_penalty_pts": 0,
       "primary_archetype": "Quality Compounder",
       "secondary_tags": [
+        "Sector/RS Leader",
         "Above 50DMA"
       ],
       "universe_bucket": "core_research",
@@ -2678,35 +2277,33 @@
         "revenue_yoy_gt_10pct",
         "gross_margin_positive",
         "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
         "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
+        "outperforming_spy_1m"
       ],
       "discovery_signal_points": {
         "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
+        "outperforming_spy_1m": 3
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 10.43,
+        "revenue_growth_yoy": 35.1,
         "revenue_decelerating": false,
-        "gross_margin": 55.47,
-        "analyst_upside_pct": -1.4792896042448174,
-        "consensus_score": 3.5,
-        "debt_to_equity": 0.0
+        "gross_margin": 84.16,
+        "analyst_upside_pct": 26.977904206408017,
+        "consensus_score": 3.84,
+        "debt_to_equity": -1.7398796183950704
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
       "ticker": "TKO",
@@ -2805,56 +2402,6 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "BBAI",
-      "discovery_score": 12,
-      "adjusted_discovery_score": 12,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [
-        "revenue_growth_yoy"
-      ],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": null,
-        "revenue_decelerating": false,
-        "gross_margin": 25.76,
-        "analyst_upside_pct": 19.28429423459244,
-        "consensus_score": 3.25,
-        "debt_to_equity": 0.030502084374466255
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
       "ticker": "SE",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
@@ -2903,7 +2450,7 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "VEEV",
+      "ticker": "AUR",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
       "risk_penalty_pts": 0,
@@ -2917,31 +2464,33 @@
         "Speculative Theme"
       ],
       "discovery_signals": [
-        "revenue_yoy_positive",
+        "revenue_decline_slowing",
         "gross_margin_positive",
         "debt_not_dangerous",
         "analyst_upside_gt_15pct",
-        "consensus_not_negative",
         "outperforming_spy_1m",
-        "outperforming_sector_1m"
+        "outperforming_sector_1m",
+        "higher_lows"
       ],
       "discovery_signal_points": {
-        "revenue_yoy_positive": 1,
+        "revenue_decline_slowing": 1,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
         "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
         "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
       },
-      "missing_data_fields": [],
+      "missing_data_fields": [
+        "analyst_consensus"
+      ],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 3.05,
+        "revenue_growth_yoy": 0.0,
         "revenue_decelerating": false,
-        "gross_margin": 75.53,
-        "analyst_upside_pct": 45.48571428571429,
-        "consensus_score": 3.67,
-        "debt_to_equity": 0.013286527381675767
+        "gross_margin": 40.75,
+        "analyst_upside_pct": 36.19153978154877,
+        "consensus_score": null,
+        "debt_to_equity": 0.040224032586558045
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -2999,53 +2548,6 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "ADM",
-      "discovery_score": 12,
-      "adjusted_discovery_score": 12,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 10.42,
-        "revenue_decelerating": false,
-        "gross_margin": 5.83,
-        "analyst_upside_pct": -7.24492353973427,
-        "consensus_score": 3.25,
-        "debt_to_equity": 0.4673302929310647
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
       "ticker": "LSCC",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
@@ -3085,6 +2587,53 @@
         "analyst_upside_pct": -2.346020761245665,
         "consensus_score": 3.82,
         "debt_to_equity": 0.05390733612642689
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "ADM",
+      "discovery_score": 12,
+      "adjusted_discovery_score": 12,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 10.42,
+        "revenue_decelerating": false,
+        "gross_margin": 5.83,
+        "analyst_upside_pct": -7.24492353973427,
+        "consensus_score": 3.25,
+        "debt_to_equity": 0.4673302929310647
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -3144,11 +2693,11 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "POET",
+      "ticker": "SITM",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
       "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
+      "primary_archetype": "Turnaround/Inflection",
       "secondary_tags": [
         "Sector/RS Leader",
         "Above 50DMA",
@@ -3156,42 +2705,43 @@
       ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
-        "Growth Leader"
+        "Turnaround/Inflection"
       ],
       "discovery_signals": [
-        "revenue_yoy_gt_10pct",
+        "revenue_yoy_positive",
+        "gross_margin_positive",
         "debt_not_dangerous",
+        "consensus_not_negative",
         "outperforming_spy_1m",
         "outperforming_sector_1m",
         "higher_lows",
         "base_building_after_drawdown"
       ],
       "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
+        "revenue_yoy_positive": 1,
+        "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
+        "consensus_not_negative": 1,
         "outperforming_spy_1m": 3,
         "outperforming_sector_1m": 2,
         "higher_lows": 1,
         "base_building_after_drawdown": 2
       },
-      "missing_data_fields": [
-        "analyst_consensus",
-        "analyst_price_target"
-      ],
+      "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 47.53,
+        "revenue_growth_yoy": 0.25,
         "revenue_decelerating": false,
-        "gross_margin": -31.1,
-        "analyst_upside_pct": null,
-        "consensus_score": null,
-        "debt_to_equity": 0.015648501393979542
+        "gross_margin": 55.7,
+        "analyst_upside_pct": -7.754166666666672,
+        "consensus_score": 4.0,
+        "debt_to_equity": 0.0025505229607464507
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader"
+      "universe_entry_reason": "strong: outperforming_spy_1m; archetype: Turnaround/Inflection"
     },
     {
       "ticker": "SIMO",
@@ -3240,102 +2790,6 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "CRS",
-      "discovery_score": 12,
-      "adjusted_discovery_score": 12,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 11.47,
-        "revenue_decelerating": false,
-        "gross_margin": 29.73,
-        "analyst_upside_pct": -0.6780672949805976,
-        "consensus_score": 3.62,
-        "debt_to_equity": 0.3382182240278584
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "APTV",
-      "discovery_score": 12,
-      "adjusted_discovery_score": 12,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -1.3,
-        "revenue_decelerating": false,
-        "gross_margin": 19.13,
-        "analyst_upside_pct": 32.2381022543097,
-        "consensus_score": 3.61,
-        "debt_to_equity": 1.0126719376150763
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
       "ticker": "CRL",
@@ -3482,13 +2936,62 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "MEDP",
+      "ticker": "EOSE",
+      "discovery_score": 12,
+      "adjusted_discovery_score": 12,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_decline_slowing",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_decline_slowing": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": -1.78,
+        "revenue_decelerating": false,
+        "gross_margin": -101.88,
+        "analyst_upside_pct": 30.18059599043765,
+        "consensus_score": 3.3,
+        "debt_to_equity": -2.2496413249630827
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "GPN",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
       "risk_penalty_pts": 0,
       "primary_archetype": "Quality Compounder",
       "secondary_tags": [
-        "Sector/RS Leader"
+        "Sector/RS Leader",
+        "Above 50DMA"
       ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
@@ -3514,12 +3017,12 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 26.5,
-        "revenue_decelerating": true,
-        "gross_margin": 29.07,
-        "analyst_upside_pct": 11.574332938203126,
-        "consensus_score": 3.26,
-        "debt_to_equity": 0.24417613493917908
+        "revenue_growth_yoy": 56.57,
+        "revenue_decelerating": false,
+        "gross_margin": 67.31,
+        "analyst_upside_pct": 12.422195735664143,
+        "consensus_score": 3.52,
+        "debt_to_equity": 0.9909526010510179
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -3577,55 +3080,55 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "RGEN",
+      "ticker": "JHX",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
       "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
+      "primary_archetype": "Quality Compounder",
       "secondary_tags": [
         "Sector/RS Leader",
         "Above 50DMA"
       ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
-        "Speculative Theme"
+        "Quality Compounder"
       ],
       "discovery_signals": [
-        "revenue_decline_slowing",
+        "revenue_yoy_gt_10pct",
         "gross_margin_positive",
         "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
         "consensus_not_negative",
         "outperforming_spy_1m",
-        "outperforming_sector_1m"
+        "outperforming_sector_1m",
+        "higher_lows"
       ],
       "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
+        "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
         "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -1.85,
+        "revenue_growth_yoy": 13.24,
         "revenue_decelerating": false,
-        "gross_margin": 50.25,
-        "analyst_upside_pct": 31.61758773699071,
-        "consensus_score": 3.91,
-        "debt_to_equity": 0.32658849858677164
+        "gross_margin": 35.77,
+        "analyst_upside_pct": 3.092783505154634,
+        "consensus_score": 3.56,
+        "debt_to_equity": 0.7447980701890904
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "ARGX",
+      "ticker": "PAAS",
       "discovery_score": 12,
       "adjusted_discovery_score": 12,
       "risk_penalty_pts": 0,
@@ -3658,12 +3161,12 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 0.0,
+        "revenue_growth_yoy": -3.63,
         "revenue_decelerating": false,
-        "gross_margin": 89.0,
-        "analyst_upside_pct": 26.91539372480532,
-        "consensus_score": 3.89,
-        "debt_to_equity": 0.011400512101795632
+        "gross_margin": 43.79,
+        "analyst_upside_pct": 30.801687763713087,
+        "consensus_score": 3.44,
+        "debt_to_equity": 0.11490345390263802
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -3867,13 +3370,14 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "INTU",
+      "ticker": "ASTC",
       "discovery_score": 11,
       "adjusted_discovery_score": 11,
       "risk_penalty_pts": 0,
       "primary_archetype": "Growth Leader",
       "secondary_tags": [
-        "Breakout"
+        "Sector/RS Leader",
+        "Above 50DMA"
       ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
@@ -3881,101 +3385,7 @@
       ],
       "discovery_signals": [
         "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
         "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "base_building_after_drawdown"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "base_building_after_drawdown": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 84.0,
-        "revenue_decelerating": false,
-        "gross_margin": 81.03,
-        "analyst_upside_pct": 46.38151440602501,
-        "consensus_score": 3.67,
-        "debt_to_equity": 0.334480585583402
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
-    },
-    {
-      "ticker": "GE",
-      "discovery_score": 11,
-      "adjusted_discovery_score": 11,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [
-        "analyst_consensus"
-      ],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -2.56,
-        "revenue_decelerating": false,
-        "gross_margin": 34.82,
-        "analyst_upside_pct": 17.65252055065861,
-        "consensus_score": null,
-        "debt_to_equity": 1.1229440106329955
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "MS",
-      "discovery_score": 11,
-      "adjusted_discovery_score": 11,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
         "consensus_not_negative",
         "outperforming_spy_1m",
         "outperforming_sector_1m",
@@ -3983,169 +3393,74 @@
       ],
       "discovery_signal_points": {
         "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
         "consensus_not_negative": 1,
         "outperforming_spy_1m": 3,
         "outperforming_sector_1m": 2,
         "higher_lows": 1
       },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 14.86,
-        "revenue_decelerating": false,
-        "gross_margin": 57.99,
-        "analyst_upside_pct": -2.403846153846154,
-        "consensus_score": 3.54,
-        "debt_to_equity": 3.4495388761528094
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "TER",
-      "discovery_score": 11,
-      "adjusted_discovery_score": 11,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 18.38,
-        "revenue_decelerating": false,
-        "gross_margin": 58.79,
-        "analyst_upside_pct": -6.047793625732565,
-        "consensus_score": 3.65,
-        "debt_to_equity": 0.02620954915936556
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "HON",
-      "discovery_score": 11,
-      "adjusted_discovery_score": 11,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 33.28,
-        "revenue_decelerating": false,
-        "gross_margin": 36.95,
-        "analyst_upside_pct": 3.8266765368955817,
-        "consensus_score": 3.57,
-        "debt_to_equity": 1.5784534534534536
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "AXTI",
-      "discovery_score": 11,
-      "adjusted_discovery_score": 11,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA",
-        "Breakout"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Growth Leader"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows",
-        "base_building_after_drawdown"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1,
-        "base_building_after_drawdown": 2
-      },
       "missing_data_fields": [
-        "analyst_consensus",
-        "analyst_price_target",
-        "gross_margin"
+        "analyst_price_target"
       ],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 16.85,
+        "revenue_growth_yoy": 131.76,
         "revenue_decelerating": false,
-        "gross_margin": null,
+        "gross_margin": -88.1,
         "analyst_upside_pct": null,
-        "consensus_score": null,
-        "debt_to_equity": null
+        "consensus_score": 4.0,
+        "debt_to_equity": 0.19572192513368983
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader",
-      "cluster_label": "ai_infra"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader"
+    },
+    {
+      "ticker": "SOFI",
+      "discovery_score": 11,
+      "adjusted_discovery_score": 11,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_5pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_5pct": 2,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 5.48,
+        "revenue_decelerating": false,
+        "gross_margin": 76.02,
+        "analyst_upside_pct": 17.260273972602732,
+        "consensus_score": 3.19,
+        "debt_to_equity": 0.17709743182108906
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
       "ticker": "INFQ",
@@ -4196,7 +3511,54 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "HBAN",
+      "ticker": "TTWO",
+      "discovery_score": 11,
+      "adjusted_discovery_score": 11,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_5pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_5pct": 2,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 6.15,
+        "revenue_decelerating": false,
+        "gross_margin": 57.23,
+        "analyst_upside_pct": 28.176598869553608,
+        "consensus_score": 3.79,
+        "debt_to_equity": 0.8426044603947705
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "HEI",
       "discovery_score": 11,
       "adjusted_discovery_score": 11,
       "risk_penalty_pts": 0,
@@ -4212,33 +3574,133 @@
         "revenue_yoy_gt_10pct",
         "gross_margin_positive",
         "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
+        "analyst_upside_positive",
         "consensus_not_negative",
-        "outperforming_sector_1m"
+        "outperforming_spy_1m",
+        "higher_lows"
       ],
       "discovery_signal_points": {
         "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
+        "analyst_upside_positive": 1,
         "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 16.05,
+        "revenue_growth_yoy": 16.73,
         "revenue_decelerating": false,
-        "gross_margin": 62.65,
-        "analyst_upside_pct": 24.5721271393643,
-        "consensus_score": 3.48,
-        "debt_to_equity": 0.7213462425080682
+        "gross_margin": 40.06,
+        "analyst_upside_pct": 9.032684243781947,
+        "consensus_score": 3.63,
+        "debt_to_equity": 0.47987682996291803
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Quality Compounder"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "JOBY",
+      "discovery_score": 13,
+      "adjusted_discovery_score": 11,
+      "risk_penalty_pts": -2,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_decline_slowing",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_decline_slowing": 1,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": -21.37,
+        "revenue_decelerating": false,
+        "gross_margin": 11.23,
+        "analyst_upside_pct": 29.47211983308004,
+        "consensus_score": 3.0,
+        "debt_to_equity": 0.37572093123040123
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "S",
+      "discovery_score": 11,
+      "adjusted_discovery_score": 11,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_positive",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_positive": 1,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 2.03,
+        "revenue_decelerating": false,
+        "gross_margin": 74.03,
+        "analyst_upside_pct": 15.881642512077313,
+        "consensus_score": 3.68,
+        "debt_to_equity": 0.0
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
       "ticker": "LULU",
@@ -4286,47 +3748,52 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
     },
     {
-      "ticker": "CELH",
+      "ticker": "ZBRA",
       "discovery_score": 11,
       "adjusted_discovery_score": 11,
       "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
-      "secondary_tags": [],
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
-        "Growth Leader"
+        "Speculative Theme"
       ],
       "discovery_signals": [
-        "revenue_yoy_gt_10pct",
+        "revenue_yoy_positive",
         "gross_margin_positive",
         "debt_not_dangerous",
         "analyst_upside_gt_15pct",
         "consensus_not_negative",
-        "outperforming_sector_1m"
+        "outperforming_spy_1m",
+        "higher_lows"
       ],
       "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
+        "revenue_yoy_positive": 1,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
         "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 137.68,
+        "revenue_growth_yoy": 1.36,
         "revenue_decelerating": false,
-        "gross_margin": 49.62,
-        "analyst_upside_pct": 67.08685995557958,
-        "consensus_score": 3.87,
-        "debt_to_equity": 1.9474976054597117
+        "gross_margin": 47.47,
+        "analyst_upside_pct": 29.061983471074377,
+        "consensus_score": 3.7,
+        "debt_to_equity": 0.8095100864553314
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
       "ticker": "DAVE",
@@ -4375,99 +3842,6 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "AMBA",
-      "discovery_score": 11,
-      "adjusted_discovery_score": 11,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -0.51,
-        "revenue_decelerating": false,
-        "gross_margin": 58.82,
-        "analyst_upside_pct": 46.136146500108225,
-        "consensus_score": 3.56,
-        "debt_to_equity": 0.021905918939351423
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "CAVA",
-      "discovery_score": 11,
-      "adjusted_discovery_score": 11,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
-      "secondary_tags": [
-        "Breakout"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Growth Leader"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "base_building_after_drawdown"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "base_building_after_drawdown": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 59.38,
-        "revenue_decelerating": false,
-        "gross_margin": 18.6,
-        "analyst_upside_pct": 15.413340200875611,
-        "consensus_score": 3.68,
-        "debt_to_equity": 0.6154388434139536
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
     },
     {
       "ticker": "INSM",
@@ -4556,6 +3930,59 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
+    },
+    {
+      "ticker": "CODX",
+      "discovery_score": 15,
+      "adjusted_discovery_score": 11,
+      "risk_penalty_pts": -4,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA",
+        "Breakout"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_decline_slowing",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows",
+        "base_building_after_drawdown"
+      ],
+      "discovery_signal_points": {
+        "revenue_decline_slowing": 1,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1,
+        "base_building_after_drawdown": 2
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": -44.7,
+        "revenue_decelerating": false,
+        "gross_margin": 9.49,
+        "analyst_upside_pct": 2019.6919381049956,
+        "consensus_score": 3.4,
+        "debt_to_equity": 0.12656165750657164
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
       "ticker": "BRZE",
@@ -4699,7 +4126,100 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
     },
     {
-      "ticker": "JHX",
+      "ticker": "SEI",
+      "discovery_score": 11,
+      "adjusted_discovery_score": 11,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_5pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_5pct": 2,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 9.2,
+        "revenue_decelerating": false,
+        "gross_margin": 34.0,
+        "analyst_upside_pct": 15.753588705455792,
+        "consensus_score": 3.86,
+        "debt_to_equity": 2.071508773277512
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "KEEL",
+      "discovery_score": 11,
+      "adjusted_discovery_score": 11,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "debt_not_dangerous",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "debt_not_dangerous": 1,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 140.47,
+        "revenue_decelerating": false,
+        "gross_margin": -22.4,
+        "analyst_upside_pct": -7.402508069210007,
+        "consensus_score": 4.0,
+        "debt_to_equity": 1.4099753062855642
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader"
+    },
+    {
+      "ticker": "VSCO",
       "discovery_score": 11,
       "adjusted_discovery_score": 11,
       "risk_penalty_pts": 0,
@@ -4715,7 +4235,7 @@
       "discovery_signals": [
         "revenue_yoy_gt_10pct",
         "gross_margin_positive",
-        "debt_not_dangerous",
+        "consensus_not_negative",
         "outperforming_spy_1m",
         "outperforming_sector_1m",
         "higher_lows"
@@ -4723,22 +4243,19 @@
       "discovery_signal_points": {
         "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
+        "consensus_not_negative": 1,
         "outperforming_spy_1m": 3,
         "outperforming_sector_1m": 2,
         "higher_lows": 1
       },
-      "missing_data_fields": [
-        "analyst_consensus",
-        "analyst_price_target"
-      ],
+      "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 13.24,
+        "revenue_growth_yoy": 54.2,
         "revenue_decelerating": false,
-        "gross_margin": 35.77,
-        "analyst_upside_pct": null,
-        "consensus_score": null,
-        "debt_to_equity": 0.7447980701890904
+        "gross_margin": 36.38,
+        "analyst_upside_pct": 3.909909909909913,
+        "consensus_score": 3.64,
+        "debt_to_equity": 3.324766355140187
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -4791,50 +4308,52 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
     },
     {
-      "ticker": "NVDA",
-      "discovery_score": 10,
-      "adjusted_discovery_score": 10,
+      "ticker": "IOT",
+      "discovery_score": 11,
+      "adjusted_discovery_score": 11,
       "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
+      "primary_archetype": "Speculative Theme",
       "secondary_tags": [
+        "Sector/RS Leader",
         "Above 50DMA"
       ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
-        "Quality Compounder"
+        "Speculative Theme"
       ],
       "discovery_signals": [
-        "revenue_yoy_gt_10pct",
+        "revenue_yoy_gt_5pct",
         "gross_margin_positive",
         "debt_not_dangerous",
         "analyst_upside_gt_15pct",
-        "consensus_not_negative",
+        "outperforming_spy_1m",
         "higher_lows"
       ],
       "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
+        "revenue_yoy_gt_5pct": 2,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
         "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
         "higher_lows": 1
       },
-      "missing_data_fields": [],
+      "missing_data_fields": [
+        "analyst_consensus"
+      ],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 19.8,
+        "revenue_growth_yoy": 6.81,
         "revenue_decelerating": false,
-        "gross_margin": 74.15,
-        "analyst_upside_pct": 45.75744740928985,
-        "consensus_score": 3.75,
-        "debt_to_equity": 0.06555347514247419
+        "gross_margin": 76.74,
+        "analyst_upside_pct": 30.318543799772485,
+        "consensus_score": null,
+        "debt_to_equity": 0.05122894412815121
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Quality Compounder",
-      "cluster_label": "ai_infra"
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
       "ticker": "SNDK",
@@ -4885,6 +4404,52 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
+      "ticker": "NVDA",
+      "discovery_score": 10,
+      "adjusted_discovery_score": 10,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 19.8,
+        "revenue_decelerating": false,
+        "gross_margin": 74.15,
+        "analyst_upside_pct": 45.75744740928985,
+        "consensus_score": 3.75,
+        "debt_to_equity": 0.06555347514247419
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Quality Compounder",
+      "cluster_label": "ai_infra"
+    },
+    {
       "ticker": "NBIS",
       "discovery_score": 12,
       "adjusted_discovery_score": 10,
@@ -4933,96 +4498,52 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "WDC",
-      "discovery_score": 12,
+      "ticker": "AMAT",
+      "discovery_score": 10,
       "adjusted_discovery_score": 10,
-      "risk_penalty_pts": -2,
-      "primary_archetype": "Quality Compounder",
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
       "secondary_tags": [
         "Sector/RS Leader",
         "Above 50DMA"
       ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
-        "Quality Compounder"
+        "Speculative Theme"
       ],
       "discovery_signals": [
-        "revenue_yoy_gt_10pct",
         "gross_margin_positive",
         "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
         "consensus_not_negative",
         "outperforming_spy_1m",
-        "outperforming_sector_1m",
         "higher_lows"
       ],
       "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 10.61,
-        "revenue_decelerating": false,
-        "gross_margin": 45.43,
-        "analyst_upside_pct": -14.437724437724444,
-        "consensus_score": 3.7,
-        "debt_to_equity": 0.17809917355371901
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
-    },
-    {
-      "ticker": "CRWV",
-      "discovery_score": 10,
-      "adjusted_discovery_score": 10,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Quality Compounder",
-      "secondary_tags": [
-        "Above 50DMA",
-        "Breakout"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Quality Compounder"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "base_building_after_drawdown"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
         "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
-        "base_building_after_drawdown": 2
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
       },
-      "missing_data_fields": [],
+      "missing_data_fields": [
+        "revenue_growth_yoy"
+      ],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 32.2,
+        "revenue_growth_yoy": null,
         "revenue_decelerating": false,
-        "gross_margin": 69.38,
-        "analyst_upside_pct": 17.755196304849882,
-        "consensus_score": 3.52,
-        "debt_to_equity": 3.7476360579953774
+        "gross_margin": 48.96,
+        "analyst_upside_pct": 15.406536646183985,
+        "consensus_score": 3.79,
+        "debt_to_equity": 0.269982015140742
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Quality Compounder"
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
       "ticker": "VRT",
@@ -5070,53 +4591,6 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "ASTC",
-      "discovery_score": 10,
-      "adjusted_discovery_score": 10,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Growth Leader"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [
-        "analyst_price_target",
-        "gross_margin"
-      ],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 131.76,
-        "revenue_decelerating": false,
-        "gross_margin": null,
-        "analyst_upside_pct": null,
-        "consensus_score": 4.0,
-        "debt_to_equity": null
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader"
     },
     {
       "ticker": "AVAV",
@@ -5304,12 +4778,60 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "DIS",
+      "ticker": "CARR",
+      "discovery_score": 10,
+      "adjusted_discovery_score": 10,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_positive",
+        "consensus_not_negative",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_positive": 1,
+        "consensus_not_negative": 1,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 10.42,
+        "revenue_decelerating": false,
+        "gross_margin": 24.8,
+        "analyst_upside_pct": 5.683419445749182,
+        "consensus_score": 3.5,
+        "debt_to_equity": 0.9346565566458519
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "WDAY",
       "discovery_score": 10,
       "adjusted_discovery_score": 10,
       "risk_penalty_pts": 0,
       "primary_archetype": "Speculative Theme",
       "secondary_tags": [
+        "Sector/RS Leader",
         "Above 50DMA"
       ],
       "universe_bucket": "core_research",
@@ -5317,45 +4839,44 @@
         "Speculative Theme"
       ],
       "discovery_signals": [
-        "revenue_yoy_gt_5pct",
+        "revenue_yoy_positive",
         "gross_margin_positive",
         "debt_not_dangerous",
         "analyst_upside_gt_15pct",
         "consensus_not_negative",
-        "outperforming_sector_1m"
+        "outperforming_spy_1m"
       ],
       "discovery_signal_points": {
-        "revenue_yoy_gt_5pct": 2,
+        "revenue_yoy_positive": 1,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
         "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2
+        "outperforming_spy_1m": 3
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 6.55,
-        "revenue_decelerating": true,
-        "gross_margin": 37.16,
-        "analyst_upside_pct": 35.5909276701356,
-        "consensus_score": 3.56,
-        "debt_to_equity": 0.43564411082900983
+        "revenue_growth_yoy": 0.39,
+        "revenue_decelerating": false,
+        "gross_margin": 75.77,
+        "analyst_upside_pct": 24.33094994892749,
+        "consensus_score": 3.53,
+        "debt_to_equity": 0.569355080053868
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "SAP",
+      "ticker": "CCL",
       "discovery_score": 10,
       "adjusted_discovery_score": 10,
       "risk_penalty_pts": 0,
       "primary_archetype": "Speculative Theme",
       "secondary_tags": [
-        "Sector/RS Leader",
         "Above 50DMA"
       ],
       "universe_bucket": "core_research",
@@ -5380,12 +4901,12 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -1.33,
+        "revenue_growth_yoy": -2.61,
         "revenue_decelerating": false,
-        "gross_margin": 73.2,
-        "analyst_upside_pct": 114.40223341361944,
-        "consensus_score": 3.35,
-        "debt_to_equity": 0.0
+        "gross_margin": 37.55,
+        "analyst_upside_pct": 29.31712549159815,
+        "consensus_score": 3.55,
+        "debt_to_equity": 2.041823344332745
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -5395,54 +4916,7 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
     },
     {
-      "ticker": "TTWO",
-      "discovery_score": 10,
-      "adjusted_discovery_score": 10,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -1.13,
-        "revenue_decelerating": false,
-        "gross_margin": 57.23,
-        "analyst_upside_pct": 28.176598869553608,
-        "consensus_score": 3.79,
-        "debt_to_equity": 0.8426044603947705
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "VST",
+      "ticker": "MP",
       "discovery_score": 10,
       "adjusted_discovery_score": 10,
       "risk_penalty_pts": 0,
@@ -5457,25 +4931,27 @@
       "discovery_signals": [
         "revenue_yoy_gt_10pct",
         "gross_margin_positive",
+        "debt_not_dangerous",
         "analyst_upside_gt_15pct",
         "consensus_not_negative",
-        "outperforming_sector_1m"
+        "higher_lows"
       ],
       "discovery_signal_points": {
         "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
         "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2
+        "higher_lows": 1
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 99.06,
+        "revenue_growth_yoy": 28.18,
         "revenue_decelerating": false,
-        "gross_margin": 12.72,
-        "analyst_upside_pct": 42.54959634520309,
-        "consensus_score": 3.91,
-        "debt_to_equity": 3.5577988207968554
+        "gross_margin": 24.16,
+        "analyst_upside_pct": 24.49640816263407,
+        "consensus_score": 3.92,
+        "debt_to_equity": 0.44017661601893177
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -5485,97 +4961,47 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Quality Compounder"
     },
     {
-      "ticker": "B",
-      "discovery_score": 12,
+      "ticker": "CELH",
+      "discovery_score": 10,
       "adjusted_discovery_score": 10,
-      "risk_penalty_pts": -2,
+      "risk_penalty_pts": 0,
       "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
+      "secondary_tags": [],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
         "Speculative Theme"
       ],
       "discovery_signals": [
-        "revenue_decline_slowing",
+        "revenue_yoy_gt_5pct",
         "gross_margin_positive",
         "debt_not_dangerous",
         "analyst_upside_gt_15pct",
         "consensus_not_negative",
-        "outperforming_spy_1m",
         "outperforming_sector_1m"
       ],
       "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
+        "revenue_yoy_gt_5pct": 2,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
         "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
         "outperforming_sector_1m": 2
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -13.7,
+        "revenue_growth_yoy": 8.45,
         "revenue_decelerating": false,
-        "gross_margin": 53.35,
-        "analyst_upside_pct": 27.56515613993894,
-        "consensus_score": 3.68,
-        "debt_to_equity": 0.17286658213421652
+        "gross_margin": 49.62,
+        "analyst_upside_pct": 67.08685995557958,
+        "consensus_score": 3.87,
+        "debt_to_equity": 1.9474976054597117
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "EOG",
-      "discovery_score": 10,
-      "adjusted_discovery_score": 10,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
-      "secondary_tags": [],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Growth Leader"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_positive",
-        "consensus_not_negative",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_positive": 1,
-        "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 19.87,
-        "revenue_decelerating": false,
-        "gross_margin": 71.29,
-        "analyst_upside_pct": 11.553456290298394,
-        "consensus_score": 3.61,
-        "debt_to_equity": 0.26873301410638023
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct; archetype: Growth Leader"
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
     },
     {
       "ticker": "STLD",
@@ -5654,7 +5080,7 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 32.94,
+        "revenue_growth_yoy": 20.01,
         "revenue_decelerating": false,
         "gross_margin": 17.07,
         "analyst_upside_pct": 45.062649164677794,
@@ -5807,56 +5233,60 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
     },
     {
-      "ticker": "RKT",
-      "discovery_score": 10,
+      "ticker": "BB",
+      "discovery_score": 12,
       "adjusted_discovery_score": 10,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [],
+      "risk_penalty_pts": -2,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
-        "Speculative Theme"
+        "Quality Compounder"
       ],
       "discovery_signals": [
-        "revenue_yoy_gt_5pct",
+        "revenue_yoy_gt_10pct",
         "gross_margin_positive",
         "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
         "consensus_not_negative",
-        "outperforming_sector_1m"
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
       ],
       "discovery_signal_points": {
-        "revenue_yoy_gt_5pct": 2,
+        "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 9.65,
+        "revenue_growth_yoy": 10.8,
         "revenue_decelerating": false,
-        "gross_margin": 90.17,
-        "analyst_upside_pct": 49.171385024930856,
-        "consensus_score": 3.16,
-        "debt_to_equity": 1.3636246233318985
+        "gross_margin": 75.82,
+        "analyst_upside_pct": -10.480349344978174,
+        "consensus_score": 3.14,
+        "debt_to_equity": 0.2886058981233244
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
-      "ticker": "VOYG",
-      "discovery_score": 10,
+      "ticker": "EL",
+      "discovery_score": 12,
       "adjusted_discovery_score": 10,
-      "risk_penalty_pts": 0,
+      "risk_penalty_pts": -2,
       "primary_archetype": "Speculative Theme",
       "secondary_tags": [
-        "Sector/RS Leader",
         "Above 50DMA"
       ],
       "universe_bucket": "core_research",
@@ -5864,30 +5294,31 @@
         "Speculative Theme"
       ],
       "discovery_signals": [
+        "revenue_decline_slowing",
+        "gross_margin_positive",
+        "debt_not_dangerous",
         "analyst_upside_gt_15pct",
         "consensus_not_negative",
         "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
+        "outperforming_sector_1m"
       ],
       "discovery_signal_points": {
+        "revenue_decline_slowing": 1,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
         "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
         "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
+        "outperforming_sector_1m": 2
       },
-      "missing_data_fields": [
-        "gross_margin",
-        "revenue_growth_yoy"
-      ],
+      "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": null,
+        "revenue_growth_yoy": -12.41,
         "revenue_decelerating": false,
-        "gross_margin": null,
-        "analyst_upside_pct": 20.0,
-        "consensus_score": 3.83,
-        "debt_to_equity": null
+        "gross_margin": 73.4,
+        "analyst_upside_pct": 18.53554941643344,
+        "consensus_score": 3.39,
+        "debt_to_equity": 2.329075882794891
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -5895,6 +5326,145 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "LFUS",
+      "discovery_score": 10,
+      "adjusted_discovery_score": 10,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 10.61,
+        "revenue_decelerating": false,
+        "gross_margin": 38.29,
+        "analyst_upside_pct": -6.772396056579516,
+        "consensus_score": 3.5,
+        "debt_to_equity": 0.06746248305532397
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "AMBA",
+      "discovery_score": 10,
+      "adjusted_discovery_score": 10,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_decline_slowing",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "outperforming_spy_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_decline_slowing": 1,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [
+        "analyst_consensus"
+      ],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": -0.51,
+        "revenue_decelerating": false,
+        "gross_margin": 58.82,
+        "analyst_upside_pct": 46.136146500108225,
+        "consensus_score": null,
+        "debt_to_equity": 0.021905918939351423
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "Q",
+      "discovery_score": 10,
+      "adjusted_discovery_score": 10,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 10.5,
+        "revenue_decelerating": false,
+        "gross_margin": 41.97,
+        "analyst_upside_pct": 1.7772687547129271,
+        "consensus_score": 4.0,
+        "debt_to_equity": 0.559838575006958
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
       "ticker": "PAYX",
@@ -5925,7 +5495,7 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 19.87,
+        "revenue_growth_yoy": 16.13,
         "revenue_decelerating": false,
         "gross_margin": 73.93,
         "analyst_upside_pct": 15.632089090534127,
@@ -5940,9 +5510,333 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Quality Compounder"
     },
     {
-      "ticker": "OVV",
+      "ticker": "ARGX",
       "discovery_score": 10,
       "adjusted_discovery_score": 10,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_decline_slowing",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m"
+      ],
+      "discovery_signal_points": {
+        "revenue_decline_slowing": 1,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 0.0,
+        "revenue_decelerating": false,
+        "gross_margin": 89.0,
+        "analyst_upside_pct": 26.91539372480532,
+        "consensus_score": 3.89,
+        "debt_to_equity": 0.011400512101795632
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "M",
+      "discovery_score": 12,
+      "adjusted_discovery_score": 10,
+      "risk_penalty_pts": -2,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 61.12,
+        "revenue_decelerating": false,
+        "gross_margin": 36.55,
+        "analyst_upside_pct": -15.059687786960518,
+        "consensus_score": 3.15,
+        "debt_to_equity": 1.0707818930041153
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "IFF",
+      "discovery_score": 10,
+      "adjusted_discovery_score": 10,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [
+        "revenue_growth_yoy"
+      ],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": null,
+        "revenue_decelerating": false,
+        "gross_margin": 36.35,
+        "analyst_upside_pct": 15.884286653517421,
+        "consensus_score": 3.7,
+        "debt_to_equity": 0.4119688385269122
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "RKLB",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [
+        "analyst_consensus",
+        "analyst_price_target",
+        "gross_margin"
+      ],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 11.52,
+        "revenue_decelerating": false,
+        "gross_margin": null,
+        "analyst_upside_pct": null,
+        "consensus_score": null,
+        "debt_to_equity": null
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader"
+    },
+    {
+      "ticker": "ONDS",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [
+        "analyst_consensus",
+        "analyst_price_target",
+        "gross_margin"
+      ],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 66.46,
+        "revenue_decelerating": false,
+        "gross_margin": null,
+        "analyst_upside_pct": null,
+        "consensus_score": null,
+        "debt_to_equity": null
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader"
+    },
+    {
+      "ticker": "APP",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [
+        "analyst_consensus",
+        "analyst_price_target",
+        "gross_margin"
+      ],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 11.13,
+        "revenue_decelerating": false,
+        "gross_margin": null,
+        "analyst_upside_pct": null,
+        "consensus_score": null,
+        "debt_to_equity": null
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader"
+    },
+    {
+      "ticker": "WDC",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [
+        "analyst_consensus",
+        "analyst_price_target",
+        "gross_margin"
+      ],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 10.61,
+        "revenue_decelerating": false,
+        "gross_margin": null,
+        "analyst_upside_pct": null,
+        "consensus_score": null,
+        "debt_to_equity": null
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader"
+    },
+    {
+      "ticker": "PDD",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
       "risk_penalty_pts": 0,
       "primary_archetype": "Growth Leader",
       "secondary_tags": [],
@@ -5955,25 +5849,23 @@
         "gross_margin_positive",
         "debt_not_dangerous",
         "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "higher_lows"
+        "consensus_not_negative"
       ],
       "discovery_signal_points": {
         "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
         "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "higher_lows": 1
+        "consensus_not_negative": 1
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 22.2,
-        "revenue_decelerating": false,
-        "gross_margin": 47.04,
-        "analyst_upside_pct": 17.326909350463957,
-        "consensus_score": 3.77,
-        "debt_to_equity": 0.6659456653400242
+        "revenue_growth_yoy": 10.36,
+        "revenue_decelerating": true,
+        "gross_margin": 55.98,
+        "analyst_upside_pct": 39.00365954432772,
+        "consensus_score": 3.46,
+        "debt_to_equity": 0.012096536327526882
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -5981,148 +5873,6 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
-    },
-    {
-      "ticker": "ROIV",
-      "discovery_score": 10,
-      "adjusted_discovery_score": 10,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [
-        "gross_margin",
-        "revenue_growth_yoy"
-      ],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": null,
-        "revenue_decelerating": false,
-        "gross_margin": null,
-        "analyst_upside_pct": 23.81745502998002,
-        "consensus_score": 3.93,
-        "debt_to_equity": null
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "IOT",
-      "discovery_score": 10,
-      "adjusted_discovery_score": 10,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Sector/RS Leader",
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_spy_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_spy_1m": 3,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [
-        "revenue_growth_yoy"
-      ],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": null,
-        "revenue_decelerating": false,
-        "gross_margin": 76.74,
-        "analyst_upside_pct": 30.318543799772485,
-        "consensus_score": 3.78,
-        "debt_to_equity": 0.05122894412815121
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct,outperforming_spy_1m; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "BROS",
-      "discovery_score": 10,
-      "adjusted_discovery_score": 10,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_positive",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_sector_1m",
-        "higher_lows"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_positive": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 4.69,
-        "revenue_decelerating": false,
-        "gross_margin": 25.18,
-        "analyst_upside_pct": 29.31928127159639,
-        "consensus_score": 3.95,
-        "debt_to_equity": 1.6661272605876989
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
     },
     {
       "ticker": "TMO",
@@ -6299,223 +6049,92 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
     },
     {
-      "ticker": "UBER",
+      "ticker": "BA",
       "discovery_score": 9,
       "adjusted_discovery_score": 9,
       "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
-      "secondary_tags": [],
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
       "universe_bucket": "core_research",
       "matched_position_archetypes": [
-        "Growth Leader"
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_decline_slowing",
+        "gross_margin_positive",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_decline_slowing": 1,
+        "gross_margin_positive": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": -7.23,
+        "revenue_decelerating": false,
+        "gross_margin": 4.79,
+        "analyst_upside_pct": 21.080133704397028,
+        "consensus_score": 3.57,
+        "debt_to_equity": 7.885251377985636
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "MS",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
       ],
       "discovery_signals": [
         "revenue_yoy_gt_10pct",
         "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative"
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "higher_lows"
       ],
       "discovery_signal_points": {
         "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 14.48,
-        "revenue_decelerating": true,
-        "gross_margin": 41.03,
-        "analyst_upside_pct": 44.9002687791767,
-        "consensus_score": 3.84,
-        "debt_to_equity": 0.6418326532261323
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
-    },
-    {
-      "ticker": "AXP",
-      "discovery_score": 9,
-      "adjusted_discovery_score": 9,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
         "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2
+        "outperforming_spy_1m": 3,
+        "higher_lows": 1
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -0.77,
+        "revenue_growth_yoy": 14.86,
         "revenue_decelerating": false,
-        "gross_margin": 83.5,
-        "analyst_upside_pct": 18.409327898378987,
-        "consensus_score": 3.3,
-        "debt_to_equity": 1.7779673481394322
+        "gross_margin": 57.99,
+        "analyst_upside_pct": -2.403846153846154,
+        "consensus_score": 3.54,
+        "debt_to_equity": 3.4495388761528094
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "NKE",
-      "discovery_score": 9,
-      "adjusted_discovery_score": 9,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Above 50DMA"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -9.24,
-        "revenue_decelerating": false,
-        "gross_margin": 40.81,
-        "analyst_upside_pct": 48.585935911908045,
-        "consensus_score": 3.48,
-        "debt_to_equity": 0.7933286018452803
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "FUTU",
-      "discovery_score": 9,
-      "adjusted_discovery_score": 9,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [
-        "Breakout"
-      ],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "base_building_after_drawdown"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "base_building_after_drawdown": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -9.11,
-        "revenue_decelerating": false,
-        "gross_margin": 87.74,
-        "analyst_upside_pct": 58.73684210526315,
-        "consensus_score": 3.5,
-        "debt_to_equity": 0.5463696241087675
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "RTX",
-      "discovery_score": 9,
-      "adjusted_discovery_score": 9,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Speculative Theme",
-      "secondary_tags": [],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Speculative Theme"
-      ],
-      "discovery_signals": [
-        "revenue_decline_slowing",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative",
-        "outperforming_sector_1m"
-      ],
-      "discovery_signal_points": {
-        "revenue_decline_slowing": 1,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1,
-        "outperforming_sector_1m": 2
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -8.92,
-        "revenue_decelerating": false,
-        "gross_margin": 20.21,
-        "analyst_upside_pct": 25.496651785714285,
-        "consensus_score": 3.65,
-        "debt_to_equity": 0.5874321062160531
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder"
     },
     {
       "ticker": "DE",
@@ -6739,7 +6358,7 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
     },
     {
-      "ticker": "CARR",
+      "ticker": "CVNA",
       "discovery_score": 9,
       "adjusted_discovery_score": 9,
       "risk_penalty_pts": 0,
@@ -6755,35 +6374,83 @@
         "revenue_yoy_gt_10pct",
         "gross_margin_positive",
         "debt_not_dangerous",
-        "analyst_upside_positive",
-        "outperforming_sector_1m",
-        "higher_lows"
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative"
       ],
       "discovery_signal_points": {
         "revenue_yoy_gt_10pct": 3,
         "gross_margin_positive": 1,
         "debt_not_dangerous": 1,
-        "analyst_upside_positive": 1,
-        "outperforming_sector_1m": 2,
-        "higher_lows": 1
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1
       },
-      "missing_data_fields": [
-        "analyst_consensus"
-      ],
+      "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 10.42,
+        "revenue_growth_yoy": 14.8,
         "revenue_decelerating": false,
-        "gross_margin": 24.8,
-        "analyst_upside_pct": 5.683419445749182,
-        "consensus_score": null,
-        "debt_to_equity": 0.9346565566458519
+        "gross_margin": 19.97,
+        "analyst_upside_pct": 446.448087431694,
+        "consensus_score": 3.38,
+        "debt_to_equity": 0.16693548387096774
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
       "position_research_universe_member": true,
       "active_trading_universe_member": false,
       "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct; archetype: Quality Compounder"
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "AXTI",
+      "discovery_score": 14,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": -5,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA",
+        "Breakout"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "consensus_not_negative",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows",
+        "base_building_after_drawdown"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "consensus_not_negative": 1,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1,
+        "base_building_after_drawdown": 2
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 16.85,
+        "revenue_decelerating": false,
+        "gross_margin": 21.34,
+        "analyst_upside_pct": -48.34894036471169,
+        "consensus_score": 3.64,
+        "debt_to_equity": 0.25531698159884164
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Quality Compounder",
+      "cluster_label": "ai_infra"
     },
     {
       "ticker": "CEG",
@@ -6812,7 +6479,7 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 63.85,
+        "revenue_growth_yoy": 103.7,
         "revenue_decelerating": false,
         "gross_margin": 77.92,
         "analyst_upside_pct": 35.906587874200554,
@@ -6827,7 +6494,7 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
     },
     {
-      "ticker": "VRTX",
+      "ticker": "DIS",
       "discovery_score": 9,
       "adjusted_discovery_score": 9,
       "risk_penalty_pts": 0,
@@ -6857,12 +6524,12 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": -7.44,
+        "revenue_growth_yoy": -3.13,
         "revenue_decelerating": false,
-        "gross_margin": 86.28,
-        "analyst_upside_pct": 23.77217678866692,
-        "consensus_score": 3.86,
-        "debt_to_equity": 0.10259840201633104
+        "gross_margin": 37.16,
+        "analyst_upside_pct": 35.5909276701356,
+        "consensus_score": 3.56,
+        "debt_to_equity": 0.43564411082900983
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -6870,47 +6537,6 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
-    },
-    {
-      "ticker": "CME",
-      "discovery_score": 9,
-      "adjusted_discovery_score": 9,
-      "risk_penalty_pts": 0,
-      "primary_archetype": "Growth Leader",
-      "secondary_tags": [],
-      "universe_bucket": "core_research",
-      "matched_position_archetypes": [
-        "Growth Leader"
-      ],
-      "discovery_signals": [
-        "revenue_yoy_gt_10pct",
-        "gross_margin_positive",
-        "debt_not_dangerous",
-        "analyst_upside_gt_15pct",
-        "consensus_not_negative"
-      ],
-      "discovery_signal_points": {
-        "revenue_yoy_gt_10pct": 3,
-        "gross_margin_positive": 1,
-        "debt_not_dangerous": 1,
-        "analyst_upside_gt_15pct": 3,
-        "consensus_not_negative": 1
-      },
-      "missing_data_fields": [],
-      "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 14.04,
-        "revenue_decelerating": false,
-        "gross_margin": 86.34,
-        "analyst_upside_pct": 17.007672634271103,
-        "consensus_score": 3.23,
-        "debt_to_equity": 0.12860373729252916
-      },
-      "universe_source": "position_research",
-      "scanner_tier": "D",
-      "position_research_universe_member": true,
-      "active_trading_universe_member": false,
-      "priority_overlap": false,
-      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
     },
     {
       "ticker": "ICE",
@@ -6939,12 +6565,53 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 16.75,
+        "revenue_growth_yoy": 13.53,
         "revenue_decelerating": false,
         "gross_margin": 68.98,
         "analyst_upside_pct": 32.8576259722692,
         "consensus_score": 3.92,
         "debt_to_equity": 0.709864014613355
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
+    },
+    {
+      "ticker": "CME",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 14.48,
+        "revenue_decelerating": false,
+        "gross_margin": 86.34,
+        "analyst_upside_pct": 17.007672634271103,
+        "consensus_score": 3.23,
+        "debt_to_equity": 0.12860373729252916
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -6997,6 +6664,88 @@
       "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
     },
     {
+      "ticker": "MRSH",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 15.19,
+        "revenue_decelerating": false,
+        "gross_margin": 42.37,
+        "analyst_upside_pct": 26.648746639994997,
+        "consensus_score": 3.35,
+        "debt_to_equity": 1.541011737250326
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
+    },
+    {
+      "ticker": "LOW",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 12.12,
+        "revenue_decelerating": false,
+        "gross_margin": 33.8,
+        "analyst_upside_pct": 30.15384615384616,
+        "consensus_score": 3.59,
+        "debt_to_equity": -4.588996763754046
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
+    },
+    {
       "ticker": "MCO",
       "discovery_score": 9,
       "adjusted_discovery_score": 9,
@@ -7040,7 +6789,100 @@
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Quality Compounder"
     },
     {
-      "ticker": "TTD",
+      "ticker": "USAR",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [
+        "Sector/RS Leader",
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "outperforming_spy_1m",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "outperforming_spy_1m": 3,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [
+        "analyst_consensus",
+        "analyst_price_target",
+        "gross_margin"
+      ],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 246.8,
+        "revenue_decelerating": false,
+        "gross_margin": null,
+        "analyst_upside_pct": null,
+        "consensus_score": null,
+        "debt_to_equity": null
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,outperforming_spy_1m; archetype: Growth Leader"
+    },
+    {
+      "ticker": "APO",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_sector_1m",
+        "higher_lows"
+      ],
+      "discovery_signal_points": {
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_sector_1m": 2,
+        "higher_lows": 1
+      },
+      "missing_data_fields": [
+        "revenue_growth_yoy"
+      ],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": null,
+        "revenue_decelerating": false,
+        "gross_margin": 89.33,
+        "analyst_upside_pct": 27.674617356848728,
+        "consensus_score": 3.82,
+        "debt_to_equity": 0.7127462282592352
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
+    },
+    {
+      "ticker": "IDXX",
       "discovery_score": 9,
       "adjusted_discovery_score": 9,
       "risk_penalty_pts": 0,
@@ -7066,12 +6908,12 @@
       },
       "missing_data_fields": [],
       "pru_fmp_snapshot": {
-        "revenue_growth_yoy": 11.82,
-        "revenue_decelerating": true,
-        "gross_margin": 77.83,
-        "analyst_upside_pct": 38.914656771799635,
-        "consensus_score": 3.43,
-        "debt_to_equity": 0.17264211004260877
+        "revenue_growth_yoy": 14.26,
+        "revenue_decelerating": false,
+        "gross_margin": 62.05,
+        "analyst_upside_pct": 32.645999325679206,
+        "consensus_score": 3.55,
+        "debt_to_equity": 0.6931404926280587
       },
       "universe_source": "position_research",
       "scanner_tier": "D",
@@ -7079,6 +6921,137 @@
       "active_trading_universe_member": false,
       "priority_overlap": false,
       "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
+    },
+    {
+      "ticker": "HUBS",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Growth Leader",
+      "secondary_tags": [],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Growth Leader"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 23.36,
+        "revenue_decelerating": true,
+        "gross_margin": 83.65,
+        "analyst_upside_pct": 27.887492734174845,
+        "consensus_score": 3.79,
+        "debt_to_equity": 0.12384489027334007
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct,analyst_upside_gt_15pct; archetype: Growth Leader"
+    },
+    {
+      "ticker": "ADP",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Quality Compounder",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Quality Compounder"
+      ],
+      "discovery_signals": [
+        "revenue_yoy_gt_10pct",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_positive",
+        "consensus_not_negative",
+        "outperforming_sector_1m"
+      ],
+      "discovery_signal_points": {
+        "revenue_yoy_gt_10pct": 3,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_positive": 1,
+        "consensus_not_negative": 1,
+        "outperforming_sector_1m": 2
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": 10.82,
+        "revenue_decelerating": false,
+        "gross_margin": 47.48,
+        "analyst_upside_pct": 9.82239451857194,
+        "consensus_score": 3.08,
+        "debt_to_equity": 0.6263365931245177
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: revenue_yoy_gt_10pct; archetype: Quality Compounder"
+    },
+    {
+      "ticker": "GD",
+      "discovery_score": 9,
+      "adjusted_discovery_score": 9,
+      "risk_penalty_pts": 0,
+      "primary_archetype": "Speculative Theme",
+      "secondary_tags": [
+        "Above 50DMA"
+      ],
+      "universe_bucket": "core_research",
+      "matched_position_archetypes": [
+        "Speculative Theme"
+      ],
+      "discovery_signals": [
+        "revenue_decline_slowing",
+        "gross_margin_positive",
+        "debt_not_dangerous",
+        "analyst_upside_gt_15pct",
+        "consensus_not_negative",
+        "outperforming_sector_1m"
+      ],
+      "discovery_signal_points": {
+        "revenue_decline_slowing": 1,
+        "gross_margin_positive": 1,
+        "debt_not_dangerous": 1,
+        "analyst_upside_gt_15pct": 3,
+        "consensus_not_negative": 1,
+        "outperforming_sector_1m": 2
+      },
+      "missing_data_fields": [],
+      "pru_fmp_snapshot": {
+        "revenue_growth_yoy": -6.25,
+        "revenue_decelerating": false,
+        "gross_margin": 15.24,
+        "analyst_upside_pct": 20.138113429327056,
+        "consensus_score": 3.47,
+        "debt_to_equity": 0.30729705893630893
+      },
+      "universe_source": "position_research",
+      "scanner_tier": "D",
+      "position_research_universe_member": true,
+      "active_trading_universe_member": false,
+      "priority_overlap": false,
+      "universe_entry_reason": "strong: analyst_upside_gt_15pct; archetype: Speculative Theme"
     }
   ]
 }

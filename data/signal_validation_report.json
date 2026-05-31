@@ -1,11 +1,11 @@
 {
   "meta": {
-    "generated_at": "2026-05-20T06:32:01.976571+00:00",
+    "generated_at": "2026-05-31T19:55:41.951196+00:00",
     "source_file": "data/training_records.jsonl",
-    "total_records": 453,
-    "eligible_records": 406,
-    "ineligible_excluded": 47,
-    "usable_records": 177,
+    "total_records": 485,
+    "eligible_records": 428,
+    "ineligible_excluded": 57,
+    "usable_records": 199,
     "eligible_missing_scores": 229,
     "dimensions_tested": [
       "analyst_revision",
@@ -34,129 +34,129 @@
     "analyst_revision": {
       "ic": 0.0,
       "p_value": 1.0,
-      "ci_lo": -0.1597,
-      "ci_hi": 0.1597,
-      "n": 151,
+      "ci_lo": -0.1492,
+      "ci_hi": 0.1492,
+      "n": 173,
       "flag": "NOISE"
     },
     "breakout": {
-      "ic": -0.0669,
-      "p_value": 0.3762,
-      "ci_lo": -0.2123,
-      "ci_hi": 0.0814,
-      "n": 177,
+      "ic": -0.026,
+      "p_value": 0.7151,
+      "ci_lo": -0.1645,
+      "ci_hi": 0.1135,
+      "n": 199,
       "flag": "NEGATIVE"
     },
     "catalyst": {
       "ic": 0.0,
       "p_value": 1.0,
-      "ci_lo": -0.1533,
-      "ci_hi": 0.1533,
-      "n": 164,
+      "ci_lo": -0.1439,
+      "ci_hi": 0.1439,
+      "n": 186,
       "flag": "NOISE"
     },
     "flow": {
-      "ic": -0.1177,
-      "p_value": 0.1186,
-      "ci_lo": -0.2607,
-      "ci_hi": 0.0303,
-      "n": 177,
+      "ic": -0.1025,
+      "p_value": 0.1496,
+      "ci_lo": -0.2382,
+      "ci_hi": 0.0371,
+      "n": 199,
       "flag": "NEGATIVE"
     },
     "insider_buying": {
-      "ic": -0.0719,
-      "p_value": 0.3802,
-      "ci_lo": -0.229,
-      "ci_hi": 0.0888,
-      "n": 151,
+      "ic": -0.0743,
+      "p_value": 0.3311,
+      "ci_lo": -0.2211,
+      "ci_hi": 0.0757,
+      "n": 173,
       "flag": "NEGATIVE"
     },
     "iv_skew": {
-      "ic": -0.0032,
-      "p_value": 0.9661,
-      "ci_lo": -0.1511,
-      "ci_hi": 0.1448,
-      "n": 176,
-      "flag": "NEGATIVE"
+      "ic": 0.0011,
+      "p_value": 0.9877,
+      "ci_lo": -0.1384,
+      "ci_hi": 0.1405,
+      "n": 198,
+      "flag": "NOISE"
     },
     "momentum": {
-      "ic": -0.013,
-      "p_value": 0.8637,
-      "ci_lo": -0.1602,
-      "ci_hi": 0.1348,
-      "n": 177,
+      "ic": -0.0263,
+      "p_value": 0.7128,
+      "ci_lo": -0.1647,
+      "ci_hi": 0.1132,
+      "n": 199,
       "flag": "NEGATIVE"
     },
     "mtf": {
-      "ic": -0.1221,
-      "p_value": 0.1054,
-      "ci_lo": -0.2648,
-      "ci_hi": 0.0259,
-      "n": 177,
+      "ic": -0.0921,
+      "p_value": 0.1957,
+      "ci_lo": -0.2283,
+      "ci_hi": 0.0476,
+      "n": 199,
       "flag": "NEGATIVE"
     },
     "news": {
-      "ic": -0.0231,
-      "p_value": 0.7604,
-      "ci_lo": -0.17,
-      "ci_hi": 0.1249,
-      "n": 177,
+      "ic": -0.0219,
+      "p_value": 0.7586,
+      "ci_lo": -0.1605,
+      "ci_hi": 0.1175,
+      "n": 199,
       "flag": "NEGATIVE"
     },
     "overnight_drift": {
-      "ic": -0.1988,
-      "p_value": 0.0093,
-      "ci_lo": -0.3392,
-      "ci_hi": -0.0498,
-      "n": 170,
+      "ic": -0.1611,
+      "p_value": 0.0256,
+      "ci_lo": -0.296,
+      "ci_hi": -0.02,
+      "n": 192,
       "flag": "NEGATIVE"
     },
     "pead": {
       "ic": 0.0,
       "p_value": 1.0,
-      "ci_lo": -0.1479,
-      "ci_hi": 0.1479,
-      "n": 176,
+      "ci_lo": -0.1394,
+      "ci_hi": 0.1394,
+      "n": 198,
       "flag": "NOISE"
     },
     "reversion": {
-      "ic": -0.0978,
-      "p_value": 0.1952,
-      "ci_lo": -0.2418,
-      "ci_hi": 0.0504,
-      "n": 177,
+      "ic": -0.0741,
+      "p_value": 0.2982,
+      "ci_lo": -0.211,
+      "ci_hi": 0.0657,
+      "n": 199,
       "flag": "NEGATIVE"
     },
     "short_squeeze": {
-      "ic": -0.1035,
-      "p_value": 0.1718,
-      "ci_lo": -0.2476,
-      "ci_hi": 0.0451,
-      "n": 176,
+      "ic": -0.0681,
+      "p_value": 0.3405,
+      "ci_lo": -0.2056,
+      "ci_hi": 0.072,
+      "n": 198,
       "flag": "NEGATIVE"
     },
     "social": {
-      "ic": -0.0095,
-      "p_value": 0.8999,
-      "ci_lo": -0.1568,
-      "ci_hi": 0.1382,
-      "n": 177,
+      "ic": -0.0073,
+      "p_value": 0.918,
+      "ci_lo": -0.1463,
+      "ci_hi": 0.1319,
+      "n": 199,
       "flag": "NEGATIVE"
     },
     "squeeze": {
-      "ic": 0.1002,
-      "p_value": 0.1845,
-      "ci_lo": -0.048,
-      "ci_hi": 0.2441,
-      "n": 177,
+      "ic": 0.0919,
+      "p_value": 0.1966,
+      "ci_lo": -0.0478,
+      "ci_hi": 0.2281,
+      "n": 199,
       "flag": "MARGINAL"
     },
     "trend": {
-      "ic": -0.0013,
-      "p_value": 0.9859,
-      "ci_lo": -0.1488,
-      "ci_hi": 0.1462,
-      "n": 177,
+      "ic": -0.0033,
+      "p_value": 0.9629,
+      "ci_lo": -0.1423,
+      "ci_hi": 0.1358,
+      "n": 199,
       "flag": "NEGATIVE"
     }
   },
@@ -169,8 +169,8 @@
           0.0
         ],
         "mean_score": 0.0,
-        "mean_pnl_pct": 0.1303,
-        "n": 151
+        "mean_pnl_pct": 0.116,
+        "n": 173
       }
     ],
     "breakout": [
@@ -178,11 +178,11 @@
         "bucket": 5,
         "score_range": [
           0.0,
-          10.0
+          13.0
         ],
-        "mean_score": 0.62,
-        "mean_pnl_pct": 0.0857,
-        "n": 177
+        "mean_score": 0.88,
+        "mean_pnl_pct": 0.0783,
+        "n": 199
       }
     ],
     "catalyst": [
@@ -193,8 +193,8 @@
           0.0
         ],
         "mean_score": 0.0,
-        "mean_pnl_pct": 0.1198,
-        "n": 164
+        "mean_pnl_pct": 0.1078,
+        "n": 186
       }
     ],
     "flow": [
@@ -212,11 +212,11 @@
         "bucket": 2,
         "score_range": [
           4.0,
-          5.4
+          6.0
         ],
-        "mean_score": 4.21,
-        "mean_pnl_pct": 0.29,
-        "n": 58
+        "mean_score": 4.2,
+        "mean_pnl_pct": 0.2846,
+        "n": 59
       },
       {
         "bucket": 4,
@@ -225,8 +225,8 @@
           8.0
         ],
         "mean_score": 6.0,
-        "mean_pnl_pct": -0.0442,
-        "n": 51
+        "mean_pnl_pct": -0.035,
+        "n": 57
       },
       {
         "bucket": 5,
@@ -234,31 +234,21 @@
           8.0,
           10.0
         ],
-        "mean_score": 8.8,
-        "mean_pnl_pct": -0.0016,
-        "n": 55
+        "mean_score": 8.89,
+        "mean_pnl_pct": 0.0012,
+        "n": 70
       }
     ],
     "insider_buying": [
       {
-        "bucket": 2,
-        "score_range": [
-          0.0,
-          6.0
-        ],
-        "mean_score": 0.17,
-        "mean_pnl_pct": 0.0009,
-        "n": 53
-      },
-      {
         "bucket": 3,
         "score_range": [
-          6.0,
+          0.0,
           8.0
         ],
-        "mean_score": 6.31,
-        "mean_pnl_pct": 0.0182,
-        "n": 13
+        "mean_score": 1.03,
+        "mean_pnl_pct": 0.0078,
+        "n": 88
       },
       {
         "bucket": 5,
@@ -278,9 +268,9 @@
           0.0,
           4.0
         ],
-        "mean_score": 0.31,
-        "mean_pnl_pct": 0.1155,
-        "n": 127
+        "mean_score": 0.26,
+        "mean_pnl_pct": 0.1011,
+        "n": 149
       },
       {
         "bucket": 5,
@@ -298,14 +288,24 @@
         "bucket": 1,
         "score_range": [
           0.0,
-          6.0
+          4.0
         ],
-        "mean_score": 2.48,
-        "mean_pnl_pct": -0.0513,
-        "n": 21
+        "mean_score": 0.64,
+        "mean_pnl_pct": 0.0321,
+        "n": 36
       },
       {
         "bucket": 2,
+        "score_range": [
+          4.0,
+          6.0
+        ],
+        "mean_score": 4.14,
+        "mean_pnl_pct": -0.2617,
+        "n": 7
+      },
+      {
+        "bucket": 3,
         "score_range": [
           6.0,
           7.0
@@ -315,24 +315,14 @@
         "n": 47
       },
       {
-        "bucket": 3,
-        "score_range": [
-          7.0,
-          8.0
-        ],
-        "mean_score": 7.0,
-        "mean_pnl_pct": -0.0947,
-        "n": 37
-      },
-      {
         "bucket": 4,
         "score_range": [
-          8.0,
+          7.0,
           10.0
         ],
-        "mean_score": 8.0,
-        "mean_pnl_pct": 0.0036,
-        "n": 29
+        "mean_score": 7.44,
+        "mean_pnl_pct": -0.0515,
+        "n": 66
       },
       {
         "bucket": 5,
@@ -350,21 +340,11 @@
         "bucket": 1,
         "score_range": [
           0.0,
-          6.0
-        ],
-        "mean_score": 0.0,
-        "mean_pnl_pct": 0.0435,
-        "n": 20
-      },
-      {
-        "bucket": 2,
-        "score_range": [
-          6.0,
           7.0
         ],
-        "mean_score": 6.0,
-        "mean_pnl_pct": -0.0055,
-        "n": 17
+        "mean_score": 2.76,
+        "mean_pnl_pct": 0.021,
+        "n": 37
       },
       {
         "bucket": 3,
@@ -377,14 +357,24 @@
         "n": 58
       },
       {
-        "bucket": 5,
+        "bucket": 4,
         "score_range": [
           10.0,
           13.0
         ],
-        "mean_score": 11.02,
-        "mean_pnl_pct": 0.2396,
-        "n": 82
+        "mean_score": 10.0,
+        "mean_pnl_pct": 0.0041,
+        "n": 57
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          13.0,
+          13.0
+        ],
+        "mean_score": 13.0,
+        "mean_pnl_pct": 0.4217,
+        "n": 47
       }
     ],
     "news": [
@@ -394,29 +384,29 @@
           0.0,
           3.0
         ],
-        "mean_score": 0.39,
-        "mean_pnl_pct": 0.0082,
-        "n": 103
+        "mean_score": 0.41,
+        "mean_pnl_pct": 0.0076,
+        "n": 112
       },
       {
         "bucket": 4,
         "score_range": [
           3.0,
-          5.0
+          6.0
         ],
-        "mean_score": 3.52,
-        "mean_pnl_pct": -0.1346,
-        "n": 31
+        "mean_score": 3.87,
+        "mean_pnl_pct": -0.0886,
+        "n": 45
       },
       {
         "bucket": 5,
         "score_range": [
-          5.0,
+          6.0,
           10.0
         ],
-        "mean_score": 6.58,
-        "mean_pnl_pct": 0.4303,
-        "n": 43
+        "mean_score": 6.95,
+        "mean_pnl_pct": 0.4455,
+        "n": 42
       }
     ],
     "overnight_drift": [
@@ -424,31 +414,31 @@
         "bucket": 1,
         "score_range": [
           0.0,
-          3.0
+          2.0
         ],
-        "mean_score": 1.2,
-        "mean_pnl_pct": -0.0063,
-        "n": 25
+        "mean_score": 0.22,
+        "mean_pnl_pct": 0.0112,
+        "n": 36
       },
       {
         "bucket": 2,
         "score_range": [
-          3.0,
-          6.0
+          2.0,
+          5.0
         ],
-        "mean_score": 4.19,
-        "mean_pnl_pct": 0.0044,
-        "n": 32
+        "mean_score": 2.54,
+        "mean_pnl_pct": -0.0068,
+        "n": 24
       },
       {
         "bucket": 3,
         "score_range": [
-          6.0,
+          5.0,
           8.0
         ],
-        "mean_score": 6.0,
-        "mean_pnl_pct": -0.0007,
-        "n": 17
+        "mean_score": 5.47,
+        "mean_pnl_pct": 0.0037,
+        "n": 36
       },
       {
         "bucket": 4,
@@ -479,8 +469,8 @@
           0.0
         ],
         "mean_score": 0.0,
-        "mean_pnl_pct": 0.084,
-        "n": 176
+        "mean_pnl_pct": 0.0767,
+        "n": 198
       }
     ],
     "reversion": [
@@ -490,9 +480,9 @@
           0.0,
           9.0
         ],
-        "mean_score": 0.16,
-        "mean_pnl_pct": 0.0857,
-        "n": 177
+        "mean_score": 0.15,
+        "mean_pnl_pct": 0.0783,
+        "n": 199
       }
     ],
     "short_squeeze": [
@@ -503,8 +493,8 @@
           3.0
         ],
         "mean_score": 0.05,
-        "mean_pnl_pct": 0.084,
-        "n": 176
+        "mean_pnl_pct": 0.0767,
+        "n": 198
       }
     ],
     "social": [
@@ -515,8 +505,8 @@
           1.0
         ],
         "mean_score": 0.0,
-        "mean_pnl_pct": -0.0437,
-        "n": 102
+        "mean_pnl_pct": -0.0382,
+        "n": 113
       },
       {
         "bucket": 5,
@@ -525,30 +515,20 @@
           1.0
         ],
         "mean_score": 1.0,
-        "mean_pnl_pct": 0.2617,
-        "n": 75
+        "mean_pnl_pct": 0.2313,
+        "n": 86
       }
     ],
     "squeeze": [
       {
-        "bucket": 3,
-        "score_range": [
-          0.0,
-          2.0
-        ],
-        "mean_score": 0.0,
-        "mean_pnl_pct": -0.0454,
-        "n": 103
-      },
-      {
         "bucket": 4,
         "score_range": [
-          2.0,
+          0.0,
           3.0
         ],
-        "mean_score": 2.0,
-        "mean_pnl_pct": -0.0485,
-        "n": 28
+        "mean_score": 0.37,
+        "mean_pnl_pct": -0.0368,
+        "n": 153
       },
       {
         "bucket": 5,
@@ -566,75 +546,49 @@
         "bucket": 1,
         "score_range": [
           0.0,
-          3.0
+          3.6
         ],
-        "mean_score": 0.75,
-        "mean_pnl_pct": -0.0407,
-        "n": 28
+        "mean_score": 1.43,
+        "mean_pnl_pct": -0.0243,
+        "n": 40
       },
       {
         "bucket": 2,
         "score_range": [
-          3.0,
-          5.0
+          3.6,
+          5.2
         ],
-        "mean_score": 3.71,
-        "mean_pnl_pct": -0.094,
-        "n": 41
-      },
-      {
-        "bucket": 3,
-        "score_range": [
-          5.0,
-          6.0
-        ],
-        "mean_score": 5.0,
-        "mean_pnl_pct": 0.0628,
-        "n": 9
+        "mean_score": 4.28,
+        "mean_pnl_pct": -0.0888,
+        "n": 40
       },
       {
         "bucket": 4,
         "score_range": [
           6.0,
-          8.0
+          9.0
         ],
-        "mean_score": 6.1,
-        "mean_pnl_pct": 0.0041,
-        "n": 49
+        "mean_score": 6.74,
+        "mean_pnl_pct": 0.2566,
+        "n": 77
       },
       {
         "bucket": 5,
         "score_range": [
-          8.0,
+          9.0,
           13.0
         ],
-        "mean_score": 9.14,
-        "mean_pnl_pct": 0.388,
-        "n": 50
+        "mean_score": 10.4,
+        "mean_pnl_pct": 0.0081,
+        "n": 42
       }
     ]
   },
   "hold_time_stratification": {
     "medium_60to480min": {
-      "n": 39,
+      "n": 40,
       "dims": {
         "analyst_revision": {
-          "ic": 0.0,
-          "p_value": 1.0,
-          "ci_lo": -0.3333,
-          "ci_hi": 0.3333,
-          "n": 35,
-          "flag": "NOISE"
-        },
-        "breakout": {
-          "ic": -0.014,
-          "p_value": 0.9327,
-          "ci_lo": -0.328,
-          "ci_hi": 0.3029,
-          "n": 39,
-          "flag": "NEGATIVE"
-        },
-        "catalyst": {
           "ic": 0.0,
           "p_value": 1.0,
           "ci_lo": -0.3285,
@@ -642,375 +596,391 @@
           "n": 36,
           "flag": "NOISE"
         },
+        "breakout": {
+          "ic": -0.0632,
+          "p_value": 0.6983,
+          "ci_lo": -0.3675,
+          "ci_hi": 0.2533,
+          "n": 40,
+          "flag": "NEGATIVE"
+        },
+        "catalyst": {
+          "ic": 0.0,
+          "p_value": 1.0,
+          "ci_lo": -0.324,
+          "ci_hi": 0.324,
+          "n": 37,
+          "flag": "NOISE"
+        },
         "flow": {
-          "ic": 0.0737,
-          "p_value": 0.6557,
-          "ci_lo": -0.2476,
-          "ci_hi": 0.3804,
-          "n": 39,
+          "ic": 0.0531,
+          "p_value": 0.7449,
+          "ci_lo": -0.2628,
+          "ci_hi": 0.3587,
+          "n": 40,
           "flag": "MARGINAL"
         },
         "insider_buying": {
-          "ic": 0.0154,
-          "p_value": 0.93,
-          "ci_lo": -0.3195,
-          "ci_hi": 0.3469,
-          "n": 35,
-          "flag": "NOISE"
+          "ic": 0.0219,
+          "p_value": 0.8992,
+          "ci_lo": -0.3089,
+          "ci_hi": 0.3479,
+          "n": 36,
+          "flag": "MARGINAL"
         },
         "iv_skew": {
-          "ic": -0.219,
-          "p_value": 0.1804,
-          "ci_lo": -0.5,
-          "ci_hi": 0.1037,
-          "n": 39,
+          "ic": -0.2253,
+          "p_value": 0.1621,
+          "ci_lo": -0.5016,
+          "ci_hi": 0.0927,
+          "n": 40,
           "flag": "NEGATIVE"
         },
         "momentum": {
-          "ic": 0.2083,
-          "p_value": 0.2032,
-          "ci_lo": -0.1148,
-          "ci_hi": 0.4915,
-          "n": 39,
+          "ic": 0.1936,
+          "p_value": 0.2313,
+          "ci_lo": -0.1255,
+          "ci_hi": 0.4764,
+          "n": 40,
           "flag": "MARGINAL"
         },
         "mtf": {
-          "ic": -0.0314,
-          "p_value": 0.8496,
-          "ci_lo": -0.3435,
-          "ci_hi": 0.287,
-          "n": 39,
+          "ic": -0.0886,
+          "p_value": 0.5869,
+          "ci_lo": -0.3893,
+          "ci_hi": 0.2293,
+          "n": 40,
           "flag": "NEGATIVE"
         },
         "news": {
-          "ic": 0.133,
-          "p_value": 0.4196,
-          "ci_lo": -0.1905,
-          "ci_hi": 0.4305,
-          "n": 39,
+          "ic": 0.0662,
+          "p_value": 0.6847,
+          "ci_lo": -0.2505,
+          "ci_hi": 0.3701,
+          "n": 40,
           "flag": "MARGINAL"
         },
         "overnight_drift": {
-          "ic": -0.1305,
-          "p_value": 0.4347,
-          "ci_lo": -0.4322,
-          "ci_hi": 0.1974,
-          "n": 38,
+          "ic": -0.048,
+          "p_value": 0.7718,
+          "ci_lo": -0.3581,
+          "ci_hi": 0.2717,
+          "n": 39,
           "flag": "NEGATIVE"
         },
         "pead": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.3155,
-          "ci_hi": 0.3155,
-          "n": 39,
+          "ci_lo": -0.3115,
+          "ci_hi": 0.3115,
+          "n": 40,
           "flag": "NOISE"
         },
         "reversion": {
-          "ic": 0.0593,
-          "p_value": 0.7198,
-          "ci_lo": -0.2611,
-          "ci_hi": 0.3679,
-          "n": 39,
-          "flag": "MARGINAL"
+          "ic": 0.0013,
+          "p_value": 0.9936,
+          "ci_lo": -0.3103,
+          "ci_hi": 0.3127,
+          "n": 40,
+          "flag": "NOISE"
         },
         "short_squeeze": {
-          "ic": 0.0656,
-          "p_value": 0.6916,
-          "ci_lo": -0.2552,
-          "ci_hi": 0.3734,
-          "n": 39,
-          "flag": "MARGINAL"
+          "ic": 0.0066,
+          "p_value": 0.9679,
+          "ci_lo": -0.3056,
+          "ci_hi": 0.3174,
+          "n": 40,
+          "flag": "NOISE"
         },
         "social": {
-          "ic": 0.1585,
-          "p_value": 0.3352,
-          "ci_lo": -0.1653,
-          "ci_hi": 0.4514,
-          "n": 39,
+          "ic": 0.1345,
+          "p_value": 0.4079,
+          "ci_lo": -0.1847,
+          "ci_hi": 0.4281,
+          "n": 40,
           "flag": "MARGINAL"
         },
         "squeeze": {
-          "ic": 0.0057,
-          "p_value": 0.9727,
-          "ci_lo": -0.3104,
-          "ci_hi": 0.3206,
-          "n": 39,
-          "flag": "NOISE"
+          "ic": -0.0144,
+          "p_value": 0.9295,
+          "ci_lo": -0.3245,
+          "ci_hi": 0.2984,
+          "n": 40,
+          "flag": "NEGATIVE"
         },
         "trend": {
-          "ic": 0.1634,
-          "p_value": 0.3204,
-          "ci_lo": -0.1604,
-          "ci_hi": 0.4554,
-          "n": 39,
+          "ic": 0.1015,
+          "p_value": 0.5331,
+          "ci_lo": -0.2169,
+          "ci_hi": 0.4004,
+          "n": 40,
           "flag": "MARGINAL"
         }
       }
     },
     "scalp_lt60min": {
-      "n": 89,
+      "n": 103,
       "dims": {
         "analyst_revision": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2402,
-          "ci_hi": 0.2402,
-          "n": 67,
+          "ci_lo": -0.2184,
+          "ci_hi": 0.2184,
+          "n": 81,
           "flag": "NOISE"
         },
         "breakout": {
-          "ic": -0.0735,
-          "p_value": 0.4937,
-          "ci_lo": -0.2775,
-          "ci_hi": 0.1369,
-          "n": 89,
+          "ic": -0.0737,
+          "p_value": 0.4592,
+          "ci_lo": -0.2635,
+          "ci_hi": 0.1215,
+          "n": 103,
           "flag": "NEGATIVE"
         },
         "catalyst": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2211,
-          "ci_hi": 0.2211,
-          "n": 79,
+          "ci_lo": -0.2037,
+          "ci_hi": 0.2037,
+          "n": 93,
           "flag": "NOISE"
         },
         "flow": {
-          "ic": -0.2533,
-          "p_value": 0.0166,
-          "ci_lo": -0.4384,
-          "ci_hi": -0.0475,
-          "n": 89,
+          "ic": -0.2122,
+          "p_value": 0.0314,
+          "ci_lo": -0.3897,
+          "ci_hi": -0.0194,
+          "n": 103,
           "flag": "NEGATIVE"
         },
         "insider_buying": {
-          "ic": -0.0277,
-          "p_value": 0.8239,
-          "ci_lo": -0.2661,
-          "ci_hi": 0.2139,
-          "n": 67,
+          "ic": -0.0072,
+          "p_value": 0.9491,
+          "ci_lo": -0.2252,
+          "ci_hi": 0.2115,
+          "n": 81,
           "flag": "NEGATIVE"
         },
         "iv_skew": {
-          "ic": 0.0905,
-          "p_value": 0.4019,
-          "ci_lo": -0.1213,
-          "ci_hi": 0.2943,
-          "n": 88,
+          "ic": 0.0566,
+          "p_value": 0.572,
+          "ci_lo": -0.1394,
+          "ci_hi": 0.2484,
+          "n": 102,
           "flag": "MARGINAL"
         },
         "momentum": {
-          "ic": -0.1611,
-          "p_value": 0.1315,
-          "ci_lo": -0.3574,
-          "ci_hi": 0.0488,
-          "n": 89,
+          "ic": -0.0852,
+          "p_value": 0.392,
+          "ci_lo": -0.2742,
+          "ci_hi": 0.1101,
+          "n": 103,
           "flag": "NEGATIVE"
         },
         "mtf": {
-          "ic": -0.0758,
-          "p_value": 0.4799,
-          "ci_lo": -0.2797,
-          "ci_hi": 0.1345,
-          "n": 89,
+          "ic": -0.0901,
+          "p_value": 0.3652,
+          "ci_lo": -0.2788,
+          "ci_hi": 0.1052,
+          "n": 103,
           "flag": "NEGATIVE"
         },
         "news": {
-          "ic": -0.061,
-          "p_value": 0.5699,
-          "ci_lo": -0.2659,
-          "ci_hi": 0.1491,
-          "n": 89,
+          "ic": -0.0642,
+          "p_value": 0.5197,
+          "ci_lo": -0.2545,
+          "ci_hi": 0.131,
+          "n": 103,
           "flag": "NEGATIVE"
         },
         "overnight_drift": {
-          "ic": -0.1773,
-          "p_value": 0.1087,
-          "ci_lo": -0.3786,
-          "ci_hi": 0.0399,
-          "n": 83,
+          "ic": -0.0618,
+          "p_value": 0.5474,
+          "ci_lo": -0.2581,
+          "ci_hi": 0.1393,
+          "n": 97,
           "flag": "NEGATIVE"
         },
         "pead": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2094,
-          "ci_hi": 0.2094,
-          "n": 88,
+          "ci_lo": -0.1945,
+          "ci_hi": 0.1945,
+          "n": 102,
           "flag": "NOISE"
         },
         "reversion": {
-          "ic": -0.1104,
-          "p_value": 0.3032,
-          "ci_lo": -0.3115,
-          "ci_hi": 0.1002,
-          "n": 89,
+          "ic": -0.1274,
+          "p_value": 0.1995,
+          "ci_lo": -0.3132,
+          "ci_hi": 0.0678,
+          "n": 103,
           "flag": "NEGATIVE"
         },
         "short_squeeze": {
-          "ic": -0.0894,
-          "p_value": 0.4076,
-          "ci_lo": -0.2933,
-          "ci_hi": 0.1224,
-          "n": 88,
+          "ic": -0.0904,
+          "p_value": 0.3661,
+          "ci_lo": -0.28,
+          "ci_hi": 0.1059,
+          "n": 102,
           "flag": "NEGATIVE"
         },
         "social": {
-          "ic": -0.0117,
-          "p_value": 0.9136,
-          "ci_lo": -0.2194,
-          "ci_hi": 0.1971,
-          "n": 89,
+          "ic": -0.0377,
+          "p_value": 0.7056,
+          "ci_lo": -0.2295,
+          "ci_hi": 0.157,
+          "n": 103,
           "flag": "NEGATIVE"
         },
         "squeeze": {
-          "ic": 0.1667,
-          "p_value": 0.1184,
-          "ci_lo": -0.0431,
-          "ci_hi": 0.3624,
-          "n": 89,
+          "ic": 0.1615,
+          "p_value": 0.1032,
+          "ci_lo": -0.0331,
+          "ci_hi": 0.3443,
+          "n": 103,
           "flag": "MARGINAL"
         },
         "trend": {
-          "ic": 0.0007,
-          "p_value": 0.9951,
-          "ci_lo": -0.2076,
-          "ci_hi": 0.2089,
-          "n": 89,
-          "flag": "NOISE"
+          "ic": -0.0215,
+          "p_value": 0.8296,
+          "ci_lo": -0.2141,
+          "ci_hi": 0.1728,
+          "n": 103,
+          "flag": "NEGATIVE"
         }
       }
     },
     "swing_gte480min": {
-      "n": 49,
+      "n": 56,
       "dims": {
         "analyst_revision": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2812,
-          "ci_hi": 0.2812,
-          "n": 49,
+          "ci_lo": -0.2629,
+          "ci_hi": 0.2629,
+          "n": 56,
           "flag": "NOISE"
         },
         "breakout": {
-          "ic": -0.0304,
-          "p_value": 0.8357,
-          "ci_lo": -0.309,
-          "ci_hi": 0.253,
-          "n": 49,
-          "flag": "NEGATIVE"
+          "ic": 0.0541,
+          "p_value": 0.6919,
+          "ci_lo": -0.2118,
+          "ci_hi": 0.3126,
+          "n": 56,
+          "flag": "MARGINAL"
         },
         "catalyst": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2812,
-          "ci_hi": 0.2812,
-          "n": 49,
+          "ci_lo": -0.2629,
+          "ci_hi": 0.2629,
+          "n": 56,
           "flag": "NOISE"
         },
         "flow": {
-          "ic": -0.0042,
-          "p_value": 0.9772,
-          "ci_lo": -0.285,
-          "ci_hi": 0.2773,
-          "n": 49,
-          "flag": "NEGATIVE"
+          "ic": 0.0495,
+          "p_value": 0.7172,
+          "ci_lo": -0.2162,
+          "ci_hi": 0.3084,
+          "n": 56,
+          "flag": "MARGINAL"
         },
         "insider_buying": {
-          "ic": -0.0045,
-          "p_value": 0.9756,
-          "ci_lo": -0.2853,
-          "ci_hi": 0.2771,
-          "n": 49,
+          "ic": -0.2351,
+          "p_value": 0.0811,
+          "ci_lo": -0.469,
+          "ci_hi": 0.0296,
+          "n": 56,
           "flag": "NEGATIVE"
         },
         "iv_skew": {
-          "ic": -0.0238,
-          "p_value": 0.8712,
-          "ci_lo": -0.303,
-          "ci_hi": 0.2592,
-          "n": 49,
+          "ic": -0.0033,
+          "p_value": 0.9809,
+          "ci_lo": -0.266,
+          "ci_hi": 0.2598,
+          "n": 56,
           "flag": "NEGATIVE"
         },
         "momentum": {
-          "ic": 0.1659,
-          "p_value": 0.2546,
-          "ci_lo": -0.1209,
-          "ci_hi": 0.4272,
-          "n": 49,
-          "flag": "MARGINAL"
+          "ic": 0.003,
+          "p_value": 0.9824,
+          "ci_lo": -0.2601,
+          "ci_hi": 0.2657,
+          "n": 56,
+          "flag": "NOISE"
         },
         "mtf": {
-          "ic": -0.2286,
-          "p_value": 0.1142,
-          "ci_lo": -0.479,
-          "ci_hi": 0.0562,
-          "n": 49,
+          "ic": -0.06,
+          "p_value": 0.6604,
+          "ci_lo": -0.3179,
+          "ci_hi": 0.2061,
+          "n": 56,
           "flag": "NEGATIVE"
         },
         "news": {
-          "ic": -0.0499,
-          "p_value": 0.7335,
-          "ci_lo": -0.3265,
-          "ci_hi": 0.2346,
-          "n": 49,
-          "flag": "NEGATIVE"
+          "ic": 0.0046,
+          "p_value": 0.9733,
+          "ci_lo": -0.2586,
+          "ci_hi": 0.2672,
+          "n": 56,
+          "flag": "NOISE"
         },
         "overnight_drift": {
-          "ic": -0.2974,
-          "p_value": 0.0379,
-          "ci_lo": -0.534,
-          "ci_hi": -0.0177,
-          "n": 49,
+          "ic": -0.3084,
+          "p_value": 0.0207,
+          "ci_lo": -0.5285,
+          "ci_hi": -0.0495,
+          "n": 56,
           "flag": "NEGATIVE"
         },
         "pead": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2812,
-          "ci_hi": 0.2812,
-          "n": 49,
+          "ci_lo": -0.2629,
+          "ci_hi": 0.2629,
+          "n": 56,
           "flag": "NOISE"
         },
         "reversion": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2812,
-          "ci_hi": 0.2812,
-          "n": 49,
+          "ci_lo": -0.2629,
+          "ci_hi": 0.2629,
+          "n": 56,
           "flag": "NOISE"
         },
         "short_squeeze": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2812,
-          "ci_hi": 0.2812,
-          "n": 49,
+          "ci_lo": -0.2629,
+          "ci_hi": 0.2629,
+          "n": 56,
           "flag": "NOISE"
         },
         "social": {
-          "ic": -0.0509,
-          "p_value": 0.7283,
-          "ci_lo": -0.3274,
-          "ci_hi": 0.2336,
-          "n": 49,
+          "ic": -0.0123,
+          "p_value": 0.9283,
+          "ci_lo": -0.2743,
+          "ci_hi": 0.2514,
+          "n": 56,
           "flag": "NEGATIVE"
         },
         "squeeze": {
-          "ic": 0.0839,
-          "p_value": 0.5666,
-          "ci_lo": -0.2021,
-          "ci_hi": 0.3567,
-          "n": 49,
+          "ic": 0.0347,
+          "p_value": 0.7998,
+          "ci_lo": -0.2303,
+          "ci_hi": 0.2949,
+          "n": 56,
           "flag": "MARGINAL"
         },
         "trend": {
-          "ic": -0.0994,
-          "p_value": 0.4969,
-          "ci_lo": -0.3702,
-          "ci_hi": 0.187,
-          "n": 49,
-          "flag": "NEGATIVE"
+          "ic": 0.0492,
+          "p_value": 0.7187,
+          "ci_lo": -0.2165,
+          "ci_hi": 0.3081,
+          "n": 56,
+          "flag": "MARGINAL"
         }
       }
     }
@@ -1416,134 +1386,134 @@
       }
     },
     "SWING": {
-      "n": 95,
+      "n": 117,
       "dims": {
         "analyst_revision": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2026,
-          "ci_hi": 0.2026,
-          "n": 94,
+          "ci_lo": -0.1823,
+          "ci_hi": 0.1823,
+          "n": 116,
           "flag": "NOISE"
         },
         "breakout": {
-          "ic": -0.1081,
-          "p_value": 0.2972,
-          "ci_lo": -0.303,
-          "ci_hi": 0.0956,
-          "n": 95,
+          "ic": -0.0479,
+          "p_value": 0.6084,
+          "ci_lo": -0.2274,
+          "ci_hi": 0.1349,
+          "n": 117,
           "flag": "NEGATIVE"
         },
         "catalyst": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2026,
-          "ci_hi": 0.2026,
-          "n": 94,
+          "ci_lo": -0.1823,
+          "ci_hi": 0.1823,
+          "n": 116,
           "flag": "NOISE"
         },
         "flow": {
-          "ic": -0.1028,
-          "p_value": 0.3216,
-          "ci_lo": -0.2982,
-          "ci_hi": 0.1009,
-          "n": 95,
+          "ic": -0.0783,
+          "p_value": 0.4017,
+          "ci_lo": -0.2562,
+          "ci_hi": 0.1048,
+          "n": 117,
           "flag": "NEGATIVE"
         },
         "insider_buying": {
-          "ic": -0.0129,
-          "p_value": 0.9017,
-          "ci_lo": -0.215,
-          "ci_hi": 0.1902,
-          "n": 94,
+          "ic": -0.028,
+          "p_value": 0.7651,
+          "ci_lo": -0.2093,
+          "ci_hi": 0.1551,
+          "n": 116,
           "flag": "NEGATIVE"
         },
         "iv_skew": {
-          "ic": -0.0378,
-          "p_value": 0.7158,
-          "ci_lo": -0.2376,
-          "ci_hi": 0.165,
-          "n": 95,
+          "ic": -0.0471,
+          "p_value": 0.6141,
+          "ci_lo": -0.2267,
+          "ci_hi": 0.1356,
+          "n": 117,
           "flag": "NEGATIVE"
         },
         "momentum": {
-          "ic": -0.2111,
-          "p_value": 0.04,
-          "ci_lo": -0.3958,
-          "ci_hi": -0.01,
-          "n": 95,
+          "ic": -0.1322,
+          "p_value": 0.1554,
+          "ci_lo": -0.3064,
+          "ci_hi": 0.0506,
+          "n": 117,
           "flag": "NEGATIVE"
         },
         "mtf": {
-          "ic": -0.1673,
-          "p_value": 0.1052,
-          "ci_lo": -0.3568,
-          "ci_hi": 0.0355,
-          "n": 95,
+          "ic": -0.0819,
+          "p_value": 0.38,
+          "ci_lo": -0.2596,
+          "ci_hi": 0.1011,
+          "n": 117,
           "flag": "NEGATIVE"
         },
         "news": {
-          "ic": -0.0823,
-          "p_value": 0.4277,
-          "ci_lo": -0.2792,
-          "ci_hi": 0.1212,
-          "n": 95,
+          "ic": -0.0718,
+          "p_value": 0.4418,
+          "ci_lo": -0.2501,
+          "ci_hi": 0.1112,
+          "n": 117,
           "flag": "NEGATIVE"
         },
         "overnight_drift": {
-          "ic": -0.267,
-          "p_value": 0.0089,
-          "ci_lo": -0.4446,
-          "ci_hi": -0.0692,
-          "n": 95,
+          "ic": -0.1546,
+          "p_value": 0.096,
+          "ci_lo": -0.327,
+          "ci_hi": 0.0277,
+          "n": 117,
           "flag": "NEGATIVE"
         },
         "pead": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2015,
-          "ci_hi": 0.2015,
-          "n": 95,
+          "ci_lo": -0.1815,
+          "ci_hi": 0.1815,
+          "n": 117,
           "flag": "NOISE"
         },
         "reversion": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2015,
-          "ci_hi": 0.2015,
-          "n": 95,
+          "ci_lo": -0.1815,
+          "ci_hi": 0.1815,
+          "n": 117,
           "flag": "NOISE"
         },
         "short_squeeze": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2015,
-          "ci_hi": 0.2015,
-          "n": 95,
+          "ci_lo": -0.1815,
+          "ci_hi": 0.1815,
+          "n": 117,
           "flag": "NOISE"
         },
         "social": {
-          "ic": -0.0739,
-          "p_value": 0.4768,
-          "ci_lo": -0.2714,
-          "ci_hi": 0.1296,
-          "n": 95,
+          "ic": -0.0654,
+          "p_value": 0.4834,
+          "ci_lo": -0.2441,
+          "ci_hi": 0.1175,
+          "n": 117,
           "flag": "NEGATIVE"
         },
         "squeeze": {
-          "ic": 0.1358,
-          "p_value": 0.1893,
-          "ci_lo": -0.0676,
-          "ci_hi": 0.3284,
-          "n": 95,
+          "ic": 0.1351,
+          "p_value": 0.1465,
+          "ci_lo": -0.0476,
+          "ci_hi": 0.309,
+          "n": 117,
           "flag": "MARGINAL"
         },
         "trend": {
-          "ic": -0.1147,
-          "p_value": 0.2682,
-          "ci_lo": -0.3091,
-          "ci_hi": 0.0889,
-          "n": 95,
+          "ic": -0.0261,
+          "p_value": 0.7801,
+          "ci_lo": -0.2066,
+          "ci_hi": 0.1562,
+          "n": 117,
           "flag": "NEGATIVE"
         }
       }
@@ -2482,134 +2452,134 @@
       }
     },
     "TRENDING_UP": {
-      "n": 98,
+      "n": 120,
       "dims": {
         "analyst_revision": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2184,
-          "ci_hi": 0.2184,
-          "n": 81,
+          "ci_lo": -0.1935,
+          "ci_hi": 0.1935,
+          "n": 103,
           "flag": "NOISE"
         },
         "breakout": {
-          "ic": -0.0913,
-          "p_value": 0.3711,
-          "ci_lo": -0.2846,
-          "ci_hi": 0.1091,
-          "n": 98,
+          "ic": -0.0483,
+          "p_value": 0.6005,
+          "ci_lo": -0.2256,
+          "ci_hi": 0.1321,
+          "n": 120,
           "flag": "NEGATIVE"
         },
         "catalyst": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.2059,
-          "ci_hi": 0.2059,
-          "n": 91,
+          "ci_lo": -0.1847,
+          "ci_hi": 0.1847,
+          "n": 113,
           "flag": "NOISE"
         },
         "flow": {
-          "ic": -0.2402,
-          "p_value": 0.0172,
-          "ci_lo": -0.4186,
-          "ci_hi": -0.0438,
-          "n": 98,
+          "ic": -0.2199,
+          "p_value": 0.0158,
+          "ci_lo": -0.384,
+          "ci_hi": -0.0424,
+          "n": 120,
           "flag": "NEGATIVE"
         },
         "insider_buying": {
-          "ic": -0.1028,
-          "p_value": 0.3609,
-          "ci_lo": -0.3141,
-          "ci_hi": 0.1182,
-          "n": 81,
+          "ic": -0.1414,
+          "p_value": 0.1543,
+          "ci_lo": -0.326,
+          "ci_hi": 0.0536,
+          "n": 103,
           "flag": "NEGATIVE"
         },
         "iv_skew": {
-          "ic": 0.0576,
-          "p_value": 0.5735,
-          "ci_lo": -0.1425,
-          "ci_hi": 0.2531,
-          "n": 98,
+          "ic": 0.1071,
+          "p_value": 0.2444,
+          "ci_lo": -0.0736,
+          "ci_hi": 0.2809,
+          "n": 120,
           "flag": "MARGINAL"
         },
         "momentum": {
-          "ic": -0.088,
-          "p_value": 0.3891,
-          "ci_lo": -0.2815,
-          "ci_hi": 0.1124,
-          "n": 98,
+          "ic": -0.0697,
+          "p_value": 0.4496,
+          "ci_lo": -0.2458,
+          "ci_hi": 0.111,
+          "n": 120,
           "flag": "NEGATIVE"
         },
         "mtf": {
-          "ic": -0.2907,
-          "p_value": 0.0037,
-          "ci_lo": -0.4624,
-          "ci_hi": -0.0979,
-          "n": 98,
+          "ic": -0.1709,
+          "p_value": 0.0619,
+          "ci_lo": -0.3398,
+          "ci_hi": 0.0086,
+          "n": 120,
           "flag": "NEGATIVE"
         },
         "news": {
-          "ic": -0.0627,
-          "p_value": 0.5395,
-          "ci_lo": -0.2579,
-          "ci_hi": 0.1374,
-          "n": 98,
+          "ic": -0.0622,
+          "p_value": 0.4995,
+          "ci_lo": -0.2388,
+          "ci_hi": 0.1183,
+          "n": 120,
           "flag": "NEGATIVE"
         },
         "overnight_drift": {
-          "ic": -0.1891,
-          "p_value": 0.0636,
-          "ci_lo": -0.3744,
-          "ci_hi": 0.0108,
-          "n": 97,
+          "ic": -0.1438,
+          "p_value": 0.1187,
+          "ci_lo": -0.3156,
+          "ci_hi": 0.0372,
+          "n": 119,
           "flag": "NEGATIVE"
         },
         "pead": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.1984,
-          "ci_hi": 0.1984,
-          "n": 98,
+          "ci_lo": -0.1792,
+          "ci_hi": 0.1792,
+          "n": 120,
           "flag": "NOISE"
         },
         "reversion": {
           "ic": 0.0,
           "p_value": 1.0,
-          "ci_lo": -0.1984,
-          "ci_hi": 0.1984,
-          "n": 98,
+          "ci_lo": -0.1792,
+          "ci_hi": 0.1792,
+          "n": 120,
           "flag": "NOISE"
         },
         "short_squeeze": {
-          "ic": -0.3074,
-          "p_value": 0.0021,
-          "ci_lo": -0.4767,
-          "ci_hi": -0.116,
-          "n": 98,
+          "ic": -0.2102,
+          "p_value": 0.0212,
+          "ci_lo": -0.3753,
+          "ci_hi": -0.0322,
+          "n": 120,
           "flag": "NEGATIVE"
         },
         "social": {
-          "ic": -0.0616,
-          "p_value": 0.5468,
-          "ci_lo": -0.2569,
-          "ci_hi": 0.1385,
-          "n": 98,
+          "ic": -0.0807,
+          "p_value": 0.3809,
+          "ci_lo": -0.2562,
+          "ci_hi": 0.1,
+          "n": 120,
           "flag": "NEGATIVE"
         },
         "squeeze": {
-          "ic": 0.0872,
-          "p_value": 0.3932,
-          "ci_lo": -0.1132,
-          "ci_hi": 0.2808,
-          "n": 98,
+          "ic": 0.0684,
+          "p_value": 0.4576,
+          "ci_lo": -0.1122,
+          "ci_hi": 0.2447,
+          "n": 120,
           "flag": "MARGINAL"
         },
         "trend": {
-          "ic": -0.1045,
-          "p_value": 0.3059,
-          "ci_lo": -0.2968,
-          "ci_hi": 0.0959,
-          "n": 98,
+          "ic": -0.039,
+          "p_value": 0.6721,
+          "ci_lo": -0.2168,
+          "ci_hi": 0.1412,
+          "n": 120,
           "flag": "NEGATIVE"
         }
       }
@@ -2757,9 +2727,9 @@
         "divergence": null
       },
       "breakout": {
-        "candidate_ic": 0.0122,
-        "execution_ic": -0.0669,
-        "divergence": "SIGN_FLIP"
+        "candidate_ic": -0.0023,
+        "execution_ic": -0.026,
+        "divergence": null
       },
       "catalyst": {
         "candidate_ic": null,
@@ -2767,39 +2737,39 @@
         "divergence": null
       },
       "flow": {
-        "candidate_ic": -0.0097,
-        "execution_ic": -0.1177,
-        "divergence": "LARGE_GAP"
+        "candidate_ic": 0.0265,
+        "execution_ic": -0.1025,
+        "divergence": "SIGN_FLIP"
       },
       "insider_buying": {
-        "candidate_ic": -0.0732,
-        "execution_ic": -0.0719,
+        "candidate_ic": -0.1095,
+        "execution_ic": -0.0743,
         "divergence": null
       },
       "iv_skew": {
-        "candidate_ic": -0.0955,
-        "execution_ic": -0.0032,
-        "divergence": null
+        "candidate_ic": -0.1126,
+        "execution_ic": 0.0011,
+        "divergence": "SIGN_FLIP"
       },
       "momentum": {
-        "candidate_ic": -0.0478,
-        "execution_ic": -0.013,
+        "candidate_ic": -0.1092,
+        "execution_ic": -0.0263,
         "divergence": null
       },
       "mtf": {
-        "candidate_ic": -0.0315,
-        "execution_ic": -0.1221,
-        "divergence": null
+        "candidate_ic": 0.0508,
+        "execution_ic": -0.0921,
+        "divergence": "SIGN_FLIP"
       },
       "news": {
-        "candidate_ic": 0.1219,
-        "execution_ic": -0.0231,
+        "candidate_ic": 0.1321,
+        "execution_ic": -0.0219,
         "divergence": "SIGN_FLIP"
       },
       "overnight_drift": {
-        "candidate_ic": -0.076,
-        "execution_ic": -0.1988,
-        "divergence": "LARGE_GAP"
+        "candidate_ic": -0.1245,
+        "execution_ic": -0.1611,
+        "divergence": null
       },
       "pead": {
         "candidate_ic": 0.0,
@@ -2807,28 +2777,28 @@
         "divergence": null
       },
       "reversion": {
-        "candidate_ic": 0.0207,
-        "execution_ic": -0.0978,
-        "divergence": "SIGN_FLIP"
+        "candidate_ic": -0.0205,
+        "execution_ic": -0.0741,
+        "divergence": null
       },
       "short_squeeze": {
-        "candidate_ic": 0.0105,
-        "execution_ic": -0.1035,
+        "candidate_ic": 0.0041,
+        "execution_ic": -0.0681,
         "divergence": "SIGN_FLIP"
       },
       "social": {
-        "candidate_ic": 0.0703,
-        "execution_ic": -0.0095,
+        "candidate_ic": 0.0654,
+        "execution_ic": -0.0073,
         "divergence": "SIGN_FLIP"
       },
       "squeeze": {
-        "candidate_ic": -0.046,
-        "execution_ic": 0.1002,
+        "candidate_ic": -0.0768,
+        "execution_ic": 0.0919,
         "divergence": "SIGN_FLIP"
       },
       "trend": {
-        "candidate_ic": 0.0223,
-        "execution_ic": -0.0013,
+        "candidate_ic": 0.0598,
+        "execution_ic": -0.0033,
         "divergence": "SIGN_FLIP"
       }
     }
@@ -2839,7 +2809,6 @@
       "breakout",
       "flow",
       "insider_buying",
-      "iv_skew",
       "momentum",
       "mtf",
       "news",
