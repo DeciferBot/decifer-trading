@@ -99,7 +99,13 @@ def _fmp(endpoint: str, params: dict, timeout: int = 8) -> list | dict | None:
             timeout=timeout,
         )
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        # FMP returns rate-limit / subscription errors as HTTP 200 with an error body
+        if isinstance(data, dict) and ("Error Message" in data or "error" in data):
+            log.warning("conviction_engine: FMP %s app-error — %s", endpoint,
+                        data.get("Error Message") or data.get("error"))
+            return None
+        return data
     except Exception as exc:
         log.debug("conviction_engine: FMP %s failed — %s", endpoint, exc)
         return None

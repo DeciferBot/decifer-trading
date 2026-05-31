@@ -1287,11 +1287,23 @@ def internal_error(exc: Exception) -> Response:
 # ---------------------------------------------------------------------------
 
 def _warmup_conviction_cache() -> None:
-    """Background warm-up: rescore full TTG universe on startup."""
-    import threading
+    """
+    Background warm-up: rescore full TTG universe on startup.
+    Uses a file lock so only one gunicorn worker runs the warm-up — prevents
+    2 workers × 4 threads each = 8 concurrent FMP batches hitting rate limits.
+    """
+    import threading, fcntl, tempfile
     def _run():
+        _log = __import__("logging").getLogger("decifer.conviction")
+        lock_path = "/tmp/conviction_warmup.lock"
         try:
-            import conviction_cache, conviction_engine
+            lock_fd = open(lock_path, "w")
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (OSError, IOError):
+            _log.info("Warm-up skipped — another worker already running it")
+            return
+        try:
+            import conviction_cache
             from pathlib import Path
             import json as _j
             data_dir = Path(__file__).parent / "data" / "intelligence"
@@ -1301,13 +1313,16 @@ def _warmup_conviction_cache() -> None:
                 if e.get("status") == "active" and e.get("symbol")
             })
             if symbols:
-                import logging
-                logging.getLogger("decifer.conviction").info(
-                    "Startup warm-up: rescoring %d symbols", len(symbols))
+                _log.info("Startup warm-up: rescoring %d symbols", len(symbols))
                 conviction_cache.refresh_all(symbols)
         except Exception as exc:
-            import logging
-            logging.getLogger("decifer.conviction").warning("Warm-up failed: %s", exc)
+            _log.warning("Warm-up failed: %s", exc)
+        finally:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                lock_fd.close()
+            except Exception:
+                pass
     threading.Thread(target=_run, daemon=True, name="conviction-warmup").start()
 
 

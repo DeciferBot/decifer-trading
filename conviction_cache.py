@@ -51,7 +51,7 @@ _CACHE_FILE = _CACHE_DIR / "scores.json"
 _FULL_TTL   = 1800   # 30 minutes — price data changes meaningfully
 _VALUATION_TTL = 86400  # 24 hours — DCF/analyst doesn't move intraday
 
-_MAX_WORKERS = 8     # parallel FMP calls per full rescore batch
+_MAX_WORKERS = 4     # parallel FMP calls — conservative to avoid FMP rate limits
 
 # ---------------------------------------------------------------------------
 # In-memory state
