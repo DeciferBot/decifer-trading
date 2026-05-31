@@ -106,9 +106,9 @@ function buildStoryHero(data: DriversPayload): StoryHero {
     regimeBorder = "var(--accent-amber-border)";
   } else if (driverCount === 0) {
     regime = "QUIET";
-    regimeBg = "#F5F5F5";
-    regimeText = "#6B7280";
-    regimeBorder = "#E5E7EB";
+    regimeBg = "transparent";
+    regimeText = "var(--text-secondary)";
+    regimeBorder = "var(--border)";
   } else if (hasFuturesRiskOff) {
     regime = "RISK OFF";
     regimeBg = "var(--accent-red-bg)";
@@ -395,7 +395,7 @@ function DriverCard({ driver, idx }: { driver: ActiveDriver; idx: number }) {
           color: "var(--text-primary)",
           lineHeight: 1.5,
           margin: 0,
-          textTransform: "capitalize",
+          textTransform: "none",
         }}
       >
         {description.charAt(0).toUpperCase() + description.slice(1)}.
@@ -497,7 +497,7 @@ function ThemeRow({ theme, idx }: { theme: ActivatedTheme; idx: number }) {
           color: "var(--text-primary)",
           minWidth: "190px",
           flexShrink: 0,
-          textTransform: "capitalize",
+          textTransform: "none",
         }}
       >
         {label}
