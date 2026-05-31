@@ -10,6 +10,7 @@ import {
   extractWatchTomorrow,
   type EodSummaryPayload,
   type EodMover,
+  type OptionsFlowRow,
 } from "@/app/api/eod-summary/route";
 
 export const maxDuration = 90;
@@ -412,10 +413,66 @@ function renderWatchSection(raw: string): string {
   return html;
 }
 
+// ── Options flow section ──────────────────────────────────────────────────────
+
+function buildOptionsFlowSection(rows: OptionsFlowRow[], source: string): string {
+  if (!rows.length) return "";
+
+  const sourceLabel = source === "friday_close" ? "Friday Close" : "Today";
+  const rowsHtml = rows.map(r => {
+    const side = r.unusual_calls && r.unusual_puts ? "BOTH"
+      : r.unusual_calls ? "CALL" : "PUT";
+    const sideColor = side === "CALL" ? "#22c55e" : side === "PUT" ? "#ef4444" : "#f59e0b";
+    const exp = side === "CALL" ? r.call_expansion
+      : side === "PUT" ? r.put_expansion
+      : Math.max(r.call_expansion ?? 0, r.put_expansion ?? 0);
+    const expStr = exp !== null ? `${exp.toFixed(1)}×` : "—";
+    const theme = getThemeLabel(r.underlying);
+    const themeChip = theme
+      ? `<span style="display:inline-block;background:#1c2a1c;border:1px solid #2d4a2d;color:#86efac;font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;margin-left:4px;">${theme}</span>`
+      : "";
+    const totalVol = (r.call_volume + r.put_volume).toLocaleString();
+    return `
+    <tr>
+      <td style="padding:6px 0;border-bottom:1px solid #0d1117;vertical-align:middle;">
+        <span style="color:#f97316;font-weight:700;font-size:12px;font-family:'Courier New',monospace;">${r.underlying}</span>${themeChip}
+      </td>
+      <td style="padding:6px 8px;border-bottom:1px solid #0d1117;vertical-align:middle;">
+        <span style="background:${sideColor}20;color:${sideColor};font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;">${side}</span>
+      </td>
+      <td style="padding:6px 0;border-bottom:1px solid #0d1117;color:#e5e7eb;font-size:12px;font-weight:700;text-align:right;white-space:nowrap;">${expStr}</td>
+      <td style="padding:6px 0 6px 10px;border-bottom:1px solid #0d1117;color:#6b7280;font-size:11px;text-align:right;white-space:nowrap;">${totalVol} contracts</td>
+    </tr>`;
+  }).join("");
+
+  return `
+  <tr>
+    <td style="background:#0d1117;padding:16px 32px 20px;border-top:1px solid #1f2937;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <div style="display:inline-block;background:#1a0f1a;border:1px solid #3d1f3d;border-radius:6px;padding:4px 12px;">
+          <span style="color:#c084fc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">&#9889; Unusual Options Flow</span>
+        </div>
+        <span style="color:#4b5563;font-size:10px;">${sourceLabel} &nbsp;&bull;&nbsp; ${rows.length} symbols</span>
+      </div>
+      <table cellpadding="0" cellspacing="0" width="100%">
+        <thead>
+          <tr>
+            <th align="left" style="color:#374151;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;padding:0 0 8px;font-weight:600;border-bottom:1px solid #1f2937;">Symbol</th>
+            <th align="left" style="color:#374151;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;padding:0 8px 8px;font-weight:600;border-bottom:1px solid #1f2937;">Side</th>
+            <th align="right" style="color:#374151;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;padding:0 0 8px;font-weight:600;border-bottom:1px solid #1f2937;">Expansion</th>
+            <th align="right" style="color:#374151;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;padding:0 0 8px 10px;font-weight:600;border-bottom:1px solid #1f2937;">Volume</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </td>
+  </tr>`;
+}
+
 // ── Full email HTML builder ───────────────────────────────────────────────────
 
 export function buildHtml(payload: EodSummaryPayload): string {
-  const { marketDate, tape, rawText, items, gainers, losers, generatedAt } = payload;
+  const { marketDate, tape, rawText, items, gainers, losers, optionsFlow, optionsFlowSource, generatedAt } = payload;
 
   const tapeCells: Array<[string, string, string]> = [
     ["S&P 500", fmtPct(tape.spy), tapeColor(tape.spy)],
@@ -500,6 +557,9 @@ export function buildHtml(payload: EodSummaryPayload): string {
 
       <!-- Movers -->
       ${buildMoversSection(gainers ?? [], losers ?? [])}
+
+      <!-- Options Flow -->
+      ${buildOptionsFlowSection(optionsFlow ?? [], optionsFlowSource ?? "unavailable")}
 
       <!-- Summary Items -->
       <tr>

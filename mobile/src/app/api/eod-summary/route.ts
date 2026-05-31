@@ -35,6 +35,17 @@ export interface EodMover {
   price?: number;
 }
 
+export interface OptionsFlowRow {
+  underlying: string;
+  call_expansion: number | null;
+  put_expansion: number | null;
+  unusual_calls: boolean;
+  unusual_puts: boolean;
+  call_volume: number;
+  put_volume: number;
+  anomaly_score: number;
+}
+
 export interface EodSummaryPayload {
   marketDate: string;
   tape: EodTape;
@@ -42,6 +53,8 @@ export interface EodSummaryPayload {
   items: EodItem[];
   gainers: EodMover[];
   losers: EodMover[];
+  optionsFlow: OptionsFlowRow[];
+  optionsFlowSource: "live" | "friday_close" | "unavailable";
   generatedAt: string;
   error?: string;
 }
@@ -508,6 +521,29 @@ async function fetchTopNews(): Promise<string> {
   return `NOTABLE NEWS (last 12h):\n${lines.join("\n")}`;
 }
 
+// ── Options flow fetch ────────────────────────────────────────────────────────
+
+const OPTIONS_FLOW_URL =
+  process.env.OPTIONS_FLOW_API_URL ?? "https://options-kappa.vercel.app";
+
+async function fetchOptionsFlow(): Promise<{ rows: OptionsFlowRow[]; source: "live" | "friday_close" | "unavailable" }> {
+  try {
+    const res = await fetch(`${OPTIONS_FLOW_URL}/api/options/leaderboard?limit=20`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return { rows: [], source: "unavailable" };
+    const data = await res.json();
+    const rows: OptionsFlowRow[] = (data.leaderboard ?? [])
+      .filter((r: OptionsFlowRow) => r.unusual_calls || r.unusual_puts)
+      .slice(0, 10);
+    const source = data.source === "friday_close" ? "friday_close" : "live";
+    return { rows, source };
+  } catch {
+    return { rows: [], source: "unavailable" };
+  }
+}
+
 // ── Claude synthesis ──────────────────────────────────────────────────────────
 
 async function synthesize(
@@ -656,7 +692,7 @@ export async function generateEodSummary(): Promise<EodSummaryPayload> {
   const marketDate = nyDateLabel();
   const generatedAt = new Date().toISOString();
 
-  const [tape, moversData, mostActive, analystMoves, insiderBuys, topNews, tomorrowCalendar] =
+  const [tape, moversData, mostActive, analystMoves, insiderBuys, topNews, tomorrowCalendar, optionsFlowData] =
     await Promise.all([
       fetchTape(),
       fetchMovers(),
@@ -665,6 +701,7 @@ export async function generateEodSummary(): Promise<EodSummaryPayload> {
       fetchInsiderBuys(),
       fetchTopNews(),
       fetchTomorrowCalendar(today),
+      fetchOptionsFlow(),
     ]);
 
   const rawText = await synthesize(
@@ -682,6 +719,8 @@ export async function generateEodSummary(): Promise<EodSummaryPayload> {
     items,
     gainers: moversData.gainers,
     losers: moversData.losers,
+    optionsFlow: optionsFlowData.rows,
+    optionsFlowSource: optionsFlowData.source,
     generatedAt,
   };
 }
