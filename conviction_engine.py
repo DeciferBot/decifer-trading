@@ -360,7 +360,7 @@ def _score_forward_catalyst(
     # passed in from refresh_all to avoid per-symbol FMP calls during warm-up.
     # Falls back to live fetch for single-symbol rescores.
     now = datetime.now(UTC)
-    days_away = symbol_earnings_days.get(symbol.upper()) if symbol_earnings_days else None
+    days_away = symbol_earnings_days.get(symbol.upper()) if symbol_earnings_days is not None else None
     if days_away is None:
         # Single-symbol path: fetch live
         cal_raw = _fmp("earnings-calendar", {"symbol": symbol, "limit": 3})
