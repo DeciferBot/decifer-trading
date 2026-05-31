@@ -121,28 +121,32 @@ export default function IntelligenceGraph({ nodes, edges, activeDriverIds, block
     );
 
     // ─── Simulation ───────────────────────────────────────────────────────
-    const simNodes: SimNode[] = nodes.map(n => ({ ...n }));
+    // Spread nodes across the viewport initially to avoid a ball of nodes at (0,0)
+    const tierY: Record<number, number> = { 0: H * 0.15, 1: H * 0.42, 2: H * 0.72 };
+    const simNodes: SimNode[] = nodes.map((n, i) => {
+      const ty = tierY[n.tier] ?? H / 2;
+      const count = nodes.filter(x => x.tier === n.tier).length || 1;
+      const idx   = nodes.filter((x, j) => x.tier === n.tier && j < i).length;
+      return { ...n, x: (W * 0.1) + ((W * 0.8) / count) * idx + (Math.random() - 0.5) * 40, y: ty + (Math.random() - 0.5) * 60 };
+    });
     const idMap = new Map(simNodes.map(n => [n.id, n]));
 
     const simEdges: SimEdge[] = edges
       .filter(e => idMap.has(e.source as string) && idMap.has(e.target as string))
       .map(e => ({ ...e, source: e.source as string, target: e.target as string }));
 
-    // Tier-based Y positions
-    const tierY: Record<number, number> = { 0: H * 0.15, 1: H * 0.45, 2: H * 0.78 };
-
     simRef.current?.stop();
     const sim = d3.forceSimulation<SimNode>(simNodes)
       .force("link", d3.forceLink<SimNode, SimEdge>(simEdges)
         .id(n => n.id)
-        .distance(d => (d.type === "activates" ? 130 : 80))
-        .strength(d => (d.type === "activates" ? 0.6 : 0.4))
+        .distance(d => (d.type === "activates" ? 120 : 70))
+        .strength(d => (d.type === "activates" ? 0.5 : 0.3))
       )
-      .force("charge", d3.forceManyBody<SimNode>().strength(n => n.type === "driver" ? -600 : n.type === "theme" ? -200 : -60))
-      .force("collide",  d3.forceCollide<SimNode>().radius(n => nodeRadius(n) + 6))
-      .force("cx",       d3.forceX(W / 2).strength(0.04))
-      .force("cy",       d3.forceY<SimNode>(n => tierY[n.tier] ?? H / 2).strength(0.25))
-      .alphaDecay(0.025);
+      .force("charge", d3.forceManyBody<SimNode>().strength(n => n.type === "driver" ? -500 : n.type === "theme" ? -180 : -50))
+      .force("collide",  d3.forceCollide<SimNode>().radius(n => nodeRadius(n) + 8))
+      .force("cx",       d3.forceX(W / 2).strength(0.06))
+      .force("cy",       d3.forceY<SimNode>(n => tierY[n.tier] ?? H / 2).strength(0.35))
+      .alphaDecay(0.022);
     simRef.current = sim;
 
     // ─── Edges ────────────────────────────────────────────────────────────

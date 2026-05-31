@@ -1,6 +1,6 @@
 {
   "name": "map",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "clsx": "^2.1.1",
     "d3": "^7.9.0",
     "lucide-react": "^1.17.0",
