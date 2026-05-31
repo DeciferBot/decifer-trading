@@ -1,11 +1,11 @@
 {
-  "saved_at": "2026-05-31T18:08:26.835552+00:00",
+  "saved_at": "2026-05-31T18:38:40.664906+00:00",
   "total": 1,
   "scores": {
     "NVDA": {
       "symbol": "NVDA",
-      "composite": 25,
-      "tier": "WATCHLIST",
+      "composite": 14,
+      "tier": "DORMANT",
       "dimensions": {
         "analyst": {
           "raw_pts": 5,
@@ -31,9 +31,29 @@
           "raw_pts": 25,
           "max_pts": 25,
           "signal": "driver=ai_capex_growth(active)_direct_beneficiary\u2192+20; strong_evidence\u2192+5"
+        },
+        "news_catalyst": {
+          "raw_pts": -7,
+          "max_pts": 12,
+          "signal": "negative_event\u2192-7"
+        },
+        "options_flow": {
+          "raw_pts": 0,
+          "max_pts": 12,
+          "signal": "no flow data"
+        },
+        "peer_network": {
+          "raw_pts": 0,
+          "max_pts": 8,
+          "signal": "no_price_data_for_peers"
+        },
+        "counter_thesis": {
+          "raw_pts": -2,
+          "max_pts": 3,
+          "signal": "conflicts=unverified(enterprise_ai_roi_disappointment)\u2192-2"
         }
       },
-      "ts": "2026-05-31T18:08:26.830306+00:00"
+      "ts": "2026-05-31T18:38:40.664840+00:00"
     }
   }
 }
