@@ -32,6 +32,42 @@ def _5d_return(close: pd.Series) -> float | None:
     return float(s.iloc[-1] / anchor - 1)
 
 
+def fetch_futures_quotes() -> list[dict]:
+    """
+    Fetch ES=F and NQ=F current price, day change, and 5-day return.
+
+    Returns list of dicts: symbol, name, price, change_pct (1-day), return_5d.
+    Used for the weekend/closed-market preview in the dashboard.
+    Never raises — fails closed with empty list.
+    """
+    try:
+        import yfinance as yf
+        tickers = yf.Tickers(f"{_ES} {_NQ}")
+        results = []
+        _NAMES = {_ES: "E-Mini S&P 500", _NQ: "E-Mini Nasdaq 100"}
+        for sym in (_ES, _NQ):
+            try:
+                info = tickers.tickers[sym].fast_info
+                price     = getattr(info, "last_price", None)
+                prev      = getattr(info, "previous_close", None)
+                if price is None:
+                    continue
+                chg_pct = round((price / prev - 1) * 100, 2) if prev else None
+                results.append({
+                    "symbol": sym,
+                    "name": _NAMES.get(sym, sym),
+                    "price": round(float(price), 2),
+                    "change_pct": chg_pct,
+                    "prev_close": round(float(prev), 2) if prev else None,
+                })
+            except Exception as exc:
+                log.debug("futures_data: quote failed for %s: %s", sym, exc)
+        return results
+    except Exception as exc:
+        log.debug("futures_data: fetch_futures_quotes failed: %s", exc)
+        return []
+
+
 def fetch_futures_returns() -> tuple[float | None, float | None]:
     """
     Fetch ES=F and NQ=F 5-day returns via yfinance.

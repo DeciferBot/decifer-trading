@@ -102,6 +102,19 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .mkt-sectors::-webkit-scrollbar{display:none}
 .mkt-strip-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;padding:0 10px;border-left:1px solid var(--border)}
 
+/* Weekend / closed-market preview bar */
+.wknd-bar{display:none;flex-direction:column;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.wknd-bar.visible{display:flex}
+.wknd-futures-row{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.wknd-futures-pill{display:inline-flex;flex-direction:column;padding:4px 10px;border-radius:4px;border:1px solid var(--border2);background:var(--bg3);font-family:'JetBrains Mono',monospace;gap:1px;min-width:100px}
+.wknd-futures-pill.up{border-color:rgba(0,200,83,.5);background:rgba(0,200,83,.07)}
+.wknd-futures-pill.down{border-color:rgba(255,109,0,.5);background:rgba(255,109,0,.07)}
+.wknd-calendar-row{display:flex;align-items:flex-start;gap:8px;padding:7px 12px;flex-wrap:wrap}
+.wknd-cal-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:4px;font-size:10px;font-family:'JetBrains Mono',monospace;border:1px solid var(--border2);background:var(--bg3)}
+.wknd-cal-chip.high{border-color:rgba(255,214,0,.5);background:rgba(255,214,0,.07);color:#ffd43b}
+.wknd-cal-chip.medium{border-color:var(--border2);color:var(--muted2)}
+.wknd-cal-chip.printed{opacity:.65}
+
 /* Market stage spectrum bar */
 .mkt-stage-bar{display:flex;align-items:stretch;border-bottom:2px solid var(--border);background:var(--bg);flex-shrink:0;overflow-x:auto;scrollbar-width:none;min-height:48px}
 .mkt-stage-bar::-webkit-scrollbar{display:none}
@@ -873,6 +886,14 @@ canvas{display:block;width:100% !important}
       <span id="on-prev-close-date" style="font-size:11px;color:var(--muted2)"></span>
       <button id="on-movers-refresh-btn" onclick="loadMovers()" style="background:transparent;border:1px solid var(--border2);color:var(--muted2);font-size:11px;padding:2px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;border-radius:3px" title="Refresh live movers">↻</button>
     </div>
+  </div>
+
+  <!-- ── ROW 1b: Weekend / closed-market preview (futures + Monday calendar) ── -->
+  <div class="wknd-bar" id="wknd-bar">
+    <div class="wknd-futures-row" id="wknd-futures-row">
+      <span style="color:var(--muted2);font-size:11px">Loading futures…</span>
+    </div>
+    <div class="wknd-calendar-row" id="wknd-calendar-row"></div>
   </div>
 
   <!-- ── ROW 2: Market Stage Spectrum (horizontal pills, active highlighted) ── -->
@@ -5822,6 +5843,18 @@ async function poll() {
     };
     const rawSession = d.session || '—';
     document.getElementById('s-session').textContent = _SESSION_LABELS[rawSession] || rawSession;
+
+    // Weekend / closed-market preview bar
+    const _isOffHours = ['CLOSED', 'WEEKEND', 'AFTER_HOURS'].includes(rawSession);
+    const wkndBar = document.getElementById('wknd-bar');
+    if (wkndBar) {
+      if (_isOffHours) {
+        wkndBar.classList.add('visible');
+        _loadWeekendPreview();
+      } else {
+        wkndBar.classList.remove('visible');
+      }
+    }
     document.getElementById('s-scans').textContent   = d.scan_count || 0;
     // Show last scan time with ET hint
     document.getElementById('s-last').textContent    = d.last_scan ? 'Last: ' + d.last_scan + ' New York' : '—';
@@ -6277,6 +6310,7 @@ setInterval(loadLiveTabNews, 90_000);  // live tab news refresh every 90 s
 setInterval(loadNews, 90_000);         // News tab refresh every 90 s
 setInterval(loadIntelligence, 300_000); // intelligence panels every 5 min
 setInterval(loadRegimeLive, 300_000);  // regime refresh every 5 min (matches server cache)
+setInterval(_loadWeekendPreview, 300_000); // futures/calendar refresh every 5 min
 loadRegimeLive();                 // regime on page load — no bot scan needed
 loadMovers();                     // live movers — never reads brief
 loadLiveTabNews();                // live tab news — never reads brief
@@ -6284,6 +6318,101 @@ loadNews();                       // News tab — load immediately on page open
 loadOvernightNotes();             // morning brief: events/calendar/performance only
 
 // ── Live regime from Alpaca/FMP — populates header before first bot scan ─────
+// ── Weekend / closed-market preview — ES futures + Monday calendar ────────────
+const _FUTURES_NAMES = { 'ES=F': 'E-Mini S&P', 'NQ=F': 'E-Mini Nasdaq', 'GC=F': 'Gold', 'CL=F': 'Crude Oil' };
+const _FOREX_NAMES   = { EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY' };
+let _wkndPreviewLoading = false;
+
+async function _loadWeekendPreview() {
+  if (_wkndPreviewLoading) return;
+  _wkndPreviewLoading = true;
+  try {
+    const r = await fetch('/api/weekend-preview');
+    if (!r.ok) return;
+    const d = await r.json();
+
+    // ── Futures + forex pills ─────────────────────────────────────────────────
+    const futuresRow = document.getElementById('wknd-futures-row');
+    if (futuresRow) {
+      const futures = (d.futures || []);
+      const forex   = (d.forex   || []);
+      if (!futures.length && !forex.length) {
+        futuresRow.innerHTML = '<span style="color:var(--muted2);font-size:11px">Futures data unavailable</span>';
+      } else {
+        const sign = v => v > 0 ? '+' : '';
+        const fmtPct = v => v != null ? `${sign(v)}${v.toFixed(2)}%` : 'n/a';
+        const fmtPx  = (v, sym) => {
+          if (v == null) return '—';
+          // JPY pairs are large integers; others need decimals
+          return sym === 'USDJPY' ? v.toFixed(2) : v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        };
+
+        const futuresPills = futures.map(f => {
+          const chg = f.change_pct;
+          const cls  = chg == null ? '' : chg > 0 ? 'up' : chg < 0 ? 'down' : '';
+          const col  = chg == null ? 'var(--muted2)' : chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--muted2)';
+          const name = _FUTURES_NAMES[f.symbol] || f.symbol;
+          return `<div class="wknd-futures-pill ${cls}">
+            <span style="display:flex;align-items:center;gap:6px">
+              <span style="color:#fff;font-size:11px;font-weight:700">${esc(name)}</span>
+              <span style="color:${col};font-size:11px">${fmtPct(chg)}</span>
+            </span>
+            <span style="color:var(--muted2);font-size:10px">${fmtPx(f.price, f.symbol)}</span>
+          </div>`;
+        });
+
+        const forexPills = forex.map(f => {
+          const chg = f.change_pct;
+          const col = chg == null ? 'var(--muted2)' : chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--muted2)';
+          const name = _FOREX_NAMES[f.symbol] || f.symbol;
+          return `<div class="wknd-futures-pill">
+            <span style="display:flex;align-items:center;gap:6px">
+              <span style="color:var(--muted2);font-size:11px;font-weight:600">${esc(name)}</span>
+              <span style="color:${col};font-size:11px">${fmtPct(chg)}</span>
+            </span>
+            <span style="color:var(--muted2);font-size:10px">${fmtPx(f.price, f.symbol)}</span>
+          </div>`;
+        });
+
+        const labelHtml = '<span style="font-size:10px;color:var(--muted2);letter-spacing:1px;padding-right:4px;flex-shrink:0">FUTURES</span>';
+        futuresRow.innerHTML = labelHtml + futuresPills.join('') +
+          (forexPills.length ? '<span style="width:1px;height:28px;background:var(--border2);margin:0 4px;flex-shrink:0"></span>' + forexPills.join('') : '');
+      }
+    }
+
+    // ── Economic calendar ─────────────────────────────────────────────────────
+    const calRow = document.getElementById('wknd-calendar-row');
+    if (calRow && (d.calendar || []).length) {
+      const today = new Date().toISOString().slice(0, 10);
+      const chips = (d.calendar || []).map(ev => {
+        const printed = ev.actual != null;
+        const isHigh  = ev.impact === 'High';
+        const chipCls = (isHigh ? 'high' : 'medium') + (printed ? ' printed' : '');
+        const timeStr = ev.time_et ? ev.time_et + ' ET' : '';
+        const dateLabel = ev.date === today ? 'Today' : ev.date;
+        const valStr = printed
+          ? `Actual: ${ev.actual}${ev.unit ? ' ' + ev.unit : ''}`
+          : (ev.estimate != null ? `Est: ${ev.estimate}${ev.unit ? ' ' + ev.unit : ''}` : '');
+        return `<div class="wknd-cal-chip ${chipCls}" title="${esc(ev.event)}">
+          <span style="font-size:10px;opacity:.7">${esc(dateLabel)}${timeStr ? ' · ' + timeStr : ''}</span>
+          <span style="font-weight:700;font-size:10px">${esc(ev.event.length > 36 ? ev.event.slice(0, 36) + '…' : ev.event)}</span>
+          ${valStr ? `<span style="opacity:.8;font-size:10px">${esc(valStr)}</span>` : ''}
+          ${printed ? '<span style="color:var(--green);font-size:9px">✓</span>' : ''}
+        </div>`;
+      });
+      const calLabel = '<span style="font-size:10px;color:var(--muted2);letter-spacing:1px;padding-right:2px;flex-shrink:0;align-self:center">NEXT SESSION</span>';
+      calRow.innerHTML = calLabel + chips.join('');
+    } else if (calRow) {
+      calRow.innerHTML = '';
+    }
+  } catch (e) {
+    const futuresRow = document.getElementById('wknd-futures-row');
+    if (futuresRow) futuresRow.innerHTML = '<span style="color:var(--muted2);font-size:11px">Unable to load futures data</span>';
+  } finally {
+    _wkndPreviewLoading = false;
+  }
+}
+
 async function loadRegimeLive() {
   try {
     const r = await fetch('/api/regime-live');

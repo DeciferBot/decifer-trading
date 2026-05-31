@@ -46,6 +46,9 @@ _MOVERS_CACHE_TTL = 30  # seconds
 _regime_live_cache: dict = {"data": None, "fetched_at": 0.0}
 _REGIME_LIVE_CACHE_TTL = 300  # 5 minutes — regime changes slowly
 
+_weekend_preview_cache: dict = {"data": None, "fetched_at": 0.0}
+_WEEKEND_PREVIEW_CACHE_TTL = 300  # 5 minutes — futures/calendar refresh cadence
+
 # ── Intelligence pipeline trigger state ──────────────────────────────────────
 _intel_pipeline_lock = threading.Lock()
 _intel_pipeline_state: dict = {"running": False, "triggered_at": None, "error": None}
@@ -1836,6 +1839,35 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("[mobile][/portfolio] error: %s", exc)
                 payload = {"error": "unavailable", "ts": ""}
             self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/weekend-preview":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            import time as _t
+            _now = _t.time()
+            if (
+                _weekend_preview_cache["data"]
+                and _now - _weekend_preview_cache["fetched_at"] < _WEEKEND_PREVIEW_CACHE_TTL
+            ):
+                payload = _weekend_preview_cache["data"]
+            else:
+                try:
+                    from fmp_client import get_market_futures, get_market_forex, get_next_session_calendar
+                    futures = get_market_futures()
+                    forex = get_market_forex()
+                    calendar = get_next_session_calendar()
+                    payload = {
+                        "futures": futures,
+                        "forex": forex,
+                        "calendar": calendar,
+                        "ts": int(_now),
+                    }
+                    _weekend_preview_cache["data"] = payload
+                    _weekend_preview_cache["fetched_at"] = _now
+                except Exception as exc:
+                    log.warning("[dashboard][/api/weekend-preview] error: %s", exc)
+                    payload = {"futures": [], "forex": [], "calendar": [], "ts": int(_now), "error": str(exc)}
+            self.wfile.write(json.dumps(payload).encode())
         else:
             self.send_response(404)
             self.end_headers()

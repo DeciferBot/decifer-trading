@@ -1420,6 +1420,69 @@ def get_sp500_tickers() -> list[str]:
     return [item["symbol"] for item in data if item.get("symbol")]
 
 
+def get_market_futures() -> list[dict]:
+    """
+    Fetch live ES=F and NQ=F quotes via futures_data.py (approved yfinance carve-out).
+
+    FMP Premium does not include commodities/forex endpoints on the bot's plan.
+    yfinance is the only viable source for these symbols and is explicitly approved.
+    Returns list of dicts: symbol, name, price, change_pct, prev_close.
+    """
+    try:
+        from futures_data import fetch_futures_quotes
+        return fetch_futures_quotes()
+    except Exception:
+        return []
+
+
+def get_market_forex() -> list[dict]:
+    """
+    Fetch live forex quotes. FMP forex endpoints require a higher plan tier.
+    Returns empty list — forex display is omitted when unavailable.
+    """
+    return []
+
+
+def get_next_session_calendar() -> list[dict]:
+    """
+    Return High and Medium impact US economic events for the next 3 trading days.
+    Includes events that have already printed (actual != None) so overnight misses are visible.
+    """
+    today = date.today()
+    end_dt = today + timedelta(days=4)
+    raw = _get(
+        "economic-calendar",
+        {"from": str(today), "to": str(end_dt)},
+        ttl=30 * 60,
+    )
+    if not raw or not isinstance(raw, list):
+        return []
+
+    events = []
+    for item in raw:
+        country = (item.get("country") or "").upper()
+        if country not in ("US", "USD"):
+            continue
+        impact = (item.get("impact") or "").capitalize()
+        if impact not in ("High", "Medium"):
+            continue
+        raw_date = (item.get("date") or "")
+        event_date = raw_date[:10]
+        event_time = raw_date[11:16] if len(raw_date) > 10 else ""
+        events.append({
+            "date": event_date,
+            "time_et": event_time,
+            "event": item.get("event") or "",
+            "impact": impact,
+            "estimate": _safe_float(item.get("estimate")),
+            "previous": _safe_float(item.get("previous")),
+            "actual": _safe_float(item.get("actual")),
+            "unit": item.get("unit") or "",
+        })
+
+    return sorted(events, key=lambda x: (x["date"], x["time_et"]))
+
+
 def _safe_pct(val) -> float | None:
     """
     Convert FMP decimal fraction (0.35) to percentage (35.0).
