@@ -31,6 +31,18 @@ function scoreLabel(score: number): { text: string; color: string } {
   return { text: "Moderate", color: "#888" };
 }
 
+// Returns the correct dominant side based on actual expansion data, overriding stale backend field
+function deriveSide(row: LeaderboardRow): string {
+  const ce = row.call_expansion ?? 0;
+  const pe = row.put_expansion ?? 0;
+  const uc = row.unusual_calls ?? false;
+  const up = row.unusual_puts ?? false;
+  if (uc && up) return ce >= pe ? "CALL" : "PUT";
+  if (uc) return "CALL";
+  if (up) return "PUT";
+  return row.dominant_side ?? "MIXED";
+}
+
 function plainSignal(row: LeaderboardRow): string {
   const ce = row.call_expansion ?? 0;
   const pe = row.put_expansion ?? 0;
@@ -41,60 +53,193 @@ function plainSignal(row: LeaderboardRow): string {
   const callRatio = pv > 10 ? cv / pv : null;
   const putRatio  = cv > 10 ? pv / cv : null;
 
-  // Both sides unusual — determine if one clearly dominates
   if (uc && up) {
-    const callDominant = ce >= pe * 1.5;
-    const putDominant  = pe >= ce * 1.5;
+    const callDominant  = ce >= pe * 1.5;
+    const putDominant   = pe >= ce * 1.5;
+    const callSoftLean  = !callDominant && !putDominant && ce > pe * 1.2;
+    const putSoftLean   = !callDominant && !putDominant && pe > ce * 1.2;
+
     if (callDominant && callRatio && callRatio >= 3) {
-      return `Both calls and puts jumped, but calls are leading by a wide margin (${ce.toFixed(1)}× vs ${pe.toFixed(1)}×, ratio ${callRatio.toFixed(1)}:1). Bullish tilt — the put activity looks like hedging rather than a directional bet.`;
+      return `Calls jumped ${ce.toFixed(1)}x vs puts at ${pe.toFixed(1)}x, with a ${callRatio.toFixed(1)}:1 ratio. Puts are likely hedging. The directional bet is up.`;
     }
     if (callDominant) {
-      return `Unusual activity on both sides, with calls leading (${ce.toFixed(1)}× vs puts at ${pe.toFixed(1)}×). Likely bullish positioning with some hedging mixed in.`;
+      return `Both sides active, but calls are leading at ${ce.toFixed(1)}x vs puts at ${pe.toFixed(1)}x. Leans bullish with some protection mixed in.`;
     }
     if (putDominant && putRatio && putRatio >= 3) {
-      return `Both calls and puts spiked, but puts are overwhelming calls (${pe.toFixed(1)}× vs ${ce.toFixed(1)}×, ratio ${putRatio.toFixed(1)}:1). Someone is betting on downside or protecting a large position.`;
+      return `Puts are overwhelming calls: ${pe.toFixed(1)}x vs ${ce.toFixed(1)}x, a ${putRatio.toFixed(1)}:1 ratio. Someone is making a serious downside bet or protecting a big position.`;
     }
     if (putDominant) {
-      return `Unusual activity on both sides, with puts leading (${pe.toFixed(1)}× vs calls at ${ce.toFixed(1)}×). Could be defensive positioning or a bearish bet.`;
+      return `Both sides active, puts leading at ${pe.toFixed(1)}x vs calls at ${ce.toFixed(1)}x. Leans bearish or defensive.`;
     }
-    // Balanced both sides — classic event-driven
-    return `Call and put volume both spiked together (calls ${ce.toFixed(1)}×, puts ${pe.toFixed(1)}×). When both sides move at once it usually signals a known upcoming event — earnings, FDA decision, or macro announcement.`;
+    if (callSoftLean) {
+      return `Both sides spiked, with calls slightly ahead (${ce.toFixed(1)}x vs puts at ${pe.toFixed(1)}x). Likely event positioning with a mild bullish lean.`;
+    }
+    if (putSoftLean) {
+      return `Both sides spiked, with puts slightly ahead (${pe.toFixed(1)}x vs calls at ${ce.toFixed(1)}x). Likely event positioning with a mild bearish lean.`;
+    }
+    return `Both calls (${ce.toFixed(1)}x) and puts (${pe.toFixed(1)}x) spiked together. When both sides move like this, a known catalyst is usually the driver: earnings, an FDA decision, or a big macro print.`;
   }
 
-  // Calls only unusual
   if (uc) {
     if (ce >= 4) {
-      const ratioNote = callRatio && callRatio >= 5 ? ` Only ${fmtContracts(pv)} puts traded vs ${fmtContracts(cv)} calls — very one-sided.` : "";
-      return `Very heavy call buying — ${ce.toFixed(1)}× yesterday's volume.${ratioNote} Someone is making a large bet this goes up.`;
+      const ratioNote = callRatio && callRatio >= 5 ? ` Only ${fmtContracts(pv)} puts traded vs ${fmtContracts(cv)} calls. Very one-sided.` : "";
+      return `Heavy call buying at ${ce.toFixed(1)}x yesterday's volume.${ratioNote} A large bet this goes up.`;
     }
     if (ce >= 2) {
-      return `Call buying picked up significantly — ${ce.toFixed(1)}× yesterday's volume. Traders are positioning for upside.`;
+      return `Calls picked up to ${ce.toFixed(1)}x normal volume. Traders are positioning for upside.`;
     }
-    return `Mild increase in call activity — ${ce.toFixed(1)}× yesterday's normal level.`;
+    return `Call activity ticked up to ${ce.toFixed(1)}x normal. Mild bullish interest.`;
   }
 
-  // Puts only unusual
   if (up) {
     if (pe >= 4) {
-      return `Very heavy put buying — ${pe.toFixed(1)}× yesterday's volume. Someone is either betting on a drop or protecting a large long position.`;
+      return `Heavy put buying at ${pe.toFixed(1)}x yesterday's volume. Either a downside bet or someone protecting a large position.`;
     }
     if (pe >= 2) {
-      return `Put buying picked up significantly — ${pe.toFixed(1)}× yesterday's volume. Traders are positioning for downside or hedging.`;
+      return `Puts picked up to ${pe.toFixed(1)}x normal volume. Traders are positioning for downside or hedging.`;
     }
-    return `Mild increase in put activity — ${pe.toFixed(1)}× yesterday's normal level.`;
+    return `Put activity ticked up to ${pe.toFixed(1)}x normal. Mild bearish or defensive interest.`;
   }
 
-  return "Volume expansion detected — above normal activity but below the unusual threshold.";
+  return "Volume picked up above normal but below the unusual threshold.";
 }
 
 function simpleBrief(info: CompanyInfo | undefined): string {
   if (!info?.brief) return "";
-  const b = info.brief;
-  // Strip the company name from the start of the description — it's already shown
   const name = info.name ?? "";
-  const stripped = b.startsWith(name) ? b.slice(name.length).replace(/^\s*[,.]?\s*/, "") : b;
-  // Capitalise first letter
-  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  // ETFs and funds already explain themselves in the name — brief adds no signal
+  if (/\b(ETF|Fund|Trust|Index)\b/i.test(name)) return "";
+  const b = info.brief;
+  let stripped = b.startsWith(name) ? b.slice(name.length).replace(/^\s*[,.]?\s*/, "") : b;
+  stripped = stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  // Word-safe truncation at 85 chars
+  if (stripped.length <= 85) return stripped;
+  const cut = stripped.slice(0, 85).lastIndexOf(" ");
+  return stripped.slice(0, cut > 0 ? cut : 85) + "…";
+}
+
+function volumeLabel(callVol: number | null | undefined, putVol: number | null | undefined): { text: string; color: string } | null {
+  const total = (callVol ?? 0) + (putVol ?? 0);
+  if (total === 0) return null;
+  if (total >= 50_000) return { text: "Institutional size", color: "#3b82f6" };
+  if (total >= 10_000) return { text: "Large flow", color: "#8b5cf6" };
+  if (total >= 2_000)  return { text: "Notable", color: "#888" };
+  return null; // light volume not worth labeling
+}
+
+// ── Market Pulse narrative ────────────────────────────────────────────────────
+
+interface Pulse {
+  headline: string;
+  detail: string;
+  callCount: number;
+  putCount: number;
+  eventCount: number;
+  topSymbols: string[];
+}
+
+function buildMarketPulse(rows: LeaderboardRow[], companyMap: Record<string, CompanyInfo>): Pulse | null {
+  if (rows.length === 0) return null;
+
+  const callOnly = rows.filter(r => r.unusual_calls && !r.unusual_puts);
+  const putOnly  = rows.filter(r => r.unusual_puts && !r.unusual_calls);
+  const both     = rows.filter(r => r.unusual_calls && r.unusual_puts);
+
+  // Determine session tone
+  const callPct = callOnly.length / rows.length;
+  const putPct  = putOnly.length / rows.length;
+  const bothPct = both.length / rows.length;
+
+  let tone: string;
+  if (callPct > 0.35) tone = "skewed bullish. Calls dominating across the board";
+  else if (putPct > 0.35) tone = "skewed bearish. Puts dominating, defensive positioning";
+  else if (bothPct > 0.25) tone = "event-driven. Both sides moving together points to known catalysts ahead";
+  else tone = "mixed. No clear directional consensus";
+
+  // Top 3 names with short labels
+  const top3 = rows.slice(0, 3).map(r => {
+    const name = companyMap[r.underlying]?.name;
+    const shortName = name
+      ? name.replace(/,?\s*(Inc|Corp|Ltd|Co)\.?(\s|$)/gi, " ").replace(/\s+/g, " ").trim().replace(/[,.]$/, "").split(" ").slice(0, 2).join(" ")
+      : null;
+    return shortName ? `${r.underlying} (${shortName})` : r.underlying;
+  });
+
+  // Classify call dominance in top symbol
+  const topRow = rows[0];
+  const topCe = topRow.call_expansion ?? 0;
+  const topPe = topRow.put_expansion ?? 0;
+  let leadingNote = "";
+  if (topCe >= 3 && topCe > topPe * 1.5) {
+    leadingNote = `${topRow.underlying} leads with ${topCe.toFixed(1)}x call expansion. A strong directional bet.`;
+  } else if (topPe >= 3 && topPe > topCe * 1.5) {
+    leadingNote = `${topRow.underlying} leads with ${topPe.toFixed(1)}x put expansion. Heavy downside positioning.`;
+  } else if (topCe >= 2 && topPe >= 2) {
+    leadingNote = `${topRow.underlying} has both sides moving (calls ${topCe.toFixed(1)}x, puts ${topPe.toFixed(1)}x). Event risk is the likely driver.`;
+  }
+
+  const headline = `${rows.length} symbols with unusual activity. Session is ${tone}.`;
+
+  // Flag if the top symbol's direction contradicts the session tone
+  const sessionBullish = callPct > putPct;
+  const topIsBullish = (topRow.call_expansion ?? 0) > (topRow.put_expansion ?? 0);
+  const contradiction = (sessionBullish && !topIsBullish) || (!sessionBullish && topIsBullish)
+    ? ` Note: the biggest flow (${topRow.underlying}) is going the other way.`
+    : "";
+
+  const detail = `Leading: ${top3.join(", ")}. ${leadingNote}${contradiction}`;
+
+  return {
+    headline,
+    detail,
+    callCount: callOnly.length,
+    putCount: putOnly.length,
+    eventCount: both.length,
+    topSymbols: rows.slice(0, 3).map(r => r.underlying),
+  };
+}
+
+function MarketPulseBanner({ pulse, ts }: { pulse: Pulse; ts: string | null }) {
+  const asOf = ts
+    ? new Date(ts).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) + " ET"
+    : null;
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, #111 0%, #0f0f0f 100%)",
+      border: "1px solid #2a2a2a",
+      borderRadius: 10,
+      padding: "16px 18px",
+      marginBottom: 20,
+      marginTop: 16,
+    }}>
+      {asOf && (
+        <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+          As of {asOf}
+        </div>
+      )}
+      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", lineHeight: 1.4, marginBottom: 8 }}>
+        {pulse.headline}
+      </div>
+      <div style={{ fontSize: 13, color: "var(--muted2)", lineHeight: 1.55, marginBottom: 12 }}>
+        {pulse.detail}
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <PulseStat label="Call plays" value={pulse.callCount} color="var(--green)" />
+        <PulseStat label="Put plays" value={pulse.putCount} color="var(--red)" />
+        <PulseStat label="Event-driven" value={pulse.eventCount} color="var(--yellow)" />
+      </div>
+    </div>
+  );
+}
+
+function PulseStat({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+      <span style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "var(--mono)" }}>{value}</span>
+      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>{label}</span>
+    </div>
+  );
 }
 
 // ── Symbol Detail Panel ───────────────────────────────────────────────────────
@@ -136,23 +281,20 @@ function SymbolPanel({ ticker, onClose }: { ticker: string; onClose: () => void 
                 <SideBadge side={data.summary.dominant_side} />
                 <ScoreBar score={data.summary.top_score} />
               </div>
-              {/* Expansion ratios */}
               <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                 <ExpansionPill label="Calls" value={data.summary.call_expansion} active={data.summary.unusual_calls} />
                 <ExpansionPill label="Puts" value={data.summary.put_expansion} active={data.summary.unusual_puts} />
               </div>
-              {/* Volume breakdown */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
                 <Stat label="Call volume" value={data.summary.call_volume != null ? fmtContracts(data.summary.call_volume) : "—"} />
                 <Stat label="Put volume" value={data.summary.put_volume != null ? fmtContracts(data.summary.put_volume) : "—"} />
                 <Stat label="Call sweeps" value={String(data.summary.call_sweep_count)} />
                 <Stat label="Put sweeps" value={String(data.summary.put_sweep_count)} />
               </div>
-              {/* Flags */}
               {(data.summary.flags ?? []).length > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   {(data.summary.flags ?? []).map((f, i) => (
-                    <div key={i} style={{ fontSize: 11, color: "#ccc", marginBottom: 3 }}>· {f}</div>
+                    <div key={i} style={{ fontSize: 11, color: "var(--muted2)", marginBottom: 3 }}>· {f}</div>
                   ))}
                 </div>
               )}
@@ -215,7 +357,7 @@ function EventRow({ event: e, compact, onSymbolClick }: {
           {e.strike && <span>@ ${e.strike.toFixed(0)} strike</span>}
           {e.expiry && <span>exp {e.expiry}</span>}
           {e.price && <span>px ${e.price.toFixed(2)}</span>}
-          <span style={{ color: "var(--muted)" }}>{fmtTime(e.ts)}</span>
+          <span>{fmtTime(e.ts)}</span>
         </div>
         {e.driver_tags.length > 0 && (
           <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -260,31 +402,29 @@ function LeaderRow({ row, info, onSymbolClick }: {
       onMouseEnter={(e) => (e.currentTarget.style.background = "#0d0d0d")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
-      {/* Row 1: logo + name + side + score label */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
         <SymbolLogo symbol={row.underlying} size={34} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
             <span style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--mono)", flexShrink: 0 }}>
               {row.underlying}
             </span>
             {info?.name && (
-              <span style={{ fontSize: 12, color: "#999", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 12, color: "var(--muted2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {info.name}
               </span>
             )}
           </div>
-          {/* What the company does — plain English */}
+          {/* Company context — secondary, not the story */}
           {brief && (
-            <div style={{ fontSize: 11, color: "#555", lineHeight: 1.45, marginBottom: 6 }}>
+            <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.45, marginBottom: 6 }}>
               {brief}
             </div>
           )}
-          {/* Plain-English signal interpretation */}
-          <div style={{ fontSize: 12, color: "#ccc", lineHeight: 1.5, marginBottom: 8 }}>
+          {/* What this flow is actually saying */}
+          <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.55, marginBottom: 8 }}>
             {signal}
           </div>
-          {/* Data line: expansion pills + raw volume */}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
             <ExpansionPill label="Calls" value={row.call_expansion} active={row.unusual_calls} />
             <ExpansionPill label="Puts" value={row.put_expansion} active={row.unusual_puts} />
@@ -293,12 +433,19 @@ function LeaderRow({ row, info, onSymbolClick }: {
                 {fmtContracts(row.call_volume)}C · {fmtContracts(row.put_volume)}P
               </span>
             )}
+            {(() => {
+              const vl = volumeLabel(row.call_volume, row.put_volume);
+              return vl ? (
+                <span style={{ fontSize: 10, fontWeight: 600, color: vl.color, letterSpacing: "0.04em" }}>
+                  {vl.text}
+                </span>
+              ) : null;
+            })()}
             {(row.driver_tags ?? []).slice(0, 1).map((t) => <DriverTag key={t} tag={t} />)}
           </div>
         </div>
-        {/* Score column */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0, minWidth: 80 }}>
-          <SideBadge side={row.dominant_side} />
+          <SideBadge side={deriveSide(row)} />
           <span style={{ fontSize: 11, fontWeight: 700, color: scoreColor }}>{scoreText}</span>
           <ScoreBar score={row.top_score} />
         </div>
@@ -349,7 +496,7 @@ function FilterBar({
       style={{
         background: active ? "rgba(232,125,46,0.15)" : "var(--surface2)",
         border: `1px solid ${active ? "rgba(232,125,46,0.4)" : "var(--border)"}`,
-        color: active ? "var(--orange)" : "var(--muted)",
+        color: active ? "var(--orange)" : "var(--muted2)",
         borderRadius: 20, padding: "3px 12px",
         fontSize: 11, fontWeight: 600, letterSpacing: "0.05em",
       }}
@@ -371,6 +518,32 @@ function FilterBar({
   );
 }
 
+// ── Live feed offline state ───────────────────────────────────────────────────
+
+function FeedOfflineCard() {
+  return (
+    <div style={{
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      borderRadius: 10,
+      padding: "28px 24px",
+      marginTop: 20,
+      textAlign: "center",
+    }}>
+      <div style={{ fontSize: 28, marginBottom: 12 }}>📡</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
+        Live stream offline
+      </div>
+      <div style={{ fontSize: 13, color: "var(--muted2)", lineHeight: 1.6, maxWidth: 360, margin: "0 auto", marginBottom: 16 }}>
+        The real-time event stream runs during market hours only. Individual option sweeps and clusters are captured as they happen and appear here while the market is open.
+      </div>
+      <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
+        Outside market hours, use the <strong style={{ color: "var(--muted2)" }}>Leaderboard</strong> tab. It shows the end-of-session summary with all unusual activity ranked by magnitude.
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function OptionsPage() {
@@ -379,6 +552,7 @@ export default function OptionsPage() {
   const [side, setSide] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [feed, setFeed] = useState<FlowEvent[]>([]);
+  const [feedAvailable, setFeedAvailable] = useState<boolean | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -392,10 +566,10 @@ export default function OptionsPage() {
 
     if (!lbData && !feedData) { setUnavailable(true); return; }
     setUnavailable(false);
+
     if (lbData) {
       setLeaderboard(lbData.leaderboard);
       setLastUpdated(lbData.ts);
-      // Fetch company info for visible symbols (fire-and-forget, non-blocking)
       const syms = lbData.leaderboard.map((r) => r.underlying);
       getCompanyInfo(syms).then((d) => {
         if (!d?.results) return;
@@ -406,17 +580,26 @@ export default function OptionsPage() {
         });
       });
     }
-    if (feedData) { setFeed(feedData.events); setLastUpdated(feedData.ts); }
+
+    if (feedData) {
+      setFeed(feedData.events);
+      setLastUpdated(feedData.ts);
+      setFeedAvailable(true);
+    } else {
+      // leaderboard loaded but feed endpoint returned null — stream offline
+      setFeedAvailable(false);
+    }
   }, [signal, side]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Auto-poll
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     timerRef.current = setInterval(refresh, POLL_INTERVAL_MS);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [refresh]);
+
+  const pulse = buildMarketPulse(leaderboard, companyMap);
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -438,14 +621,17 @@ export default function OptionsPage() {
 
           {!unavailable && tab === "leaderboard" && (
             <>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingTop: 16, paddingBottom: 8 }}>
+              {pulse && <MarketPulseBanner pulse={pulse} ts={lastUpdated} />}
+
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingTop: 4, paddingBottom: 8 }}>
                 <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                  Hottest symbols — last 30 min
+                  {leaderboard.length} symbols ranked by unusual flow
                 </span>
-                <span style={{ fontSize: 10, color: "#444" }}>
-                  Score = how unusual today&apos;s options activity is vs. yesterday
+                <span style={{ fontSize: 10, color: "var(--muted)" }}>
+                  Score = how unusual today&apos;s activity is vs. yesterday
                 </span>
               </div>
+
               {leaderboard.length === 0 && (
                 <div style={{ color: "var(--muted)", fontSize: 13, padding: "24px 0" }}>No unusual flow detected yet.</div>
               )}
@@ -457,15 +643,21 @@ export default function OptionsPage() {
 
           {!unavailable && tab === "feed" && (
             <>
-              <div style={{ paddingTop: 16, paddingBottom: 8, fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                Live events — newest first
-              </div>
-              {feed.length === 0 && (
-                <div style={{ color: "var(--muted)", fontSize: 13, padding: "24px 0" }}>No events in the current filter.</div>
+              {feedAvailable === false && <FeedOfflineCard />}
+
+              {feedAvailable === true && (
+                <>
+                  <div style={{ paddingTop: 16, paddingBottom: 8, fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    Live events — newest first
+                  </div>
+                  {feed.length === 0 && (
+                    <div style={{ color: "var(--muted)", fontSize: 13, padding: "24px 0" }}>No events match this filter.</div>
+                  )}
+                  {feed.map((e, i) => (
+                    <EventRow key={i} event={e} onSymbolClick={setSelectedSymbol} />
+                  ))}
+                </>
               )}
-              {feed.map((e, i) => (
-                <EventRow key={i} event={e} onSymbolClick={setSelectedSymbol} />
-              ))}
             </>
           )}
         </div>
