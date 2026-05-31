@@ -45,7 +45,7 @@ SENTIMENT_SCORER_INTERVAL = int(os.getenv("SENTIMENT_SCORER_INTERVAL", str(15 * 
 
 CONFIG = {
     # ── IBKR CONNECTION ────────────────────────────────────────
-    "ibkr_host": "127.0.0.1",
+    "ibkr_host": os.environ.get("IBKR_HOST", "127.0.0.1"),
     "ibkr_port": 7496,  # 7496 = TWS/Gateway
     "ibkr_client_id": 10,
     "active_account": os.environ.get("IBKR_ACTIVE_ACCOUNT", ""),
