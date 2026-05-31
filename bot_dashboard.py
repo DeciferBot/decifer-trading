@@ -905,8 +905,6 @@ class DashHandler(BaseHTTPRequestHandler):
                 html = html.replace("__DECIFER_VERSION__", _mod.__version__)
             except Exception:
                 html = html.replace("__DECIFER_VERSION__", "?")
-            if self._is_remote_request():
-                html = html.replace("<body>", '<body class="remote-mode">', 1)
             self.wfile.write(html.encode())
         elif self.path == "/api/state":
             self.send_response(200)
@@ -1895,12 +1893,6 @@ class DashHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"ok": False, "error": str(exc)}).encode())
             return
 
-        if self._is_remote_request():
-            self.send_response(403)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "write operations not available remotely"}).encode())
-            return
         ib = bot_state.ib
         if self.path == "/api/reconnect":
             import bot_state as _bs
