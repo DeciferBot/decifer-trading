@@ -24,9 +24,10 @@ function fmtContracts(n: number) {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
-function scoreLabel(score: number): { text: string; color: string } {
-  if (score >= 100) return { text: "Max unusual", color: "#e74c3c" };
-  if (score >= 80)  return { text: "High activity", color: "#e87d2e" };
+function scoreLabel(score: number, side?: string): { text: string; color: string } {
+  const dirColor = side === "CALL" ? "#2ecc71" : side === "PUT" ? "#e74c3c" : null;
+  if (score >= 100) return { text: "Max unusual", color: dirColor ?? "#e87d2e" };
+  if (score >= 80)  return { text: "High activity", color: dirColor ?? "#e87d2e" };
   if (score >= 60)  return { text: "Elevated", color: "#f1c40f" };
   return { text: "Moderate", color: "#888" };
 }
@@ -395,7 +396,8 @@ function LeaderRow({ row, info, onSymbolClick }: {
 }) {
   const brief = simpleBrief(info);
   const signal = plainSignal(row);
-  const { text: scoreText, color: scoreColor } = scoreLabel(row.top_score);
+  const side = deriveSide(row);
+  const { text: scoreText, color: scoreColor } = scoreLabel(row.top_score, side);
 
   return (
     <div
@@ -447,9 +449,9 @@ function LeaderRow({ row, info, onSymbolClick }: {
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0, minWidth: 80 }}>
-          <SideBadge side={deriveSide(row)} />
+          <SideBadge side={side} />
           <span style={{ fontSize: 11, fontWeight: 700, color: scoreColor }}>{scoreText}</span>
-          <ScoreBar score={row.top_score} />
+          <ScoreBar score={row.top_score} side={side} />
         </div>
       </div>
     </div>

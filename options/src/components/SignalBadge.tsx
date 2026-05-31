@@ -35,9 +35,8 @@ export function SideBadge({ side }: { side: Side }) {
   );
 }
 
-export function ScoreBar({ score }: { score: number }) {
-  // Score = unusualness intensity, not direction — always orange, never red/green
-  const color = score >= 80 ? "#e87d2e" : score >= 60 ? "#e8a42e" : score >= 40 ? "#f1c40f" : "#555";
+export function ScoreBar({ score, side }: { score: number; side?: Side }) {
+  const color = side === "CALL" ? "#2ecc71" : side === "PUT" ? "#e74c3c" : "#e87d2e";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <div style={{ width: 48, height: 3, background: "#222", borderRadius: 2, overflow: "hidden" }}>
