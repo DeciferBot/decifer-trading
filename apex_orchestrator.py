@@ -48,6 +48,7 @@ _shadow_log_lock = threading.Lock()
 _DRIVER_STATE_PATH       = os.path.join("data", "intelligence", "live_driver_state.json")
 _THEME_STATE_PATH        = os.path.join("data", "intelligence", "theme_activation.json")
 _COUNTER_THESIS_PATH     = os.path.join("data", "intelligence", "counter_thesis_cache.json")
+_MACRO_EVENTS_PATH       = os.path.join("data", "intelligence", "macro_events.jsonl")
 
 
 def _load_driver_notes() -> dict:
@@ -149,7 +150,49 @@ def _load_driver_notes() -> dict:
         if warnings:
             summary += f" Watch: {warnings[0]}"
 
-        return {"active_drivers": active, "warnings": warnings, "summary": summary}
+        # ── Recent earnings call transcript intelligence ────────────────────────
+        transcript_notes: list[str] = []
+        try:
+            from datetime import timedelta
+            now_ts = datetime.now(UTC)
+            if os.path.exists(_MACRO_EVENTS_PATH):
+                with open(_MACRO_EVENTS_PATH, encoding="utf-8") as _ef:
+                    for _line in _ef:
+                        _line = _line.strip()
+                        if not _line:
+                            continue
+                        try:
+                            _ev = json.loads(_line)
+                        except Exception:
+                            continue
+                        if _ev.get("event_type") != "earnings_call_guidance":
+                            continue
+                        # Only include events from the last 72 hours
+                        recorded = _ev.get("recorded_at", "")
+                        try:
+                            age_h = (now_ts - datetime.fromisoformat(recorded)).total_seconds() / 3600
+                        except Exception:
+                            age_h = 999
+                        if age_h > 72:
+                            continue
+                        sym     = _ev.get("symbol", "")
+                        guide   = _ev.get("guidance_direction", "")
+                        tone    = _ev.get("tone", "")
+                        outlook = _ev.get("forward_outlook", "")
+                        diverges = _ev.get("diverges_from_headline", False)
+                        div_flag = " ⚠ diverges from headline EPS result" if diverges else ""
+                        transcript_notes.append(
+                            f"  {sym} (Q-call): guidance={guide} tone={tone}{div_flag} — {outlook}"
+                        )
+        except Exception as _te:
+            log.debug("_load_driver_notes: transcript load failed — %s", _te)
+
+        return {
+            "active_drivers":    active,
+            "warnings":          warnings,
+            "summary":           summary,
+            "transcript_notes":  transcript_notes,
+        }
 
     except Exception as exc:
         log.debug("_load_driver_notes failed: %s", exc)

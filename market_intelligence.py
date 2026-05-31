@@ -1187,6 +1187,11 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
             parts.append(f"  {driver_notes['summary']}")
         for w in driver_notes.get("warnings", []):
             parts.append(f"  ⚠ {w}")
+        transcript_notes = driver_notes.get("transcript_notes") or []
+        if transcript_notes:
+            parts.append("\n[EARNINGS CALL INTELLIGENCE] (recent call transcripts — guidance signals only, not orders)")
+            for tn in transcript_notes:
+                parts.append(tn)
     if sctx:
         parts.append(f"  market_read (cached): {sctx.market_read}")
         if sctx.overnight_text:

@@ -684,6 +684,30 @@ def get_earnings_surprise_history(symbol: str, limit: int = 8) -> list[dict]:
     return results
 
 
+# ── Earnings Call Transcripts ─────────────────────────────────────────────────
+
+
+def get_earnings_transcript(symbol: str, year: int, quarter: int) -> str | None:
+    """
+    Fetch the earnings call transcript for a symbol/period from FMP.
+
+    Returns the transcript text string, or None if unavailable.
+    Cached for 7 days — transcripts are immutable once published.
+    """
+    raw = _get(
+        "earning_call_transcript",
+        {"symbol": symbol.upper(), "year": str(year), "quarter": str(quarter)},
+        ttl=7 * 24 * 3600,
+    )
+    if not raw:
+        return None
+    item = raw[0] if isinstance(raw, list) and raw else (raw if isinstance(raw, dict) else None)
+    if not item:
+        return None
+    text = item.get("content") or item.get("transcript") or ""
+    return text.strip() or None
+
+
 # ── Company Profile / Sector ──────────────────────────────────────────────────
 
 

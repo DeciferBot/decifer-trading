@@ -470,6 +470,30 @@ def run() -> None:
         log.warning("Counter-thesis cache refresh failed (non-fatal): %s: %s", type(_ct_err).__name__, _ct_err)
         print(f"      [WARN] Counter-thesis cache skipped: {type(_ct_err).__name__}: {_ct_err}")
 
+    # Step 7 — Earnings transcript intelligence (fail-soft)
+    print("[7/7] Processing recent earnings call transcripts...")
+    try:
+        from earnings_transcript_engine import process_recent_earnings
+        # Load committed universe symbols for filtering
+        _universe_symbols: list[str] = []
+        try:
+            _committed_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "data", "committed_universe.json"
+            )
+            with open(_committed_path, encoding="utf-8") as _fh:
+                _cu = json.load(_fh)
+            _universe_symbols = [s.get("symbol", "") for s in (_cu if isinstance(_cu, list) else [])]
+        except Exception:
+            pass
+        processed = process_recent_earnings(_universe_symbols, hours_back=36)
+        if processed:
+            print(f"      transcripts processed: {', '.join(processed)}")
+        else:
+            print("      no earnings transcripts to process")
+    except Exception as _tr_err:
+        log.warning("Transcript processing failed (non-fatal): %s: %s", type(_tr_err).__name__, _tr_err)
+        print(f"      [WARN] Transcript step skipped: {type(_tr_err).__name__}: {_tr_err}")
+
     print("=== Done ===")
 
 

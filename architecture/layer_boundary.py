@@ -145,6 +145,8 @@ _INTELLIGENCE_MODULES: frozenset[str] = frozenset({
     "theme_graph",
     # ── Macro Event Layer — news → structured macro intelligence ──
     "macro_event_layer",
+    # ── Earnings Transcript Engine — call transcripts → guidance intelligence ──
+    "earnings_transcript_engine",
     # ── Source-of-truth market data (movers/news/tape) for intelligence cloud ──
     "market_data_provider",
 })
