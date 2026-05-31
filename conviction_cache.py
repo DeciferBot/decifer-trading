@@ -210,17 +210,36 @@ def _apply_relative_tiers(results: dict[str, dict]) -> None:
 # ---------------------------------------------------------------------------
 
 _loaded = False
+_loaded_mtime: float = 0.0
 _load_lock = threading.Lock()
 
 
 def _ensure_loaded() -> None:
-    global _loaded
+    """
+    Load from disk on cold start. Also reload if the disk file is newer than
+    our last load — catches the case where another gunicorn worker finished a
+    full rescore and wrote a fresh file while we were serving a stale cache.
+    """
+    global _loaded, _loaded_mtime
+    # Fast path: already loaded and disk file hasn't changed
     if _loaded:
-        return
+        try:
+            current_mtime = _CACHE_FILE.stat().st_mtime if _CACHE_FILE.exists() else 0.0
+            if current_mtime <= _loaded_mtime:
+                return
+        except Exception:
+            return
+
     with _load_lock:
-        if not _loaded:
+        try:
+            current_mtime = _CACHE_FILE.stat().st_mtime if _CACHE_FILE.exists() else 0.0
+        except Exception:
+            current_mtime = 0.0
+
+        if not _loaded or current_mtime > _loaded_mtime:
             _load_from_disk()
             _loaded = True
+            _loaded_mtime = current_mtime
 
 
 def _trigger_rescore(symbols: list[str], reason: str) -> None:
