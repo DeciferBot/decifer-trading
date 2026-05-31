@@ -1,0 +1,54 @@
+# deployment/decifer-trading.service
+#
+# Systemd unit for the Decifer Trading Bot — DigitalOcean droplet.
+#
+# Runs bot.py with auto-restart. Requires IBeam (IB Gateway) to be running
+# before starting — see deployment/ibeam-docker.service for gateway setup.
+#
+# Installation:
+#   sudo cp deployment/decifer-trading.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable decifer-trading
+#   sudo systemctl start decifer-trading
+#
+# Logs:
+#   journalctl -u decifer-trading -f
+#   tail -f /opt/decifer/logs/bot-launchd.log
+#
+# Stop before code updates:
+#   sudo systemctl stop decifer-trading
+#   cd /opt/decifer && git pull
+#   sudo systemctl start decifer-trading
+
+[Unit]
+Description=Decifer Trading Bot (bot.py)
+After=network-online.target docker.service
+Wants=network-online.target
+# Give IBeam time to start the gateway before the bot tries to connect
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/decifer
+
+EnvironmentFile=-/opt/decifer/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+ExecStart=/opt/decifer/venv/bin/python3 bot.py
+
+# Restart on crash, 30s between attempts (mirrors Mac launchd ThrottleInterval)
+Restart=always
+RestartSec=30
+
+# Memory and CPU caps — leaves room for intelligence-api and IBeam on same droplet
+MemoryMax=2G
+CPUQuota=150%
+
+StandardOutput=append:/opt/decifer/logs/bot-launchd.log
+StandardError=append:/opt/decifer/logs/bot-launchd.log
+
+[Install]
+WantedBy=multi-user.target

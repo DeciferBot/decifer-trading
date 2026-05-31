@@ -120,7 +120,7 @@ services:
     profiles: [live]   # Safety gate: requires --profile live to start
     build: .
     image: decifer-trading:latest
-    command: python3 scripts/healthcheck.py   # safe default — NOT bot.py
+    command: python3 bot.py
     restart: unless-stopped
     network_mode: host    # Linux only — required for IBKR localhost connection
     depends_on:
@@ -263,9 +263,38 @@ services:
       retries: 2
       start_period: 120s
 
-# ── Named volume ──────────────────────────────────────────────────────────────
+  # ── IBeam — headless IB Gateway (paper account) ─────────────────────────────
+  # Runs IB Gateway on Linux without a display. Handles auto-login and the 24h
+  # session keepalive. The live-bot reaches it via host networking at 127.0.0.1:4002.
+  #
+  # Credentials: IBEAM_ACCOUNT and IBEAM_PASSWORD in .env (never committed).
+  # Start:  docker compose --profile ibkr up -d ibeam
+  # Health: curl http://localhost:5000/v1/api/tickle
+  ibeam:
+    profiles: [ibkr]
+    image: voyz/ibeam:latest
+    restart: unless-stopped
+    environment:
+      - IBEAM_ACCOUNT=${IBEAM_ACCOUNT}
+      - IBEAM_PASSWORD=${IBEAM_PASSWORD}
+      - IBEAM_GATEWAY_BASE_URL=https://localhost:4002
+      - IBEAM_LOG_TO_FILE=True
+    ports:
+      - "127.0.0.1:4002:4002"
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - ibeam-conf:/srv/ibeam/conf
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+
+# ── Named volumes ──────────────────────────────────────────────────────────────
 # On first deploy, seed data/ via rsync from dev machine before compose up.
 # Then: chown -R 1000:1000 /opt/decifer/data /opt/decifer/logs
 volumes:
   decifer-data:
+    driver: local
+  ibeam-conf:
     driver: local
