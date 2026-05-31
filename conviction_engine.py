@@ -865,9 +865,16 @@ def _score_peer_network(symbol: str, price_changes: dict[str, float]) -> Dimensi
     peers_with_data = [(p, price_changes.get(p)) for p in peers
                        if price_changes.get(p) is not None]
 
+    # If peer prices are missing from the batch (single-symbol rescore path),
+    # fetch them on demand — one batch call for all peers.
+    if len(peers_with_data) < 2 and peers:
+        peer_prices = fetch_price_changes(peers[:20])  # cap at 20 to stay fast
+        peers_with_data = [(p, peer_prices.get(p)) for p in peers
+                           if peer_prices.get(p) is not None]
+
     if len(peers_with_data) < 2:
         return DimensionScore(raw_pts=0, max_pts=MAX,
-                              signal=f"no_price_data_for_peers")
+                              signal="no_price_data_for_peers")
 
     positive_count = sum(1 for _, ret in peers_with_data if ret > 0)
     total = len(peers_with_data)
@@ -950,7 +957,9 @@ def _score_counter_thesis(symbol: str, driver_id: str) -> DimensionScore:
         return DimensionScore(raw_pts=0, max_pts=MAX,
                               signal="no_conflicts,no_divergence_data→0")
 
-    raw_pts = -min(penalty, 15)   # cap at -15 so one dimension can't dominate
+    # Structural conflicts are macro/systemic risks shared across a theme.
+    # Cap at -6: advisory, not decisive — they don't disqualify a name alone.
+    raw_pts = -min(penalty, 6)
     signal  = f"conflicts={','.join(active_conflicts)}→{raw_pts}"
     return DimensionScore(raw_pts=raw_pts, max_pts=MAX, signal=signal)
 

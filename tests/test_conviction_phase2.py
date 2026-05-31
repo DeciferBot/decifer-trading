@@ -250,9 +250,9 @@ class TestD9CounterThesis:
         result = _call_d9("AAPL", "d1", n_conflicts=0, thesis_intact=True)
         assert result.raw_pts == 3
 
-    def test_two_or_more_conflicts_gives_heavy_penalty(self):
+    def test_two_or_more_conflicts_gives_penalty(self):
         result = _call_d9("AAPL", "d1", n_conflicts=2, thesis_intact=None)
-        assert result.raw_pts <= -10  # 2 verified conflicts = -15 (capped)
+        assert result.raw_pts < 0  # structural conflicts reduce conviction
 
     def test_diverging_thesis_gives_minus8(self):
         result = _call_d9("AAPL", "d1", n_conflicts=0, thesis_intact=False)
