@@ -2114,6 +2114,38 @@
       "status": "active",
       "risk_note": "Adtech exposure to digital ad spend cycles. Not a pure AI infrastructure play \u2014 thematic link is indirect.",
       "last_reviewed": "2026-05-30"
+    },
+    {
+      "symbol": "BE",
+      "label": "Bloom Energy",
+      "driver_id": "ai_capex_growth",
+      "theme_id": "ai_energy_nuclear",
+      "bucket_id": "power_management_electrical_equipment",
+      "exposure_type": "direct_beneficiary",
+      "confidence": 0.78,
+      "evidence_basis": "company_profile",
+      "source_type": "curated_reference",
+      "status": "active",
+      "reason_to_care": "Bloom Energy manufactures solid oxide fuel cells for on-site power generation. Data centres and hyperscalers are adopting fuel cells as primary or backup baseload power to bypass grid congestion and meet 24/7 clean power commitments.",
+      "risk_note": "High capital cost of fuel cell deployments; technology adoption pace depends on utility interconnection delays and hydrogen supply.",
+      "route_hint": "In focus",
+      "last_reviewed": "2026-05-31"
+    },
+    {
+      "symbol": "KGS",
+      "label": "Kodiak Gas Services",
+      "driver_id": "domestic_manufacturing_investment",
+      "theme_id": "reshoring_industrial_capex",
+      "bucket_id": "engineering_construction_electrical",
+      "exposure_type": "direct_beneficiary",
+      "confidence": 0.74,
+      "evidence_basis": "company_profile",
+      "source_type": "curated_reference",
+      "status": "active",
+      "reason_to_care": "Kodiak Gas Services deploys mobile natural gas compression units along pipelines. US natural gas infrastructure buildout and midstream capacity expansion drive direct demand for compression services.",
+      "risk_note": "Revenue tied to natural gas throughput volumes and E&P capex cycles; commodity price weakness can slow pipeline utilisation.",
+      "route_hint": "Monitor",
+      "last_reviewed": "2026-05-31"
     }
   ]
 }

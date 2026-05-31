@@ -11,15 +11,16 @@
         "PWR",
         "CEG",
         "GEV",
-        "VST"
+        "VST",
+        "BE"
       ],
       "etf_proxies": [
         "XLU"
       ],
       "route_bias": "position_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 6,
-      "notes": "Direct beneficiaries of AI data-centre power demand: VRT (Vertiv \u2014 cooling and power infrastructure), ETN (Eaton \u2014 power management systems), PWR (Quanta Services \u2014 grid and electrical engineering), CEG (Constellation Energy \u2014 nuclear power supply, hyperscaler PPAs), GEV (GE Vernova \u2014 grid solutions, power conversion, gas/nuclear at scale; $259.7B FMP-verified), VST (Vistra Corp \u2014 second-largest US nuclear fleet, Microsoft PPA signed; $53.9B FMP-verified). XLU as sector ETF proxy.",
+      "max_candidates": 7,
+      "notes": "Direct beneficiaries of AI data-centre power demand: VRT (Vertiv \u2014 cooling and power infrastructure), ETN (Eaton \u2014 power management systems), PWR (Quanta Services \u2014 grid and electrical engineering), CEG (Constellation Energy \u2014 nuclear power supply, hyperscaler PPAs), GEV (GE Vernova \u2014 grid solutions, power conversion, gas/nuclear at scale; $259.7B FMP-verified), VST (Vistra Corp \u2014 second-largest US nuclear fleet, Microsoft PPA signed; $53.9B FMP-verified), BE (Bloom Energy \u2014 solid oxide fuel cells for on-site power generation; data centres and hyperscalers adopting as backup and primary baseload power, bypasses grid congestion). XLU as sector ETF proxy.",
       "last_reviewed": "2026-05-29",
       "source_label": "intelligence_first_static_rule"
     },
@@ -363,15 +364,16 @@
         "AMAT",
         "CMI",
         "VMC",
-        "PCOR"
+        "PCOR",
+        "KGS"
       ],
       "etf_proxies": [
         "XLI"
       ],
       "route_bias": "position_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 8,
-      "notes": "Industrial infrastructure and reshoring beneficiaries. CAT (Caterpillar \u2014 heavy machinery), DE (Deere \u2014 agriculture and construction equipment), GE (GE Aerospace \u2014 jet engines), URI (United Rentals \u2014 equipment rental, construction proxy), AMAT (Applied Materials \u2014 semiconductor fab equipment for US foundry buildout), CMI (Cummins \u2014 power generation and industrial engines, infrastructure buildout beneficiary; $89.5B FMP-verified), VMC (Vulcan Materials \u2014 crushed stone and aggregates, direct construction activity proxy; $36.8B FMP-verified). XLI as Industrial Select Sector SPDR ETF proxy. PCOR (Procore Technologies \u2014 construction project management software; infrastructure and reshoring capex drives SaaS subscription growth; direct beneficiary of US infrastructure bill spend and onshoring buildout).",
+      "max_candidates": 9,
+      "notes": "Industrial infrastructure and reshoring beneficiaries. CAT (Caterpillar \u2014 heavy machinery), DE (Deere \u2014 agriculture and construction equipment), GE (GE Aerospace \u2014 jet engines), URI (United Rentals \u2014 equipment rental, construction proxy), AMAT (Applied Materials \u2014 semiconductor fab equipment for US foundry buildout), CMI (Cummins \u2014 power generation and industrial engines, infrastructure buildout beneficiary; $89.5B FMP-verified), VMC (Vulcan Materials \u2014 crushed stone and aggregates, direct construction activity proxy; $36.8B FMP-verified). XLI as Industrial Select Sector SPDR ETF proxy. PCOR (Procore Technologies \u2014 construction project management software; infrastructure and reshoring capex drives SaaS subscription growth; direct beneficiary of US infrastructure bill spend and onshoring buildout). KGS (Kodiak Gas Services \u2014 mobile natural gas compression; deploys compression equipment along pipelines, direct picks-and-shovels play on US natural gas infrastructure buildout and midstream capacity expansion).",
       "last_reviewed": "2026-05-30",
       "source_label": "intelligence_first_static_rule"
     },
