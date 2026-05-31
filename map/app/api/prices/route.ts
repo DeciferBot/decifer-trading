@@ -25,23 +25,43 @@ export async function GET(request: Request) {
   }
 
   try {
-    const res = await fetch(
-      `https://financialmodelingprep.com/stable/batch-quote-short?symbols=${symbols}&apikey=${apiKey}`,
-      { next: { revalidate: 120 } }
-    );
-    if (!res.ok) return NextResponse.json({ prices: {} });
-    const data = await res.json();
+    const [quoteRes, changeRes] = await Promise.all([
+      fetch(
+        `https://financialmodelingprep.com/stable/batch-quote-short?symbols=${symbols}&apikey=${apiKey}`,
+        { next: { revalidate: 120 } }
+      ),
+      fetch(
+        `https://financialmodelingprep.com/stable/stock-price-change?symbols=${symbols}&apikey=${apiKey}`,
+        { next: { revalidate: 300 } }
+      ),
+    ]);
 
-    const prices: Record<string, { price: number; change_pct: number; volume: number }> = {};
-    if (Array.isArray(data)) {
-      for (const q of data) {
-        prices[q.symbol] = {
-          price: q.price ?? 0,
-          change_pct: q.changesPercentage ?? 0,
-          volume: q.volume ?? 0,
-        };
+    const prices: Record<string, { price: number; change_pct: number; volume: number; change_5d?: number }> = {};
+
+    if (quoteRes.ok) {
+      const data = await quoteRes.json();
+      if (Array.isArray(data)) {
+        for (const q of data) {
+          prices[q.symbol] = {
+            price: q.price ?? 0,
+            change_pct: q.changesPercentage ?? 0,
+            volume: q.volume ?? 0,
+          };
+        }
       }
     }
+
+    if (changeRes.ok) {
+      const changeData = await changeRes.json();
+      if (Array.isArray(changeData)) {
+        for (const c of changeData) {
+          if (prices[c.symbol]) {
+            prices[c.symbol].change_5d = c["5D"] ?? undefined;
+          }
+        }
+      }
+    }
+
     return NextResponse.json({ prices });
   } catch {
     return NextResponse.json({ prices: {} });

@@ -9,7 +9,7 @@ import type { GraphData } from "@/lib/types";
 interface Props {
   chain: Chain;
   selectedSymbol: string | null;
-  prices: Record<string, { price: number; change_pct: number }>;
+  prices: Record<string, { price: number; change_pct: number; change_5d?: number }>;
   graphData: GraphData | null;
   onSelect: (symbol: string) => void;
   allNodeLabels: Record<string, string>;
@@ -52,7 +52,7 @@ function SymbolCard({
 }: {
   symbol: string;
   name: string;
-  price?: { price: number; change_pct: number };
+  price?: { price: number; change_pct: number; change_5d?: number };
   isSelected: boolean;
   isActive: boolean;
   chainColor: string;
@@ -63,16 +63,30 @@ function SymbolCard({
   const isUp = hasChange && pct! > 0;
   const isDown = hasChange && pct! < 0;
   const changeColor = isUp ? "#10b981" : isDown ? "#ef4444" : "rgba(255,255,255,0.35)";
+  const cv = SYMBOL_CONVICTION[symbol];
+  const cvScore = cv ? Math.round(cv * 100) : null;
+  const cvColor = cv
+    ? cv >= 0.85 ? "#10b981" : cv >= 0.70 ? "#f59e0b" : "#94a3b8"
+    : "#94a3b8";
 
   return (
     <button
       onClick={onClick}
       className="w-full text-left rounded-xl transition-all"
       style={{
-        background: isSelected ? chainColor + "20" : "rgba(255,255,255,0.04)",
-        border: isSelected ? `1px solid ${chainColor}66` : "1px solid rgba(255,255,255,0.08)",
-        borderLeft: `3px solid ${isSelected ? chainColor : isActive ? "rgba(16,185,129,0.4)" : hasChange ? changeColor : "rgba(255,255,255,0.12)"}`,
+        background: isSelected
+          ? chainColor + "20"
+          : isActive
+          ? "rgba(16,185,129,0.06)"
+          : "rgba(255,255,255,0.04)",
+        border: isSelected
+          ? `1px solid ${chainColor}66`
+          : isActive
+          ? "1px solid rgba(16,185,129,0.30)"
+          : "1px solid rgba(255,255,255,0.08)",
+        borderLeft: `3px solid ${isSelected ? chainColor : isActive ? "#10b981" : hasChange ? changeColor : "rgba(255,255,255,0.12)"}`,
         padding: "10px 10px",
+        boxShadow: isActive && !isSelected ? "0 0 0 1px rgba(16,185,129,0.12) inset" : undefined,
       }}
     >
       {/* Logo + ticker row */}
@@ -81,22 +95,8 @@ function SymbolCard({
         <span className="font-bold font-mono text-white leading-none" style={{ fontSize: 13 }}>
           {symbol}
         </span>
-        {(() => {
-          const cv = SYMBOL_CONVICTION[symbol];
-          if (!cv) return null;
-          const cvColor = cv >= 0.85 ? "#10b981" : cv >= 0.70 ? "#f59e0b" : "#94a3b8";
-          return (
-            <span
-              className="font-mono leading-none"
-              style={{ fontSize: 9, color: cvColor, opacity: 0.9 }}
-              title={`Conviction: ${Math.round(cv * 100)}`}
-            >
-              {Math.round(cv * 100)}
-            </span>
-          );
-        })()}
         {isActive && (
-          <span className="w-[6px] h-[6px] rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+          <span className="w-[6px] h-[6px] rounded-full bg-emerald-400 animate-pulse flex-shrink-0" title="In active universe" />
         )}
         {hasChange && (
           <span
@@ -113,12 +113,44 @@ function SymbolCard({
         {name}
       </div>
 
-      {/* Price */}
-      <div className="font-mono leading-none" style={{ fontSize: 11, color: price?.price ? "rgba(255,255,255,0.90)" : "rgba(255,255,255,0.45)" }}>
-        {price?.price
-          ? `$${price.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-          : "—"}
+      {/* Price + conviction row */}
+      <div className="flex items-center justify-between gap-1">
+        <div className="font-mono leading-none" style={{ fontSize: 11, color: price?.price ? "rgba(255,255,255,0.90)" : "rgba(255,255,255,0.45)" }}>
+          {price?.price
+            ? `$${price.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : "—"}
+        </div>
+        {cvScore !== null && (
+          <span
+            className="font-mono font-semibold leading-none px-1.5 py-0.5 rounded-md flex-shrink-0"
+            style={{
+              fontSize: 9,
+              color: cvColor,
+              background: cvColor + "18",
+              border: `1px solid ${cvColor}30`,
+            }}
+            title={`Conviction: ${cvScore}`}
+          >
+            CV {cvScore}
+          </span>
+        )}
       </div>
+
+      {/* 5-day return */}
+      {price?.change_5d !== undefined && (
+        <div className="mt-1 flex items-center gap-1">
+          <span style={{ fontSize: 8, color: "rgba(255,255,255,0.30)" }}>5d</span>
+          <span
+            className="font-mono font-semibold leading-none"
+            style={{
+              fontSize: 9,
+              color: price.change_5d > 0 ? "#10b981" : price.change_5d < 0 ? "#ef4444" : "rgba(255,255,255,0.35)",
+            }}
+          >
+            {price.change_5d > 0 ? "+" : ""}{price.change_5d.toFixed(2)}%
+          </span>
+        </div>
+      )}
     </button>
   );
 }

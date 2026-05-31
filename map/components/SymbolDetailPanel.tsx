@@ -10,7 +10,7 @@ interface Props {
   chainId: string;
   chains: Chain[];
   graphData: GraphData | null;
-  prices: Record<string, { price: number; change_pct: number }>;
+  prices: Record<string, { price: number; change_pct: number; change_5d?: number }>;
   allNodeLabels: Record<string, string>;
   onSelect: (symbol: string, chainId: string) => void;
   onClose: () => void;

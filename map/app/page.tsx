@@ -22,7 +22,7 @@ export default function MapPage() {
   const [activeChain, setActiveChain] = useState("ai_infrastructure");
   const [selectedSymbol, setSelectedSymbol] = useState<{ symbol: string; chainId: string } | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [prices, setPrices] = useState<Record<string, { price: number; change_pct: number }>>({});
+  const [prices, setPrices] = useState<Record<string, { price: number; change_pct: number; change_5d?: number }>>({});
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [activeCandidates, setActiveCandidates] = useState<Set<string>>(new Set());
 
