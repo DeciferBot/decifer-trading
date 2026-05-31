@@ -827,25 +827,6 @@ def main():
     else:
         clog("INFO", "📱 Telegram kill switch not configured (set TELEGRAM_BOT_TOKEN + authorized_chat_ids)")
 
-    # ── iCloud backup sync (every 5 min, runs in this process so FDA inherited) ─
-    _ICLOUD_SYNC_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "icloud-sync.sh")
-
-    def _run_icloud_sync():
-        if os.path.exists(_ICLOUD_SYNC_SCRIPT):
-            try:
-                import subprocess
-
-                subprocess.Popen(
-                    ["bash", _ICLOUD_SYNC_SCRIPT],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            except Exception as _sync_err:
-                clog("WARN", f"iCloud sync failed: {_sync_err}")
-
-    schedule.every(5).minutes.do(_run_icloud_sync)
-    _run_icloud_sync()  # run immediately on startup
-
     # ── Startup health check — warn if any enabled real-time subsystem failed ──
     _failed = []
     if CONFIG.get("alpaca_news_enabled", True) and getattr(bot_state, "_alpaca_news_stream", None) is None:
