@@ -49,22 +49,19 @@ export interface ResearchStoryGroup {
 }
 
 // ── Story label map ────────────────────────────────────────────────────────────
+// Sourced from data/intelligence/label_registry.json (canonical).
+// Run scripts/sync_labels.py to update the local copy in mobile/src/data/.
+// Do NOT edit these strings here — edit the canonical and re-sync.
+
+import labelRegistry from "@/data/label_registry.json";
+
+const _themes = labelRegistry.themes as Record<string, string>;
 
 export const TTG_STORY_LABELS: Record<string, string> = {
-  // Backend theme IDs (10 structural themes from the TTG)
-  ai_energy_nuclear:                "Energy & Nuclear",   // fallback for unclassified ai_energy_nuclear cards
-  defence_rearmament:               "Defence",
-  cybersecurity_digital_resilience: "Cybersecurity",
-  reshoring_industrial_capex:       "Industrial Reshoring",
-  critical_minerals_copper:         "Critical Minerals",
-  gold_real_assets:                 "Gold",
-  glp1_metabolic_health:            "Healthcare Innovation",
-  housing_rate_sensitivity:         "Rate-Sensitive Names",
-  water_infrastructure:             "Water Infrastructure",
-  digital_assets_infrastructure:    "Digital Assets",
+  ..._themes,
   // Virtual split IDs — produced when ai_energy_nuclear is split by bucket in buildStoryGroups
-  ai_energy_nuclear_ai:             "AI Infrastructure",
-  ai_energy_nuclear_energy:         "Energy & Nuclear",
+  ai_energy_nuclear_ai:     _themes["ai_energy_nuclear_ai"] ?? _themes["ai_energy_nuclear"] ?? "AI Infrastructure",
+  ai_energy_nuclear_energy: _themes["ai_energy_nuclear_energy"] ?? "Nuclear & Clean Power",
 };
 
 // Buckets that belong to the AI compute side of the ai_energy_nuclear theme

@@ -5,7 +5,7 @@
 const DEFAULT_INTELLIGENCE_API_BASE = "https://intelligence.decifertrading.com";
 
 // Use || not ?? so that an empty-string env var also falls back to the default.
-function getIntelligenceApiBase(): string {
+export function getIntelligenceApiBase(): string {
   const raw = process.env.NEXT_PUBLIC_INTELLIGENCE_API_URL?.trim();
   return raw || DEFAULT_INTELLIGENCE_API_BASE;
 }

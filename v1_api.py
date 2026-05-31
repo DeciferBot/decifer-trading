@@ -47,6 +47,37 @@ v1_bp = Blueprint("v1", __name__, url_prefix="/v1")
 
 _BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _DATA_DIR = _BASE_DIR / "data" / "intelligence"
+
+# ── Label registry — single source of truth for human labels ─────────────────
+_label_registry_cache: dict | None = None
+_label_registry_lock = threading.Lock()
+
+def _load_label_registry() -> dict:
+    global _label_registry_cache
+    if _label_registry_cache is not None:
+        return _label_registry_cache
+    with _label_registry_lock:
+        if _label_registry_cache is not None:
+            return _label_registry_cache
+        try:
+            raw = json.loads((_DATA_DIR / "label_registry.json").read_text())
+            _label_registry_cache = raw
+        except Exception as exc:
+            log.warning("v1_api: label_registry load failed — %s", exc)
+            _label_registry_cache = {}
+    return _label_registry_cache
+
+def _resolve_theme_label(theme_id: str, fallback: str | None = None) -> str:
+    reg = _load_label_registry()
+    return reg.get("themes", {}).get(theme_id) or fallback or theme_id
+
+def _resolve_bucket_label(bucket_id: str, fallback: str | None = None) -> str:
+    reg = _load_label_registry()
+    return reg.get("buckets", {}).get(bucket_id) or fallback or bucket_id
+
+def _resolve_driver_label(driver_id: str, fallback: str | None = None) -> str:
+    reg = _load_label_registry()
+    return reg.get("drivers", {}).get(driver_id) or fallback or driver_id
 _CACHE_DIR = _BASE_DIR / "data" / "api_cache"
 _CACHE_TTL_SECONDS = 300  # 5 minutes
 _MOMENTUM_CACHE_TTL = 1800  # 30 minutes
@@ -357,9 +388,9 @@ def _build_symbol_card(ticker: str) -> dict | None:
         driver_id = exp.get("driver_id", "")
         themes.append({
             "theme_id": exp.get("theme_id"),
-            "theme_label": theme_node.get("label", exp.get("theme_id")),
+            "theme_label": _resolve_theme_label(exp.get("theme_id", ""), theme_node.get("label")),
             "bucket_id": exp.get("bucket_id"),
-            "bucket_label": bucket_node.get("label", exp.get("bucket_id")),
+            "bucket_label": _resolve_bucket_label(exp.get("bucket_id", ""), bucket_node.get("label")),
             "exposure_type": exp.get("exposure_type"),
             "confidence": exp.get("confidence"),
             "reason_to_care": exp.get("reason_to_care"),
@@ -543,7 +574,7 @@ def universe_list() -> Response:
             "symbol":          sym,
             "label":           exp.get("label", sym),
             "theme_id":        exp.get("theme_id"),
-            "theme_label":     theme_node.get("label", exp.get("theme_id")),
+            "theme_label":     _resolve_theme_label(exp.get("theme_id", ""), theme_node.get("label")),
             "exposure_type":   exp.get("exposure_type"),
             "confidence":      float(exp.get("confidence") or 0),
             "driver_id":       driver_id,

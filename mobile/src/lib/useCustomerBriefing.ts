@@ -4,7 +4,7 @@
 // Used by CustomerApp; individual views receive derived state as props.
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { fetchMarketNow, fetchTtgThemes, type MarketNowPayload, type TtgTheme } from "@/lib/customerApi";
+import { fetchMarketNow, fetchTtgThemes, getIntelligenceApiBase, type MarketNowPayload, type TtgTheme } from "@/lib/customerApi";
 import { buildCustomerStory, type CustomerStory } from "@/lib/customerStory";
 import { buildMarketCauseCards, type MarketCauseCard } from "@/lib/marketCauseStory";
 import {
@@ -12,7 +12,19 @@ import {
   buildConnectionTree,
   type CustomerMarketForce,
   type CustomerConnectionNode,
+  type MacroEventContext,
 } from "@/lib/customerBriefingModel";
+
+async function fetchMacroContext(): Promise<MacroEventContext | null> {
+  try {
+    const base = getIntelligenceApiBase();
+    const res = await fetch(`${base}/api/intelligence/macro-context`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
 
 // ── Market clock ──────────────────────────────────────────────────────────────
 
@@ -238,6 +250,7 @@ export interface CustomerBriefingState {
   sinceAway: SinceAwaySummary;
   ttgThemes: TtgTheme[];
   activeForces: CustomerMarketForce[];
+  watchingForces: CustomerMarketForce[];
   dormantForces: CustomerMarketForce[];
   connectionTree: CustomerConnectionNode[];
   refresh: () => Promise<void>;
@@ -250,6 +263,7 @@ export function useCustomerBriefing(): CustomerBriefingState {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [clock, setClock] = useState<MarketClockState>(computeMarketClock);
   const [ttgThemes, setTtgThemes] = useState<TtgTheme[]>([]);
+  const [macroContext, setMacroContext] = useState<MacroEventContext | null>(null);
   const sinceAwayRef = useRef<SinceAwaySummary>({
     hasChanges: false,
     items: [],
@@ -297,6 +311,9 @@ export function useCustomerBriefing(): CustomerBriefingState {
     fetchTtgThemes()
       .then(setTtgThemes)
       .catch(() => setTtgThemes([]));
+    fetchMacroContext()
+      .then(setMacroContext)
+      .catch(() => setMacroContext(null));
   }, []);
 
   const refresh = useCallback((): Promise<void> => load(true), [load]);
@@ -306,7 +323,7 @@ export function useCustomerBriefing(): CustomerBriefingState {
   const freshnessState = computeFreshnessState(data, loading, clock.session);
   const freshnessLabel = FRESHNESS_LABELS[freshnessState];
 
-  const forcesResult = data ? buildCustomerForces(data) : { active: [], dormant: [] };
+  const forcesResult = data ? buildCustomerForces(data, macroContext) : { active: [], watching: [], dormant: [] };
   const connectionTree = data ? buildConnectionTree(data, ttgThemes) : [];
 
   /* eslint-disable react-hooks/refs */
@@ -323,6 +340,7 @@ export function useCustomerBriefing(): CustomerBriefingState {
     sinceAway: sinceAwayRef.current,
     ttgThemes,
     activeForces: forcesResult.active,
+    watchingForces: forcesResult.watching,
     dormantForces: forcesResult.dormant,
     connectionTree,
     refresh,

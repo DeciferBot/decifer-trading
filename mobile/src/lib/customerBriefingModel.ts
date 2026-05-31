@@ -5,6 +5,7 @@
 
 import type { MarketNowPayload, TtgTheme } from "./customerApi";
 import type { CustomerStory } from "./customerStory";
+import labelRegistry from "@/data/label_registry.json";
 
 // ── Customer Market Regime ─────────────────────────────────────────────────────
 
@@ -273,12 +274,28 @@ export interface CustomerMarketForce {
   id: string;
   label: string;
   is_active: boolean;
+  // "active" = price confirmed | "watching" = event-backed, price not confirmed yet | "dormant" = neither
+  confirmation_status: "active" | "watching" | "dormant";
   why_it_matters: string;
   market_impact: string;
   risk_to_monitor: string;
   evidence_basis: string;
   connected_theme_ids: string[];
   connected_theme_labels: string[];
+  event_summary?: string;   // set when confirmation_status === "watching"
+  event_type?: string;
+}
+
+export interface MacroEventContext {
+  drivers_with_event_backing: Record<string, Array<{
+    event_type: string;
+    event_summary: string;
+    direction_of_risk: string;
+    confidence: number;
+  }>>;
+  active_domains: string[];
+  risk_direction: string;
+  event_count: number;
 }
 
 const ALL_FORCE_IDS = [
@@ -411,24 +428,12 @@ const FORCE_THEMES: Record<string, string[]> = {
   reits_falling_yield:     ["reits_falling_yield"],
 };
 
+// THEME_LABELS sourced from label_registry.json (canonical).
+// Run scripts/sync_labels.py to update. Do NOT edit strings here.
 const THEME_LABELS: Record<string, string> = {
-  data_centre_power:         "Data Centres & Power",
-  semiconductors:            "Semiconductors",
-  ai_compute_infrastructure: "AI Infrastructure",
-  memory_storage:            "Memory & Storage",
-  defence:                   "Defence",
-  cybersecurity:             "Cybersecurity",
-  gold_safe_haven_bid:       "Gold Safe Haven",
-  gold_precious_metals:      "Gold & Precious Metals",
-  small_cap_risk_on:         "Small-Cap Rally",
-  risk_on_rotation:          "Risk-On Rotation",
-  reits:                     "Real Estate (REITs)",
-  reits_falling_yield:       "REITs Under Pressure",
-  regional_banks:            "Regional Banks",
-  consumer_discretionary:    "Consumer Spending",
-  mega_cap_platforms:        "Mega-Cap Tech",
-  travel_leisure:            "Travel & Leisure",
-  energy:                    "Energy",
+  ...(labelRegistry.themes   as Record<string, string>),
+  ...(labelRegistry.drivers  as Record<string, string>),
+  ...(labelRegistry.subthemes as Record<string, string>),
 };
 
 export function resolveForceThemeLabel(themeId: string): string {
@@ -465,17 +470,25 @@ function resolveEvidenceBasis(forceId: string, hasFreshEvents: boolean): string 
 
 export function buildCustomerForces(
   payload: MarketNowPayload,
-): { active: CustomerMarketForce[]; dormant: CustomerMarketForce[] } {
+  macroContext?: MacroEventContext | null,
+): { active: CustomerMarketForce[]; watching: CustomerMarketForce[]; dormant: CustomerMarketForce[] } {
   const hasFreshEvents = (payload.key_events?.length ?? 0) > 0;
   const rawActive = (payload.key_drivers ?? [])
     .map(normalizeForceId)
     .filter(id => Boolean(FORCE_LABELS[id]));
   const activeSet = new Set(rawActive);
 
+  // Drivers that have event backing but price hasn't confirmed — EVENT_UNCONFIRMED
+  const eventBacked = macroContext?.drivers_with_event_backing ?? {};
+  const watchingIds = Object.keys(eventBacked)
+    .filter(id => Boolean(FORCE_LABELS[id]) && !activeSet.has(id));
+  const watchingSet = new Set(watchingIds);
+
   const active: CustomerMarketForce[] = rawActive.map(id => ({
     id,
     label: FORCE_LABELS[id],
     is_active: true,
+    confirmation_status: "active" as const,
     why_it_matters: FORCE_WHY[id] ?? "",
     market_impact: FORCE_IMPACT[id] ?? "",
     risk_to_monitor: FORCE_RISK[id] ?? "",
@@ -484,12 +497,32 @@ export function buildCustomerForces(
     connected_theme_labels: (FORCE_THEMES[id] ?? []).map(resolveForceThemeLabel),
   }));
 
+  const watching: CustomerMarketForce[] = watchingIds.map(id => {
+    const events = eventBacked[id] ?? [];
+    const topEvent = events.sort((a, b) => b.confidence - a.confidence)[0];
+    return {
+      id,
+      label: FORCE_LABELS[id],
+      is_active: false,
+      confirmation_status: "watching" as const,
+      why_it_matters: FORCE_WHY[id] ?? "",
+      market_impact: FORCE_IMPACT[id] ?? "",
+      risk_to_monitor: FORCE_RISK[id] ?? "",
+      evidence_basis: "Event signal — not yet confirmed by price",
+      connected_theme_ids: FORCE_THEMES[id] ?? [],
+      connected_theme_labels: (FORCE_THEMES[id] ?? []).map(resolveForceThemeLabel),
+      event_summary: topEvent?.event_summary,
+      event_type: topEvent?.event_type,
+    };
+  });
+
   const dormant: CustomerMarketForce[] = ALL_FORCE_IDS
-    .filter(id => !activeSet.has(id))
+    .filter(id => !activeSet.has(id) && !watchingSet.has(id))
     .map(id => ({
       id,
       label: FORCE_LABELS[id],
       is_active: false,
+      confirmation_status: "dormant" as const,
       why_it_matters: FORCE_WHY[id] ?? "",
       market_impact: FORCE_IMPACT[id] ?? "",
       risk_to_monitor: FORCE_RISK[id] ?? "",
@@ -498,7 +531,7 @@ export function buildCustomerForces(
       connected_theme_labels: (FORCE_THEMES[id] ?? []).map(resolveForceThemeLabel),
     }));
 
-  return { active, dormant };
+  return { active, watching, dormant };
 }
 
 // ── Connection Tree ────────────────────────────────────────────────────────────

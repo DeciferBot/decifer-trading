@@ -407,8 +407,9 @@ def _load_roster_universe() -> list[dict[str, str]]:
         log.warning("_load_roster_universe: could not read roster files — %s", exc)
         return []
 
+    _reg_themes = _load_label_registry().get("themes", {})
     theme_names: dict[str, str] = {
-        t["theme_id"]: t["name"]
+        t["theme_id"]: _reg_themes.get(t["theme_id"]) or t["name"]
         for t in taxonomy.get("themes", [])
         if isinstance(t, dict) and "theme_id" in t and "name" in t
     }

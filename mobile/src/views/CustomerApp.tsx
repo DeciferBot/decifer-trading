@@ -198,6 +198,7 @@ export default function CustomerApp() {
     sinceAway,
     ttgThemes,
     activeForces,
+    watchingForces,
     dormantForces,
     connectionTree,
     refresh,
@@ -374,6 +375,7 @@ export default function CustomerApp() {
           <ForcesTab
             data={data}
             activeForces={activeForces}
+            watchingForces={watchingForces}
             dormantForces={dormantForces}
             connectionTree={connectionTree}
             onThemeSelect={goToTheme}

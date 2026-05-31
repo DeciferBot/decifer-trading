@@ -47,8 +47,11 @@ export function ScoreBar({ score, side }: { score: number; side?: Side }) {
   );
 }
 
+import labelRegistry from "@/data/label_registry.json";
+const _driverLabels = labelRegistry.drivers as Record<string, string>;
+
 export function DriverTag({ tag }: { tag: string }) {
-  const label = tag.replace(/_/g, " ");
+  const label = _driverLabels[tag] ?? tag.replace(/_/g, " ");
   return (
     <span style={{
       background: "#181818", border: "1px solid #2a2a2a",

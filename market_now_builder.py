@@ -491,6 +491,52 @@ def build_market_now() -> SaaSIntelligencePayload:
     what_to_watch = sections.get("watch_next") or _build_what_to_watch(drivers, active_theme_ids)
     source_labels = _build_source_labels(drivers, bool(apex_read))
 
+    # ── Macro Event Layer injection ────────────────────────────────────────
+    # Read structured macro events and inject event-backed context into
+    # known_conflicts (event vs price divergence) and what_changed (new events).
+    # Fail-soft — never blocks payload assembly.
+    known_conflicts = list(sections.get("known_conflicts", []))
+    what_changed = list(sections.get("what_changed", []))
+    try:
+        from macro_event_layer import get_active_context as _get_macro_ctx
+        macro_ctx = _get_macro_ctx()
+        event_backed = macro_ctx.get("drivers_with_event_backing", {})
+        active_driver_set = set(active_driver_keys)
+
+        for driver_id, events in event_backed.items():
+            if not events:
+                continue
+            top = max(events, key=lambda e: e.get("confidence", 0))
+            summary = top.get("event_summary", "")
+            label = _driver_label(driver_id)
+            if driver_id not in active_driver_set:
+                # Event implicates driver but price hasn't confirmed
+                msg = f"{label}: news signals this force may be emerging, but price has not confirmed yet."
+                if summary:
+                    msg = f"{label}: {summary} Price confirmation pending."
+                if msg not in known_conflicts:
+                    known_conflicts.append(msg)
+            else:
+                # Event confirms an already-active price driver — surface in what_changed
+                if summary:
+                    entry = f"{label}: {summary}"
+                    if entry not in what_changed:
+                        what_changed.insert(0, entry)
+
+        # Surface overall macro risk direction divergence if it conflicts with regime
+        macro_risk = macro_ctx.get("risk_direction", "neutral")
+        if macro_risk == "risk_off" and regime_label and "BULL" in regime_label.upper():
+            conflict = "Macro news signals risk-off conditions while price regime remains bullish — watch for divergence."
+            if conflict not in known_conflicts:
+                known_conflicts.append(conflict)
+        elif macro_risk == "risk_on" and regime_label and "BEAR" in regime_label.upper():
+            conflict = "Macro news signals improving risk appetite while price regime remains bearish — potential early turn."
+            if conflict not in known_conflicts:
+                known_conflicts.append(conflict)
+
+    except Exception as _mac_exc:
+        log.debug("build_market_now: macro_event_layer injection failed — %s", _mac_exc)
+
     # freshness_timestamp = when THIS payload was built, not the source manifest.
     # Per-source freshness is exposed via section_freshness so customers see
     # both "payload built now" and "macro_drivers last updated 2.3h ago".
@@ -509,15 +555,15 @@ def build_market_now() -> SaaSIntelligencePayload:
             "Market intelligence powered by Decifer. "
             "Not financial advice. For informational purposes only."
         ),
-        # Sprint M11A — Market Map sections
+        # Sprint M11A — Market Map sections (enriched with macro event context)
         market_mood=sections.get("market_mood", ""),
-        what_changed=sections.get("what_changed", []),
+        what_changed=what_changed,
         key_events=sections.get("key_events", []),
         sectors=sections.get("sectors", []),
         themes=sections.get("themes", []),
         radar=sections.get("radar", []),
         watch_next=sections.get("watch_next", []),
-        known_conflicts=sections.get("known_conflicts", []),
+        known_conflicts=known_conflicts,
         section_freshness=sections.get("section_freshness", {}),
         source_notes=sections.get("source_notes", []),
         # Sprint M11C — customer-safe universe snapshot

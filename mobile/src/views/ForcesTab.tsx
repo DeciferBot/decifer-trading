@@ -273,6 +273,7 @@ function DormantForceRow({ force }: { force: CustomerMarketForce }) {
 interface Props {
   data: MarketNowPayload;
   activeForces: CustomerMarketForce[];
+  watchingForces: CustomerMarketForce[];
   dormantForces: CustomerMarketForce[];
   connectionTree: CustomerConnectionNode[];
   onThemeSelect: (themeId: string) => void;
@@ -283,6 +284,7 @@ interface Props {
 export default function ForcesTab({
   data,
   activeForces,
+  watchingForces,
   dormantForces,
   connectionTree,
   onThemeSelect,
@@ -303,7 +305,7 @@ export default function ForcesTab({
     connectionTree.map(n => [n.force_id, n]),
   );
 
-  const hasNoData = activeForces.length === 0 && dormantForces.length === 0;
+  const hasNoData = activeForces.length === 0 && watchingForces.length === 0 && dormantForces.length === 0;
 
   return (
     <div className="px-4 pt-3 pb-8 space-y-5">
@@ -315,7 +317,9 @@ export default function ForcesTab({
         </p>
         <p className="text-[12px] text-slate-400 leading-relaxed">
           {activeForces.length > 0
-            ? `${activeForces.length} active force${activeForces.length !== 1 ? "s" : ""} are moving attention today. Dormant forces are below.`
+            ? `${activeForces.length} active force${activeForces.length !== 1 ? "s" : ""}${watchingForces.length > 0 ? `, ${watchingForces.length} watching` : ""} today.`
+            : watchingForces.length > 0
+            ? `${watchingForces.length} force${watchingForces.length !== 1 ? "s" : ""} flagged by news — not yet confirmed by price.`
             : "No forces are confirmed active right now. Structural themes remain available below."}
         </p>
       </div>
@@ -363,6 +367,61 @@ export default function ForcesTab({
               onAskAbout={onAskAbout}
               onGoToNames={onGoToNames}
             />
+          ))}
+        </section>
+      )}
+
+      {/* ── Watching forces — event-backed, price not confirmed ───────────── */}
+      {watchingForces.length > 0 && (
+        <section className="space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-400/80 px-1">
+            Watching — news signal, price not confirmed
+          </p>
+          {watchingForces.map(force => (
+            <div
+              key={force.id}
+              className="rounded-2xl px-4 py-4"
+              style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.15)" }}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="w-2 h-2 rounded-full mt-1.5 shrink-0"
+                  style={{ background: "#f59e0b" }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[13px] font-semibold text-slate-200">{force.label}</span>
+                    <span
+                      className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                      style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24" }}
+                    >
+                      Unconfirmed
+                    </span>
+                  </div>
+                  {force.event_summary && (
+                    <p className="text-[12px] text-amber-200/70 leading-relaxed mt-1">
+                      {force.event_summary}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-400 leading-relaxed mt-1.5">
+                    {force.why_it_matters}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Watch for price confirmation to activate this force.
+                  </p>
+                  {onAskAbout && (
+                    <button
+                      onClick={() => onAskAbout(`What's the news behind the ${force.label.toLowerCase()} signal and what would confirm it in price action?`)}
+                      className="mt-2 text-[11px] font-semibold flex items-center gap-1.5 transition-opacity active:opacity-60"
+                      style={{ color: "#fbbf24" }}
+                    >
+                      <Zap size={10} />
+                      Ask Decifer about this signal
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           ))}
         </section>
       )}
