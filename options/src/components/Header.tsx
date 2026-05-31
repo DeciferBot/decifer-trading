@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export function Header({ lastUpdated }: { lastUpdated: string | null }) {
+export function Header({ lastUpdated, source }: { lastUpdated: string | null; source?: "live" | "friday_close" }) {
   const [now, setNow] = useState("");
   useEffect(() => {
     const fmt = () =>
@@ -14,17 +14,27 @@ export function Header({ lastUpdated }: { lastUpdated: string | null }) {
   const age = lastUpdated
     ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000)
     : null;
-  const ageLabel = age === null
-    ? "—"
-    : age < 60
-      ? `${age}s ago`
-      : age < 3600
-        ? `${Math.round(age / 60)}m ago`
-        : `Last scan: ${new Date(lastUpdated!).toLocaleString("en-US", {
-            timeZone: "America/New_York",
-            weekday: "short", month: "short", day: "numeric",
-            hour: "2-digit", minute: "2-digit",
-          })} ET`;
+
+  let ageLabel: string;
+  if (source === "friday_close" && lastUpdated) {
+    ageLabel = `Friday close · ${new Date(lastUpdated).toLocaleString("en-US", {
+      timeZone: "America/New_York",
+      month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    })} ET`;
+  } else if (age === null) {
+    ageLabel = "—";
+  } else if (age < 60) {
+    ageLabel = `${age}s ago`;
+  } else if (age < 3600) {
+    ageLabel = `${Math.round(age / 60)}m ago`;
+  } else {
+    ageLabel = `Last scan: ${new Date(lastUpdated!).toLocaleString("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    })} ET`;
+  }
 
   return (
     <header style={{

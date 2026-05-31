@@ -27,6 +27,7 @@ import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, Response, jsonify, request
 
@@ -45,11 +46,26 @@ except ImportError:
 _BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _EVENTS_PATH = str(_BASE_DIR / "data" / "options_flow" / "live_events.json")
 _LEADERBOARD_PATH = _BASE_DIR / "data" / "options_flow" / "leaderboard.json"
+_FRIDAY_CLOSE_PATH = _BASE_DIR / "data" / "options_flow" / "leaderboard_friday_close.json"
 
 _DEFAULT_FEED_LIMIT = 100
 _MAX_FEED_LIMIT = 500
 _UNIVERSE_SCAN_TTL = 1800  # 30 minutes before triggering a fresh scan
 _MAX_CUSTOM_SYMBOLS = 50
+_ET = ZoneInfo("America/New_York")
+
+
+def _is_market_weekend() -> bool:
+    """True on Saturday and Sunday ET — no live flow data will arrive."""
+    return datetime.now(tz=_ET).weekday() >= 5
+
+
+def _load_friday_close() -> dict | None:
+    """Load Friday close snapshot if it exists, else None."""
+    try:
+        return json.loads(_FRIDAY_CLOSE_PATH.read_text())
+    except Exception:
+        return None
 
 
 def _load_json(path: str) -> dict | None:
@@ -128,6 +144,12 @@ def options_leaderboard() -> Response:
         return Response(status=204)
 
     data = _load_json(_LEADERBOARD_PATH)
+    source = "live"
+    if data is None or (not data.get("leaderboard") and _is_market_weekend()):
+        friday = _load_friday_close()
+        if friday:
+            data = friday
+            source = "friday_close"
     if data is None:
         return _unavailable("Leaderboard not yet available. Stream may be starting.")
 
@@ -142,13 +164,17 @@ def options_leaderboard() -> Response:
     except (ValueError, TypeError):
         limit = 50
 
-    return _ok({
+    payload: dict = {
         "status": "ok",
         "ts": data.get("ts", _now_iso()),
         "total": data.get("count", 0),
         "returned": min(limit, len(rows)),
         "leaderboard": rows[:limit],
-    })
+    }
+    if source == "friday_close":
+        payload["source"] = "friday_close"
+        payload["friday_close_ts"] = data.get("ts")
+    return _ok(payload)
 
 
 @bp.route("/api/options/symbol/<ticker>", methods=["GET", "OPTIONS"])
@@ -227,8 +253,17 @@ def v1_universe_scan() -> Response:
     """
     stale = _leaderboard_stale()
     data = _load_leaderboard()
+    source = "live"
 
-    if stale:
+    # On weekends with no live data, fall back to Friday close snapshot
+    if _is_market_weekend() and (data is None or not data.get("leaderboard")):
+        friday = _load_friday_close()
+        if friday:
+            data = friday
+            source = "friday_close"
+            stale = False  # friday close is intentionally stale — don't trigger scan
+
+    if not _is_market_weekend() and stale:
         # Trigger fresh scan in background — don't block the response
         import threading
         def _bg_scan():
@@ -246,11 +281,11 @@ def v1_universe_scan() -> Response:
             "ts": _now_iso(),
         }, 202)
 
-    return _ok({
-        "status": "ok",
-        "stale": stale,
-        **data,
-    })
+    response: dict = {"status": "ok", "stale": stale, **data}
+    if source == "friday_close":
+        response["source"] = "friday_close"
+        response["friday_close_ts"] = data.get("ts")
+    return _ok(response)
 
 
 @bp.route("/v1/options/scan", methods=["POST"])

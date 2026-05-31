@@ -558,6 +558,7 @@ export default function OptionsPage() {
   const [feed, setFeed] = useState<FlowEvent[]>([]);
   const [feedAvailable, setFeedAvailable] = useState<boolean | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<"live" | "friday_close">("live");
   const [unavailable, setUnavailable] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [companyMap, setCompanyMap] = useState<Record<string, CompanyInfo>>({});
@@ -573,7 +574,8 @@ export default function OptionsPage() {
 
     if (lbData) {
       setLeaderboard(lbData.leaderboard);
-      setLastUpdated(lbData.ts);
+      setLastUpdated(lbData.friday_close_ts ?? lbData.ts);
+      setDataSource(lbData.source ?? "live");
       const syms = lbData.leaderboard.map((r) => r.underlying);
       getCompanyInfo(syms).then((d) => {
         if (!d?.results) return;
@@ -607,7 +609,7 @@ export default function OptionsPage() {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <Header lastUpdated={lastUpdated} />
+      <Header lastUpdated={lastUpdated} source={dataSource} />
 
       <div style={{ maxWidth: selectedSymbol ? "calc(100% - 380px)" : "900px", margin: "0 auto" }}>
         <TabBar active={tab} onChange={setTab} />
@@ -637,7 +639,11 @@ export default function OptionsPage() {
               </div>
 
               {leaderboard.length === 0 && (
-                <div style={{ color: "var(--muted)", fontSize: 13, padding: "24px 0" }}>No unusual flow detected yet.</div>
+                <div style={{ color: "var(--muted)", fontSize: 13, padding: "24px 0" }}>
+                  {dataSource === "friday_close"
+                    ? "No unusual flow was detected at Friday close."
+                    : "No unusual flow detected yet."}
+                </div>
               )}
               {leaderboard.map((row) => (
                 <LeaderRow key={row.underlying} row={row} info={companyMap[row.underlying]} onSymbolClick={setSelectedSymbol} />

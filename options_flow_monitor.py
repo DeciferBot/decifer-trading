@@ -20,6 +20,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 
 import dotenv
+from zoneinfo import ZoneInfo
 
 from options_flow_engine import (
     FlowEvent,
@@ -69,6 +70,7 @@ _windows: dict[str, UnderlyingWindow] = {}   # underlying → window
 _quote_cache: dict[str, float] = {}          # occ_symbol → best ask
 _all_events: list[FlowEvent] = []            # rolling event log
 _universe: frozenset[str] = frozenset()
+_friday_snapshot_taken: bool = False   # reset each monitor process start
 
 
 def _get_or_create_window(underlying: str) -> UnderlyingWindow:
@@ -219,11 +221,38 @@ def _atomic_write(path: str, payload: dict) -> None:
         log.error("options_flow_monitor: write failed %s — %s", path, exc)
 
 
+_ET = ZoneInfo("America/New_York")
+_FRIDAY_SNAPSHOT_HOUR = 15
+_FRIDAY_SNAPSHOT_MINUTE_START = 55   # take snapshot in 15:55–16:04 ET window
+_FRIDAY_SNAPSHOT_MINUTE_END = 64     # (16:00–16:04 are minute 60–64 conceptually, handled via hour check)
+
+
+def _maybe_take_friday_snapshot() -> None:
+    """Write Friday close snapshot once per monitor session at ~15:55 ET."""
+    global _friday_snapshot_taken
+    if _friday_snapshot_taken:
+        return
+    now_et = datetime.now(tz=_ET)
+    if now_et.weekday() != 4:   # 4 = Friday
+        return
+    # Window: 15:55–16:04 ET (minute 55–64; handle hour rollover)
+    total_minutes = now_et.hour * 60 + now_et.minute
+    if not (15 * 60 + 55 <= total_minutes <= 16 * 60 + 4):
+        return
+    _friday_snapshot_taken = True
+    try:
+        from options_flow_scanner import save_friday_close_snapshot
+        save_friday_close_snapshot()
+    except Exception as exc:
+        log.error("options_flow_monitor: Friday snapshot failed — %s", exc)
+
+
 def _writer_thread() -> None:
     while True:
         time.sleep(WRITE_INTERVAL_SECONDS)
         try:
             _evaluate_and_write()
+            _maybe_take_friday_snapshot()
         except Exception as exc:
             log.error("options_flow_monitor: evaluate/write error — %s", exc)
 
