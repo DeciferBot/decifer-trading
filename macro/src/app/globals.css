@@ -24,31 +24,31 @@
   --accent-amber: #F59E0B;
   --accent-amber-bg: #1C1000;
   --accent-amber-border: #78350F;
-  /* conviction card themes — dark */
-  --cv-high-bg: #1A1200;
-  --cv-high-border: #3D2E00;
-  --cv-high-accent: #D97706;
-  --cv-high-badge-bg: #2A1E00;
-  --cv-high-badge-border: #5C3D00;
-  --cv-high-badge-color: #FCD34D;
-  --cv-medium-bg: #080F1C;
-  --cv-medium-border: #1E3A5F;
-  --cv-medium-accent: #60A5FA;
-  --cv-medium-badge-bg: #0C1A30;
-  --cv-medium-badge-border: #1E3A5F;
-  --cv-medium-badge-color: #93C5FD;
-  --cv-low-bg: #071510;
-  --cv-low-border: #14532D;
-  --cv-low-accent: #22C55E;
-  --cv-low-badge-bg: #0A1F12;
-  --cv-low-badge-border: #166534;
-  --cv-low-badge-color: #86EFAC;
-  --cv-watch-bg: #111111;
-  --cv-watch-border: #2A2A2A;
-  --cv-watch-accent: #6B7280;
-  --cv-watch-badge-bg: #1A1A1A;
-  --cv-watch-badge-border: #374151;
-  --cv-watch-badge-color: #9CA3AF;
+  /* conviction — dark: NO tinted backgrounds, one surface, accent on border + text only */
+  --cv-high-bg: var(--surface);
+  --cv-high-border: var(--border);
+  --cv-high-accent: #F59E0B;
+  --cv-high-badge-bg: transparent;
+  --cv-high-badge-border: #78350F;
+  --cv-high-badge-color: #F59E0B;
+  --cv-medium-bg: var(--surface);
+  --cv-medium-border: var(--border);
+  --cv-medium-accent: #22C55E;
+  --cv-medium-badge-bg: transparent;
+  --cv-medium-badge-border: #14532D;
+  --cv-medium-badge-color: #22C55E;
+  --cv-low-bg: var(--surface);
+  --cv-low-border: var(--border);
+  --cv-low-accent: #555555;
+  --cv-low-badge-bg: transparent;
+  --cv-low-badge-border: #333333;
+  --cv-low-badge-color: #888888;
+  --cv-watch-bg: var(--surface);
+  --cv-watch-border: var(--border);
+  --cv-watch-accent: #444444;
+  --cv-watch-badge-bg: transparent;
+  --cv-watch-badge-border: #333333;
+  --cv-watch-badge-color: #666666;
 }
 
 /* ── Light (toggle) ─────────────────────────────────────────────────────────── */

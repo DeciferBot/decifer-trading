@@ -409,7 +409,7 @@ function DriverCard({ driver, idx }: { driver: ActiveDriver; idx: number }) {
             fontFamily: "'DM Mono', monospace",
             fontSize: "10px",
             color: "var(--text-muted)",
-            background: "rgba(0,0,0,0.04)",
+            background: "transparent",
             border: "1px solid var(--border)",
             padding: "2px 8px",
             borderRadius: "20px",
@@ -428,7 +428,7 @@ function DriverCard({ driver, idx }: { driver: ActiveDriver; idx: number }) {
             flexDirection: "column",
             gap: "5px",
             paddingTop: "8px",
-            borderTop: "1px solid rgba(0,0,0,0.06)",
+            borderTop: "1px solid var(--border)",
           }}
         >
           {entries.map(([k, v]) => (
@@ -469,31 +469,33 @@ function ThemeRow({ theme, idx }: { theme: ActivatedTheme; idx: number }) {
   const confidencePct = Math.round(theme.confidence * 100);
   const label = theme.theme_id.replace(/_/g, " ");
 
+  const accentColor = isHeadwind ? "var(--accent-amber)" : cvStyle.leftAccent;
+
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
         gap: "16px",
-        padding: "12px 16px",
-        borderBottom: "1px solid var(--border-light)",
-        borderLeft: `3px solid ${isHeadwind ? "var(--accent-amber)" : cvStyle.leftAccent}`,
-        background: cvStyle.bg,
+        padding: "13px 20px",
+        borderBottom: "1px solid var(--border)",
+        borderLeft: `3px solid ${accentColor}`,
+        background: "var(--surface)",
         animation: `fade-up 0.3s ease-out ${80 + idx * 35}ms forwards`,
         opacity: 0,
-        transition: "filter 0.1s ease",
+        transition: "background 0.1s ease",
       }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.filter = "brightness(0.97)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.filter = "none"; }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "var(--surface-warm)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "var(--surface)"; }}
     >
-      {/* Theme name */}
+      {/* Theme name — white, readable */}
       <span
         style={{
           fontFamily: "'DM Sans', system-ui, sans-serif",
           fontSize: "14px",
           fontWeight: 500,
           color: "var(--text-primary)",
-          minWidth: "180px",
+          minWidth: "190px",
           flexShrink: 0,
           textTransform: "capitalize",
         }}
@@ -501,23 +503,24 @@ function ThemeRow({ theme, idx }: { theme: ActivatedTheme; idx: number }) {
         {label}
       </span>
 
-      {/* Conviction / state badge */}
+      {/* State badge — accent color, no tinted background */}
       <span
         style={{
           fontSize: "10px",
           fontFamily: "'DM Mono', monospace",
           fontWeight: 600,
-          letterSpacing: "0.08em",
-          color: isHeadwind ? "var(--accent-amber)" : cvStyle.badgeColor,
-          background: isHeadwind ? "var(--accent-amber-bg)" : cvStyle.badgeBg,
-          border: `1px solid ${isHeadwind ? "var(--accent-amber-border)" : cvStyle.badgeBorder}`,
+          letterSpacing: "0.1em",
+          color: accentColor,
+          border: `1px solid ${accentColor}`,
+          background: "transparent",
           padding: "2px 8px",
           borderRadius: "4px",
           flexShrink: 0,
           whiteSpace: "nowrap",
+          opacity: 0.9,
         }}
       >
-        {isHeadwind ? "HEADWIND" : cvStyle.badge}
+        {isHeadwind ? "HEADWIND" : "ACTIVE"}
       </span>
 
       {/* Confidence bar */}
@@ -525,9 +528,9 @@ function ThemeRow({ theme, idx }: { theme: ActivatedTheme; idx: number }) {
         <div
           style={{
             flex: 1,
-            maxWidth: "120px",
-            height: "3px",
-            background: "rgba(0,0,0,0.08)",
+            maxWidth: "100px",
+            height: "2px",
+            background: "var(--border)",
             borderRadius: "2px",
             overflow: "hidden",
           }}
@@ -537,8 +540,7 @@ function ThemeRow({ theme, idx }: { theme: ActivatedTheme; idx: number }) {
               height: "100%",
               borderRadius: "2px",
               width: `${confidencePct}%`,
-              background: isHeadwind ? "var(--accent-amber)" : cvStyle.leftAccent,
-              opacity: 0.8,
+              background: accentColor,
             }}
           />
         </div>
@@ -546,7 +548,7 @@ function ThemeRow({ theme, idx }: { theme: ActivatedTheme; idx: number }) {
           style={{
             fontFamily: "'DM Mono', monospace",
             fontSize: "11px",
-            color: "var(--text-muted)",
+            color: "var(--text-secondary)",
             fontVariantNumeric: "tabular-nums",
             flexShrink: 0,
           }}
@@ -555,34 +557,20 @@ function ThemeRow({ theme, idx }: { theme: ActivatedTheme; idx: number }) {
         </span>
       </div>
 
-      {/* Direction */}
-      <span
-        style={{
-          fontFamily: "'DM Mono', monospace",
-          fontSize: "11px",
-          color: "var(--text-muted)",
-          letterSpacing: "0.05em",
-          flexShrink: 0,
-          minWidth: "60px",
-          textAlign: "right",
-        }}
-      >
-        {theme.direction.toUpperCase()}
-      </span>
-
-      {/* Risk flags */}
-      <div style={{ display: "flex", gap: "4px", flexShrink: 0, flexWrap: "wrap" }}>
+      {/* Risk flags — subtle, no hardcoded light colours */}
+      <div style={{ display: "flex", gap: "6px", flexShrink: 0, flexWrap: "wrap" }}>
         {theme.risk_flags.slice(0, 3).map((f) => (
           <span
             key={f}
             style={{
               fontSize: "10px",
               fontFamily: "'DM Mono', monospace",
-              color: "#92400E",
-              background: "#FEF3C7",
-              border: "1px solid #FDE68A",
-              padding: "1px 6px",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border)",
+              background: "transparent",
+              padding: "1px 7px",
               borderRadius: "3px",
+              letterSpacing: "0.03em",
             }}
           >
             {f.replace(/_/g, " ")}
@@ -606,8 +594,10 @@ function BlockedRow({ condition }: { condition: BlockedCondition }) {
         display: "flex",
         alignItems: "center",
         gap: "16px",
-        padding: "12px 16px",
-        borderBottom: "1px solid #FEE2E2",
+        padding: "13px 20px",
+        borderBottom: "1px solid var(--border)",
+        borderLeft: "3px solid var(--accent-red)",
+        background: "var(--surface)",
       }}
     >
       <div style={{ width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0, background: "var(--accent-red)" }} />
@@ -1209,7 +1199,7 @@ export default function MacroPage() {
               </SectionLabel>
               <div
                 style={{
-                  background: "#FFF8F8",
+                  background: "var(--surface)",
                   border: "1px solid var(--accent-red-border)",
                   borderRadius: "10px",
                   overflow: "hidden",
