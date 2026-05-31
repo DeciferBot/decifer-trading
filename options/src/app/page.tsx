@@ -31,8 +31,10 @@ function scoreLabel(score: number): { text: string; color: string } {
   return { text: "Moderate", color: "#888" };
 }
 
+import type { Side } from "@/lib/types";
+
 // Returns the correct dominant side based on actual expansion data, overriding stale backend field
-function deriveSide(row: LeaderboardRow): string {
+function deriveSide(row: LeaderboardRow): Side {
   const ce = row.call_expansion ?? 0;
   const pe = row.put_expansion ?? 0;
   const uc = row.unusual_calls ?? false;
