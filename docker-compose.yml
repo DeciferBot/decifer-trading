@@ -294,10 +294,16 @@ services:
           cpus: "0.5"
 
 # ── Named volumes ──────────────────────────────────────────────────────────────
-# On first deploy, seed data/ via rsync from dev machine before compose up.
-# Then: chown -R 1000:1000 /opt/decifer/data /opt/decifer/logs
+# decifer-data is a bind mount to /opt/decifer/data on the host so that the
+# intelligence-api container sees cron-written pipeline output in real time.
+# The named-volume indirection is preserved so all service volume references
+# remain unchanged — only the backing store changes.
 volumes:
   decifer-data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/decifer/data
   ibeam-conf:
     driver: local
