@@ -359,8 +359,27 @@ def _promote_to_live(shadow_path: str, live_path: str) -> int:
     return len(universe.get("candidates", []))
 
 
+def _cleanup_stale_fail_files() -> int:
+    """Delete .fail_*.json files in data/live/ older than 24 hours."""
+    import glob as _glob
+    import time as _time
+    cutoff = _time.time() - 86400
+    removed = 0
+    for path in _glob.glob(os.path.join(_LIVE_DIR, ".fail_*.json")):
+        try:
+            if os.path.getmtime(path) < cutoff:
+                os.remove(path)
+                removed += 1
+        except OSError:
+            pass
+    return removed
+
+
 def run() -> None:
     print("=== Intelligence Pipeline ===")
+    _n = _cleanup_stale_fail_files()
+    if _n:
+        print(f"      cleaned up {_n} stale .fail_*.json files from {_LIVE_DIR}")
 
     # Step 1 — live driver state
     print("[1/5] Resolving live macro driver state...")

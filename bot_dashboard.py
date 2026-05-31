@@ -1380,7 +1380,18 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             try:
-                payload = _get_news_payload()
+                import concurrent.futures as _cf
+                with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+                    _fut = _ex.submit(_get_news_payload)
+                    try:
+                        payload = _fut.result(timeout=8)
+                    except _cf.TimeoutError:
+                        log.warning("news API timed out after 8s — returning cached or empty")
+                        payload = (
+                            _news_payload_cache["data"]
+                            if _news_payload_cache["data"]
+                            else {"articles": [], "sentinel_triggers": [], "catalyst_triggers": [], "error": "timeout"}
+                        )
             except Exception as exc:
                 log.warning("news API error: %s", exc)
                 payload = {"articles": [], "sentinel_triggers": [], "catalyst_triggers": [], "error": str(exc)}
@@ -1619,8 +1630,21 @@ class DashHandler(BaseHTTPRequestHandler):
                     payload = _regime_live_cache["data"]
                 else:
                     from scanner import get_market_regime as _gmr
-                    # ib param is never used by _regime_download — Alpaca/FMP called directly
-                    _r = _gmr(None)
+                    import concurrent.futures as _cf2
+                    with _cf2.ThreadPoolExecutor(max_workers=1) as _ex2:
+                        _fut2 = _ex2.submit(_gmr, None)
+                        try:
+                            # ib param is never used by _regime_download — Alpaca/FMP called directly
+                            _r = _fut2.result(timeout=8)
+                        except _cf2.TimeoutError:
+                            log.warning("regime-live fetch timed out after 8s")
+                            payload = (
+                                _regime_live_cache["data"]
+                                if _regime_live_cache["data"]
+                                else {"ok": False, "error": "regime fetch timeout — using last known"}
+                            )
+                            self.wfile.write(json.dumps(payload, default=str).encode())
+                            return
                     payload = {"ok": True, "ts": int(_now), "regime": _r}
                     _regime_live_cache["data"] = payload
                     _regime_live_cache["fetched_at"] = _now
@@ -2230,7 +2254,9 @@ def _pnl_refresh_loop():
 
 
 def start_dashboard():
-    server = ThreadingHTTPServer(("127.0.0.1", CONFIG["dashboard_port"]), DashHandler)
+    server = ThreadingHTTPServer(("0.0.0.0", CONFIG["dashboard_port"]), DashHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     threading.Thread(target=_pnl_refresh_loop, daemon=True, name="pnl-refresh").start()
-    clog("INFO", f"Dashboard live → http://localhost:{CONFIG['dashboard_port']}")
+    import socket as _socket
+    _local_ip = _socket.gethostbyname(_socket.gethostname())
+    clog("INFO", f"Dashboard live → http://localhost:{CONFIG['dashboard_port']}  |  network: http://{_local_ip}:{CONFIG['dashboard_port']}")
