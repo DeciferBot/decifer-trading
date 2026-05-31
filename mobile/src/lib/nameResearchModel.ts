@@ -246,6 +246,10 @@ export interface NameFundamentalsResponse {
     priceTarget?: number;
     ratingCount?: number;
   };
+  shortInterest?: {
+    shortFloatPct: number;
+    date: string;
+  };
   available: boolean;
   source: "fmp" | "none";
 }
@@ -449,6 +453,21 @@ export function buildDetailQuestions(
     `Are ${symbol}'s current moves driven by fundamentals or broader market conditions?`,
     `How does ${symbol} compare with other names in the ${label} space?`,
   ];
+}
+
+// ── Short interest context ────────────────────────────────────────────────────
+
+export function buildShortInterestLine(
+  shortInterest?: NameFundamentalsResponse["shortInterest"],
+): string | null {
+  if (!shortInterest || shortInterest.shortFloatPct == null) return null;
+  const pct = shortInterest.shortFloatPct;
+  if (pct < 10) return null;
+  const rounded = Math.round(pct);
+  if (pct >= 20) {
+    return `About ${rounded}% of the available float is sold short. If demand picks up, short sellers would need to cover their positions — which can amplify any upward move.`;
+  }
+  return `About ${rounded}% of the float is sold short — elevated, but not at extreme levels.`;
 }
 
 // ── Fresh price merge ─────────────────────────────────────────────────────────

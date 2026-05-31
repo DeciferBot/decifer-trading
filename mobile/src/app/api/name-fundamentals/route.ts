@@ -30,12 +30,13 @@ export async function GET(req: NextRequest) {
   // FMP stable API — verified working endpoints for this plan:
   // stable/profile (not profile-symbol), key-metrics-ttm, price-target-consensus, financial-growth.
   // grades-summary returns [] with this key — omitted.
-  const [profileResult, metricsResult, priceTargetResult, growthResult] =
+  const [profileResult, metricsResult, priceTargetResult, growthResult, shortFloatResult] =
     await Promise.allSettled([
       fetch(`${base}/profile?symbol=${symbol}&${key}`, CACHE_OPTS),
       fetch(`${base}/key-metrics-ttm?symbol=${symbol}&${key}`, CACHE_OPTS),
       fetch(`${base}/price-target-consensus?symbol=${symbol}&${key}`, CACHE_OPTS),
       fetch(`${base}/financial-growth?symbol=${symbol}&period=annual&limit=1&${key}`, CACHE_OPTS),
+      fetch(`${base}/short-of-float?symbol=${symbol}&${key}`, { next: { revalidate: 86400 } }),
     ]);
 
   // ── Profile ──────────────────────────────────────────────────────────────────
@@ -134,7 +135,23 @@ export async function GET(req: NextRequest) {
     } catch { /* graceful */ }
   }
 
-  const available = !!(profile || fundamentals || analyst);
+  // ── Short interest (FINRA bi-monthly via FMP short-of-float) ─────────────────
+  let shortInterest: { shortFloatPct: number; date: string } | undefined;
+
+  if (shortFloatResult.status === "fulfilled" && shortFloatResult.value.ok) {
+    try {
+      const data = await shortFloatResult.value.json();
+      const s = Array.isArray(data) ? data[0] : data;
+      if (s && typeof s.shortPercent === "number" && s.shortPercent > 0) {
+        shortInterest = {
+          shortFloatPct: parseFloat((s.shortPercent * 100).toFixed(1)),
+          date: typeof s.date === "string" ? s.date.slice(0, 10) : "",
+        };
+      }
+    } catch { /* graceful */ }
+  }
+
+  const available = !!(profile || fundamentals || analyst || shortInterest);
 
   return NextResponse.json({
     symbol,
@@ -142,6 +159,7 @@ export async function GET(req: NextRequest) {
     ...(profile && { profile }),
     ...(fundamentals && { fundamentals }),
     ...(analyst && { analyst }),
+    ...(shortInterest && { shortInterest }),
     available,
     source: available ? "fmp" : "none",
   });

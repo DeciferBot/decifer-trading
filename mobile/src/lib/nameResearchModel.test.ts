@@ -15,6 +15,7 @@ import {
   buildDetailQuestions,
   buildWhyItMattersNow,
   buildRiskNoteLine,
+  buildShortInterestLine,
   mergeFreshPrice,
   buildPriceFreshnessLabel,
   type NameFundamentalsResponse,
@@ -936,6 +937,51 @@ describe("buildRiskNoteLine", () => {
     const note = "Sector rotation may reduce attention on this name.";
     const result = buildRiskNoteLine("MSFT", note, "Microsoft Corporation");
     const forbidden = ["buy", "sell", "order", "stop loss", "broker"];
+    for (const w of forbidden) {
+      expect(result.toLowerCase()).not.toContain(w);
+    }
+  });
+});
+
+describe("buildShortInterestLine", () => {
+  it("returns null when shortInterest is undefined", () => {
+    expect(buildShortInterestLine(undefined)).toBeNull();
+  });
+
+  it("returns null when shortFloatPct is null", () => {
+    expect(buildShortInterestLine({ shortFloatPct: null as unknown as number, date: "2026-06-01" })).toBeNull();
+  });
+
+  it("returns null when shortFloatPct is below 10", () => {
+    expect(buildShortInterestLine({ shortFloatPct: 9.9, date: "2026-06-01" })).toBeNull();
+  });
+
+  it("returns null at exactly 0", () => {
+    expect(buildShortInterestLine({ shortFloatPct: 0, date: "2026-06-01" })).toBeNull();
+  });
+
+  it("returns elevated copy for 10–19% float short", () => {
+    const result = buildShortInterestLine({ shortFloatPct: 15, date: "2026-06-01" });
+    expect(result).not.toBeNull();
+    expect(result).toContain("15%");
+    expect(result).toContain("elevated");
+  });
+
+  it("returns squeeze-mechanism copy for ≥20% float short", () => {
+    const result = buildShortInterestLine({ shortFloatPct: 25, date: "2026-06-01" });
+    expect(result).not.toBeNull();
+    expect(result).toContain("25%");
+    expect(result).toContain("cover");
+  });
+
+  it("rounds to nearest integer", () => {
+    const result = buildShortInterestLine({ shortFloatPct: 22.7, date: "2026-06-01" });
+    expect(result).toContain("23%");
+  });
+
+  it("contains no forbidden execution language", () => {
+    const result = buildShortInterestLine({ shortFloatPct: 25, date: "2026-06-01" }) ?? "";
+    const forbidden = ["order", "broker", "place a trade", "execute"];
     for (const w of forbidden) {
       expect(result.toLowerCase()).not.toContain(w);
     }
