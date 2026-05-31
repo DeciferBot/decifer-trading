@@ -1,0 +1,39 @@
+{
+  "saved_at": "2026-05-31T18:08:26.835552+00:00",
+  "total": 1,
+  "scores": {
+    "NVDA": {
+      "symbol": "NVDA",
+      "composite": 25,
+      "tier": "WATCHLIST",
+      "dimensions": {
+        "analyst": {
+          "raw_pts": 5,
+          "max_pts": 38,
+          "signal": "consensus=UNKNOWN"
+        },
+        "momentum": {
+          "raw_pts": 0,
+          "max_pts": 20,
+          "signal": "no price data"
+        },
+        "valuation": {
+          "raw_pts": 0,
+          "max_pts": 23,
+          "signal": "no valuation data"
+        },
+        "highs": {
+          "raw_pts": 0,
+          "max_pts": 12,
+          "signal": "no price history"
+        },
+        "macro": {
+          "raw_pts": 25,
+          "max_pts": 25,
+          "signal": "driver=ai_capex_growth(active)_direct_beneficiary\u2192+20; strong_evidence\u2192+5"
+        }
+      },
+      "ts": "2026-05-31T18:08:26.830306+00:00"
+    }
+  }
+}

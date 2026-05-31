@@ -12,14 +12,16 @@ the next 1–10 days given everything we know about it structurally?
 It is NOT about intraday entry timing (5m bars, MFI, VWAP). That is the
 signal engine's job. Conviction uses daily and multi-day data only.
 
-Phase 1 dimensions (weights sum to 1.00 across enabled dims):
-  D1 — Analyst consensus + price target        weight 0.20
-  D2 — Price momentum 1D/5D vs SPY             weight 0.18
-  D3 — Valuation (DCF, P/E, revenue growth)   weight 0.15
-  D4 — Distance from 52W/ATH highs (corrected) weight 0.07
-  D5 — Macro theme + driver state              weight 0.13
-
-Phase 2 adds: D6 news/catalyst, D7 options flow, D8 peer network, D9 counter-thesis.
+Phase 1+2 dimensions:
+  D1 — Analyst consensus + price target        max 38 pts
+  D2 — Price momentum 1D/5D vs SPY             max 20 pts
+  D3 — Valuation (DCF, P/E, revenue growth)    max 23 pts
+  D4 — Distance from 52W/ATH highs (corrected) max 12 pts
+  D5 — Macro theme + driver state              max 25 pts
+  D6 — News and catalyst (customer_event_tape) max 12 pts
+  D7 — Options flow (api_cache flow files)     max 12 pts  (ASYMMETRIC put penalty)
+  D8 — Peer network alignment (TTG bucket)     max  8 pts
+  D9 — Counter-thesis (structural conflicts)   max  3 pts  (-10 penalty)
 
 Composite score: raw_sum / enabled_max * 100, clamped 0–100.
 
@@ -505,18 +507,348 @@ def fetch_analyst_changes(symbols: list[str]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# D6 — News and catalyst  (max 12 pts)
+# ---------------------------------------------------------------------------
+# Reads customer_event_tape.json. Matches symbol via tickers_first_order /
+# tickers_second_order, or by theme_id appearing in themes_strengthened /
+# themes_weakened.
+#
+# Materiality mapping: "high" → 0.9, "medium" → 0.5, "low" → 0.2
+# Direction: positive = theme_id in themes_strengthened, or event_family
+#   "earnings" and symbol in tickers_first_order; negative = theme_id in
+#   themes_weakened, or event_family "geopolitics" and symbol in
+#   tickers_first_order with no strengthened match.
+# Age windows keyed on source_published_at.
+#   positive event (materiality >= 0.7) within 24h: +12
+#   positive event within 72h: +7
+#   positive event within 7d: +3
+#   no material news: 0
+#   negative event within 24h: -12
+#   negative event within 72h: -7
+
+_MATERIALITY_MAP = {"high": 0.9, "medium": 0.5, "low": 0.2}
+
+
+def _event_age_hours(event: dict) -> float | None:
+    """Return age of event in hours from now, or None if unparseable."""
+    pub_str = event.get("source_published_at") or event.get("ingested_at") or ""
+    try:
+        pub_dt = datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
+        if pub_dt.tzinfo is None:
+            pub_dt = pub_dt.replace(tzinfo=UTC)
+        delta = datetime.now(UTC) - pub_dt
+        return delta.total_seconds() / 3600
+    except Exception:
+        return None
+
+
+def _event_direction_for_symbol(event: dict, symbol: str, theme_id: str) -> str:
+    """
+    Returns "positive", "negative", or "neutral" for the given symbol/theme.
+
+    Logic priority:
+    1. theme_id in themes_strengthened → positive
+    2. theme_id in themes_weakened → negative
+    3. symbol in tickers_first_order AND event_family is "earnings" → positive
+    4. symbol in tickers_first_order AND event_family is "geopolitics" → negative
+    5. fallback: neutral
+    """
+    themes_strengthened = event.get("themes_strengthened") or []
+    themes_weakened     = event.get("themes_weakened") or []
+
+    if theme_id and theme_id in themes_strengthened:
+        return "positive"
+    if theme_id and theme_id in themes_weakened:
+        return "negative"
+
+    sym_upper  = symbol.upper()
+    first_ord  = [t.upper() for t in (event.get("tickers_first_order") or [])]
+
+    if sym_upper in first_ord:
+        family = (event.get("event_family") or "").lower()
+        if family == "earnings":
+            return "positive"
+        if family == "geopolitics":
+            return "negative"
+
+    return "neutral"
+
+
+def _score_news_catalyst(symbol: str, theme_id: str) -> DimensionScore:
+    MAX = 12
+
+    tape_path = _DATA_DIR / "customer_event_tape.json"
+    raw = _read_json(tape_path)
+    events = raw.get("events", [])
+
+    sym_upper = symbol.upper()
+
+    best_positive_pts = 0
+    worst_negative_pts = 0
+
+    for event in events:
+        materiality_str = (event.get("materiality") or "low").lower()
+        materiality = _MATERIALITY_MAP.get(materiality_str, 0.2)
+        if materiality < 0.7:
+            continue
+
+        # Does this event touch our symbol?
+        first_ord  = [t.upper() for t in (event.get("tickers_first_order")  or [])]
+        second_ord = [t.upper() for t in (event.get("tickers_second_order") or [])]
+        themes_str = (event.get("themes_strengthened") or []) + (event.get("themes_weakened") or [])
+
+        symbol_touched = (
+            sym_upper in first_ord
+            or sym_upper in second_ord
+            or (theme_id and theme_id in themes_str)
+        )
+        if not symbol_touched:
+            continue
+
+        age_h = _event_age_hours(event)
+        if age_h is None or age_h > 7 * 24:
+            continue
+
+        direction = _event_direction_for_symbol(event, symbol, theme_id)
+
+        if direction == "positive":
+            if age_h <= 24:
+                pts = 12
+            elif age_h <= 72:
+                pts = 7
+            else:
+                pts = 3
+            best_positive_pts = max(best_positive_pts, pts)
+
+        elif direction == "negative":
+            if age_h <= 24:
+                pts = -12
+            elif age_h <= 72:
+                pts = -7
+            else:
+                pts = 0  # negative beyond 72h: no deduction
+            worst_negative_pts = min(worst_negative_pts, pts)
+
+    # Combine: best positive + worst negative, clamped
+    combined = max(-MAX, min(MAX, best_positive_pts + worst_negative_pts))
+    if combined == 0:
+        signal = "no material news"
+    elif combined > 0:
+        signal = f"positive_event→+{combined}"
+    else:
+        signal = f"negative_event→{combined}"
+
+    return DimensionScore(raw_pts=combined, max_pts=MAX, signal=signal)
+
+
+# ---------------------------------------------------------------------------
+# D7 — Options flow  (max 12 pts, ASYMMETRIC — put penalty 1.5x)
+# ---------------------------------------------------------------------------
+# Reads data/api_cache/{SYMBOL}_flow.json if it exists and is < 30 min old.
+# Fields: unusual_calls (bool), unusual_puts (bool),
+#         call_expansion (float), put_expansion (float)
+#
+#   unusual_calls = True: +10
+#   call_expansion 1.75–2.5x (no unusual flag): +5
+#   call_expansion 2.5x+: +8
+#   unusual_puts = True: -15  (1.5x asymmetry — informed sellers > buyers)
+#   put_expansion dominant (> call_expansion, no unusual flags): -8
+#   no unusual flow: 0
+
+_FLOW_MAX_AGE_SECONDS = 30 * 60  # 30 minutes
+_API_CACHE_DIR = _BASE_DIR / "data" / "api_cache"
+
+
+def _score_options_flow(symbol: str) -> DimensionScore:
+    MAX = 12
+
+    flow_path = _API_CACHE_DIR / f"{symbol.upper()}_flow.json"
+    if not flow_path.exists():
+        return DimensionScore(raw_pts=0, max_pts=MAX, signal="no flow data")
+
+    # Age check
+    try:
+        mtime = flow_path.stat().st_mtime
+        age_s = time.time() - mtime
+        if age_s > _FLOW_MAX_AGE_SECONDS:
+            return DimensionScore(raw_pts=0, max_pts=MAX,
+                                  signal=f"flow_data_stale({age_s/60:.0f}m)")
+    except Exception:
+        return DimensionScore(raw_pts=0, max_pts=MAX, signal="flow_stat_error")
+
+    try:
+        flow = json.loads(flow_path.read_text())
+    except Exception:
+        return DimensionScore(raw_pts=0, max_pts=MAX, signal="flow_parse_error")
+
+    unusual_calls  = bool(flow.get("unusual_calls", False))
+    unusual_puts   = bool(flow.get("unusual_puts", False))
+    call_expansion = _f(flow.get("call_expansion")) or 0.0
+    put_expansion  = _f(flow.get("put_expansion"))  or 0.0
+
+    pts = 0
+    signals = []
+
+    if unusual_puts:
+        pts -= 15
+        signals.append("unusual_puts→-15")
+    elif put_expansion > call_expansion and put_expansion > 0:
+        pts -= 8
+        signals.append(f"put_dominant({put_expansion:.1f}x)→-8")
+
+    if unusual_calls:
+        pts += 10
+        signals.append("unusual_calls→+10")
+    elif call_expansion >= 2.5:
+        pts += 8
+        signals.append(f"call_expansion={call_expansion:.1f}x→+8")
+    elif call_expansion >= 1.75:
+        pts += 5
+        signals.append(f"call_expansion={call_expansion:.1f}x→+5")
+
+    if not signals:
+        signals.append("no unusual flow")
+
+    pts = max(-15, min(MAX, pts))  # cap at MAX but allow -15 for put asymmetry
+    return DimensionScore(raw_pts=pts, max_pts=MAX, signal="; ".join(signals))
+
+
+# ---------------------------------------------------------------------------
+# D8 — Peer network alignment  (max 8 pts)
+# ---------------------------------------------------------------------------
+# Finds all OTHER active TTG exposures sharing the same bucket_id as the
+# symbol's primary exposure. Uses price_changes (5D returns) for peers.
+#
+#   >= 75% peers positive 5D: +8
+#   50–74% positive: +4
+#   25–49% positive: 0
+#   < 25% positive: -5
+#   < 2 peers found: 0 (insufficient data)
+
+def _score_peer_network(symbol: str, price_changes: dict[str, float]) -> DimensionScore:
+    MAX = 8
+
+    exposures = _exposures_for(symbol)
+    if not exposures:
+        return DimensionScore(raw_pts=0, max_pts=MAX, signal="not_in_TTG")
+
+    primary = exposures[0]
+    bucket_id = primary.get("bucket_id", "")
+    if not bucket_id:
+        return DimensionScore(raw_pts=0, max_pts=MAX, signal="no_bucket_id")
+
+    # Load all exposures to find peers in same bucket
+    raw = _read_json(_DATA_DIR / "theme_graph" / "symbol_exposures.json")
+    all_exposures = raw.get("exposures", [])
+
+    sym_upper = symbol.upper()
+    peers = [
+        e.get("symbol", "").upper()
+        for e in all_exposures
+        if e.get("bucket_id") == bucket_id
+        and e.get("status") == "active"
+        and e.get("symbol", "").upper() != sym_upper
+    ]
+
+    if len(peers) < 2:
+        return DimensionScore(raw_pts=0, max_pts=MAX,
+                              signal=f"insufficient_peers({len(peers)})")
+
+    peers_with_data = [(p, price_changes.get(p)) for p in peers
+                       if price_changes.get(p) is not None]
+
+    if len(peers_with_data) < 2:
+        return DimensionScore(raw_pts=0, max_pts=MAX,
+                              signal=f"no_price_data_for_peers")
+
+    positive_count = sum(1 for _, ret in peers_with_data if ret > 0)
+    total = len(peers_with_data)
+    pct_positive = positive_count / total * 100
+
+    if pct_positive >= 75:
+        pts = 8;  signal = f"peers={total},pos%={pct_positive:.0f}→+8"
+    elif pct_positive >= 50:
+        pts = 4;  signal = f"peers={total},pos%={pct_positive:.0f}→+4"
+    elif pct_positive >= 25:
+        pts = 0;  signal = f"peers={total},pos%={pct_positive:.0f}→0"
+    else:
+        pts = -5; signal = f"peers={total},pos%={pct_positive:.0f}→-5"
+
+    return DimensionScore(raw_pts=pts, max_pts=MAX, signal=signal)
+
+
+# ---------------------------------------------------------------------------
+# D9 — Counter-thesis  (max 3 pts positive, -10 penalty)
+# ---------------------------------------------------------------------------
+# Reads counter_thesis_cache.json structural_conflicts for driver_id.
+# Reads thesis_divergence.json for thesis_intact status of symbol.
+#
+#   no conflicts AND thesis_intact=True: +3
+#   no conflicts, no divergence data: 0
+#   weak/speculative conflicts (< 2 conflicts): -3
+#   strong conflicts (>= 2 evidenced conflicts): -10
+#   thesis_intact=False (diverging): -8
+
+def _score_counter_thesis(symbol: str, driver_id: str) -> DimensionScore:
+    MAX = 3
+
+    conflicts = _counter_thesis_for(driver_id) if driver_id else []
+    divergence = _thesis_divergence_for(symbol)
+
+    # thesis_intact can be True, False, or None (data_unavailable)
+    thesis_intact: bool | None = None
+    if divergence is not None:
+        raw_intact = divergence.get("thesis_intact")
+        if raw_intact is True:
+            thesis_intact = True
+        elif raw_intact is False:
+            thesis_intact = False
+        # None / null / "data_unavailable" → thesis_intact stays None
+
+    # thesis_intact=False takes priority regardless of conflicts
+    if thesis_intact is False:
+        return DimensionScore(raw_pts=-8, max_pts=MAX,
+                              signal="thesis_intact=False→-8")
+
+    n_conflicts = len(conflicts)
+
+    if n_conflicts == 0:
+        if thesis_intact is True:
+            return DimensionScore(raw_pts=3, max_pts=MAX,
+                                  signal="no_conflicts+thesis_intact→+3")
+        return DimensionScore(raw_pts=0, max_pts=MAX,
+                              signal="no_conflicts,no_divergence_data→0")
+
+    if n_conflicts >= 2:
+        return DimensionScore(raw_pts=-10, max_pts=MAX,
+                              signal=f"{n_conflicts}_evidenced_conflicts→-10")
+
+    # 1 conflict = weak/speculative
+    return DimensionScore(raw_pts=-3, max_pts=MAX,
+                          signal=f"{n_conflicts}_speculative_conflict→-3")
+
+
+# ---------------------------------------------------------------------------
 # Composite scorer
 # ---------------------------------------------------------------------------
 
-# Phase 1 enabled dimensions and their max_pts
-_PHASE1_DIMS = {
-    "analyst":   38,
-    "momentum":  20,
-    "valuation": 23,
-    "highs":     12,
-    "macro":     25,
+# All enabled dimensions and their max_pts (Phase 1 + Phase 2)
+_ALL_DIMS = {
+    "analyst":       38,
+    "momentum":      20,
+    "valuation":     23,
+    "highs":         12,
+    "macro":         25,
+    "news_catalyst": 12,
+    "options_flow":  12,
+    "peer_network":   8,
+    "counter_thesis": 3,
 }
-_PHASE1_MAX = sum(_PHASE1_DIMS.values())   # 118
+_ALL_DIMS_MAX = sum(_ALL_DIMS.values())   # 153
+
+# Keep legacy name as alias for any callers that referenced it
+_PHASE1_DIMS = {k: _ALL_DIMS[k] for k in ("analyst", "momentum", "valuation", "highs", "macro")}
+_PHASE1_MAX = sum(_PHASE1_DIMS.values())  # 118
 
 
 def _tier(score: int) -> str:
@@ -532,7 +864,7 @@ def score_symbol(
     analyst_changes: list[dict] | None = None,
 ) -> ConvictionScore:
     """
-    Score a single symbol across all Phase 1 conviction dimensions.
+    Score a single symbol across all Phase 1+2 conviction dimensions.
 
     price_changes and analyst_changes are batch-fetched at universe level
     and passed in to avoid redundant API calls.
@@ -542,24 +874,43 @@ def score_symbol(
     if analyst_changes is None:
         analyst_changes = fetch_analyst_changes([symbol])
 
+    # Resolve primary TTG exposure once for D5/D6/D9
+    exposures = _exposures_for(symbol)
+    primary_exposure = exposures[0] if exposures else {}
+    theme_id  = primary_exposure.get("theme_id", "")
+    driver_id = primary_exposure.get("driver_id", "")
+
+    # Phase 1
     d1 = _score_analyst(symbol, analyst_changes)
     d2 = _score_momentum(symbol, price_changes)
     d3 = _score_valuation(symbol)
     d4 = _score_distance_from_highs(symbol)
     d5 = _score_macro_theme(symbol)
 
-    raw_sum = d1.raw_pts + d2.raw_pts + d3.raw_pts + d4.raw_pts + d5.raw_pts
-    # Normalise against Phase 1 max. Clamp numerator at 0 so negatives don't
+    # Phase 2
+    d6 = _score_news_catalyst(symbol, theme_id)
+    d7 = _score_options_flow(symbol)
+    d8 = _score_peer_network(symbol, price_changes)
+    d9 = _score_counter_thesis(symbol, driver_id)
+
+    raw_sum = (d1.raw_pts + d2.raw_pts + d3.raw_pts + d4.raw_pts + d5.raw_pts
+               + d6.raw_pts + d7.raw_pts + d8.raw_pts + d9.raw_pts)
+
+    # Normalise against all-dims max. Clamp numerator at 0 so negatives don't
     # produce a negative composite — floor is 0.
-    composite = round(max(0, raw_sum) / _PHASE1_MAX * 100)
+    composite = round(max(0, raw_sum) / _ALL_DIMS_MAX * 100)
     composite = min(composite, 100)
 
     dims = {
-        "analyst":   d1.to_dict(),
-        "momentum":  d2.to_dict(),
-        "valuation": d3.to_dict(),
-        "highs":     d4.to_dict(),
-        "macro":     d5.to_dict(),
+        "analyst":       d1.to_dict(),
+        "momentum":      d2.to_dict(),
+        "valuation":     d3.to_dict(),
+        "highs":         d4.to_dict(),
+        "macro":         d5.to_dict(),
+        "news_catalyst": d6.to_dict(),
+        "options_flow":  d7.to_dict(),
+        "peer_network":  d8.to_dict(),
+        "counter_thesis":d9.to_dict(),
     }
 
     return ConvictionScore(
