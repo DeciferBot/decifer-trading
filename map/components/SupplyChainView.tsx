@@ -12,6 +12,7 @@ interface Props {
   graphData: GraphData | null;
   onSelect: (symbol: string) => void;
   allNodeLabels: Record<string, string>;
+  activeCandidates?: Set<string>;
 }
 
 function SymbolLogo({ symbol, size = 28 }: { symbol: string; size?: number }) {
@@ -44,6 +45,7 @@ function SymbolCard({
   name,
   price,
   isSelected,
+  isActive,
   chainColor,
   onClick,
 }: {
@@ -51,6 +53,7 @@ function SymbolCard({
   name: string;
   price?: { price: number; change_pct: number };
   isSelected: boolean;
+  isActive: boolean;
   chainColor: string;
   onClick: () => void;
 }) {
@@ -67,7 +70,7 @@ function SymbolCard({
       style={{
         background: isSelected ? chainColor + "20" : "rgba(255,255,255,0.04)",
         border: isSelected ? `1px solid ${chainColor}66` : "1px solid rgba(255,255,255,0.08)",
-        borderLeft: `3px solid ${isSelected ? chainColor : hasChange ? changeColor : "rgba(255,255,255,0.12)"}`,
+        borderLeft: `3px solid ${isSelected ? chainColor : isActive ? "rgba(16,185,129,0.4)" : hasChange ? changeColor : "rgba(255,255,255,0.12)"}`,
         padding: "10px 10px",
       }}
     >
@@ -77,6 +80,9 @@ function SymbolCard({
         <span className="font-bold font-mono text-white leading-none" style={{ fontSize: 13 }}>
           {symbol}
         </span>
+        {isActive && (
+          <span className="w-[6px] h-[6px] rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+        )}
         {hasChange && (
           <span
             className="ml-auto text-[10px] font-semibold font-mono leading-none px-1.5 py-0.5 rounded-md"
@@ -102,7 +108,7 @@ function SymbolCard({
   );
 }
 
-export default function SupplyChainView({ chain, selectedSymbol, prices, onSelect, allNodeLabels }: Props) {
+export default function SupplyChainView({ chain, selectedSymbol, prices, onSelect, allNodeLabels, activeCandidates }: Props) {
   const stages = chain.stages.filter(s => s.symbols.length > 0);
 
   return (
@@ -131,6 +137,7 @@ export default function SupplyChainView({ chain, selectedSymbol, prices, onSelec
                     name={allNodeLabels[symbol] ?? symbol}
                     price={prices[symbol]}
                     isSelected={selectedSymbol === symbol}
+                    isActive={activeCandidates?.has(symbol) ?? false}
                     chainColor={chain.color}
                     onClick={() => onSelect(symbol)}
                   />

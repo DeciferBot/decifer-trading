@@ -15,12 +15,18 @@ interface DriverState {
 async function fetchLiveDriverState(): Promise<DriverState | null> {
   if (!INTELLIGENCE_API_URL) return null;
   try {
-    const res = await fetch(`${INTELLIGENCE_API_URL}/api/intelligence/drivers`, {
+    const res = await fetch(`${INTELLIGENCE_API_URL}/api/market-now`, {
       next: { revalidate: 60 },
       signal: AbortSignal.timeout(4000),
     });
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    return {
+      active_drivers: data.active_themes ?? [],
+      blocked_conditions: data.blocked_conditions ?? [],
+      evidence: data.key_drivers ?? {},
+      generated_at: data.generated_at,
+    };
   } catch {
     return null;
   }
@@ -35,7 +41,7 @@ async function fetchActiveCandidates(): Promise<string[]> {
     });
     if (!res.ok) return [];
     const data = await res.json();
-    const candidates: Array<{ symbol: string }> = data.candidates ?? data.universe ?? [];
+    const candidates: Array<{ symbol: string }> = data.theme_graph_universe ?? data.candidates ?? data.universe ?? [];
     return candidates.map((c) => c.symbol);
   } catch {
     return [];

@@ -274,6 +274,45 @@ export default function SymbolDetailPanel({
             No relationships mapped.
           </div>
         )}
+
+        {/* Ask Decifer */}
+        <div className="px-4 pt-4 pb-5 mt-1 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          <div className="text-[9px] uppercase tracking-wide mb-2" style={{ color: "rgba(255,255,255,0.25)" }}>
+            Ask Decifer
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <a
+              href="https://mobile.decifertrading.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full text-left rounded-lg px-3 py-2 transition-all hover:bg-white/8"
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.50)",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                display: "block",
+              }}
+            >
+              Why is {symbol} moving?
+            </a>
+            <a
+              href="https://mobile.decifertrading.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full text-left rounded-lg px-3 py-2 transition-all hover:bg-white/8"
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.50)",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                display: "block",
+              }}
+            >
+              What&apos;s the supply chain risk for {symbol}?
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

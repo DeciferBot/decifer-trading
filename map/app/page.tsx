@@ -24,6 +24,7 @@ export default function MapPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [prices, setPrices] = useState<Record<string, { price: number; change_pct: number }>>({});
   const [graphData, setGraphData] = useState<GraphData | null>(null);
+  const [activeCandidates, setActiveCandidates] = useState<Set<string>>(new Set());
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -40,6 +41,16 @@ export default function MapPage() {
 
   useEffect(() => {
     fetch("/api/graph").then(r => r.json()).then(setGraphData).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/intelligence")
+      .then(r => r.json())
+      .then(data => {
+        const symbols: string[] = data.active_candidate_symbols ?? [];
+        setActiveCandidates(new Set(symbols));
+      })
+      .catch(() => {});
   }, []);
 
   const loadPrices = useCallback(async (c: typeof chain) => {
@@ -287,6 +298,7 @@ export default function MapPage() {
             graphData={graphData}
             onSelect={sym => handleSymbolSelect(sym)}
             allNodeLabels={allNodeLabels}
+            activeCandidates={activeCandidates}
           />
         </div>
 

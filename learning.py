@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import tempfile
 import threading
@@ -680,6 +681,41 @@ def load_trades() -> list:
         return []
 
 
+def _calculate_sharpe() -> float | None:
+    """Calculate annualised Sharpe ratio from equity_history.json open/close pairs."""
+    equity_path = os.path.join(os.path.dirname(__file__), "data", "equity_history.json")
+    try:
+        with open(equity_path) as f:
+            history = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(history, list) or len(history) < 5:
+        return None
+
+    # History is 2 points per day (open, close). Take pairs: open[i], close[i+1].
+    # daily_return = (close - open) / open
+    daily_returns: list[float] = []
+    for i in range(0, len(history) - 1, 2):
+        open_val = history[i].get("value")
+        close_val = history[i + 1].get("value")
+        if open_val and close_val and open_val > 0:
+            daily_returns.append((close_val - open_val) / open_val)
+
+    if len(daily_returns) < 5:
+        return None
+
+    n = len(daily_returns)
+    mean = sum(daily_returns) / n
+    variance = sum((r - mean) ** 2 for r in daily_returns) / n
+    std = math.sqrt(variance)
+
+    if std == 0:
+        return None
+
+    return round((mean / std) * math.sqrt(252), 2)
+
+
 def get_performance_summary(trades: list | None = None) -> dict:
     """Calculate performance metrics from trade history."""
     if trades is None:
@@ -704,6 +740,7 @@ def get_performance_summary(trades: list | None = None) -> dict:
             "worst_trade": 0,
             "profit_factor": 0,
             "expectancy": 0,
+            "sharpe": _calculate_sharpe(),
         }
 
     wins = [t for t in closed if t["pnl"] > 0]
@@ -720,6 +757,8 @@ def get_performance_summary(trades: list | None = None) -> dict:
 
     expectancy = (win_rate * avg_win) + ((1 - win_rate) * avg_loss)
 
+    sharpe = _calculate_sharpe()
+
     return {
         "total_trades": len(closed),
         "wins": len(wins),
@@ -732,6 +771,7 @@ def get_performance_summary(trades: list | None = None) -> dict:
         "worst_trade": round(min((t["pnl"] for t in closed), default=0), 2),
         "profit_factor": round(profit_factor, 2),
         "expectancy": round(expectancy, 2),
+        "sharpe": sharpe,
     }
 
 
