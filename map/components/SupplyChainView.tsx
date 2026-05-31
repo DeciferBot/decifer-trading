@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { Chain } from "@/lib/chain-definitions";
+import { SYMBOL_CONVICTION } from "@/lib/chain-definitions";
 import type { GraphData } from "@/lib/types";
 
 interface Props {
@@ -80,6 +81,20 @@ function SymbolCard({
         <span className="font-bold font-mono text-white leading-none" style={{ fontSize: 13 }}>
           {symbol}
         </span>
+        {(() => {
+          const cv = SYMBOL_CONVICTION[symbol];
+          if (!cv) return null;
+          const cvColor = cv >= 0.85 ? "#10b981" : cv >= 0.70 ? "#f59e0b" : "#94a3b8";
+          return (
+            <span
+              className="font-mono leading-none"
+              style={{ fontSize: 9, color: cvColor, opacity: 0.9 }}
+              title={`Conviction: ${Math.round(cv * 100)}`}
+            >
+              {Math.round(cv * 100)}
+            </span>
+          );
+        })()}
         {isActive && (
           <span className="w-[6px] h-[6px] rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
         )}
@@ -94,12 +109,12 @@ function SymbolCard({
       </div>
 
       {/* Company name */}
-      <div className="truncate leading-tight mb-1.5" style={{ fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
+      <div className="truncate leading-tight mb-1.5" style={{ fontSize: 10, color: "rgba(255,255,255,0.80)" }}>
         {name}
       </div>
 
       {/* Price */}
-      <div className="font-mono leading-none" style={{ fontSize: 11, color: price?.price ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.18)" }}>
+      <div className="font-mono leading-none" style={{ fontSize: 11, color: price?.price ? "rgba(255,255,255,0.90)" : "rgba(255,255,255,0.45)" }}>
         {price?.price
           ? `$${price.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : "—"}
@@ -122,7 +137,7 @@ export default function SupplyChainView({ chain, selectedSymbol, prices, onSelec
                   {stage.label}
                 </div>
                 {stage.sublabel && (
-                  <div className="text-[9px] leading-tight" style={{ color: "rgba(255,255,255,0.25)" }}>
+                  <div className="text-[9px] leading-tight" style={{ color: "rgba(255,255,255,0.60)" }}>
                     {stage.sublabel}
                   </div>
                 )}

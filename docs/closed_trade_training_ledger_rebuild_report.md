@@ -1,20 +1,20 @@
 # Closed Trade Training Ledger — Rebuild Report
 
-Generated: 2026-05-14T19:09:08.550617+00:00
+Generated: 2026-05-31T18:44:45.036230+00:00
 Mode: LIVE
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Records read from training_records.jsonl | 422 |
-| Records written to .rebuilt file | 416 |
-| Skipped (duplicate trade_id) | 6 |
+| Records read from training_records.jsonl | 485 |
+| Records written to .rebuilt file | 36 |
+| Skipped (duplicate trade_id) | 449 |
 | Quarantined (blank trade_id) | 0 |
 | Quarantined (schema invalid) | 0 |
-| Flagged (empty signal_scores — in rebuilt + quarantine) | 253 |
-| Records with regime=UNKNOWN (in rebuilt) | 216 |
-| Records with canonical entry snapshot available | 0 |
+| Flagged (empty signal_scores — in rebuilt + quarantine) | 5 |
+| Records with regime=UNKNOWN (in rebuilt) | 5 |
+| Records with canonical entry snapshot available | 18 |
 
 ## Output Files
 
