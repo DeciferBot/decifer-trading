@@ -180,6 +180,7 @@ services:
       - "127.0.0.1:8001:8000"
     volumes:
       - decifer-data:/app/data:ro   # read-only mount — intelligence cloud never writes execution state
+      - conviction-cache:/tmp/decifer_conviction  # writable — conviction scores survive restarts
       - ./logs:/app/logs
     env_file: .env
     environment:
@@ -297,6 +298,7 @@ services:
 # The named-volume indirection is preserved so all service volume references
 # remain unchanged — only the backing store changes.
 volumes:
+  conviction-cache:   # persists conviction scores across intelligence-api restarts
   decifer-data:
     driver: local
     driver_opts:
