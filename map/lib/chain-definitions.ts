@@ -53,15 +53,27 @@ export const CHAINS: Chain[] = [
       },
       {
         id: "chips",
-        label: "Semiconductors",
-        sublabel: "GPUs, CPUs, ASICs, memory",
-        symbols: ["NVDA", "AMD", "AVGO", "MRVL", "MU"],
+        label: "Compute Chips",
+        sublabel: "GPUs, CPUs, ASICs, networking silicon",
+        symbols: ["NVDA", "AMD", "AVGO", "MRVL"],
+      },
+      {
+        id: "memory",
+        label: "Memory",
+        sublabel: "DRAM, HBM, NAND storage",
+        symbols: ["MU"],
+      },
+      {
+        id: "photonics",
+        label: "Photonics & Optical",
+        sublabel: "Optical transceivers, DSP, fibre",
+        symbols: ["CIEN", "COHR", "LITE"],
       },
       {
         id: "networking",
         label: "Networking",
-        sublabel: "Switches, optical, cables",
-        symbols: ["ANET", "CIEN", "COHR", "LITE", "MRVL"],
+        sublabel: "Switches, routers, hyperscale fabric",
+        symbols: ["ANET"],
       },
       {
         id: "power_cooling",
