@@ -1,75 +1,46 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Activity, Filter, Search, X, Brain, Map } from "lucide-react";
-import type { GraphData, EnrichedNode, GraphEdge, Cluster } from "@/lib/types";
-import { computeBrightness } from "@/lib/types";
+import { Activity, Brain, Map, X, TrendingUp, TrendingDown, Minus, Link2 } from "lucide-react";
+import type { GraphData, EnrichedNode, GraphEdge } from "@/lib/types";
+import { computeBrightness, EDGE_COLORS, EDGE_LABELS } from "@/lib/types";
 import type { IntelligenceNode, IntelligenceEdge, IntelligenceGraphData } from "@/lib/intelligence-types";
-import NodePanel from "@/components/NodePanel";
 import BrainPanel from "@/components/BrainPanel";
-import MobileMap from "@/components/MobileMap";
 
-const MarketGraph      = dynamic(() => import("@/components/MarketGraph"),      { ssr: false });
+const MarketGraph       = dynamic(() => import("@/components/MarketGraph"),       { ssr: false });
 const IntelligenceGraph = dynamic(() => import("@/components/IntelligenceGraph"), { ssr: false });
 
-type ViewMode = "market" | "brain";
+type MapMode = "ai" | "space" | "brain";
 
-const EDGE_TYPE_FILTERS = [
-  { key: "all",             label: "All" },
-  { key: "supply_chain_up", label: "Supply chain" },
-  { key: "customer",        label: "Customer" },
-  { key: "competition",     label: "Competition" },
-  { key: "investment",      label: "Investment" },
-  { key: "ecosystem",       label: "Ecosystem" },
-] as const;
+const MAP_OPTIONS: { key: MapMode; label: string; icon?: string; desc: string }[] = [
+  { key: "ai",    label: "AI Ecosystem",    desc: "51 companies across compute, software, power and infrastructure" },
+  { key: "space", label: "Space & Defence", desc: "18 companies across launch, earth observation, defence and comms" },
+  { key: "brain", label: "Intelligence",    desc: "Live driver → theme → symbol intelligence graph" },
+];
 
 export default function MapPage() {
-  // ─── View mode ────────────────────────────────────────────────────────────
-  const [viewMode, setViewMode] = useState<ViewMode>("market");
+  const [mapMode, setMapMode]   = useState<MapMode>("ai");
 
-  // ─── Market graph state ───────────────────────────────────────────────────
-  const [graphData, setGraphData]       = useState<GraphData | null>(null);
-  const [enriched, setEnriched]         = useState<EnrichedNode[]>([]);
-  const [selected, setSelected]         = useState<EnrichedNode | null>(null);
-  const [activeFilter, setActiveFilter] = useState<string>("all");
-  const [lastUpdated, setLastUpdated]   = useState<Date | null>(null);
-  const [search, setSearch]             = useState("");
-  const [focusId, setFocusId]           = useState<string | null>(null);
-  const [showSearch, setShowSearch]     = useState(false);
-  const autoSelectedRef                 = useRef(false);
-  const searchRef                       = useRef<HTMLInputElement>(null);
+  // ── Market data ──────────────────────────────────────────────────────────
+  const [graphData, setGraphData]   = useState<GraphData | null>(null);
+  const [enriched, setEnriched]     = useState<EnrichedNode[]>([]);
+  const [selected, setSelected]     = useState<EnrichedNode | null>(null);
 
-  // ─── Brain state ──────────────────────────────────────────────────────────
-  const [brainData, setBrainData]             = useState<IntelligenceGraphData | null>(null);
-  const [brainSelected, setBrainSelected]     = useState<IntelligenceNode | null>(null);
-  const [brainLoading, setBrainLoading]       = useState(false);
+  // ── Brain data ────────────────────────────────────────────────────────────
+  const [brainData, setBrainData]         = useState<IntelligenceGraphData | null>(null);
+  const [brainSelected, setBrainSelected] = useState<IntelligenceNode | null>(null);
 
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
-  // ─── Market data ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    fetch("/api/graph").then(r => r.json()).then(setGraphData);
-  }, []);
+  // ── Load graph + prices ───────────────────────────────────────────────────
+  useEffect(() => { fetch("/api/graph").then(r => r.json()).then(setGraphData); }, []);
 
   const loadPrices = useCallback(async () => {
     if (!graphData) return;
     try {
-      const res = await fetch("/api/prices");
-      const { prices } = await res.json();
-      const nodes: EnrichedNode[] = graphData.nodes.map(n => ({
-        ...n,
-        price: prices[n.id],
-        brightness: computeBrightness(prices[n.id]),
-      }));
-      setEnriched(nodes);
-      setLastUpdated(new Date());
+      const { prices } = await fetch("/api/prices").then(r => r.json());
+      setEnriched(graphData.nodes.map(n => ({
+        ...n, price: prices[n.id], brightness: computeBrightness(prices[n.id]),
+      })));
     } catch {
       setEnriched(graphData.nodes.map(n => ({ ...n, brightness: 20 })));
     }
@@ -78,369 +49,288 @@ export default function MapPage() {
   useEffect(() => {
     if (!graphData) return;
     loadPrices();
-    const interval = setInterval(loadPrices, 120_000);
-    return () => clearInterval(interval);
+    const t = setInterval(loadPrices, 120_000);
+    return () => clearInterval(t);
   }, [graphData, loadPrices]);
 
-  // ─── Brain data ───────────────────────────────────────────────────────────
-  const loadBrain = useCallback(async () => {
-    if (brainData) return; // already loaded
-    setBrainLoading(true);
-    try {
-      const res = await fetch("/api/intelligence");
-      if (res.ok) setBrainData(await res.json());
-    } catch { /* silently degrade */ }
-    finally { setBrainLoading(false); }
+  // ── Load brain ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (mapMode === "brain" && !brainData) {
+      fetch("/api/intelligence").then(r => r.ok ? r.json() : null).then(d => d && setBrainData(d));
+    }
+  }, [mapMode, brainData]);
+
+  // ── Derived: filtered nodes for current market map ────────────────────────
+  const clusterFilter = mapMode === "brain" ? null : mapMode;
+
+  // Default: tier-0 only. When a node is selected: that node + all directly connected nodes.
+  const visibleNodes: EnrichedNode[] = (() => {
+    const byCluster = clusterFilter
+      ? enriched.filter(n => n.cluster === clusterFilter)
+      : enriched;
+    if (!selected) return byCluster.filter(n => n.tier === 0);
+    const connectedIds = new Set<string>();
+    connectedIds.add(selected.id);
+    enriched.forEach(n => {
+      const linked = (graphData?.edges ?? []).some(
+        e => (e.source === selected.id && e.target === n.id) ||
+             (e.target === selected.id && e.source === n.id)
+      );
+      if (linked) connectedIds.add(n.id);
+    });
+    return byCluster.filter(n => connectedIds.has(n.id));
+  })();
+
+  const visibleEdges: GraphEdge[] = (graphData?.edges ?? []).filter(e => {
+    const ids = new Set(visibleNodes.map(n => n.id));
+    return ids.has(e.source as string) && ids.has(e.target as string);
+  });
+
+  // Clear selected when map mode changes
+  useEffect(() => { setSelected(null); setBrainSelected(null); }, [mapMode]);
+
+  const handleBrainNavigate = useCallback((id: string) => {
+    const node = brainData?.nodes.find(n => n.id === id);
+    if (node) setBrainSelected(node as IntelligenceNode);
   }, [brainData]);
 
-  useEffect(() => {
-    if (viewMode === "brain") loadBrain();
-  }, [viewMode, loadBrain]);
-
-  // Derived intelligence sets
   const activeDriverIds = new Set(brainData?.active_driver_ids ?? []);
   const blockedIds      = new Set(brainData?.blocked_condition_ids ?? []);
   const hotSymbols      = new Set(brainData?.active_candidate_symbols ?? []);
 
-  // Enrich brain nodes with driver_ids / theme_ids from edges
-  const enrichedBrainNodes: IntelligenceNode[] = brainData?.nodes ?? [];
+  // Price change info for selected node
+  const pct   = selected?.price?.change_pct ?? 0;
+  const price = selected?.price?.price;
 
-  // ─── Market filters / selection ───────────────────────────────────────────
-  const filteredEdges: GraphEdge[] = (graphData?.edges ?? []).filter(
-    e => activeFilter === "all" || e.type === activeFilter
-  );
-
-  const handleSelect        = useCallback((node: EnrichedNode | null) => setSelected(node), []);
-  const handleBrainSelect   = useCallback((node: IntelligenceNode | null) => setBrainSelected(node), []);
-  const handleBrainNavigate = useCallback((id: string) => {
-    const node = enrichedBrainNodes.find(n => n.id === id);
-    if (node) setBrainSelected(node);
-  }, [enrichedBrainNodes]);
-  const handleNavigate      = useCallback((id: string) => {
-    const node = enriched.find(n => n.id === id);
-    if (node) setSelected(node);
-  }, [enriched]);
-
-  useEffect(() => {
-    if (!selected) return;
-    const updated = enriched.find(n => n.id === selected.id);
-    if (updated) setSelected(updated);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enriched]);
-
-  // Auto-select hottest node on first load
-  useEffect(() => {
-    if (enriched.length === 0 || autoSelectedRef.current) return;
-    const timer = setTimeout(() => {
-      if (autoSelectedRef.current) return;
-      autoSelectedRef.current = true;
-      const hottest = [...enriched].sort((a, b) => b.brightness - a.brightness)[0];
-      if (hottest) { setSelected(hottest); setFocusId(hottest.id); }
-    }, 2800);
-    return () => clearTimeout(timer);
-  }, [enriched]);
-
-  // Search
-  useEffect(() => {
-    if (!search.trim()) { setFocusId(null); return; }
-    const q = search.trim().toUpperCase();
-    const match = enriched.find(n =>
-      n.id.toUpperCase() === q ||
-      n.id.toUpperCase().startsWith(q) ||
-      n.label.toUpperCase().includes(search.trim().toUpperCase())
-    );
-    if (match) { setSelected(match); setFocusId(match.id); }
-  }, [search, enriched]);
-
-  // Keyboard shortcut
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        setShowSearch(true);
-        setTimeout(() => searchRef.current?.focus(), 50);
-      }
-      if (e.key === "Escape") { setShowSearch(false); setSearch(""); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
-
-  const clusters: Cluster[] = graphData?.clusters ?? [];
-
-  const hotNodes = enriched
-    .filter(n => n.brightness > 55)
-    .sort((a, b) => b.brightness - a.brightness)
-    .slice(0, 6);
+  // Connections for selected node (full graph edges, not just visible)
+  const connections = selected
+    ? (graphData?.edges ?? [])
+        .filter(e => e.source === selected.id || e.target === selected.id)
+        .map(e => {
+          const otherId = e.source === selected.id ? e.target : e.source;
+          const other = enriched.find(n => n.id === otherId);
+          return { edge: e, other, isOutgoing: e.source === selected.id };
+        })
+        .filter(c => c.other)
+        .sort((a, b) => b.edge.strength - a.edge.strength)
+    : [];
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex flex-col" style={{ background: "#080d1a", color: "#fff" }}>
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 flex-shrink-0 gap-3">
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <Activity size={16} className="text-indigo-400" />
-          <span className="font-semibold text-white tracking-tight hidden sm:block">Decifer</span>
+    <div className="h-screen w-screen overflow-hidden flex" style={{ background: "#080d1a", color: "#fff" }}>
 
-          {/* View toggle */}
-          <div className="flex items-center gap-0.5 rounded-lg bg-white/5 border border-white/10 p-0.5">
-            <button
-              onClick={() => setViewMode("market")}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
-                viewMode === "market"
-                  ? "bg-white/10 text-white"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              <Map size={11} />
-              <span>Market</span>
-            </button>
-            <button
-              onClick={() => setViewMode("brain")}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-all ${
-                viewMode === "brain"
-                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              <Brain size={11} />
-              <span>Brain</span>
-            </button>
-          </div>
+      {/* ── Main graph area ─────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
 
-          {viewMode === "market" && !isMobile && (
-            <div className="flex items-center gap-3">
-              {[
-                { color: "#6366f1", label: "Compute" },
-                { color: "#818cf8", label: "Software" },
-                { color: "#4338ca", label: "Foundry" },
-                { color: "#06b6d4", label: "Networking" },
-                { color: "#f97316", label: "Power" },
-                { color: "#f59e0b", label: "Launch" },
-                { color: "#ef4444", label: "Defence" },
-              ].map(({ color, label }) => (
-                <div key={label} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-                  <span className="text-xs text-gray-500 hidden xl:block">{label}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {viewMode === "brain" && brainData && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">{activeDriverIds.size} drivers active</span>
-              <span className="text-xs text-gray-600">·</span>
-              <span className="text-xs text-gray-500">{enrichedBrainNodes.filter(n => n.type === "symbol").length} tickers mapped</span>
-            </div>
-          )}
-        </div>
-
-        {/* Search (market mode only) */}
-        {viewMode === "market" && (
-          <div className="flex-1 max-w-xs">
-            {showSearch ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/8 border border-white/15">
-                <Search size={12} className="text-gray-400 flex-shrink-0" />
-                <input
-                  ref={searchRef}
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search ticker or company…"
-                  className="flex-1 bg-transparent text-xs text-white placeholder-gray-600 outline-none min-w-0"
-                  autoComplete="off"
-                />
-                {search && (
-                  <button onClick={() => { setSearch(""); setFocusId(null); }} className="text-gray-600 hover:text-gray-300">
-                    <X size={11} />
-                  </button>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={() => { setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 50); }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all border border-transparent hover:border-white/10"
-              >
-                <Search size={12} />
-                <span className="hidden sm:block">Search</span>
-                <span className="text-gray-700 hidden sm:block">·</span>
-                <kbd className="text-gray-700 font-mono hidden sm:block">/</kbd>
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {lastUpdated && viewMode === "market" && (
-            <span className="text-xs text-gray-600 hidden lg:block">
-              {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        {/* Header */}
+        <header className="flex items-center gap-3 px-4 py-2.5 border-b border-white/8 flex-shrink-0">
+          <Activity size={15} className="text-indigo-400 flex-shrink-0" />
+          <span className="font-semibold text-white tracking-tight text-sm">Decifer</span>
+          <div className="flex-1" />
+          {mapMode !== "brain" && selected && (
+            <span className="text-xs text-gray-500">
+              Showing {visibleNodes.length} connected — click background to reset
             </span>
           )}
-          {viewMode === "brain" && brainData && (
-            <span className="text-xs text-gray-600 hidden lg:block">
-              {brainData.live ? "Live drivers" : `Snapshot ${brainData.generated_at}`}
+          {mapMode !== "brain" && !selected && (
+            <span className="text-xs text-gray-600">
+              Showing tier-0 anchors · click any node to drill in
             </span>
           )}
           <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-xs text-emerald-400">Live</span>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Hot strip — market mode only */}
-      {viewMode === "market" && hotNodes.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 overflow-x-auto flex-shrink-0">
-          <span className="text-xs text-gray-600 flex-shrink-0">Hot:</span>
-          {hotNodes.map(n => (
-            <button
-              key={n.id}
-              onClick={() => setSelected(n)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs flex-shrink-0 transition-all hover:bg-white/10"
-              style={{
-                borderColor: (n.price?.change_pct ?? 0) >= 0 ? "#10b98140" : "#ef444440",
-                background:  (n.price?.change_pct ?? 0) >= 0 ? "#10b98110" : "#ef444410",
-              }}
-            >
-              <span className="font-mono font-semibold text-white">{n.id}</span>
-              {n.price && (
-                <span className={n.price.change_pct >= 0 ? "text-emerald-400" : "text-red-400"}>
-                  {n.price.change_pct >= 0 ? "+" : ""}{n.price.change_pct.toFixed(1)}%
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Brain legend strip */}
-      {viewMode === "brain" && (
-        <div className="flex items-center gap-4 px-4 py-2 border-b border-white/5 overflow-x-auto flex-shrink-0">
-          {[
-            { color: "#f59e0b", label: "Active driver" },
-            { color: "#374151", label: "Inactive driver" },
-            { color: "#6366f1", label: "Theme" },
-            { color: "#10b981", label: "High conviction ticker" },
-            { color: "#818cf8", label: "In scope ticker" },
-            { color: "#334155", label: "Idle ticker" },
-          ].map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-1.5 flex-shrink-0">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
-              <span className="text-xs text-gray-500">{label}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {viewMode === "market" ? (
-          isMobile ? (
-            <div className="flex-1 overflow-hidden">
-              {selected ? (
-                <div className="h-full flex flex-col">
-                  <NodePanel node={selected} edges={filteredEdges} allNodes={enriched} onClose={() => setSelected(null)} onNavigate={handleNavigate} />
-                </div>
-              ) : (
-                <MobileMap nodes={enriched} edges={filteredEdges} clusters={clusters} onSelect={handleSelect} />
-              )}
-            </div>
+        {/* Graph */}
+        <div className="flex-1 relative overflow-hidden">
+          {mapMode !== "brain" ? (
+            enriched.length > 0 ? (
+              <MarketGraph
+                nodes={visibleNodes}
+                edges={visibleEdges}
+                clusters={graphData?.clusters ?? []}
+                onSelect={setSelected}
+                selected={selected}
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-indigo-400/50 border-t-indigo-400 rounded-full animate-spin" />
+              </div>
+            )
           ) : (
-            <>
-              <div className="flex-1 relative">
-                {enriched.length > 0 ? (
-                  <MarketGraph nodes={enriched} edges={filteredEdges} clusters={clusters} onSelect={handleSelect} selected={selected} focusId={focusId} />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center space-y-3">
-                      <div className="w-8 h-8 border-2 border-indigo-400/50 border-t-indigo-400 rounded-full animate-spin mx-auto" />
-                      <div className="text-sm text-gray-500">Loading market map…</div>
-                    </div>
+            brainData ? (
+              <IntelligenceGraph
+                nodes={brainData.nodes as IntelligenceNode[]}
+                edges={brainData.edges as IntelligenceEdge[]}
+                activeDriverIds={activeDriverIds}
+                blockedIds={blockedIds}
+                hotSymbols={hotSymbols}
+                onSelect={n => setBrainSelected(n)}
+                selected={brainSelected}
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-amber-400/50 border-t-amber-400 rounded-full animate-spin" />
+              </div>
+            )
+          )}
+
+          {/* Edge type legend (market mode only) */}
+          {mapMode !== "brain" && (
+            <div className="absolute bottom-4 left-4 rounded-xl bg-black/50 backdrop-blur border border-white/8 p-3 space-y-1.5">
+              {[
+                { color: EDGE_COLORS.supply_chain_up, label: "Supply chain" },
+                { color: EDGE_COLORS.customer,        label: "Customer" },
+                { color: EDGE_COLORS.competition,     label: "Competition" },
+                { color: EDGE_COLORS.investment,      label: "Investment" },
+                { color: EDGE_COLORS.ecosystem,       label: "Ecosystem" },
+              ].map(({ color, label }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <div className="w-6 h-0.5 rounded-full" style={{ background: color }} />
+                  <span className="text-xs text-gray-500">{label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Right sidebar ──────────────────────────────────────────────────── */}
+      <div style={{ width: 224, flexShrink: 0, background: "#050810", borderLeft: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column" }}>
+
+        {/* Map selector */}
+        <div className="p-3 border-b border-white/8">
+          <div className="text-xs text-gray-600 uppercase tracking-widest mb-2.5">Choose map</div>
+          <div className="space-y-1">
+            {MAP_OPTIONS.map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setMapMode(opt.key)}
+                className={`w-full text-left px-3 py-2.5 rounded-lg transition-all text-xs ${
+                  mapMode === opt.key
+                    ? opt.key === "brain"
+                      ? "bg-amber-500/15 border border-amber-500/30 text-amber-300"
+                      : "bg-indigo-500/15 border border-indigo-500/30 text-indigo-300"
+                    : "text-gray-500 hover:text-gray-300 hover:bg-white/5 border border-transparent"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-0.5">
+                  {opt.key === "brain"
+                    ? <Brain size={10} />
+                    : <Map size={10} />}
+                  <span className="font-medium">{opt.label}</span>
+                </div>
+                <div className="text-gray-600 leading-snug text-[10px]">{opt.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Node detail (market mode) */}
+        {mapMode !== "brain" && selected && (
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-3 border-b border-white/8">
+              <div className="flex items-start justify-between mb-1">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-base">{selected.id}</span>
+                    {price !== undefined && <span className="text-xs text-gray-400">${price.toFixed(2)}</span>}
                   </div>
-                )}
-                {/* Edge filter */}
-                <div className="absolute bottom-4 left-4 flex items-center gap-1.5 overflow-x-auto max-w-lg pb-0.5">
-                  <Filter size={12} className="text-gray-600" />
-                  {EDGE_TYPE_FILTERS.map(f => (
-                    <button key={f.key} onClick={() => setActiveFilter(f.key)}
-                      className={`px-2.5 py-1 rounded-full text-xs transition-all border whitespace-nowrap flex-shrink-0 ${
-                        activeFilter === f.key
-                          ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-300"
-                          : "bg-white/5 border-white/10 text-gray-500 hover:text-gray-300"
-                      }`}>
-                      {f.label}
+                  <div className="text-xs text-gray-500 mt-0.5">{selected.label}</div>
+                  <div className="text-xs text-gray-700 capitalize">{selected.subcluster?.replace(/_/g, " ")} · Tier {selected.tier}</div>
+                </div>
+                <button onClick={() => setSelected(null)} className="text-gray-600 hover:text-gray-300 mt-0.5">
+                  <X size={13} />
+                </button>
+              </div>
+              {pct !== 0 && (
+                <div className={`flex items-center gap-1 text-xs font-semibold mt-1 ${pct > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {pct > 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                  {pct > 0 ? "+" : ""}{pct.toFixed(2)}%
+                </div>
+              )}
+            </div>
+
+            {/* Description */}
+            {selected.description && (
+              <div className="px-3 pt-3 pb-2">
+                <div className="text-xs text-gray-500 leading-relaxed">{selected.description}</div>
+              </div>
+            )}
+
+            {/* Connections */}
+            {connections.length > 0 && (
+              <div className="px-3 pb-4">
+                <div className="text-xs text-gray-600 uppercase tracking-widest mb-2">
+                  Connections ({connections.length})
+                </div>
+                <div className="space-y-1">
+                  {connections.map(({ edge, other, isOutgoing }) => (
+                    <button
+                      key={`${edge.source}-${edge.target}`}
+                      onClick={() => other && setSelected(other)}
+                      className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                    >
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: EDGE_COLORS[edge.type] }} />
+                      <span className="text-xs font-mono text-white font-semibold flex-shrink-0">{other?.id}</span>
+                      <span className="text-[10px] px-1 py-0.5 rounded flex-shrink-0"
+                        style={{ color: EDGE_COLORS[edge.type], background: EDGE_COLORS[edge.type] + "22" }}>
+                        {EDGE_LABELS[edge.type]}
+                      </span>
+                      {!isOutgoing && <span className="text-[10px] text-gray-700 ml-auto">←</span>}
                     </button>
                   ))}
                 </div>
-                {/* Legend */}
-                <div className="absolute bottom-4 right-4 hidden lg:block">
-                  <div className="rounded-xl bg-black/60 backdrop-blur-sm border border-white/10 p-3 space-y-1.5">
-                    {[
-                      { color: "#6366f1", label: "Supply chain" },
-                      { color: "#10b981", label: "Customer" },
-                      { color: "#ef4444", label: "Competition" },
-                      { color: "#a855f7", label: "Investment" },
-                      { color: "#f59e0b", label: "Ecosystem" },
-                    ].map(({ color, label }) => (
-                      <div key={label} className="flex items-center gap-2">
-                        <div className="w-6 h-0.5 rounded-full" style={{ background: color }} />
-                        <span className="text-xs text-gray-500">{label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {selected && (
-                <div className="w-80 xl:w-96 border-l border-white/10 flex-shrink-0 overflow-hidden bg-black/20">
-                  <NodePanel node={selected} edges={filteredEdges} allNodes={enriched} onClose={() => setSelected(null)} onNavigate={handleNavigate} />
-                </div>
-              )}
-            </>
-          )
-        ) : (
-          /* ─── Brain view ────────────────────────────────────────────── */
-          <>
-            <div className="flex-1 relative">
-              {brainLoading && (
-                <div className="absolute inset-0 flex items-center justify-center z-10">
-                  <div className="text-center space-y-3">
-                    <div className="w-8 h-8 border-2 border-amber-400/50 border-t-amber-400 rounded-full animate-spin mx-auto" />
-                    <div className="text-sm text-gray-500">Loading intelligence graph…</div>
-                  </div>
-                </div>
-              )}
-              {brainData && !brainLoading && (
-                <IntelligenceGraph
-                  nodes={enrichedBrainNodes}
-                  edges={brainData.edges as IntelligenceEdge[]}
-                  activeDriverIds={activeDriverIds}
-                  blockedIds={blockedIds}
-                  hotSymbols={hotSymbols}
-                  onSelect={handleBrainSelect}
-                  selected={brainSelected}
-                />
-              )}
-              {/* Brain hint */}
-              {brainData && !brainSelected && (
-                <div className="absolute bottom-4 left-4 text-xs text-gray-600 pointer-events-none">
-                  Click any node to trace its intelligence path
-                </div>
-              )}
-            </div>
-            {brainSelected && (
-              <div className="w-80 xl:w-96 border-l border-white/10 flex-shrink-0 overflow-hidden bg-black/20">
-                <BrainPanel
-                  node={brainSelected}
-                  activeDriverIds={activeDriverIds}
-                  blockedIds={blockedIds}
-                  hotSymbols={hotSymbols}
-                  allNodes={enrichedBrainNodes}
-                  onClose={() => setBrainSelected(null)}
-                  onNavigate={handleBrainNavigate}
-                />
               </div>
             )}
-          </>
+          </div>
         )}
+
+        {/* Brain node detail */}
+        {mapMode === "brain" && brainSelected && (
+          <div className="flex-1 overflow-y-auto">
+            <BrainPanel
+              node={brainSelected}
+              activeDriverIds={activeDriverIds}
+              blockedIds={blockedIds}
+              hotSymbols={hotSymbols}
+              allNodes={(brainData?.nodes ?? []) as IntelligenceNode[]}
+              onClose={() => setBrainSelected(null)}
+              onNavigate={handleBrainNavigate}
+            />
+          </div>
+        )}
+
+        {/* Brain driver summary when nothing selected */}
+        {mapMode === "brain" && !brainSelected && brainData && (
+          <div className="p-3 space-y-2">
+            <div className="text-xs text-gray-600 uppercase tracking-widest">Active drivers</div>
+            {brainData.active_driver_ids.map(id => {
+              const node = brainData.nodes.find(n => n.id === id);
+              return (
+                <div key={id} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
+                  <span className="text-xs text-amber-200/80">{node?.label ?? id}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {mapMode !== "brain" && !selected && (
+          <div className="p-3 mt-2">
+            <div className="text-xs text-gray-700 leading-relaxed">
+              Click any node to see its full connection map and drill into tier-2 relationships.
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="p-3 border-t border-white/8 mt-auto">
+          <div className="text-[10px] text-gray-700">map.decifertrading.com</div>
+        </div>
       </div>
     </div>
   );

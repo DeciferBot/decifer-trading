@@ -5,34 +5,30 @@ import * as d3 from "d3";
 import type { EnrichedNode, GraphEdge, Cluster } from "@/lib/types";
 import { EDGE_COLORS } from "@/lib/types";
 
-// Per-subcluster base colour — more visual variety than a flat cluster colour
 const SUBCLUSTER_COLORS: Record<string, string> = {
-  // AI / tech
-  compute:        "#6366f1", // indigo  — core silicon (NVDA, AMD, INTC)
-  software:       "#818cf8", // lavender — platforms & SaaS (MSFT, PLTR, CRM…)
-  foundry:        "#4338ca", // deep indigo — chip fabs (TSM, ASML, AMAT…)
-  memory:         "#7c3aed", // violet — memory & storage (MU)
-  networking:     "#06b6d4", // cyan — data-centre fabric (ANET, CIEN…)
-  systems:        "#a78bfa", // soft purple — servers & systems (DELL, HPE, SMCI…)
-  power:          "#f97316", // orange — AI power infra (VRT, ETN, CEG, NRG…)
-  infrastructure: "#8b5cf6", // purple — data-centre real-estate (EQIX, DLR…)
-  photonics:      "#38bdf8", // sky-blue — optical (CIEN, COHR, LITE…)
-  // Space / defence
-  launch:         "#f59e0b", // amber — launch vehicles (RKLB…)
-  earth_obs:      "#84cc16", // lime — earth observation (PL, SPIR…)
-  defence:        "#ef4444", // red — defence primes (LMT, NOC, RTX…)
-  comms:          "#22d3ee", // teal — satellite comms (VSAT, IRDM…)
-  components:     "#d97706", // dark amber — aero components (MOGA, CW, HEI…)
-  materials:      "#a3e635", // lime-green — advanced materials (HXL, ATI…)
+  compute:        "#6366f1",
+  software:       "#818cf8",
+  foundry:        "#4338ca",
+  memory:         "#7c3aed",
+  networking:     "#06b6d4",
+  systems:        "#a78bfa",
+  power:          "#f97316",
+  infrastructure: "#8b5cf6",
+  photonics:      "#38bdf8",
+  launch:         "#f59e0b",
+  earth_obs:      "#84cc16",
+  defence:        "#ef4444",
+  comms:          "#22d3ee",
+  components:     "#d97706",
+  materials:      "#a3e635",
 };
 
 interface Props {
-  nodes: EnrichedNode[];
+  nodes: EnrichedNode[];        // already filtered by cluster
   edges: GraphEdge[];
   clusters: Cluster[];
   onSelect: (node: EnrichedNode | null) => void;
   selected: EnrichedNode | null;
-  focusId?: string | null;
 }
 
 interface SimNode extends EnrichedNode {
@@ -40,23 +36,15 @@ interface SimNode extends EnrichedNode {
   fx?: number | null; fy?: number | null;
 }
 
-interface TooltipState {
-  x: number; y: number; content: string;
-}
-
-export default function MarketGraph({ nodes, edges, clusters, onSelect, selected, focusId }: Props) {
-  const svgRef    = useRef<SVGSVGElement>(null);
-  const wrapRef   = useRef<HTMLDivElement>(null);
-  const simRef    = useRef<d3.Simulation<SimNode, undefined> | null>(null);
-  const zoomRef   = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
-  const nodesRef  = useRef<SimNode[]>([]);
-  const [dims, setDims]       = useState<{ w: number; h: number } | null>(null);
-  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+export default function MarketGraph({ nodes, edges, clusters, onSelect, selected }: Props) {
+  const svgRef  = useRef<SVGSVGElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const simRef  = useRef<d3.Simulation<SimNode, undefined> | null>(null);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
     if (!wrapRef.current) return;
     const el = wrapRef.current;
-    // Set dims immediately in case ResizeObserver fires with 0 at mount
     const rect = el.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) setDims({ w: rect.width, h: rect.height });
     const ro = new ResizeObserver(entries => {
@@ -67,344 +55,210 @@ export default function MarketGraph({ nodes, edges, clusters, onSelect, selected
     return () => ro.disconnect();
   }, []);
 
-  const radius = useCallback((n: EnrichedNode) => {
-    // Aggressive tier sizing so tier-0 anchors are unmistakably large
-    const base = n.tier === 0 ? 28 : n.tier === 1 ? 15 : 8;
-    return base + (n.brightness / 100) * 10;
-  }, []);
-
-  const color = useCallback((n: EnrichedNode) => {
-    // Subcluster shade first, cluster colour as fallback
-    const base = SUBCLUSTER_COLORS[n.subcluster]
-      ?? clusters.find(c => c.id === n.cluster)?.color
-      ?? "#6366f1";
+  const nodeColor = useCallback((n: EnrichedNode) => {
+    const base = SUBCLUSTER_COLORS[n.subcluster] ?? clusters.find(c => c.id === n.cluster)?.color ?? "#6366f1";
     const p = n.price?.change_pct ?? 0;
-    if (p > 2)    return "#10b981"; // strong green
-    if (p > 0.5)  return "#34d399"; // soft green
-    if (p < -2)   return "#ef4444"; // strong red
-    if (p < -0.5) return "#f87171"; // soft red
+    if (p > 2)    return "#10b981";
+    if (p > 0.5)  return "#34d399";
+    if (p < -2)   return "#ef4444";
+    if (p < -0.5) return "#f87171";
     return base;
   }, [clusters]);
 
-  // ─── Main D3 effect ───────────────────────────────────────────────────────
+  const nodeRadius = useCallback((n: EnrichedNode) => {
+    const base = n.tier === 0 ? 32 : n.tier === 1 ? 18 : 11;
+    return base + (n.brightness / 100) * 10;
+  }, []);
+
   useEffect(() => {
     if (!svgRef.current || nodes.length === 0 || !dims) return;
+    const { w: W, h: H } = dims;
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
-    const { w: W, h: H } = dims;
 
-    // Defs
+    // ── Connected set for isolation ───────────────────────────────────────
+    const connectedIds = new Set<string>();
+    if (selected) {
+      connectedIds.add(selected.id);
+      edges.forEach(e => {
+        if (e.source === selected.id) connectedIds.add(e.target as string);
+        if (e.target === selected.id) connectedIds.add(e.source as string);
+      });
+    }
+    const isolated = selected !== null;
+
+    // ── Defs ─────────────────────────────────────────────────────────────
     const defs = svg.append("defs");
 
-    const addGlow = (id: string, std: number) => {
+    // Glow filters
+    const addGlow = (id: string, std: number, color: string) => {
       const f = defs.append("filter").attr("id", id)
-        .attr("x", "-80%").attr("y", "-80%").attr("width", "260%").attr("height", "260%");
-      f.append("feGaussianBlur").attr("stdDeviation", std).attr("result", "b");
+        .attr("x", "-100%").attr("y", "-100%").attr("width", "300%").attr("height", "300%");
+      f.append("feGaussianBlur").attr("stdDeviation", std).attr("result", "blur");
+      const flood = defs.append("filter").attr("id", id + "-flood");
+      void flood; // just use simple blur merge
       const m = f.append("feMerge");
-      m.append("feMergeNode").attr("in", "b");
+      m.append("feMergeNode").attr("in", "blur");
       m.append("feMergeNode").attr("in", "SourceGraphic");
     };
-    addGlow("glow-soft", 4);
-    addGlow("glow-hot",  10);
+    addGlow("glow-node",   6,  "#fff");
+    addGlow("glow-select", 16, "#fff");
 
-    defs.append("style").text(`
-      @keyframes breathe { 0%,100%{opacity:.4} 50%{opacity:.95} }
-      @keyframes breathe-fast { 0%,100%{opacity:.5} 50%{opacity:1} }
-      .pulse { animation: breathe 2.8s ease-in-out infinite; }
-      .pulse-hot { animation: breathe-fast 1.5s ease-in-out infinite; }
-    `);
+    // Central nucleus radial gradient (Z.E.R.O. effect)
+    const rg = defs.append("radialGradient").attr("id", "nucleus-glow")
+      .attr("cx", "50%").attr("cy", "50%").attr("r", "50%");
+    rg.append("stop").attr("offset", "0%").attr("stop-color", "#ffffff").attr("stop-opacity", 0.12);
+    rg.append("stop").attr("offset", "60%").attr("stop-color", "#6366f1").attr("stop-opacity", 0.04);
+    rg.append("stop").attr("offset", "100%").attr("stop-color", "#000").attr("stop-opacity", 0);
 
-    // Zoom
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.1, 5])
-      .on("zoom", e => g.attr("transform", e.transform));
-    svg.call(zoom);
-    zoomRef.current = zoom;
-    svg.on("click.bg", e => { if (e.target === svgRef.current) onSelect(null); });
-
-    const g = svg.append("g");
-
-    // Cluster layout
-    const CC: Record<string, { x: number; y: number }> = {
-      ai:    { x: W * 0.34, y: H * 0.46 },
-      space: { x: W * 0.72, y: H * 0.46 },
-    };
-    const clusterMap = new Map<string, SimNode[]>();
-    const sn: SimNode[] = nodes.map(n => ({ ...n }));
-    sn.forEach(n => {
-      const arr = clusterMap.get(n.cluster) ?? [];
-      arr.push(n); clusterMap.set(n.cluster, arr);
-      const cx = CC[n.cluster]?.x ?? W / 2;
-      const cy = CC[n.cluster]?.y ?? H / 2;
-      const spread = 80 + n.tier * 60;
-      n.x = cx + (Math.random() - 0.5) * spread;
-      n.y = cy + (Math.random() - 0.5) * spread;
-    });
-    nodesRef.current = sn;
-
-    const ld = edges.map(e => ({
-      ...e,
-      source: sn.find(n => n.id === e.source)!,
-      target: sn.find(n => n.id === e.target)!,
-    })).filter(e => e.source && e.target);
-
-    // Adjacency for hover
-    const adj = new Map<string, Set<string>>();
-    ld.forEach(l => {
-      const s = (l.source as SimNode).id, t = (l.target as SimNode).id;
-      if (!adj.has(s)) adj.set(s, new Set());
-      if (!adj.has(t)) adj.set(t, new Set());
-      adj.get(s)!.add(t); adj.get(t)!.add(s);
+    // ── Zoom + root ───────────────────────────────────────────────────────
+    const root = svg.append("g");
+    svg.call(
+      d3.zoom<SVGSVGElement, unknown>()
+        .scaleExtent([0.15, 5])
+        .on("zoom", ({ transform }) => root.attr("transform", transform))
+    );
+    svg.on("click", (event) => {
+      if (event.target === svgRef.current) onSelect(null);
     });
 
-    // ── Layers ──
-    const hullG  = g.append("g").attr("class", "hulls");
-    const lblG   = g.append("g").attr("class", "labels").attr("pointer-events", "none");
+    // Nucleus glow background
+    root.append("ellipse")
+      .attr("cx", W / 2).attr("cy", H / 2)
+      .attr("rx", W * 0.45).attr("ry", H * 0.45)
+      .attr("fill", "url(#nucleus-glow)")
+      .attr("pointer-events", "none");
 
-    const link = g.append("g")
-      .selectAll<SVGLineElement, typeof ld[0]>("line")
-      .data(ld).join("line")
+    // ── Sim nodes ─────────────────────────────────────────────────────────
+    const sn: SimNode[] = nodes.map(n => ({
+      ...n,
+      x: W / 2 + (Math.random() - 0.5) * W * 0.5,
+      y: H / 2 + (Math.random() - 0.5) * H * 0.5,
+    }));
+    const nodeById = new Map(sn.map(n => [n.id, n]));
+
+    const ld = edges
+      .map(e => ({
+        ...e,
+        source: nodeById.get(e.source as string)!,
+        target: nodeById.get(e.target as string)!,
+      }))
+      .filter(e => e.source && e.target);
+
+    // ── Simulation ────────────────────────────────────────────────────────
+    const sim = d3.forceSimulation<SimNode>(sn)
+      .force("link", d3.forceLink<SimNode, typeof ld[0]>(ld)
+        .id(d => d.id)
+        .distance(d => 160 + (1 - d.strength) * 80)
+        .strength(0.4))
+      .force("charge", d3.forceManyBody().strength(-600))
+      .force("collide", d3.forceCollide<SimNode>().radius(d => nodeRadius(d) + 20))
+      .force("x", d3.forceX(W / 2).strength(0.04))
+      .force("y", d3.forceY(H / 2).strength(0.04))
+      .alphaDecay(0.02);
+    simRef.current = sim;
+
+    // ── Edges ─────────────────────────────────────────────────────────────
+    const edgeG = root.append("g");
+    const linkSel = edgeG.selectAll<SVGLineElement, typeof ld[0]>("line")
+      .data(ld)
+      .join("line")
       .attr("stroke", d => EDGE_COLORS[d.type] ?? "#555")
-      .attr("stroke-opacity", 0.28)
-      .attr("stroke-width",   d => Math.max(0.5, d.strength * 1.8))
-      .style("cursor", "crosshair");
-
-    // Edge tooltip
-    const onEdgeMove = (event: MouseEvent, d: typeof ld[0]) => {
-      const rect = wrapRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setTooltip({
-        x: event.clientX - rect.left + 14,
-        y: event.clientY - rect.top  - 14,
-        content: d.label + (d.lag_weeks > 0 ? ` · ~${d.lag_weeks}w signal lag` : ""),
+      .attr("stroke-width", d => Math.max(2, d.strength * 4))
+      .attr("stroke-linecap", "round")
+      .attr("stroke-opacity", d => {
+        if (!isolated) return 0.35;
+        const s = (d.source as SimNode).id, t = (d.target as SimNode).id;
+        return connectedIds.has(s) && connectedIds.has(t) ? 0.9 : 0.03;
       });
-    };
-    link
-      .on("mouseenter", onEdgeMove)
-      .on("mousemove",  onEdgeMove)
-      .on("mouseleave", () => setTooltip(null));
 
-    // ── Node groups ──
-    const nodeG = g.append("g")
-      .selectAll<SVGGElement, SimNode>("g.node")
-      .data(sn).join("g")
-      .attr("class", "node")
-      .style("cursor", "pointer");
+    // ── Nodes ─────────────────────────────────────────────────────────────
+    const nodeG = root.append("g");
+    const nodeSel = nodeG.selectAll<SVGGElement, SimNode>("g")
+      .data(sn, d => d.id)
+      .join("g")
+      .attr("class", "node-group")
+      .style("cursor", "pointer")
+      .on("click", (event, d) => { event.stopPropagation(); onSelect(d as EnrichedNode); });
 
-    nodeG.call(
+    nodeSel.call(
       d3.drag<SVGGElement, SimNode>()
         .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
         .on("drag",  (e, d) => { d.fx = e.x; d.fy = e.y; })
         .on("end",   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
     );
-    nodeG.on("click", (_e, d) => onSelect(d));
 
-    // ── Hover spotlight ──
-    nodeG
-      .on("mouseenter", (event, d) => {
-        const conn = adj.get(d.id) ?? new Set<string>();
-
-        nodeG.transition().duration(180)
-          .attr("opacity", n => n.id === d.id || conn.has(n.id) ? 1 : 0.05);
-
-        link.transition().duration(180)
-          .attr("stroke-opacity", l => {
-            const s = (l.source as SimNode).id, t = (l.target as SimNode).id;
-            return s === d.id || t === d.id ? 0.9 : 0.02;
-          })
-          .attr("stroke-width", l => {
-            const s = (l.source as SimNode).id, t = (l.target as SimNode).id;
-            return s === d.id || t === d.id ? Math.max(2.5, l.strength * 5) : 0.2;
-          });
-
-        // Tooltip
-        const rect = wrapRef.current?.getBoundingClientRect();
-        if (rect) {
-          const p = d.price?.change_pct;
-          const pStr = p !== undefined ? `  ${p >= 0 ? "+" : ""}${p.toFixed(2)}%` : "";
-          setTooltip({
-            x: event.clientX - rect.left + 16,
-            y: event.clientY - rect.top  - 16,
-            content: `${d.id} — ${d.label}${pStr}`,
-          });
-        }
-      })
-      .on("mousemove", event => {
-        const rect = wrapRef.current?.getBoundingClientRect();
-        if (rect) setTooltip(p => p ? { ...p, x: event.clientX - rect.left + 16, y: event.clientY - rect.top - 16 } : null);
-      })
-      .on("mouseleave", () => {
-        nodeG.transition().duration(320).attr("opacity", 1);
-        link.transition().duration(320)
-          .attr("stroke-opacity", 0.28)
-          .attr("stroke-width", l => Math.max(0.5, l.strength * 1.8));
-        setTooltip(null);
-      });
-
-    // ── Node visuals ──
-
-    // Outer animated pulse ring
-    nodeG.append("circle")
-      .attr("class", d => d.brightness > 72 ? "pulse-hot" : "pulse")
-      .attr("r", d => radius(d) + (d.brightness > 65 ? 11 : 5))
+    // Outer glow ring (selected node only)
+    nodeSel.append("circle")
+      .attr("r", d => selected?.id === d.id ? nodeRadius(d) + 14 : 0)
       .attr("fill", "none")
-      .attr("stroke", d => color(d))
-      .attr("stroke-width", d => d.brightness > 72 ? 2.5 : d.brightness > 50 ? 1.5 : 0)
-      .attr("stroke-opacity", d => Math.max(0, (d.brightness - 40) / 80))
-      .attr("filter", d => d.brightness > 68 ? "url(#glow-hot)" : "url(#glow-soft)");
+      .attr("stroke", d => nodeColor(d))
+      .attr("stroke-width", 1.5)
+      .attr("stroke-opacity", 0.5)
+      .attr("filter", "url(#glow-select)");
 
-    // Main filled circle
-    nodeG.append("circle")
-      .attr("r", d => radius(d))
-      .attr("fill", d => color(d))
-      .attr("fill-opacity", d => 0.22 + (d.brightness / 100) * 0.68)
-      .attr("stroke", d => color(d))
-      .attr("stroke-width", 1)
-      .attr("stroke-opacity", 0.5);
+    // Main circle
+    nodeSel.append("circle")
+      .attr("r", d => nodeRadius(d))
+      .attr("fill", d => nodeColor(d))
+      .attr("fill-opacity", d => {
+        if (!isolated) return 0.25 + (d.brightness / 100) * 0.6;
+        return connectedIds.has(d.id) ? 0.85 : 0.04;
+      })
+      .attr("stroke", d => selected?.id === d.id ? "#fff" : nodeColor(d))
+      .attr("stroke-width", d => selected?.id === d.id ? 2.5 : 1)
+      .attr("stroke-opacity", d => {
+        if (!isolated) return 0.6;
+        return connectedIds.has(d.id) ? 1 : 0.05;
+      })
+      .attr("filter", d => selected?.id === d.id ? "url(#glow-select)" : d.brightness > 50 ? "url(#glow-node)" : "none");
 
-    // Ticker
-    nodeG.append("text")
+    // Ticker label
+    nodeSel.append("text")
       .text(d => d.id)
-      .attr("text-anchor", "middle").attr("dy", "0.35em")
-      .attr("font-size", d => d.tier === 0 ? 11 : d.tier === 1 ? 9 : 7.5)
-      .attr("font-weight", d => d.tier === 0 ? "700" : "600")
-      .attr("fill", "#fff")
-      .attr("fill-opacity", d => 0.55 + (d.brightness / 100) * 0.45)
-      .attr("pointer-events", "none");
-
-    // Company name (tier 0 always, tier 1+ only if bright)
-    nodeG.append("text")
-      .text(d => (d.tier === 0 || d.brightness > 50) ? d.label : "")
       .attr("text-anchor", "middle")
-      .attr("dy", d => radius(d) + 13)
-      .attr("font-size", 7.5)
-      .attr("fill", "#9ca3af")
-      .attr("fill-opacity", d => 0.35 + (d.brightness / 100) * 0.5)
+      .attr("dy", "0.35em")
+      .attr("font-size", d => d.tier === 0 ? 12 : d.tier === 1 ? 9 : 7.5)
+      .attr("font-weight", d => d.tier === 0 ? "700" : "500")
+      .attr("fill", "#fff")
+      .attr("fill-opacity", d => {
+        if (!isolated) return 0.6 + (d.brightness / 100) * 0.4;
+        return connectedIds.has(d.id) ? 1 : 0.04;
+      })
       .attr("pointer-events", "none");
 
-    // ── Simulation ──
-    const cx = W / 2, cy = H / 2;
-    const sim = d3.forceSimulation<SimNode>(sn)
-      .force("link", d3.forceLink<SimNode, typeof ld[0]>(ld)
-        .id(d => d.id).distance(d => 50 + (1 - d.strength) * 40))
-      .force("charge", d3.forceManyBody().strength(-100))
-      .force("collide", d3.forceCollide<SimNode>().radius(d => radius(d) + 12))
-      .force("x", d3.forceX<SimNode>(d => CC[d.cluster]?.x ?? cx).strength(0.4))
-      .force("y", d3.forceY<SimNode>(d => CC[d.cluster]?.y ?? cy).strength(0.4))
-      .force("radial", d3.forceRadial<SimNode>(
-        d => d.tier * 90,
-        d => CC[d.cluster]?.x ?? cx,
-        d => CC[d.cluster]?.y ?? cy,
-      ).strength(0.35))
-      .on("tick", () => {
-        link
-          .attr("x1", d => (d.source as SimNode).x ?? 0)
-          .attr("y1", d => (d.source as SimNode).y ?? 0)
-          .attr("x2", d => (d.target as SimNode).x ?? 0)
-          .attr("y2", d => (d.target as SimNode).y ?? 0);
-        nodeG.attr("transform", d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+    // Company name below (tier-0 always, others when connected/selected)
+    nodeSel.append("text")
+      .text(d => {
+        const show = !isolated ? (d.tier === 0 || d.brightness > 50) : connectedIds.has(d.id);
+        return show ? d.label : "";
+      })
+      .attr("text-anchor", "middle")
+      .attr("dy", d => nodeRadius(d) + 14)
+      .attr("font-size", 8)
+      .attr("fill", "#9ca3af")
+      .attr("fill-opacity", d => {
+        if (!isolated) return 0.4 + (d.brightness / 100) * 0.4;
+        return connectedIds.has(d.id) ? 0.85 : 0;
+      })
+      .attr("pointer-events", "none");
 
-        // Hulls
-        hullG.selectAll("path").remove();
-        clusterMap.forEach((cnodes, cid) => {
-          const pts = cnodes.filter(n => n.x !== undefined).map(n => [n.x!, n.y!] as [number, number]);
-          if (pts.length < 3) return;
-          const hull = d3.polygonHull(pts); if (!hull) return;
-          const cl = clusters.find(c => c.id === cid);
-          const mcx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
-          const mcy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
-          const padded = hull.map(([x, y]) => {
-            const dx = x - mcx, dy = y - mcy;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            return [x + dx / len * 55, y + dy / len * 55] as [number, number];
-          });
-          hullG.append("path")
-            .attr("d", `M${padded.join("L")}Z`)
-            .attr("fill",         cl?.color ?? "#6366f1").attr("fill-opacity",   0.03)
-            .attr("stroke",       cl?.color ?? "#6366f1").attr("stroke-opacity", 0.09)
-            .attr("stroke-width", 1.5).attr("stroke-dasharray", "6 5");
-        });
-      });
-
-    simRef.current = sim;
-
-    sim.on("end", () => {
-      const settled = sn.filter(n => n.x !== undefined && n.y !== undefined);
-      if (!settled.length) return;
-      const xs = settled.map(n => n.x!), ys = settled.map(n => n.y!);
-      const pad = 90;
-      const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
-      const bw = Math.max(...xs) + pad - x0, bh = Math.max(...ys) + pad - y0;
-      const s = Math.min(0.9, W / bw, H / bh);
-      const tx = (W - bw * s) / 2 - x0 * s;
-      const ty = (H - bh * s) / 2 - y0 * s;
-      svg.transition().duration(900).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(s));
-
-      // Cluster name labels at the top of each hull
-      lblG.selectAll("*").remove();
-      clusterMap.forEach((cnodes, cid) => {
-        const cl = clusters.find(c => c.id === cid); if (!cl) return;
-        const validNodes = cnodes.filter(n => n.x !== undefined && n.y !== undefined);
-        if (!validNodes.length) return;
-        const lcx = validNodes.reduce((s, n) => s + n.x!, 0) / validNodes.length;
-        const topY  = Math.min(...validNodes.map(n => n.y!));
-        lblG.append("text")
-          .attr("x", lcx).attr("y", topY - 28)
-          .attr("text-anchor", "middle")
-          .attr("font-size", 12).attr("font-weight", "700")
-          .attr("letter-spacing", "0.14em")
-          .attr("fill", cl.color).attr("fill-opacity", 0.35)
-          .text(cl.label.toUpperCase());
-      });
+    // ── Tick ──────────────────────────────────────────────────────────────
+    sim.on("tick", () => {
+      linkSel
+        .attr("x1", d => (d.source as SimNode).x ?? 0)
+        .attr("y1", d => (d.source as SimNode).y ?? 0)
+        .attr("x2", d => (d.target as SimNode).x ?? 0)
+        .attr("y2", d => (d.target as SimNode).y ?? 0);
+      nodeSel.attr("transform", d => `translate(${d.x ?? 0},${d.y ?? 0})`);
     });
 
     return () => { sim.stop(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, clusters, onSelect, dims]);
-
-  // ── Selection highlight (no redraw) ──────────────────────────────────────
-  useEffect(() => {
-    if (!svgRef.current) return;
-    d3.select(svgRef.current)
-      .selectAll<SVGGElement, SimNode>("g.node")
-      .each(function(d) {
-        const isSelected = selected?.id === d.id;
-        d3.select(this).selectAll("circle")
-          .filter((_, i) => i === 1)
-          .attr("stroke",         isSelected ? "#ffffff" : color(d))
-          .attr("stroke-width",   isSelected ? 2.5 : 1)
-          .attr("stroke-opacity", isSelected ? 1 : 0.5);
-      });
-  }, [selected, color]);
-
-  // ── Focus / search pan ───────────────────────────────────────────────────
-  useEffect(() => {
-    if (!focusId || !svgRef.current || !zoomRef.current || !dims) return;
-    const target = nodesRef.current.find(n => n.id === focusId);
-    if (!target?.x || !target?.y) return;
-    const s = 2.0;
-    const tx = dims.w / 2 - target.x * s;
-    const ty = dims.h / 2 - target.y * s;
-    d3.select(svgRef.current).transition().duration(700)
-      .call(zoomRef.current.transform, d3.zoomIdentity.translate(tx, ty).scale(s));
-  }, [focusId, dims]);
+  }, [nodes, edges, clusters, selected, onSelect, dims, nodeColor, nodeRadius]);
 
   return (
-    <div ref={wrapRef} className="w-full h-full relative">
-      <svg ref={svgRef} className="w-full h-full" />
-      {tooltip && (
-        <div
-          className="absolute pointer-events-none z-50 px-2.5 py-1.5 rounded-lg text-xs text-white whitespace-nowrap"
-          style={{
-            left: tooltip.x, top: tooltip.y,
-            background: "rgba(8,13,26,0.92)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            backdropFilter: "blur(8px)",
-          }}
-        >
-          {tooltip.content}
-        </div>
-      )}
+    <div ref={wrapRef} className="w-full h-full">
+      <svg ref={svgRef} className="w-full h-full" style={{ background: "transparent" }} />
     </div>
   );
 }
