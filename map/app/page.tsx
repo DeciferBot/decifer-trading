@@ -5,11 +5,10 @@ import dynamic from "next/dynamic";
 import { Activity, Brain, Map, X, TrendingUp, TrendingDown, Minus, Link2 } from "lucide-react";
 import type { GraphData, EnrichedNode, GraphEdge } from "@/lib/types";
 import { computeBrightness, EDGE_COLORS, EDGE_LABELS } from "@/lib/types";
-import type { IntelligenceNode, IntelligenceEdge, IntelligenceGraphData } from "@/lib/intelligence-types";
-import BrainPanel from "@/components/BrainPanel";
+import type { IntelligenceGraphData } from "@/lib/intelligence-types";
+import IntelligenceDrillDown from "@/components/IntelligenceDrillDown";
 
-const MarketGraph       = dynamic(() => import("@/components/MarketGraph"),       { ssr: false });
-const IntelligenceGraph = dynamic(() => import("@/components/IntelligenceGraph"), { ssr: false });
+const MarketGraph = dynamic(() => import("@/components/MarketGraph"), { ssr: false });
 
 type MapMode = "ai" | "space" | "brain";
 
@@ -29,7 +28,7 @@ export default function MapPage() {
 
   // ── Brain data ────────────────────────────────────────────────────────────
   const [brainData, setBrainData]         = useState<IntelligenceGraphData | null>(null);
-  const [brainSelected, setBrainSelected] = useState<IntelligenceNode | null>(null);
+  const [brainSelected, setBrainSelected] = useState<null>(null); // unused, kept for mode clear effect
 
   // ── Load graph + prices ───────────────────────────────────────────────────
   useEffect(() => { fetch("/api/graph").then(r => r.json()).then(setGraphData); }, []);
@@ -88,15 +87,6 @@ export default function MapPage() {
 
   // Clear selected when map mode changes
   useEffect(() => { setSelected(null); setBrainSelected(null); }, [mapMode]);
-
-  const handleBrainNavigate = useCallback((id: string) => {
-    const node = brainData?.nodes.find(n => n.id === id);
-    if (node) setBrainSelected(node as IntelligenceNode);
-  }, [brainData]);
-
-  const activeDriverIds = new Set(brainData?.active_driver_ids ?? []);
-  const blockedIds      = new Set(brainData?.blocked_condition_ids ?? []);
-  const hotSymbols      = new Set(brainData?.active_candidate_symbols ?? []);
 
   // Price change info for selected node
   const pct   = selected?.price?.change_pct ?? 0;
@@ -160,14 +150,15 @@ export default function MapPage() {
             )
           ) : (
             brainData ? (
-              <IntelligenceGraph
-                nodes={brainData.nodes as IntelligenceNode[]}
-                edges={brainData.edges as IntelligenceEdge[]}
-                activeDriverIds={activeDriverIds}
-                blockedIds={blockedIds}
-                hotSymbols={hotSymbols}
-                onSelect={n => setBrainSelected(n)}
-                selected={brainSelected}
+              <IntelligenceDrillDown
+                data={brainData}
+                onSymbolSelect={sym => {
+                  setMapMode("ai");
+                  setTimeout(() => {
+                    const node = enriched.find(n => n.id === sym);
+                    if (node) setSelected(node);
+                  }, 200);
+                }}
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -284,37 +275,6 @@ export default function MapPage() {
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Brain node detail */}
-        {mapMode === "brain" && brainSelected && (
-          <div className="flex-1 overflow-y-auto">
-            <BrainPanel
-              node={brainSelected}
-              activeDriverIds={activeDriverIds}
-              blockedIds={blockedIds}
-              hotSymbols={hotSymbols}
-              allNodes={(brainData?.nodes ?? []) as IntelligenceNode[]}
-              onClose={() => setBrainSelected(null)}
-              onNavigate={handleBrainNavigate}
-            />
-          </div>
-        )}
-
-        {/* Brain driver summary when nothing selected */}
-        {mapMode === "brain" && !brainSelected && brainData && (
-          <div className="p-3 space-y-2">
-            <div className="text-xs text-gray-600 uppercase tracking-widest">Active drivers</div>
-            {brainData.active_driver_ids.map(id => {
-              const node = brainData.nodes.find(n => n.id === id);
-              return (
-                <div key={id} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-                  <span className="text-xs text-amber-200/80">{node?.label ?? id}</span>
-                </div>
-              );
-            })}
           </div>
         )}
 
