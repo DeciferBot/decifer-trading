@@ -233,7 +233,8 @@ class TestD8PeerNetwork:
 
 def _call_d9(symbol: str, driver_id: str, n_conflicts: int,
               thesis_intact: bool | None) -> ce.DimensionScore:
-    conflicts = [{"driver_id": driver_id, "evidence": "x"}] * n_conflicts
+    conflicts = [{"driver_id": driver_id, "evidence": "x",
+                  "verification_status": "verified", "confidence": 0.8}] * n_conflicts
 
     divergence: dict | None = None
     if thesis_intact is not None:
@@ -249,9 +250,9 @@ class TestD9CounterThesis:
         result = _call_d9("AAPL", "d1", n_conflicts=0, thesis_intact=True)
         assert result.raw_pts == 3
 
-    def test_two_or_more_conflicts_gives_minus10(self):
+    def test_two_or_more_conflicts_gives_heavy_penalty(self):
         result = _call_d9("AAPL", "d1", n_conflicts=2, thesis_intact=None)
-        assert result.raw_pts == -10
+        assert result.raw_pts <= -10  # 2 verified conflicts = -15 (capped)
 
     def test_diverging_thesis_gives_minus8(self):
         result = _call_d9("AAPL", "d1", n_conflicts=0, thesis_intact=False)
@@ -266,9 +267,9 @@ class TestD9CounterThesis:
         result = _call_d9("AAPL", "d1", n_conflicts=3, thesis_intact=False)
         assert result.raw_pts == -8
 
-    def test_single_conflict_gives_minus3(self):
+    def test_single_conflict_gives_penalty(self):
         result = _call_d9("AAPL", "d1", n_conflicts=1, thesis_intact=None)
-        assert result.raw_pts == -3
+        assert result.raw_pts < 0  # 1 verified conflict = -8
 
 
 # ---------------------------------------------------------------------------

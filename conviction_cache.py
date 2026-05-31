@@ -29,7 +29,23 @@ from typing import Optional
 log = logging.getLogger("decifer.conviction_cache")
 
 _BASE_DIR  = Path(os.path.dirname(os.path.abspath(__file__)))
-_CACHE_DIR = _BASE_DIR / "data" / "intelligence" / "conviction"
+
+# Prefer the project data dir; fall back to /tmp if the volume is read-only
+# (the intelligence container mounts /app/data:ro in production)
+def _resolve_cache_dir() -> Path:
+    preferred = _BASE_DIR / "data" / "intelligence" / "conviction"
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        test = preferred / ".write_test"
+        test.write_text("ok")
+        test.unlink()
+        return preferred
+    except OSError:
+        fallback = Path("/tmp/decifer_conviction")
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+
+_CACHE_DIR  = _resolve_cache_dir()
 _CACHE_FILE = _CACHE_DIR / "scores.json"
 
 _FULL_TTL   = 1800   # 30 minutes — price data changes meaningfully

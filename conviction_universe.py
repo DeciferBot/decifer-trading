@@ -27,7 +27,20 @@ ENTER_TRADEABLE = 65
 EXIT_TRADEABLE = 50          # hysteresis band: enter at 65, exit at 50
 CONSECUTIVE_EXIT_REQUIRED = 2
 
-_DATA_PATH = Path(__file__).parent / "data" / "intelligence" / "conviction" / "universe_zones.json"
+def _resolve_data_path() -> Path:
+    preferred = Path(__file__).parent / "data" / "intelligence" / "conviction" / "universe_zones.json"
+    try:
+        preferred.parent.mkdir(parents=True, exist_ok=True)
+        test = preferred.parent / ".write_test"
+        test.write_text("ok")
+        test.unlink()
+        return preferred
+    except OSError:
+        fallback = Path("/tmp/decifer_conviction")
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback / "universe_zones.json"
+
+_DATA_PATH = _resolve_data_path()
 
 
 def _score_to_zone(score: float) -> str:

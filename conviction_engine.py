@@ -183,7 +183,8 @@ def _thesis_divergence_for(symbol: str) -> dict | None:
 #   Consensus:   STRONG_BUY=20, BUY=12, HOLD=5, SELL=0, STRONG_SELL=-5
 #   Upside to PT: ≥20%=+10, 10-20%=+6, 0-10%=+3, <0%=-5, ≥-20%=-10
 #   Recent change (30d): upgrade=+8, downgrade=-10
-# Max achievable: 20+10+8 = 38
+#   Grade trend (improving vs deteriorating): +4 / -4
+# Max achievable: 20+10+8+4 = 42  (clamped to 38 declared MAX)
 
 def _score_analyst(symbol: str, recent_changes: list[dict]) -> DimensionScore:
     MAX = 38
@@ -233,6 +234,28 @@ def _score_analyst(symbol: str, recent_changes: list[dict]) -> DimensionScore:
         pts += 8; signals.append(f"+{upgrades}upgrade(30d)")
     if downgrades:
         pts -= 10 * downgrades; signals.append(f"-{downgrades}downgrade(30d)")
+
+    # Grade trend: compare strong_buy+buy share now vs 90 days ago via grades history
+    try:
+        grades_raw = _fmp("analyst-grades", {"symbol": symbol, "limit": 6})
+        if isinstance(grades_raw, list) and len(grades_raw) >= 2:
+            def _bull_share(g: dict) -> float:
+                sb = int(g.get("strongBuy") or g.get("strongBuys") or 0)
+                b  = int(g.get("buy")       or g.get("buys")       or 0)
+                h  = int(g.get("hold")      or g.get("holds")      or 0)
+                s  = int(g.get("sell")      or g.get("sells")      or 0)
+                ss = int(g.get("strongSell") or g.get("strongSells") or 0)
+                total = sb + b + h + s + ss
+                return (sb + b) / total if total > 0 else 0.5
+            recent_share = _bull_share(grades_raw[0])
+            older_share  = sum(_bull_share(g) for g in grades_raw[1:]) / (len(grades_raw) - 1)
+            delta = recent_share - older_share
+            if delta >= 0.08:
+                pts += 4; signals.append(f"grade_trend=improving({delta:+.0%})→+4")
+            elif delta <= -0.08:
+                pts -= 4; signals.append(f"grade_trend=deteriorating({delta:+.0%})→-4")
+    except Exception:
+        pass
 
     pts = max(-38, min(MAX, pts))
     return DimensionScore(raw_pts=pts, max_pts=MAX, signal="; ".join(signals) or "no analyst data")
@@ -284,11 +307,44 @@ def _score_momentum(symbol: str, price_changes: dict[str, float]) -> DimensionSc
 
 
 # ---------------------------------------------------------------------------
-# D3 — Valuation: DCF, P/E, revenue growth  (max 23 pts)
+# D3 — Valuation: DCF, P/E vs sector, revenue growth  (max 23 pts)
 # ---------------------------------------------------------------------------
-# DCF upside: ≥20%=+15, ≥10%=+10, ≥0%=+5, -20% to 0=-10, <-20%=-18
-# Revenue growth: ≥30%=+8, ≥15%=+4, ≥0%=0, negative=-8
+# DCF upside:    ≥20%=+15, ≥10%=+10, ≥0%=+5, -20% to 0=-10, <-20%=-18
+# Revenue growth:≥30%=+8, ≥15%=+4, ≥0%=0, negative=-8
+# Sector-relative P/E bonus/penalty (if DCF unavailable or PE data available):
+#   PE < 0.75x sector median: +3 (cheaper than peers)
+#   PE > 2.0x sector median:  -3 (expensive vs peers)
 # Max: 15+8 = 23
+
+# Sector median forward P/E by TTG theme bucket — updated annually, good enough
+# for a directional signal. Deliberately conservative (mid-cycle estimates).
+_SECTOR_PE: dict[str, float] = {
+    "ai_infrastructure":      35.0,
+    "ai_compute":             32.0,
+    "semiconductors":         28.0,
+    "cloud_software":         30.0,
+    "cybersecurity":          35.0,
+    "defence":                20.0,
+    "energy":                 14.0,
+    "gold_precious_metals":   18.0,
+    "healthcare":             20.0,
+    "biotech":                25.0,
+    "consumer_discretionary": 22.0,
+    "financials":             12.0,
+    "industrials":            20.0,
+    "reits":                  35.0,   # price/FFO proxy
+    "crypto_infrastructure":  40.0,
+    "default":                22.0,
+}
+
+
+def _sector_median_pe(theme_id: str) -> float:
+    """Return sector median forward P/E for a TTG theme_id."""
+    raw = _read_json(_DATA_DIR / "theme_graph" / "theme_nodes.json")
+    nodes = {n.get("id", ""): n for n in raw.get("nodes", [])}
+    bucket = (nodes.get(theme_id, {}).get("sector_bucket") or "").lower().replace(" ", "_")
+    return _SECTOR_PE.get(bucket) or _SECTOR_PE.get(theme_id) or _SECTOR_PE["default"]
+
 
 def _score_valuation(symbol: str) -> DimensionScore:
     MAX = 23
@@ -327,6 +383,25 @@ def _score_valuation(symbol: str) -> DimensionScore:
             signals.append(f"rev_growth={rev_pct:.0f}%→0")
         else:
             pts -= 8; signals.append(f"rev_growth={rev_pct:.0f}%→-8")
+
+    # Sector-relative P/E: cheap vs peers = modest positive, expensive = modest negative
+    try:
+        km_raw = _fmp("key-metrics-ttm", {"symbol": symbol})
+        km_item = _first(km_raw)
+        pe_ttm = _f(km_item.get("peRatioTTM") or km_item.get("priceEarningsRatioTTM"))
+        if pe_ttm and pe_ttm > 0:
+            exposures = _exposures_for(symbol)
+            theme_id  = exposures[0].get("theme_id", "") if exposures else ""
+            median_pe = _sector_median_pe(theme_id)
+            ratio = pe_ttm / median_pe
+            if ratio < 0.75:
+                pts += 3; signals.append(f"PE={pe_ttm:.0f}x<0.75×sector({median_pe:.0f}x)→+3")
+            elif ratio > 2.0:
+                pts -= 3; signals.append(f"PE={pe_ttm:.0f}x>2×sector({median_pe:.0f}x)→-3")
+            else:
+                signals.append(f"PE={pe_ttm:.0f}x(sector={median_pe:.0f}x)→0")
+    except Exception:
+        pass
 
     pts = max(-23, min(MAX, pts))
     return DimensionScore(raw_pts=pts, max_pts=MAX,
@@ -574,6 +649,25 @@ def _event_direction_for_symbol(event: dict, symbol: str, theme_id: str) -> str:
     return "neutral"
 
 
+def _catalyst_score_for(symbol: str) -> float | None:
+    """Return today's catalyst_score for symbol from catalyst candidates file, or None."""
+    from datetime import date
+    today = date.today().strftime("%Y-%m-%d")
+    try:
+        from config import CATALYST_DIR
+        path = CATALYST_DIR / f"candidates_{today}.json"
+        if not path.exists():
+            return None
+        payload = json.loads(path.read_text())
+        candidates = payload.get("candidates", [])
+        for c in candidates:
+            if (c.get("ticker") or "").upper() == symbol.upper():
+                return _f(c.get("catalyst_score"))
+    except Exception:
+        pass
+    return None
+
+
 def _score_news_catalyst(symbol: str, theme_id: str) -> DimensionScore:
     MAX = 12
 
@@ -585,6 +679,7 @@ def _score_news_catalyst(symbol: str, theme_id: str) -> DimensionScore:
 
     best_positive_pts = 0
     worst_negative_pts = 0
+    tape_hit = False
 
     for event in events:
         materiality_str = (event.get("materiality") or "low").lower()
@@ -592,7 +687,6 @@ def _score_news_catalyst(symbol: str, theme_id: str) -> DimensionScore:
         if materiality < 0.7:
             continue
 
-        # Does this event touch our symbol?
         first_ord  = [t.upper() for t in (event.get("tickers_first_order")  or [])]
         second_ord = [t.upper() for t in (event.get("tickers_second_order") or [])]
         themes_str = (event.get("themes_strengthened") or []) + (event.get("themes_weakened") or [])
@@ -609,34 +703,58 @@ def _score_news_catalyst(symbol: str, theme_id: str) -> DimensionScore:
         if age_h is None or age_h > 7 * 24:
             continue
 
+        tape_hit = True
         direction = _event_direction_for_symbol(event, symbol, theme_id)
 
         if direction == "positive":
-            if age_h <= 24:
-                pts = 12
-            elif age_h <= 72:
-                pts = 7
-            else:
-                pts = 3
+            pts = 12 if age_h <= 24 else (7 if age_h <= 72 else 3)
             best_positive_pts = max(best_positive_pts, pts)
-
         elif direction == "negative":
-            if age_h <= 24:
-                pts = -12
-            elif age_h <= 72:
-                pts = -7
-            else:
-                pts = 0  # negative beyond 72h: no deduction
+            pts = -12 if age_h <= 24 else (-7 if age_h <= 72 else 0)
             worst_negative_pts = min(worst_negative_pts, pts)
 
-    # Combine: best positive + worst negative, clamped
+    # FMP news fallback: if symbol not in tape, check FMP stock news (last 3 days)
+    if not tape_hit:
+        try:
+            news_raw = _fmp("stock_news", {"tickers": sym_upper, "limit": 5})
+            if isinstance(news_raw, list) and news_raw:
+                for article in news_raw:
+                    age_h = _event_age_hours({
+                        "source_published_at": article.get("publishedDate", ""),
+                    })
+                    if age_h is None or age_h > 72:
+                        continue
+                    # Sentiment field from FMP: "Positive", "Negative", "Neutral"
+                    sentiment = (article.get("sentiment") or "").lower()
+                    if sentiment == "positive":
+                        pts = 6 if age_h <= 24 else 3
+                        best_positive_pts = max(best_positive_pts, pts)
+                    elif sentiment == "negative":
+                        pts = -6 if age_h <= 24 else -3
+                        worst_negative_pts = min(worst_negative_pts, pts)
+        except Exception:
+            pass
+
+    # Catalyst engine score (from today's candidates file) — treat as high signal
+    catalyst_score = _catalyst_score_for(sym_upper)
+    if catalyst_score is not None and catalyst_score >= 7.0:
+        # catalyst_score 7–8.5 = moderate catalyst, 8.5+ = high conviction event
+        if catalyst_score >= 8.5:
+            best_positive_pts = max(best_positive_pts, 10)
+        else:
+            best_positive_pts = max(best_positive_pts, 6)
+
     combined = max(-MAX, min(MAX, best_positive_pts + worst_negative_pts))
+    source = "tape" if tape_hit else ("fmp_news" if (best_positive_pts or worst_negative_pts) else "no_news")
+    if catalyst_score and catalyst_score >= 7.0:
+        source += f"+catalyst({catalyst_score:.1f})"
+
     if combined == 0:
-        signal = "no material news"
+        signal = f"no_material_news({source})"
     elif combined > 0:
-        signal = f"positive_event→+{combined}"
+        signal = f"positive({source})→+{combined}"
     else:
-        signal = f"negative_event→{combined}"
+        signal = f"negative({source})→{combined}"
 
     return DimensionScore(raw_pts=combined, max_pts=MAX, signal=signal)
 
