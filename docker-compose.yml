@@ -272,23 +272,20 @@ services:
   # Health: curl http://localhost:5000/v1/api/tickle
   ibeam:
     profiles: [ibkr]
-    image: voyz/ibeam:latest
+    image: ghcr.io/gnzsnz/ib-gateway:stable
     restart: unless-stopped
     environment:
-      - IBEAM_ACCOUNT=${IBEAM_ACCOUNT}
-      - IBEAM_PASSWORD=${IBEAM_PASSWORD}
-      - IBEAM_GATEWAY_BASE_URL=https://localhost:4002
-      - IBEAM_LOG_TO_FILE=True
-      - IBEAM_PAPER_ACCOUNT=1
-      - IBEAM_GATEWAY_STARTUP=60
+      - TWS_USERID=${IBEAM_ACCOUNT}
+      - TWS_PASSWORD=${IBEAM_PASSWORD}
+      - TRADING_MODE=paper
+      - TWS_SETTINGS_PATH=/home/ibgateway/Jts
+      - TWOFA_TIMEOUT_ACTION=exit
     ports:
       - "127.0.0.1:4002:4002"
-      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:4001:4001"
     volumes:
-      - ibeam-conf:/srv/ibeam/conf
+      - ibeam-conf:/home/ibgateway/Jts
     shm_size: '1gb'
-    security_opt:
-      - seccomp=unconfined
     deploy:
       resources:
         limits:
