@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type { Chain } from "@/lib/chain-definitions";
 import type { GraphData } from "@/lib/types";
 
@@ -106,36 +107,51 @@ export default function SupplyChainView({ chain, selectedSymbol, prices, onSelec
 
   return (
     <div className="h-full overflow-x-auto overflow-y-hidden">
-      <div className="flex h-full" style={{ padding: "20px", gap: 12, width: "max-content", minWidth: "100%" }}>
-        {stages.map((stage, stageIdx) => (
-          <div key={stage.id} className="flex flex-col flex-shrink-0" style={{ width: 164 }}>
-            <div className="mb-3 flex-shrink-0">
-              <div className="text-[9px] uppercase tracking-widest font-bold mb-0.5 truncate" style={{ color: chain.color }}>
-                {stage.label}
-              </div>
-              {stage.sublabel && (
-                <div className="text-[9px] leading-tight" style={{ color: "rgba(255,255,255,0.25)" }}>
-                  {stage.sublabel}
+      <div className="flex h-full" style={{ padding: "20px", gap: 0, width: "max-content", minWidth: "100%" }}>
+        {stages.flatMap((stage, stageIdx) => {
+          const col = (
+            <div key={stage.id} className="flex flex-col flex-shrink-0" style={{ width: 164 }}>
+              <div className="mb-3 flex-shrink-0">
+                <div className="text-[9px] uppercase tracking-widest font-bold mb-0.5 truncate" style={{ color: chain.color }}>
+                  {stage.label}
                 </div>
-              )}
-              <div className="mt-2 h-px" style={{ background: chain.color + "30" }} />
-            </div>
+                {stage.sublabel && (
+                  <div className="text-[9px] leading-tight" style={{ color: "rgba(255,255,255,0.25)" }}>
+                    {stage.sublabel}
+                  </div>
+                )}
+                <div className="mt-2 h-px" style={{ background: chain.color + "30" }} />
+              </div>
 
-            <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-1">
-              {stage.symbols.map(symbol => (
-                <SymbolCard
-                  key={`${stageIdx}-${symbol}`}
-                  symbol={symbol}
-                  name={allNodeLabels[symbol] ?? symbol}
-                  price={prices[symbol]}
-                  isSelected={selectedSymbol === symbol}
-                  chainColor={chain.color}
-                  onClick={() => onSelect(symbol)}
-                />
-              ))}
+              <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-1">
+                {stage.symbols.map(symbol => (
+                  <SymbolCard
+                    key={`${stageIdx}-${symbol}`}
+                    symbol={symbol}
+                    name={allNodeLabels[symbol] ?? symbol}
+                    price={prices[symbol]}
+                    isSelected={selectedSymbol === symbol}
+                    chainColor={chain.color}
+                    onClick={() => onSelect(symbol)}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+          if (stageIdx < stages.length - 1) {
+            return [
+              col,
+              <div
+                key={`arrow-${stage.id}`}
+                className="flex-shrink-0 flex items-start justify-center"
+                style={{ width: 16, paddingTop: 6 }}
+              >
+                <ChevronRight size={12} style={{ color: chain.color + "55" }} />
+              </div>,
+            ];
+          }
+          return [col];
+        })}
       </div>
     </div>
   );

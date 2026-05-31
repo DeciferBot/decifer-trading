@@ -3559,6 +3559,191 @@
       "strength": 0.5,
       "label": "Both EV/clean transport, different segments",
       "lag_weeks": 0
+    },
+    {
+      "source": "HXL",
+      "target": "NOC",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Hexcel composites in B-21 Raider bomber",
+      "lag_weeks": 12
+    },
+    {
+      "source": "HXL",
+      "target": "RTX",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Hexcel supplies composites for engine nacelles and airframes",
+      "lag_weeks": 12
+    },
+    {
+      "source": "ATI",
+      "target": "LMT",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "ATI specialty metals for F-35 structural components",
+      "lag_weeks": 16
+    },
+    {
+      "source": "MOGA",
+      "target": "NOC",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Moog control systems for B-21 and unmanned platforms",
+      "lag_weeks": 8
+    },
+    {
+      "source": "CW",
+      "target": "RTX",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Curtiss-Wright ruggedised electronics in Raytheon radar systems",
+      "lag_weeks": 8
+    },
+    {
+      "source": "CW",
+      "target": "LMT",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Curtiss-Wright data recorders and control electronics in F-35",
+      "lag_weeks": 8
+    },
+    {
+      "source": "HEI",
+      "target": "LMT",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "HEICO PMA replacement parts reduce F-35 maintenance costs",
+      "lag_weeks": 4
+    },
+    {
+      "source": "HEI",
+      "target": "RTX",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "HEICO supplies approved jet engine components to Pratt & Whitney operators",
+      "lag_weeks": 4
+    },
+    {
+      "source": "TDY",
+      "target": "RTX",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Teledyne subsea and radar sensors in Raytheon systems",
+      "lag_weeks": 10
+    },
+    {
+      "source": "KTOS",
+      "target": "LMT",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Kratos drone targets used in Lockheed missile testing",
+      "lag_weeks": 6
+    },
+    {
+      "source": "LHX",
+      "target": "NOC",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "L3Harris ISR sensors integrated into Northrop surveillance platforms",
+      "lag_weeks": 8
+    },
+    {
+      "source": "LHX",
+      "target": "LMT",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "L3Harris communication systems on Lockheed platforms",
+      "lag_weeks": 8
+    },
+    {
+      "source": "RKLB",
+      "target": "VSAT",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Rocket Lab launches Viasat-3 and military comms satellites",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RKLB",
+      "target": "NOC",
+      "type": "supply_chain_up",
+      "strength": 0.5,
+      "label": "Rocket Lab provides responsive launch for Northrop classified smallsats",
+      "lag_weeks": 0
+    },
+    {
+      "source": "VSAT",
+      "target": "LMT",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "Viasat satellite comms integrated into Lockheed military aircraft",
+      "lag_weeks": 4
+    },
+    {
+      "source": "VSAT",
+      "target": "RTX",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Viasat terminals in Raytheon ground systems",
+      "lag_weeks": 4
+    },
+    {
+      "source": "IRDM",
+      "target": "LMT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Iridium L-band comms used in Lockheed military platforms",
+      "lag_weeks": 4
+    },
+    {
+      "source": "NOC",
+      "target": "RTX",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Compete for DoD prime contracts across air, space, and defence electronics"
+    },
+    {
+      "source": "KTOS",
+      "target": "LHX",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Both autonomous/drone subsystems"
+    },
+    {
+      "source": "MOGA",
+      "target": "CW",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Both make ruggedised defence electronics/actuation"
+    },
+    {
+      "source": "RKLB",
+      "target": "MNTS",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Small sat launch competitors"
+    },
+    {
+      "source": "PL",
+      "target": "SPIR",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "Both earth observation smallsat operators"
+    },
+    {
+      "source": "AXON",
+      "target": "KTOS",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Both non-traditional defence tech, autonomy"
+    },
+    {
+      "source": "HXL",
+      "target": "ATI",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "Both aerospace materials, complementary"
     }
   ]
 }

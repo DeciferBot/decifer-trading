@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, ArrowLeft, ArrowRight, Minus } from "lucide-react";
+import { X, ArrowLeft, ArrowRight, Minus, ChevronLeft } from "lucide-react";
 import type { Chain } from "@/lib/chain-definitions";
 import type { GraphData } from "@/lib/types";
 
@@ -14,6 +14,8 @@ interface Props {
   allNodeLabels: Record<string, string>;
   onSelect: (symbol: string, chainId: string) => void;
   onClose: () => void;
+  onBack?: () => void;
+  hasHistory?: boolean;
 }
 
 function SymbolLogo({ symbol, size = 32 }: { symbol: string; size?: number }) {
@@ -59,7 +61,7 @@ interface RelatedSymbol {
 }
 
 export default function SymbolDetailPanel({
-  symbol, chainId, chains, graphData, prices, allNodeLabels, onSelect, onClose,
+  symbol, chainId, chains, graphData, prices, allNodeLabels, onSelect, onClose, onBack, hasHistory,
 }: Props) {
   const chain = chains.find(c => c.id === chainId) ?? chains[0];
   const stageIdx = chain.stages.findIndex(s => s.symbols.includes(symbol));
@@ -97,8 +99,10 @@ export default function SymbolDetailPanel({
     if (sym !== symbol) addRelated(sym, "competitor", seenCompetitors);
 
   for (const e of edges) {
-    if (e.type === "supply_chain_up" && e.target === symbol)
-      addRelated(e.source as string, "supplier", seenSuppliers, e.label as string);
+    // Fix: supply_chain_up means source depends on target upstream (target is the supplier).
+    // To find suppliers of `symbol`, find edges where source === symbol.
+    if (e.type === "supply_chain_up" && e.source === symbol)
+      addRelated(e.target as string, "supplier", seenSuppliers, e.label as string);
     if (e.type === "customer" && e.source === symbol)
       addRelated(e.target as string, "customer", seenCustomers, e.label as string);
     if (e.type === "competition") {
@@ -110,6 +114,9 @@ export default function SymbolDetailPanel({
   const suppliers  = related.filter(r => r.relation === "supplier");
   const customers  = related.filter(r => r.relation === "customer");
   const competitors = related.filter(r => r.relation === "competitor");
+
+  // Cross-chain membership: chains where this symbol appears, excluding the current chain
+  const otherChains = chains.filter(c => c.id !== chainId && c.stages.some(s => s.symbols.includes(symbol)));
 
   const pct = price?.change_pct;
   const hasChange = pct !== undefined && pct !== 0;
@@ -191,9 +198,16 @@ export default function SymbolDetailPanel({
               <div className="text-[12px]" style={{ color: "rgba(255,255,255,0.50)" }}>{label}</div>
             </div>
           </div>
-          <button onClick={onClose} className="hover:text-white p-1 flex-shrink-0 mt-0.5" style={{ color: "rgba(255,255,255,0.30)" }}>
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+            {hasHistory && onBack && (
+              <button onClick={onBack} className="hover:text-white p-1" style={{ color: "rgba(255,255,255,0.30)" }} title="Go back">
+                <ChevronLeft size={14} />
+              </button>
+            )}
+            <button onClick={onClose} className="hover:text-white p-1" style={{ color: "rgba(255,255,255,0.30)" }}>
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Price row */}
@@ -213,7 +227,7 @@ export default function SymbolDetailPanel({
         </div>
 
         {/* Chain breadcrumb */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: chain.color }} />
           <span className="text-[10px]" style={{ color: chain.color + "cc" }}>{chain.label}</span>
           {stageName && (
@@ -223,6 +237,24 @@ export default function SymbolDetailPanel({
             </>
           )}
         </div>
+
+        {/* Cross-chain membership */}
+        {otherChains.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.25)" }}>Also in:</span>
+            {otherChains.map(c => (
+              <button
+                key={c.id}
+                onClick={() => onSelect(symbol, c.id)}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] transition-all hover:opacity-80"
+                style={{ color: c.color, background: c.color + "18", border: `1px solid ${c.color}33` }}
+              >
+                <span className="w-1 h-1 rounded-full flex-shrink-0 inline-block" style={{ background: c.color }} />
+                {c.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Description */}
@@ -234,9 +266,9 @@ export default function SymbolDetailPanel({
 
       {/* Relationships */}
       <div className="flex-1 overflow-y-auto py-2">
-        <Section items={suppliers}   title="Suppliers"   icon={<ArrowLeft  size={10} />} />
-        <Section items={customers}   title="Customers"   icon={<ArrowRight size={10} />} />
-        <Section items={competitors} title="Same stage"  icon={<Minus      size={10} />} />
+        <Section items={suppliers}   title="Suppliers"    icon={<ArrowLeft  size={10} />} />
+        <Section items={customers}   title="Customers"    icon={<ArrowRight size={10} />} />
+        <Section items={competitors} title="Competitors"  icon={<Minus      size={10} />} />
         {suppliers.length === 0 && customers.length === 0 && competitors.length === 0 && (
           <div className="px-5 py-4 text-[11px]" style={{ color: "rgba(255,255,255,0.25)" }}>
             No relationships mapped.
