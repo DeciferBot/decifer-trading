@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { Activity, Filter } from "lucide-react";
+import { Activity, Filter, Search, X } from "lucide-react";
 import type { GraphData, EnrichedNode, GraphEdge, Cluster } from "@/lib/types";
 import { computeBrightness } from "@/lib/types";
 import NodePanel from "@/components/NodePanel";
@@ -20,12 +20,17 @@ const EDGE_TYPE_FILTERS = [
 ] as const;
 
 export default function MapPage() {
-  const [graphData, setGraphData]   = useState<GraphData | null>(null);
-  const [enriched, setEnriched]     = useState<EnrichedNode[]>([]);
-  const [selected, setSelected]     = useState<EnrichedNode | null>(null);
+  const [graphData, setGraphData]       = useState<GraphData | null>(null);
+  const [enriched, setEnriched]         = useState<EnrichedNode[]>([]);
+  const [selected, setSelected]         = useState<EnrichedNode | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>("all");
-  const [isMobile, setIsMobile]     = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isMobile, setIsMobile]         = useState(false);
+  const [lastUpdated, setLastUpdated]   = useState<Date | null>(null);
+  const [search, setSearch]             = useState("");
+  const [focusId, setFocusId]           = useState<string | null>(null);
+  const [showSearch, setShowSearch]     = useState(false);
+  const autoSelectedRef                 = useRef(false);
+  const searchRef                       = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -80,6 +85,44 @@ export default function MapPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enriched]);
 
+  // Auto-select hottest node once on first data load
+  useEffect(() => {
+    if (enriched.length === 0 || autoSelectedRef.current) return;
+    const timer = setTimeout(() => {
+      if (autoSelectedRef.current) return;
+      autoSelectedRef.current = true;
+      const hottest = [...enriched].sort((a, b) => b.brightness - a.brightness)[0];
+      if (hottest) { setSelected(hottest); setFocusId(hottest.id); }
+    }, 2800);
+    return () => clearTimeout(timer);
+  }, [enriched]);
+
+  // Search: find node, select and pan to it
+  useEffect(() => {
+    if (!search.trim()) { setFocusId(null); return; }
+    const q = search.trim().toUpperCase();
+    const match = enriched.find(n =>
+      n.id.toUpperCase() === q ||
+      n.id.toUpperCase().startsWith(q) ||
+      n.label.toUpperCase().includes(search.trim().toUpperCase())
+    );
+    if (match) { setSelected(match); setFocusId(match.id); }
+  }, [search, enriched]);
+
+  // Keyboard shortcut: / to focus search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowSearch(true);
+        setTimeout(() => searchRef.current?.focus(), 50);
+      }
+      if (e.key === "Escape") { setShowSearch(false); setSearch(""); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const clusters: Cluster[] = graphData?.clusters ?? [];
 
   const hotNodes = enriched
@@ -90,10 +133,10 @@ export default function MapPage() {
   return (
     <div className="h-screen w-screen overflow-hidden flex flex-col" style={{ background: "#080d1a", color: "#fff" }}>
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 flex-shrink-0 gap-3">
+        <div className="flex items-center gap-3 flex-shrink-0">
           <Activity size={16} className="text-indigo-400" />
-          <span className="font-semibold text-white tracking-tight">Decifer Market Map</span>
+          <span className="font-semibold text-white tracking-tight hidden sm:block">Decifer Market Map</span>
           {!isMobile && clusters.map(c => (
             <div key={c.id} className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full" style={{ background: c.color }} />
@@ -101,10 +144,43 @@ export default function MapPage() {
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-3">
+
+        {/* Search */}
+        <div className="flex-1 max-w-xs">
+          {showSearch ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/8 border border-white/15">
+              <Search size={12} className="text-gray-400 flex-shrink-0" />
+              <input
+                ref={searchRef}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search ticker or company…"
+                className="flex-1 bg-transparent text-xs text-white placeholder-gray-600 outline-none min-w-0"
+                autoComplete="off"
+              />
+              {search && (
+                <button onClick={() => { setSearch(""); setFocusId(null); }} className="text-gray-600 hover:text-gray-300">
+                  <X size={11} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => { setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 50); }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all border border-transparent hover:border-white/10"
+            >
+              <Search size={12} />
+              <span className="hidden sm:block">Search</span>
+              <span className="text-gray-700 hidden sm:block">·</span>
+              <kbd className="text-gray-700 font-mono hidden sm:block">/</kbd>
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 flex-shrink-0">
           {lastUpdated && (
-            <span className="text-xs text-gray-600 hidden sm:block">
-              Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            <span className="text-xs text-gray-600 hidden lg:block">
+              {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
           )}
           <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
@@ -172,6 +248,7 @@ export default function MapPage() {
                   clusters={clusters}
                   onSelect={handleSelect}
                   selected={selected}
+                  focusId={focusId}
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
