@@ -425,30 +425,20 @@ def _score_distance_from_highs(symbol: str) -> DimensionScore:
     pts = 0
     signals = []
 
-    hist_raw = _fmp("historical-price-full", {"symbol": symbol, "serietype": "line"})
-    h_item = _first(hist_raw) if isinstance(hist_raw, dict) else {}
-    historical = h_item.get("historical", hist_raw if isinstance(hist_raw, list) else [])
+    # Use stable/quote which includes yearHigh (52W high) — single fast call.
+    # historical-price-full is not available on this FMP tier.
+    quote_raw = _fmp("quote", {"symbol": symbol})
+    item      = _first(quote_raw)
+    current   = _f(item.get("price"))
+    high_52w  = _f(item.get("yearHigh"))
 
-    if not historical:
-        return DimensionScore(raw_pts=0, max_pts=MAX, signal="no price history")
-
-    closes = [_f(h.get("close") or h.get("adjClose")) for h in historical
-              if _f(h.get("close") or h.get("adjClose")) is not None]
-    if not closes:
-        return DimensionScore(raw_pts=0, max_pts=MAX, signal="no price history")
-
-    current = closes[0]
-    year_closes = closes[:252]   # ~1 year of trading days
-    high_52w = max(year_closes) if year_closes else current
-    ath = max(closes)
+    if current is None or high_52w is None or high_52w == 0:
+        return DimensionScore(raw_pts=0, max_pts=MAX, signal="no price data")
 
     pct_from_52w = (current - high_52w) / high_52w * 100  # negative = below
 
-    if pct_from_52w >= -2:                        # at or making new 52W high
-        if current >= ath * 0.99:                 # also at/near ATH
-            pts = 12; signals.append("new_ATH→+12")
-        else:
-            pts = 8; signals.append("near_52W_high→+8")
+    if pct_from_52w >= -2:
+        pts = 12; signals.append(f"at_52W_high({current:.0f}/{high_52w:.0f})→+12")
     elif pct_from_52w >= -15:
         pts = 3; signals.append(f"{pct_from_52w:.0f}%_from_52W→+3")
     elif pct_from_52w >= -30:

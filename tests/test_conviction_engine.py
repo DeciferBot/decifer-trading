@@ -183,52 +183,41 @@ class TestValuationScore:
 # ---------------------------------------------------------------------------
 
 class TestDistanceFromHighs:
-    def _make_hist(self, prices: list[float]) -> list[dict]:
-        return [{"close": p} for p in prices]
-
-    def _score(self, prices):
+    def _score(self, current: float, year_high: float):
         import conviction_engine as ce
-        raw = {"historical": self._make_hist(prices)}
-        with patch("conviction_engine._fmp", return_value=raw):
+        quote = [{"price": current, "yearHigh": year_high, "yearLow": year_high * 0.5}]
+        with patch("conviction_engine._fmp", return_value=quote):
             return ce._score_distance_from_highs("NVDA")
 
-    def test_at_new_ath_max_score(self):
-        # Current price = all-time high → max conviction
-        prices = [100.0] + [98.0, 95.0, 90.0, 85.0] * 60
-        d = self._score(prices)
+    def test_at_52w_high_max_score(self):
+        d = self._score(current=100.0, year_high=100.0)
         assert d.raw_pts == 12
-        assert "ATH" in d.signal or "52W" in d.signal
 
-    def test_near_52w_high_strong_positive(self):
-        # Current = 98, 52W high = 100 — within 5%
-        prices = [98.0] + [100.0, 95.0, 90.0] * 80
-        d = self._score(prices)
-        assert d.raw_pts >= 8
+    def test_near_52w_high_within_2pct(self):
+        d = self._score(current=98.5, year_high=100.0)
+        assert d.raw_pts == 12
+
+    def test_moderate_below_small_positive(self):
+        d = self._score(current=90.0, year_high=100.0)
+        assert d.raw_pts == 3
 
     def test_30pct_below_52w_is_negative(self):
-        # Current = 70, 52W high = 100 — 30% below = downtrend
-        prices = [70.0] + [100.0] + [95.0] * 250
-        d = self._score(prices)
+        d = self._score(current=70.0, year_high=100.0)
         assert d.raw_pts < 0
 
     def test_far_below_52w_heavily_penalised(self):
-        # Current = 50, 52W high = 100 — 50% below = heavily penalised
-        prices = [50.0] + [100.0] + [90.0] * 250
-        d = self._score(prices)
+        d = self._score(current=50.0, year_high=100.0)
         assert d.raw_pts == -12
 
     def test_corrected_sign_near_is_good_far_is_bad(self):
-        """Verify the trader correction: near high = positive, far below = negative."""
-        import conviction_engine as ce
-        near = self._score([99.0] + [100.0] + [95.0] * 250)
-        far  = self._score([60.0] + [100.0] + [95.0] * 250)
+        near = self._score(current=99.0, year_high=100.0)
+        far  = self._score(current=60.0, year_high=100.0)
         assert near.raw_pts > 0
         assert far.raw_pts < 0
-        assert near.raw_pts > far.raw_pts
 
-    def test_no_history_returns_zero(self):
+    def test_no_price_data_returns_zero(self):
         import conviction_engine as ce
-        with patch("conviction_engine._fmp", return_value={}):
+        with patch("conviction_engine._fmp", return_value=None):
             d = ce._score_distance_from_highs("NVDA")
         assert d.raw_pts == 0
 
@@ -372,12 +361,13 @@ class TestTraderCorrections:
     def test_d4_near_high_positive_far_below_negative(self):
         """O'Neil / Druckenmiller: strength begets strength. Near high = conviction."""
         import conviction_engine as ce
-        def _h(prices):
-            with patch("conviction_engine._fmp", return_value={"historical": [{"close": p} for p in prices]}):
+        def _h(current, year_high):
+            quote = [{"price": current, "yearHigh": year_high, "yearLow": year_high * 0.5}]
+            with patch("conviction_engine._fmp", return_value=quote):
                 return ce._score_distance_from_highs("X")
 
-        at_high   = _h([100.0] * 252)
-        far_below = _h([60.0] + [100.0] + [95.0] * 250)
+        at_high   = _h(100.0, 100.0)
+        far_below = _h(60.0, 100.0)
         assert at_high.raw_pts > 0
         assert far_below.raw_pts < 0
 
