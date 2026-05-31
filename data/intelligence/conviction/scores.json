@@ -1,10 +1,10 @@
 {
-  "saved_at": "2026-05-31T18:38:40.664906+00:00",
+  "saved_at": "2026-05-31T19:43:01.807539+00:00",
   "total": 1,
   "scores": {
     "NVDA": {
       "symbol": "NVDA",
-      "composite": 14,
+      "composite": 16,
       "tier": "DORMANT",
       "dimensions": {
         "analyst": {
@@ -25,7 +25,7 @@
         "highs": {
           "raw_pts": 0,
           "max_pts": 12,
-          "signal": "no price history"
+          "signal": "no price data"
         },
         "macro": {
           "raw_pts": 25,
@@ -35,7 +35,7 @@
         "news_catalyst": {
           "raw_pts": -7,
           "max_pts": 12,
-          "signal": "negative_event\u2192-7"
+          "signal": "negative(tape)\u2192-7"
         },
         "options_flow": {
           "raw_pts": 0,
@@ -53,7 +53,7 @@
           "signal": "conflicts=unverified(enterprise_ai_roi_disappointment)\u2192-2"
         }
       },
-      "ts": "2026-05-31T18:38:40.664840+00:00"
+      "ts": "2026-05-31T19:43:01.807430+00:00"
     }
   }
 }
