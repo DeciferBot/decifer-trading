@@ -1035,13 +1035,18 @@ def score_symbol(
     d8 = _score_peer_network(symbol, price_changes)
     d9 = _score_counter_thesis(symbol, driver_id)
 
-    raw_sum = (d1.raw_pts + d2.raw_pts + d3.raw_pts + d4.raw_pts + d5.raw_pts
-               + d6.raw_pts + d7.raw_pts + d8.raw_pts + d9.raw_pts)
+    # D1-D5 are the structural conviction thesis — normalise these against their
+    # max (118) to produce a 0-100 base. Zero on D6/D7/D8 means "no data today",
+    # not "no conviction" — treating them as part of the denominator would deflate
+    # every score by ~23% when news/options/peers are absent. D6-D9 are applied
+    # as bounded modifiers (+15 / -15) on top of the base.
+    base_raw = d1.raw_pts + d2.raw_pts + d3.raw_pts + d4.raw_pts + d5.raw_pts
+    base = round(max(0, base_raw) / _PHASE1_MAX * 100)   # 0-100
 
-    # Normalise against all-dims max. Clamp numerator at 0 so negatives don't
-    # produce a negative composite — floor is 0.
-    composite = round(max(0, raw_sum) / _ALL_DIMS_MAX * 100)
-    composite = min(composite, 100)
+    modifiers = d6.raw_pts + d7.raw_pts + d8.raw_pts + d9.raw_pts
+    modifiers = max(-15, min(15, modifiers))              # bounded ±15
+
+    composite = max(0, min(100, base + modifiers))
 
     dims = {
         "analyst":       d1.to_dict(),
