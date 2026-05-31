@@ -279,15 +279,17 @@ services:
       - IBEAM_PASSWORD=${IBEAM_PASSWORD}
       - IBEAM_GATEWAY_BASE_URL=https://localhost:4002
       - IBEAM_LOG_TO_FILE=True
+      - IBEAM_PAPER_ACCOUNT=1
     ports:
       - "127.0.0.1:4002:4002"
       - "127.0.0.1:5000:5000"
     volumes:
       - ibeam-conf:/srv/ibeam/conf
+    shm_size: '1gb'
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 768m
           cpus: "0.5"
 
 # ── Named volumes ──────────────────────────────────────────────────────────────
