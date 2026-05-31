@@ -1,7 +1,8 @@
 "use client";
 // Today tab — Sprint M16 redesign.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
+const EarningsCalendarView = lazy(() => import("./EarningsCalendarView"));
 import {
   ArrowRight,
   RefreshCw,
@@ -35,6 +36,7 @@ import { buildCauseGroups, type MarketCauseGroup } from "@/lib/marketCauseStory"
 import type { TapeEntry } from "@/app/api/market-tape/route";
 import type { MarketMoversPayload, Mover } from "@/app/api/market-movers/route";
 import type { MorningBriefPayload, EconEvent, EarningsItem, AnalystItem } from "@/app/api/morning-brief/route";
+import type { EarningsEntry } from "@/app/api/earnings-calendar/route";
 import type { MarketCommentaryPayload } from "@/app/api/market-commentary/route";
 import type { NewsItem } from "@/app/api/market-news/route";
 import { fetchUniverseSymbols } from "@/lib/customerApi";
@@ -1837,10 +1839,12 @@ function TodayAgendaSection({
   data,
   brief,
   ttgSymbolMap,
+  onOpenCalendar,
 }: {
   data: MarketNowPayload;
   brief: MorningBriefPayload | null;
   ttgSymbolMap: Map<string, { theme_label: string }>;
+  onOpenCalendar: () => void;
 }) {
   const activeDrivers = data.key_drivers ?? [];
 
@@ -1982,6 +1986,38 @@ function TodayAgendaSection({
                 );
               })}
             </div>
+            {/* Full calendar CTA */}
+            <button
+              onClick={onOpenCalendar}
+              className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold transition-all active:scale-[0.98]"
+              style={{
+                background: "rgba(249,115,22,0.06)",
+                border: "1px solid rgba(249,115,22,0.15)",
+                color: "#fb923c",
+              }}
+            >
+              <BarChart2 size={10} />
+              See full earnings calendar
+              <ArrowRight size={10} />
+            </button>
+          </div>
+        )}
+        {/* Full calendar CTA when no TTG earnings but brief has data */}
+        {earningsThisWeek.length === 0 && (brief?.earnings ?? []).length > 0 && (
+          <div className="px-4 pt-3 pb-4">
+            <button
+              onClick={onOpenCalendar}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[11px] font-semibold transition-all active:scale-[0.98]"
+              style={{
+                background: "rgba(249,115,22,0.06)",
+                border: "1px solid rgba(249,115,22,0.15)",
+                color: "#fb923c",
+              }}
+            >
+              <BarChart2 size={10} />
+              See full earnings calendar
+              <ArrowRight size={10} />
+            </button>
           </div>
         )}
       </div>
@@ -2104,6 +2140,7 @@ export default function TodayTab({
   const groups = buildCauseGroups(data);
 
   const [selectedForce, setSelectedForce] = useState<CustomerMarketForce | null>(null);
+  const [showEarningsCalendar, setShowEarningsCalendar] = useState(false);
 
   // Market tape
   const [tape, setTape] = useState<TapeEntry[]>([]);
@@ -2115,12 +2152,21 @@ export default function TodayTab({
   }, []);
   const tapeSnapshot = deriveTapeSnapshot(tape);
 
-  // Morning brief — economic calendar, earnings, analyst moves
+  // Morning brief — economic calendar, earnings (TTG-filtered preview), analyst moves
   const [morningBrief, setMorningBrief] = useState<MorningBriefPayload | null>(null);
   useEffect(() => {
     fetch("/api/morning-brief")
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setMorningBrief(d); })
+      .catch(() => {});
+  }, []);
+
+  // Full earnings calendar — US-only, full week, for the calendar overlay
+  const [fullEarnings, setFullEarnings] = useState<EarningsEntry[]>([]);
+  useEffect(() => {
+    fetch("/api/earnings-calendar")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.earnings) setFullEarnings(d.earnings); })
       .catch(() => {});
   }, []);
 
@@ -2259,6 +2305,7 @@ export default function TodayTab({
           data={data}
           brief={morningBrief}
           ttgSymbolMap={ttgData?.symbolMap ?? new Map()}
+          onOpenCalendar={() => setShowEarningsCalendar(true)}
         />
 
         {/* ── C: What is moving markets ─────────────────────────────────── */}
@@ -2322,6 +2369,17 @@ export default function TodayTab({
           onClose={() => setSelectedForce(null)}
           onAskAbout={onAskAbout}
         />
+      )}
+
+      {/* ── Earnings calendar overlay ─────────────────────────────────────── */}
+      {showEarningsCalendar && (
+        <Suspense fallback={null}>
+          <EarningsCalendarView
+            earnings={fullEarnings}
+            ttgSymbolMap={ttgData?.symbolMap ?? new Map()}
+            onClose={() => setShowEarningsCalendar(false)}
+          />
+        </Suspense>
       )}
     </div>
   );
