@@ -48,11 +48,213 @@ interface DriversPayload {
   disclaimer: string;
 }
 
+interface StoryHero {
+  headline: string;
+  subline: string | null;
+  tension: string | null;
+  regime: string;
+  regimeBg: string;
+  regimeText: string;
+  regimeBorder: string;
+}
+
+// ── Story generation ─────────────────────────────────────────────────────────
+
+// Maps driver IDs to what is actually happening in the world — plain English, no jargon.
+const DRIVER_PLAIN: Record<string, string> = {
+  ai_capex_growth:          "spending on AI infrastructure — data centres, power, and the chips that run them",
+  ai_compute_demand:        "surging demand for the computing power that runs AI models",
+  yields_falling:           "falling interest rates",
+  oil_supply_shock:         "a sharp drop in oil prices",
+  geopolitical_risk_rising: "elevated geopolitical tension",
+  credit_stress_rising:     "widening credit spreads",
+  risk_on_rotation:         "investors moving money into riskier assets",
+  futures_risk_on:          "futures markets pointing higher",
+  futures_risk_off:         "futures markets pointing lower",
+  small_cap_risk_on:        "small-cap stocks joining the rally",
+  gold_safe_haven_bid:      "investors buying gold as a safe haven",
+  credit_stress_easing:     "credit markets stabilising",
+};
+
+// Blocked condition IDs to plain friction language
+const BLOCKED_PLAIN: Record<string, string> = {
+  credit_stress_rising: "the bond market is flashing caution — credit spreads are widening even as stocks climb",
+  geopolitical_risk_rising: "geopolitical risk is elevated, which could interrupt the move",
+};
+
+function driverPlain(driver: ActiveDriver): string {
+  return DRIVER_PLAIN[driver.id] ?? driver.label.toLowerCase();
+}
+
+function buildStoryHero(data: DriversPayload): StoryHero {
+  const { active_drivers, blocked_conditions, futures } = data;
+  const hasFuturesRiskOn = futures?.advisory_drivers?.includes("futures_risk_on");
+  const hasFuturesRiskOff = futures?.advisory_drivers?.includes("futures_risk_off");
+  const hasBlocked = blocked_conditions.length > 0;
+  const driverCount = active_drivers.length;
+
+  // Regime
+  let regime: string;
+  let regimeBg: string;
+  let regimeText: string;
+  let regimeBorder: string;
+
+  if (hasBlocked && driverCount > 0) {
+    regime = "MIXED SIGNALS";
+    regimeBg = "var(--accent-amber-bg)";
+    regimeText = "var(--accent-amber)";
+    regimeBorder = "var(--accent-amber-border)";
+  } else if (driverCount === 0) {
+    regime = "QUIET";
+    regimeBg = "#F5F5F5";
+    regimeText = "#6B7280";
+    regimeBorder = "#E5E7EB";
+  } else if (hasFuturesRiskOff) {
+    regime = "RISK OFF";
+    regimeBg = "var(--accent-red-bg)";
+    regimeText = "var(--accent-red)";
+    regimeBorder = "var(--accent-red-border)";
+  } else {
+    regime = "RISK ON";
+    regimeBg = "var(--accent-green-bg)";
+    regimeText = "var(--accent-green)";
+    regimeBorder = "var(--accent-green-border)";
+  }
+
+  // Headline — describe what is happening, not what our system calls it
+  let headline = "";
+  if (driverCount === 0) {
+    headline = "No clear macro force is in play right now. Markets look quiet.";
+  } else if (hasFuturesRiskOn && futures) {
+    const nqPct = (futures.nq_5d_ret * 100).toFixed(1);
+    // Lead with the phenomenon, not the driver name
+    const aiDrivers = active_drivers.filter((d) =>
+      ["ai_capex_growth", "ai_compute_demand"].includes(d.id)
+    );
+    const hasOilDrop = active_drivers.some((d) => d.id === "oil_supply_shock");
+    const hasYieldsFalling = active_drivers.some((d) => d.id === "yields_falling");
+
+    if (aiDrivers.length >= 2) {
+      headline = `Tech is the story this week. The Nasdaq is up ${nqPct}% over five days, driven by heavy spending on AI — the chips, data centres, and energy that make it run.`;
+    } else if (aiDrivers.length === 1) {
+      headline = `Markets are leaning into growth. The Nasdaq is up ${nqPct}% this week, with ${driverPlain(aiDrivers[0])} the clearest force behind the move.`;
+    } else if (hasOilDrop && hasYieldsFalling) {
+      headline = `Oil is falling and so are interest rates — a combination that tends to lift stocks broadly. The Nasdaq is up ${nqPct}% over five days.`;
+    } else {
+      const top = driverPlain(active_drivers[0]);
+      headline = `Markets are moving higher. The Nasdaq is up ${nqPct}% over five days, with ${top} as the clearest driver.`;
+    }
+  } else if (hasFuturesRiskOff && futures) {
+    const nqPct = Math.abs(futures.nq_5d_ret * 100).toFixed(1);
+    headline = `Markets are pulling back. The Nasdaq is down ${nqPct}% over five days. ${driverCount > 0 ? `The pressure is coming from ${driverPlain(active_drivers[0])}.` : ""}`;
+  } else {
+    const top = driverPlain(active_drivers[0]);
+    const second = active_drivers[1] ? ` alongside ${driverPlain(active_drivers[1])}` : "";
+    headline = `The dominant force right now is ${top}${second}.`;
+  }
+
+  // Subline — add context about breadth or what this means
+  let subline: string | null = null;
+  const hasOilDrop = active_drivers.some((d) => d.id === "oil_supply_shock");
+  const hasYieldsFalling = active_drivers.some((d) => d.id === "yields_falling");
+  const hasRiskOn = active_drivers.some((d) => d.id === "risk_on_rotation");
+
+  if (hasFuturesRiskOn) {
+    if (hasOilDrop && !hasYieldsFalling) {
+      subline = "Oil dropping this sharply also takes pressure off inflation, which gives the rally more room to run.";
+    } else if (hasYieldsFalling && !hasOilDrop) {
+      subline = "Falling rates make growth stocks cheaper to own, which helps explain the tech-led move.";
+    } else if (hasOilDrop && hasYieldsFalling) {
+      subline = "Both forces tend to benefit growth stocks, which helps explain why tech is leading.";
+    } else if (hasRiskOn && driverCount >= 3) {
+      subline = "The move is broad. Investors are rotating into equities across the board, not just in one pocket of the market.";
+    }
+  }
+
+  // Tension — explain what the friction actually means, not what we call it
+  let tension: string | null = null;
+  if (hasBlocked) {
+    const blockedId = blocked_conditions[0]?.id ?? "";
+    const plain = BLOCKED_PLAIN[blockedId];
+    if (plain && hasFuturesRiskOn) {
+      tension = `Worth watching: ${plain}. When stocks and credit diverge like this, one of them usually catches up to the other.`;
+    } else if (plain) {
+      tension = `One caution: ${plain}.`;
+    } else {
+      tension = `One caution flag is active. The rally may be running into some friction.`;
+    }
+  }
+
+  return { headline, subline, tension, regime, regimeBg, regimeText, regimeBorder };
+}
+
+// ── Conviction ───────────────────────────────────────────────────────────────
+
+type Conviction = "high" | "medium" | "low" | "watchlist";
+
+const CONVICTION_STYLE: Record<Conviction, {
+  bg: string; border: string; leftAccent: string;
+  badge: string; badgeColor: string; badgeBg: string; badgeBorder: string;
+}> = {
+  high: {
+    bg: "#FFFCF0",
+    border: "#F5E6B8",
+    leftAccent: "#D97706",
+    badge: "HIGH CONVICTION",
+    badgeColor: "#92400E",
+    badgeBg: "#FEF3C7",
+    badgeBorder: "#FCD34D",
+  },
+  medium: {
+    bg: "#F6FAFE",
+    border: "#BFDBFE",
+    leftAccent: "#2563EB",
+    badge: "ACTIVE",
+    badgeColor: "#1D4ED8",
+    badgeBg: "#EFF6FF",
+    badgeBorder: "#BFDBFE",
+  },
+  low: {
+    bg: "#FAFFF8",
+    border: "#BBF7D0",
+    leftAccent: "#16A34A",
+    badge: "ACTIVE",
+    badgeColor: "#166534",
+    badgeBg: "#F0FDF4",
+    badgeBorder: "#86EFAC",
+  },
+  watchlist: {
+    bg: "#FAFAFA",
+    border: "#E5E5E5",
+    leftAccent: "#A8A29E",
+    badge: "BUILDING",
+    badgeColor: "#78716C",
+    badgeBg: "#F5F5F4",
+    badgeBorder: "#D6D3D1",
+  },
+};
+
+function driverConviction(driver: ActiveDriver): Conviction {
+  const vals = Object.values(driver.evidence).filter((v) => typeof v === "number") as number[];
+  if (vals.length === 0) return "low";
+  const avgAbs = vals.reduce((s, v) => s + Math.abs(v), 0) / vals.length;
+  if (avgAbs >= 0.05) return "high";
+  if (avgAbs >= 0.02) return "medium";
+  return "low";
+}
+
+function themeConviction(theme: ActivatedTheme): Conviction {
+  if (theme.state === "crowded") return "watchlist";
+  if (theme.confidence >= 0.70) return "high";
+  if (theme.confidence >= 0.40) return "medium";
+  return "low";
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtEvidenceKey(key: string): string {
   return key
-    .replace(/_5d_ret$/, " 5d")
+    .replace(/_5d_ret$/, " 5D")
     .replace(/_ret$/, "")
     .replace(/_/g, " ")
     .toUpperCase();
@@ -70,9 +272,12 @@ function fmtTs(ts: string): string {
   try {
     const d = new Date(ts);
     return d.toLocaleString("en-US", {
-      month: "short", day: "numeric",
-      hour: "2-digit", minute: "2-digit",
-      hour12: false, timeZone: "America/New_York",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "America/New_York",
     }) + " ET";
   } catch {
     return ts;
@@ -86,43 +291,153 @@ function fmtRet(val: number): string {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children, count }: { children: React.ReactNode; count?: number }) {
   return (
-    <div className="flex items-center gap-3 mb-4">
-      <span className="text-2xs font-mono font-medium tracking-[0.18em] text-[#6B6358] uppercase">
+    <div className="flex items-center gap-3 mb-5">
+      <span
+        style={{
+          fontFamily: "'DM Sans', system-ui, sans-serif",
+          fontSize: "11px",
+          fontWeight: 600,
+          letterSpacing: "0.12em",
+          color: "var(--text-muted)",
+          textTransform: "uppercase",
+        }}
+      >
         {children}
       </span>
-      <div className="flex-1 h-px bg-[#1E1E1E]" />
+      {count !== undefined && (
+        <span
+          style={{
+            fontFamily: "'DM Mono', monospace",
+            fontSize: "11px",
+            color: "var(--text-muted)",
+            background: "var(--border-light)",
+            padding: "1px 6px",
+            borderRadius: "10px",
+          }}
+        >
+          {count}
+        </span>
+      )}
+      <div style={{ flex: 1, height: "1px", background: "var(--border)" }} />
     </div>
   );
 }
 
 function DriverCard({ driver, idx }: { driver: ActiveDriver; idx: number }) {
   const entries = Object.entries(driver.evidence);
+  const conviction = driverConviction(driver);
+  const style = CONVICTION_STYLE[conviction];
+  const description = DRIVER_PLAIN[driver.id] ?? driver.label.toLowerCase();
+
   return (
     <div
-      className="card-grid-item border border-[#1E1E1E] bg-[#111111] p-4 flex flex-col gap-3 hover:border-[#2A2A2A] transition-colors"
-      style={{ animationDelay: `${idx * 40}ms` }}
+      className="card-grid-item"
+      style={{
+        background: style.bg,
+        border: `1px solid ${style.border}`,
+        borderLeft: `3px solid ${style.leftAccent}`,
+        borderRadius: "10px",
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+        animationDelay: `${60 + idx * 40}ms`,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+        transition: "box-shadow 0.15s ease",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 14px rgba(0,0,0,0.08)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)";
+      }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-mono font-medium text-[#E8E0D0] leading-snug">
-          {driver.label}
-        </span>
-        <span className="shrink-0 text-2xs font-mono font-medium tracking-widest text-[#22C55E] border border-[#14532D] px-1.5 py-0.5 bg-[#0A1F0F]">
-          ACTIVE
+      {/* Conviction badge */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+        <span
+          style={{
+            fontSize: "10px",
+            fontFamily: "'DM Mono', monospace",
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            color: style.badgeColor,
+            background: style.badgeBg,
+            border: `1px solid ${style.badgeBorder}`,
+            padding: "2px 8px",
+            borderRadius: "4px",
+          }}
+        >
+          {style.badge}
         </span>
       </div>
+
+      {/* Human description — leads */}
+      <p
+        style={{
+          fontFamily: "'DM Sans', system-ui, sans-serif",
+          fontSize: "14px",
+          fontWeight: 400,
+          color: "var(--text-primary)",
+          lineHeight: 1.5,
+          margin: 0,
+          textTransform: "capitalize",
+        }}
+      >
+        {description.charAt(0).toUpperCase() + description.slice(1)}.
+      </p>
+
+      {/* Internal label pill — for traceability */}
+      <div>
+        <span
+          style={{
+            display: "inline-block",
+            fontFamily: "'DM Mono', monospace",
+            fontSize: "10px",
+            color: "var(--text-muted)",
+            background: "rgba(0,0,0,0.04)",
+            border: "1px solid var(--border)",
+            padding: "2px 8px",
+            borderRadius: "20px",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {driver.id}
+        </span>
+      </div>
+
+      {/* Evidence values */}
       {entries.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "5px",
+            paddingTop: "8px",
+            borderTop: "1px solid rgba(0,0,0,0.06)",
+          }}
+        >
           {entries.map(([k, v]) => (
-            <div key={k} className="flex items-center justify-between">
-              <span className="text-2xs font-mono text-[#6B6358] tracking-wider">
+            <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "11px",
+                  color: "var(--text-muted)",
+                  letterSpacing: "0.04em",
+                }}
+              >
                 {fmtEvidenceKey(k)}
               </span>
               <span
-                className={`text-xs font-mono font-medium tabular-nums ${
-                  typeof v === "number" && v >= 0 ? "text-[#22C55E]" : "text-[#EF4444]"
-                }`}
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  fontVariantNumeric: "tabular-nums",
+                  color: typeof v === "number" && v >= 0 ? "var(--accent-green)" : "var(--accent-red)",
+                }}
               >
                 {fmtEvidenceVal(v as number | string)}
               </span>
@@ -130,72 +445,141 @@ function DriverCard({ driver, idx }: { driver: ActiveDriver; idx: number }) {
           ))}
         </div>
       )}
-      <div className="mt-auto pt-2 border-t border-[#1E1E1E]">
-        <span className="text-2xs font-mono text-[#3D3830] tracking-widest">
-          {driver.id}
-        </span>
-      </div>
     </div>
   );
 }
 
-function ThemeRow({ theme }: { theme: ActivatedTheme }) {
+function ThemeRow({ theme, idx }: { theme: ActivatedTheme; idx: number }) {
   const isHeadwind = theme.state === "headwind" || theme.direction === "headwind";
+  const conviction = themeConviction(theme);
+  const cvStyle = CONVICTION_STYLE[conviction];
   const confidencePct = Math.round(theme.confidence * 100);
+  const label = theme.theme_id.replace(/_/g, " ");
 
   return (
-    <div className="flex items-center gap-4 py-3 border-b border-[#1A1A1A] last:border-0 hover:bg-[#0E0E0E] transition-colors px-2 -mx-2 animate-fade-in">
-      {/* state dot */}
-      <div
-        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-          isHeadwind ? "bg-[#F59E0B]" : "bg-[#22C55E]"
-        }`}
-      />
-
-      {/* theme label */}
-      <span className="text-sm font-mono font-medium text-[#E8E0D0] w-48 shrink-0 truncate">
-        {theme.theme_id.replace(/_/g, " ")}
-      </span>
-
-      {/* state badge */}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+        padding: "12px 16px",
+        borderBottom: "1px solid var(--border-light)",
+        borderLeft: `3px solid ${isHeadwind ? "var(--accent-amber)" : cvStyle.leftAccent}`,
+        background: cvStyle.bg,
+        animation: `fade-up 0.3s ease-out ${80 + idx * 35}ms forwards`,
+        opacity: 0,
+        transition: "filter 0.1s ease",
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.filter = "brightness(0.97)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.filter = "none"; }}
+    >
+      {/* Theme name */}
       <span
-        className={`text-2xs font-mono font-medium tracking-widest px-1.5 py-0.5 border w-20 text-center shrink-0 ${
-          isHeadwind
-            ? "text-[#F59E0B] border-[#78350F] bg-[#1A0F00]"
-            : "text-[#22C55E] border-[#14532D] bg-[#0A1F0F]"
-        }`}
+        style={{
+          fontFamily: "'DM Sans', system-ui, sans-serif",
+          fontSize: "14px",
+          fontWeight: 500,
+          color: "var(--text-primary)",
+          minWidth: "180px",
+          flexShrink: 0,
+          textTransform: "capitalize",
+        }}
       >
-        {theme.state.toUpperCase()}
+        {label}
       </span>
 
-      {/* confidence bar */}
-      <div className="flex items-center gap-2 flex-1">
-        <div className="flex-1 h-1 bg-[#1E1E1E] rounded-full overflow-hidden max-w-32">
+      {/* Conviction / state badge */}
+      <span
+        style={{
+          fontSize: "10px",
+          fontFamily: "'DM Mono', monospace",
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          color: isHeadwind ? "var(--accent-amber)" : cvStyle.badgeColor,
+          background: isHeadwind ? "var(--accent-amber-bg)" : cvStyle.badgeBg,
+          border: `1px solid ${isHeadwind ? "var(--accent-amber-border)" : cvStyle.badgeBorder}`,
+          padding: "2px 8px",
+          borderRadius: "4px",
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {isHeadwind ? "HEADWIND" : cvStyle.badge}
+      </span>
+
+      {/* Confidence bar */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            flex: 1,
+            maxWidth: "120px",
+            height: "3px",
+            background: "rgba(0,0,0,0.08)",
+            borderRadius: "2px",
+            overflow: "hidden",
+          }}
+        >
           <div
-            className={`h-full rounded-full ${isHeadwind ? "bg-[#F59E0B]" : "bg-[#22C55E]"}`}
-            style={{ width: `${confidencePct}%`, opacity: 0.7 }}
+            style={{
+              height: "100%",
+              borderRadius: "2px",
+              width: `${confidencePct}%`,
+              background: isHeadwind ? "var(--accent-amber)" : cvStyle.leftAccent,
+              opacity: 0.8,
+            }}
           />
         </div>
-        <span className="text-2xs font-mono tabular-nums text-[#6B6358] w-8 text-right">
+        <span
+          style={{
+            fontFamily: "'DM Mono', monospace",
+            fontSize: "11px",
+            color: "var(--text-muted)",
+            fontVariantNumeric: "tabular-nums",
+            flexShrink: 0,
+          }}
+        >
           {confidencePct}%
         </span>
       </div>
 
-      {/* direction chip */}
-      <span className="text-2xs font-mono text-[#6B6358] tracking-wider w-16 shrink-0 text-right hidden sm:block">
+      {/* Direction */}
+      <span
+        style={{
+          fontFamily: "'DM Mono', monospace",
+          fontSize: "11px",
+          color: "var(--text-muted)",
+          letterSpacing: "0.05em",
+          flexShrink: 0,
+          minWidth: "60px",
+          textAlign: "right",
+        }}
+      >
         {theme.direction.toUpperCase()}
       </span>
 
-      {/* risk flags */}
-      <div className="flex gap-1 shrink-0 hidden md:flex">
-        {theme.risk_flags.map((f) => (
+      {/* Risk flags */}
+      <div style={{ display: "flex", gap: "4px", flexShrink: 0, flexWrap: "wrap" }}>
+        {theme.risk_flags.slice(0, 3).map((f) => (
           <span
             key={f}
-            className="text-2xs font-mono text-[#F97316] border border-[#7C3910] px-1.5 py-0.5 bg-[#150A00]"
+            style={{
+              fontSize: "10px",
+              fontFamily: "'DM Mono', monospace",
+              color: "#92400E",
+              background: "#FEF3C7",
+              border: "1px solid #FDE68A",
+              padding: "1px 6px",
+              borderRadius: "3px",
+            }}
           >
-            {f}
+            {f.replace(/_/g, " ")}
           </span>
         ))}
+        {theme.risk_flags.length > 3 && (
+          <span style={{ fontSize: "10px", fontFamily: "'DM Mono', monospace", color: "var(--text-muted)" }}>
+            +{theme.risk_flags.length - 3}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -204,22 +588,60 @@ function ThemeRow({ theme }: { theme: ActivatedTheme }) {
 function BlockedRow({ condition }: { condition: BlockedCondition }) {
   const entries = Object.entries(condition.evidence);
   return (
-    <div className="flex items-center gap-4 py-3 border-b border-[#1A1A1A] last:border-0 animate-fade-in">
-      <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#EF4444]" />
-      <span className="text-sm font-mono font-medium text-[#EF4444] flex-1 truncate">
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+        padding: "12px 16px",
+        borderBottom: "1px solid #FEE2E2",
+      }}
+    >
+      <div style={{ width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0, background: "var(--accent-red)" }} />
+      <span
+        style={{
+          fontFamily: "'DM Sans', system-ui, sans-serif",
+          fontSize: "14px",
+          fontWeight: 500,
+          color: "var(--accent-red)",
+          flex: 1,
+        }}
+      >
         {condition.label}
       </span>
       {entries.length > 0 && (
-        <div className="flex gap-3">
+        <div style={{ display: "flex", gap: "16px" }}>
           {entries.map(([k, v]) => (
-            <span key={k} className="text-2xs font-mono text-[#6B6358]">
+            <span
+              key={k}
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "12px",
+                color: "var(--text-secondary)",
+              }}
+            >
               {fmtEvidenceKey(k)}{" "}
-              <span className="text-[#EF4444]">{fmtEvidenceVal(v as number | string)}</span>
+              <span style={{ color: typeof v === "number" && v >= 0 ? "var(--accent-green)" : "var(--accent-red)", fontWeight: 500 }}>
+                {fmtEvidenceVal(v as number | string)}
+              </span>
             </span>
           ))}
         </div>
       )}
-      <span className="text-2xs font-mono tracking-widest text-[#EF4444] border border-[#7F1D1D] px-1.5 py-0.5 bg-[#1A0505] shrink-0">
+      <span
+        style={{
+          fontSize: "10px",
+          fontFamily: "'DM Mono', monospace",
+          fontWeight: 500,
+          letterSpacing: "0.08em",
+          color: "var(--accent-red)",
+          background: "var(--accent-red-bg)",
+          border: "1px solid var(--accent-red-border)",
+          padding: "2px 8px",
+          borderRadius: "4px",
+          flexShrink: 0,
+        }}
+      >
         BLOCKED
       </span>
     </div>
@@ -265,121 +687,427 @@ export default function MacroPage() {
   }, []);
 
   const isLive = data?.mode === "live_market_data";
+  const story = data ? buildStoryHero(data) : null;
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#E8E0D0] font-mono">
+    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <header className="border-b border-[#1E1E1E] px-6 py-4 sticky top-0 bg-[#0A0A0A] z-10">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <span className="text-[#F97316] text-xl font-mono font-medium tracking-tight">
+      <header
+        style={{
+          borderBottom: "1px solid var(--border)",
+          padding: "0 24px",
+          background: "var(--surface)",
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          boxShadow: "0 1px 0 var(--border)",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "1024px",
+            margin: "0 auto",
+            height: "56px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px",
+          }}
+        >
+          {/* Brand */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span
+              style={{
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+                fontSize: "16px",
+                fontWeight: 700,
+                color: "var(--accent-orange)",
+                letterSpacing: "-0.01em",
+              }}
+            >
               DECIFER
             </span>
-            <span className="text-[#2A2A2A] text-xl">/</span>
-            <span className="text-[#E8E0D0] text-xl font-mono font-light tracking-widest">
-              MACRO DRIVERS
+            <span style={{ color: "var(--border)", fontSize: "18px", fontWeight: 300 }}>/</span>
+            <span
+              style={{
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+                fontSize: "14px",
+                fontWeight: 500,
+                color: "var(--text-secondary)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Macro Drivers
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* mode badge */}
+          {/* Right controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
             {data && (
-              <div className="flex items-center gap-2">
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <div
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isLive ? "bg-[#22C55E] animate-pulse-dot" : "bg-[#6B6358]"
-                  }`}
+                  className={isLive ? "animate-pulse-dot" : ""}
+                  style={{
+                    width: "7px",
+                    height: "7px",
+                    borderRadius: "50%",
+                    background: isLive ? "var(--accent-green)" : "var(--text-muted)",
+                  }}
                 />
                 <span
-                  className={`text-xs font-mono tracking-widest ${
-                    isLive ? "text-[#22C55E]" : "text-[#6B6358]"
-                  }`}
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "11px",
+                    color: isLive ? "var(--accent-green)" : "var(--text-muted)",
+                    letterSpacing: "0.08em",
+                  }}
                 >
                   {isLive ? "LIVE" : data.mode.replace(/_/g, " ").toUpperCase()}
                 </span>
               </div>
             )}
 
-            {/* refresh countdown */}
-            <span className="text-2xs font-mono text-[#3D3830] tabular-nums hidden sm:block">
+            {data && lastFetch && (
+              <span
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "11px",
+                  color: "var(--text-muted)",
+                }}
+              >
+                {fmtTs(lastFetch.toISOString())}
+              </span>
+            )}
+
+            <span
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "11px",
+                color: "var(--text-muted)",
+              }}
+            >
               ↺ {refreshIn}s
             </span>
 
-            {/* manual refresh */}
             <button
               onClick={() => { setLoading(true); fetchData(); }}
-              className="text-2xs font-mono text-[#6B6358] hover:text-[#F97316] transition-colors tracking-widest border border-[#1E1E1E] px-2 py-1 hover:border-[#7C3910]"
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "11px",
+                color: "var(--text-secondary)",
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
+                padding: "5px 12px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                letterSpacing: "0.06em",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent-orange)";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--accent-orange)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
+              }}
             >
               REFRESH
             </button>
           </div>
         </div>
 
-        {/* data timestamp sub-row */}
+        {/* Timestamps sub-row */}
         {data && (
-          <div className="max-w-5xl mx-auto mt-2 flex items-center gap-4">
-            <span className="text-2xs font-mono text-[#3D3830]">
-              DATA <span className="text-[#6B6358]">{fmtTs(data.data_ts)}</span>
-            </span>
-            <span className="text-[#1E1E1E]">·</span>
-            <span className="text-2xs font-mono text-[#3D3830]">
-              FEED <span className="text-[#6B6358]">{fmtTs(data.ts)}</span>
-            </span>
-            {lastFetch && (
-              <>
-                <span className="text-[#1E1E1E]">·</span>
-                <span className="text-2xs font-mono text-[#3D3830]">
-                  FETCHED <span className="text-[#6B6358]">{fmtTs(lastFetch.toISOString())}</span>
-                </span>
-              </>
-            )}
+          <div
+            style={{
+              maxWidth: "1024px",
+              margin: "0 auto",
+              paddingBottom: "10px",
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+            }}
+          >
+            {[
+              ["DATA", data.data_ts],
+              ["FEED", data.ts],
+            ].map(([label, ts], i) => (
+              <span
+                key={i}
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  color: "var(--text-muted)",
+                }}
+              >
+                {label}{" "}
+                <span style={{ color: "var(--text-secondary)" }}>{fmtTs(ts)}</span>
+              </span>
+            ))}
           </div>
         )}
       </header>
 
-      {/* ── Stale warning ──────────────────────────────────────────── */}
+      {/* ── Stale banner ────────────────────────────────────────────── */}
       {data?.stale && (
-        <div className="border-b border-[#78350F] bg-[#1A0F00] px-6 py-2">
-          <div className="max-w-5xl mx-auto flex items-center gap-3">
-            <span className="text-[#F59E0B] text-xs font-mono">⚠</span>
-            <span className="text-[#F59E0B] text-xs font-mono tracking-wide">
-              Data is 30+ min old — pipeline may be sleeping.
+        <div
+          style={{
+            background: "var(--accent-amber-bg)",
+            borderBottom: "1px solid var(--accent-amber-border)",
+            padding: "10px 24px",
+          }}
+        >
+          <div style={{ maxWidth: "1024px", margin: "0 auto", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ color: "var(--accent-amber)", fontSize: "13px" }}>⚠</span>
+            <span
+              style={{
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+                fontSize: "13px",
+                color: "var(--accent-amber)",
+              }}
+            >
+              Data is 30+ minutes old — the pipeline may be sleeping.
               {data.stale_reason && (
-                <span className="text-[#78350F] ml-2">{data.stale_reason}</span>
+                <span style={{ color: "#D97706", marginLeft: "6px", fontFamily: "'DM Mono', monospace", fontSize: "11px" }}>
+                  {data.stale_reason}
+                </span>
               )}
             </span>
           </div>
         </div>
       )}
 
-      {/* ── Loading / Error ─────────────────────────────────────────── */}
+      {/* ── Loading ─────────────────────────────────────────────────── */}
       {loading && !data && (
-        <div className="max-w-5xl mx-auto px-6 py-16 flex items-center gap-3">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#F97316] animate-pulse-dot" />
-          <span className="text-sm font-mono text-[#6B6358] tracking-widest">LOADING DRIVER STATE…</span>
+        <div style={{ maxWidth: "1024px", margin: "0 auto", padding: "64px 24px", display: "flex", alignItems: "center", gap: "10px" }}>
+          <div
+            className="animate-pulse-dot"
+            style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent-orange)" }}
+          />
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "13px", color: "var(--text-muted)" }}>
+            Loading driver state…
+          </span>
         </div>
       )}
+
+      {/* ── Error ───────────────────────────────────────────────────── */}
       {error && (
-        <div className="max-w-5xl mx-auto px-6 py-6">
-          <div className="border border-[#7F1D1D] bg-[#1A0505] p-4 text-[#EF4444] text-sm font-mono">
-            ERROR: {error}
+        <div style={{ maxWidth: "1024px", margin: "24px auto", padding: "0 24px" }}>
+          <div
+            style={{
+              background: "var(--accent-red-bg)",
+              border: "1px solid var(--accent-red-border)",
+              borderRadius: "8px",
+              padding: "14px 16px",
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "13px",
+              color: "var(--accent-red)",
+            }}
+          >
+            Error: {error}
           </div>
         </div>
       )}
 
       {/* ── Body ────────────────────────────────────────────────────── */}
-      {data && (
-        <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-10">
+      {data && story && (
+        <main style={{ maxWidth: "1024px", margin: "0 auto", padding: "32px 24px", display: "flex", flexDirection: "column", gap: "40px" }}>
 
-          {/* ACTIVE DRIVERS */}
+          {/* ── Story Hero ─────────────────────────────────────────── */}
+          <section
+            className="story-animate"
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "12px",
+              padding: "28px 32px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+            }}
+          >
+            {/* Regime badge */}
+            <div style={{ marginBottom: "14px" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "11px",
+                  fontFamily: "'DM Mono', monospace",
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  color: story.regimeText,
+                  background: story.regimeBg,
+                  border: `1px solid ${story.regimeBorder}`,
+                  padding: "4px 12px",
+                  borderRadius: "20px",
+                }}
+              >
+                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: story.regimeText, display: "inline-block" }} />
+                {story.regime}
+              </span>
+            </div>
+
+            {/* Headline */}
+            <p
+              style={{
+                fontFamily: "'Instrument Serif', Georgia, serif",
+                fontSize: "22px",
+                lineHeight: 1.4,
+                color: "var(--text-primary)",
+                margin: "0 0 10px 0",
+                fontWeight: 400,
+              }}
+            >
+              {story.headline}
+            </p>
+
+            {/* Subline */}
+            {story.subline && (
+              <p
+                style={{
+                  fontFamily: "'DM Sans', system-ui, sans-serif",
+                  fontSize: "15px",
+                  lineHeight: 1.55,
+                  color: "var(--text-secondary)",
+                  margin: "0 0 0 0",
+                }}
+              >
+                {story.subline}
+              </p>
+            )}
+
+            {/* Tension strip */}
+            {story.tension && (
+              <div
+                style={{
+                  marginTop: "16px",
+                  paddingTop: "16px",
+                  borderTop: "1px solid var(--border-light)",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                }}
+              >
+                <span style={{ fontSize: "14px", flexShrink: 0, marginTop: "1px" }}>⚡</span>
+                <p
+                  style={{
+                    fontFamily: "'DM Sans', system-ui, sans-serif",
+                    fontSize: "14px",
+                    lineHeight: 1.5,
+                    color: "var(--accent-amber)",
+                    margin: 0,
+                  }}
+                >
+                  {story.tension}
+                </p>
+              </div>
+            )}
+
+            {/* Sensor count footnote */}
+            <p
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "11px",
+                color: "var(--text-muted)",
+                margin: "16px 0 0 0",
+              }}
+            >
+              {data.active_drivers.length} active drivers · {data.sensor_count} sensors monitored · {data.activated_theme_count} themes activated
+            </p>
+          </section>
+
+          {/* ── Futures Advisory ───────────────────────────────────── */}
+          {data.futures && (
+            <section>
+              <SectionLabel>Futures Advisory</SectionLabel>
+              <div
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "10px",
+                  padding: "20px 24px",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: "24px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                }}
+              >
+                {[
+                  { label: "S&P 500 (ES) — 5 day", val: data.futures.es_5d_ret },
+                  { label: "Nasdaq 100 (NQ) — 5 day", val: data.futures.nq_5d_ret },
+                ].map(({ label, val }, i) => (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                    <span
+                      style={{
+                        fontFamily: "'DM Sans', system-ui, sans-serif",
+                        fontSize: "12px",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {label}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "24px",
+                        fontWeight: 500,
+                        fontVariantNumeric: "tabular-nums",
+                        color: val >= 0 ? "var(--accent-green)" : "var(--accent-red)",
+                        letterSpacing: "-0.02em",
+                      }}
+                    >
+                      {fmtRet(val)}
+                    </span>
+                  </div>
+                ))}
+
+                {data.futures.advisory_drivers.length > 0 && (
+                  <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {data.futures.advisory_drivers.map((d) => (
+                      <span
+                        key={d}
+                        style={{
+                          fontSize: "11px",
+                          fontFamily: "'DM Mono', monospace",
+                          fontWeight: 500,
+                          letterSpacing: "0.07em",
+                          color: "var(--accent-green)",
+                          background: "var(--accent-green-bg)",
+                          border: "1px solid var(--accent-green-border)",
+                          padding: "4px 10px",
+                          borderRadius: "5px",
+                        }}
+                      >
+                        {d.replace(/_/g, " ").toUpperCase()}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* ── Active Drivers ─────────────────────────────────────── */}
           <section>
-            <SectionLabel>
-              Active Drivers — {data.active_drivers.length} / {data.sensor_count} sensors
+            <SectionLabel count={data.active_drivers.length}>
+              Active Drivers
             </SectionLabel>
             {data.active_drivers.length === 0 ? (
-              <p className="text-sm font-mono text-[#3D3830]">No active drivers.</p>
+              <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: "14px", color: "var(--text-muted)" }}>
+                No active drivers at this time.
+              </p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                  gap: "12px",
+                }}
+              >
                 {data.active_drivers.map((d, i) => (
                   <DriverCard key={d.id} driver={d} idx={i} />
                 ))}
@@ -387,72 +1115,46 @@ export default function MacroPage() {
             )}
           </section>
 
-          {/* FUTURES ADVISORY */}
-          {data.futures && (
-            <section>
-              <SectionLabel>Futures Advisory</SectionLabel>
-              <div className="border border-[#1E1E1E] bg-[#111111] p-4 flex flex-wrap items-center gap-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xs font-mono text-[#6B6358] tracking-widest">ES 5D</span>
-                  <span
-                    className={`text-lg font-mono font-medium tabular-nums ${
-                      data.futures.es_5d_ret >= 0 ? "text-[#22C55E]" : "text-[#EF4444]"
-                    }`}
-                  >
-                    {fmtRet(data.futures.es_5d_ret)}
-                  </span>
-                </div>
-                <div className="w-px h-6 bg-[#1E1E1E]" />
-                <div className="flex items-center gap-3">
-                  <span className="text-2xs font-mono text-[#6B6358] tracking-widest">NQ 5D</span>
-                  <span
-                    className={`text-lg font-mono font-medium tabular-nums ${
-                      data.futures.nq_5d_ret >= 0 ? "text-[#22C55E]" : "text-[#EF4444]"
-                    }`}
-                  >
-                    {fmtRet(data.futures.nq_5d_ret)}
-                  </span>
-                </div>
-                {data.futures.advisory_drivers.length > 0 && (
-                  <>
-                    <div className="w-px h-6 bg-[#1E1E1E]" />
-                    <div className="flex flex-wrap gap-2">
-                      {data.futures.advisory_drivers.map((d) => (
-                        <span
-                          key={d}
-                          className="text-2xs font-mono font-medium tracking-widest text-[#22C55E] border border-[#14532D] px-2 py-0.5 bg-[#0A1F0F]"
-                        >
-                          {d.replace(/_/g, " ").toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            </section>
-          )}
-
-          {/* ACTIVATED THEMES */}
+          {/* ── Activated Themes ───────────────────────────────────── */}
           <section>
-            <SectionLabel>
-              Activated Themes — {data.activated_theme_count}
+            <SectionLabel count={data.activated_theme_count}>
+              Activated Themes
             </SectionLabel>
             {data.activated_themes.length === 0 ? (
-              <p className="text-sm font-mono text-[#3D3830]">No activated themes.</p>
+              <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: "14px", color: "var(--text-muted)" }}>
+                No themes activated.
+              </p>
             ) : (
-              <div className="border border-[#1E1E1E] bg-[#111111] px-4 py-1">
-                {data.activated_themes.map((t) => (
-                  <ThemeRow key={t.theme_id} theme={t} />
+              <div
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "10px",
+                  overflow: "hidden",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                }}
+              >
+                {data.activated_themes.map((t, i) => (
+                  <ThemeRow key={t.theme_id} theme={t} idx={i} />
                 ))}
               </div>
             )}
           </section>
 
-          {/* BLOCKED CONDITIONS */}
+          {/* ── Blocked Conditions ─────────────────────────────────── */}
           {data.blocked_conditions.length > 0 && (
             <section>
-              <SectionLabel>Blocked Conditions</SectionLabel>
-              <div className="border border-[#7F1D1D] bg-[#0D0505] px-4 py-1">
+              <SectionLabel count={data.blocked_conditions.length}>
+                Blocked Conditions
+              </SectionLabel>
+              <div
+                style={{
+                  background: "#FFF8F8",
+                  border: "1px solid var(--accent-red-border)",
+                  borderRadius: "10px",
+                  overflow: "hidden",
+                }}
+              >
                 {data.blocked_conditions.map((c) => (
                   <BlockedRow key={c.id} condition={c} />
                 ))}
@@ -460,23 +1162,46 @@ export default function MacroPage() {
             </section>
           )}
 
-          {/* FOOTER */}
-          <footer className="border-t border-[#1E1E1E] pt-6 flex flex-col gap-2">
-            <div className="flex items-center gap-4 flex-wrap">
-              <span className="text-2xs font-mono text-[#3D3830]">
-                SENSORS <span className="text-[#6B6358]">{data.sensor_count}</span>
-              </span>
-              <span className="text-[#1E1E1E]">·</span>
-              <span className="text-2xs font-mono text-[#3D3830]">
-                API v<span className="text-[#6B6358]">{data.api_version}</span>
-              </span>
-              <span className="text-[#1E1E1E]">·</span>
-              <span className="text-2xs font-mono text-[#3D3830]">
-                AUTO-REFRESH <span className="text-[#6B6358]">5 MIN</span>
-              </span>
+          {/* ── Footer ─────────────────────────────────────────────── */}
+          <footer
+            style={{
+              borderTop: "1px solid var(--border)",
+              paddingTop: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+              {[
+                ["Sensors", String(data.sensor_count)],
+                ["API", `v${data.api_version}`],
+                ["Auto-refresh", "5 min"],
+              ].map(([label, val]) => (
+                <span
+                  key={label}
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "11px",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {label}:{" "}
+                  <span style={{ color: "var(--text-secondary)" }}>{val}</span>
+                </span>
+              ))}
             </div>
             {data.disclaimer && (
-              <p className="text-2xs font-mono text-[#3D3830] max-w-2xl leading-relaxed">
+              <p
+                style={{
+                  fontFamily: "'DM Sans', system-ui, sans-serif",
+                  fontSize: "12px",
+                  color: "var(--text-muted)",
+                  maxWidth: "640px",
+                  lineHeight: 1.6,
+                  margin: 0,
+                }}
+              >
                 {data.disclaimer}
               </p>
             )}

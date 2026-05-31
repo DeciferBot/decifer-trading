@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: "Decifer Market Intelligence",
   description: "Market intelligence — signals, themes, and evidence. Not financial advice.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    apple: "/favicon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
