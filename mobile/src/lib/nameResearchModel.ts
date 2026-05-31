@@ -246,9 +246,9 @@ export interface NameFundamentalsResponse {
     priceTarget?: number;
     ratingCount?: number;
   };
-  shortInterest?: {
-    shortFloatPct: number;
-    date: string;
+  floatContext?: {
+    freeFloatPct: number;
+    floatShares: number | null;
   };
   available: boolean;
   source: "fmp" | "none";
@@ -455,19 +455,19 @@ export function buildDetailQuestions(
   ];
 }
 
-// ── Short interest context ────────────────────────────────────────────────────
+// ── Float context ─────────────────────────────────────────────────────────────
 
-export function buildShortInterestLine(
-  shortInterest?: NameFundamentalsResponse["shortInterest"],
+export function buildFloatContextLine(
+  floatContext?: NameFundamentalsResponse["floatContext"],
 ): string | null {
-  if (!shortInterest || shortInterest.shortFloatPct == null) return null;
-  const pct = shortInterest.shortFloatPct;
-  if (pct < 10) return null;
+  if (!floatContext || floatContext.freeFloatPct == null || floatContext.freeFloatPct <= 0) return null;
+  const pct = floatContext.freeFloatPct;
+  if (pct > 40) return null;
   const rounded = Math.round(pct);
-  if (pct >= 20) {
-    return `About ${rounded}% of the available float is sold short. If demand picks up, short sellers would need to cover their positions — which can amplify any upward move.`;
+  if (pct < 15) {
+    return `Only about ${rounded}% of shares trade freely on the open market. With supply this tight, price moves can be sharper in both directions when conviction shifts.`;
   }
-  return `About ${rounded}% of the float is sold short — elevated, but not at extreme levels.`;
+  return `About ${rounded}% of shares trade freely — a relatively constrained float. If attention builds, limited supply can amplify price action.`;
 }
 
 // ── Fresh price merge ─────────────────────────────────────────────────────────

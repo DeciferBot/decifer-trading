@@ -15,7 +15,7 @@ import {
   buildDetailQuestions,
   buildWhyItMattersNow,
   buildRiskNoteLine,
-  buildShortInterestLine,
+  buildFloatContextLine,
   mergeFreshPrice,
   buildPriceFreshnessLabel,
   type NameFundamentalsResponse,
@@ -943,44 +943,44 @@ describe("buildRiskNoteLine", () => {
   });
 });
 
-describe("buildShortInterestLine", () => {
-  it("returns null when shortInterest is undefined", () => {
-    expect(buildShortInterestLine(undefined)).toBeNull();
+describe("buildFloatContextLine", () => {
+  it("returns null when floatContext is undefined", () => {
+    expect(buildFloatContextLine(undefined)).toBeNull();
   });
 
-  it("returns null when shortFloatPct is null", () => {
-    expect(buildShortInterestLine({ shortFloatPct: null as unknown as number, date: "2026-06-01" })).toBeNull();
+  it("returns null when freeFloatPct is null", () => {
+    expect(buildFloatContextLine({ freeFloatPct: null as unknown as number, floatShares: null })).toBeNull();
   });
 
-  it("returns null when shortFloatPct is below 10", () => {
-    expect(buildShortInterestLine({ shortFloatPct: 9.9, date: "2026-06-01" })).toBeNull();
+  it("returns null when freeFloatPct is above 40", () => {
+    expect(buildFloatContextLine({ freeFloatPct: 41, floatShares: null })).toBeNull();
   });
 
   it("returns null at exactly 0", () => {
-    expect(buildShortInterestLine({ shortFloatPct: 0, date: "2026-06-01" })).toBeNull();
+    expect(buildFloatContextLine({ freeFloatPct: 0, floatShares: null })).toBeNull();
   });
 
-  it("returns elevated copy for 10–19% float short", () => {
-    const result = buildShortInterestLine({ shortFloatPct: 15, date: "2026-06-01" });
+  it("returns tight-supply copy for <15% free float", () => {
+    const result = buildFloatContextLine({ freeFloatPct: 10, floatShares: null });
     expect(result).not.toBeNull();
-    expect(result).toContain("15%");
-    expect(result).toContain("elevated");
+    expect(result).toContain("10%");
+    expect(result).toContain("tight");
   });
 
-  it("returns squeeze-mechanism copy for ≥20% float short", () => {
-    const result = buildShortInterestLine({ shortFloatPct: 25, date: "2026-06-01" });
+  it("returns constrained copy for 15–40% free float", () => {
+    const result = buildFloatContextLine({ freeFloatPct: 30, floatShares: null });
     expect(result).not.toBeNull();
-    expect(result).toContain("25%");
-    expect(result).toContain("cover");
+    expect(result).toContain("30%");
+    expect(result).toContain("constrained");
   });
 
   it("rounds to nearest integer", () => {
-    const result = buildShortInterestLine({ shortFloatPct: 22.7, date: "2026-06-01" });
+    const result = buildFloatContextLine({ freeFloatPct: 22.7, floatShares: null });
     expect(result).toContain("23%");
   });
 
   it("contains no forbidden execution language", () => {
-    const result = buildShortInterestLine({ shortFloatPct: 25, date: "2026-06-01" }) ?? "";
+    const result = buildFloatContextLine({ freeFloatPct: 20, floatShares: null }) ?? "";
     const forbidden = ["order", "broker", "place a trade", "execute"];
     for (const w of forbidden) {
       expect(result.toLowerCase()).not.toContain(w);

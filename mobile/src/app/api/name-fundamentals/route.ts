@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       fetch(`${base}/key-metrics-ttm?symbol=${symbol}&${key}`, CACHE_OPTS),
       fetch(`${base}/price-target-consensus?symbol=${symbol}&${key}`, CACHE_OPTS),
       fetch(`${base}/financial-growth?symbol=${symbol}&period=annual&limit=1&${key}`, CACHE_OPTS),
-      fetch(`${base}/short-of-float?symbol=${symbol}&${key}`, { next: { revalidate: 86400 } }),
+      fetch(`${base}/shares-float?symbol=${symbol}&${key}`, { next: { revalidate: 86400 } }),
     ]);
 
   // ── Profile ──────────────────────────────────────────────────────────────────
@@ -135,23 +135,23 @@ export async function GET(req: NextRequest) {
     } catch { /* graceful */ }
   }
 
-  // ── Short interest (FINRA bi-monthly via FMP short-of-float) ─────────────────
-  let shortInterest: { shortFloatPct: number; date: string } | undefined;
+  // ── Float context (shares-float — free float %) ───────────────────────────────
+  let floatContext: { freeFloatPct: number; floatShares: number | null } | undefined;
 
   if (shortFloatResult.status === "fulfilled" && shortFloatResult.value.ok) {
     try {
       const data = await shortFloatResult.value.json();
       const s = Array.isArray(data) ? data[0] : data;
-      if (s && typeof s.shortPercent === "number" && s.shortPercent > 0) {
-        shortInterest = {
-          shortFloatPct: parseFloat((s.shortPercent * 100).toFixed(1)),
-          date: typeof s.date === "string" ? s.date.slice(0, 10) : "",
+      if (s && typeof s.freeFloat === "number" && s.freeFloat > 0) {
+        floatContext = {
+          freeFloatPct: parseFloat(s.freeFloat.toFixed(1)),
+          floatShares: typeof s.floatShares === "number" ? s.floatShares : null,
         };
       }
     } catch { /* graceful */ }
   }
 
-  const available = !!(profile || fundamentals || analyst || shortInterest);
+  const available = !!(profile || fundamentals || analyst || floatContext);
 
   return NextResponse.json({
     symbol,
@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
     ...(profile && { profile }),
     ...(fundamentals && { fundamentals }),
     ...(analyst && { analyst }),
-    ...(shortInterest && { shortInterest }),
+    ...(floatContext && { floatContext }),
     available,
     source: available ? "fmp" : "none",
   });

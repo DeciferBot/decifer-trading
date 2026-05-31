@@ -11,7 +11,7 @@ import {
   buildCompanyLine,
   buildFundamentalsLine,
   buildAnalystLine,
-  buildShortInterestLine,
+  buildFloatContextLine,
   buildDetailQuestions,
   buildWhyItMattersNow,
   buildRiskNoteLine,
@@ -109,7 +109,7 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
   const companyLine = buildCompanyLine(card.symbol, fundData?.profile, card.storyGroup);
   const fundamentalsLine = buildFundamentalsLine(fundData?.fundamentals);
   const analystLine = buildAnalystLine(fundData?.analyst);
-  const shortInterestLine = buildShortInterestLine(fundData?.shortInterest);
+  const floatContextLine = buildFloatContextLine(fundData?.floatContext);
   const questions = buildDetailQuestions(
     card.symbol,
     card.storyGroup,
@@ -260,8 +260,8 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
             )}
           </section>
 
-          {/* Short interest — only shown when elevated (≥10% float short) */}
-          {!fundLoading && shortInterestLine && (
+          {/* Float context — only shown when float is constrained (≤40%) */}
+          {!fundLoading && floatContextLine && (
             <div
               className="rounded-xl px-4 py-3"
               style={{
@@ -269,9 +269,9 @@ export default function NameResearchSheet({ card, onClose, onAskAbout }: Props) 
                 border: "1px solid rgba(99,102,241,0.15)",
               }}
             >
-              <SectionLabel>Short interest</SectionLabel>
+              <SectionLabel>Float</SectionLabel>
               <p className="text-[12px] leading-relaxed" style={{ color: "#a5b4fc" }}>
-                {shortInterestLine}
+                {floatContextLine}
               </p>
             </div>
           )}
