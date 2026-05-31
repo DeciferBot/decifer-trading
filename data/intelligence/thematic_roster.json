@@ -12,16 +12,18 @@
         "CEG",
         "GEV",
         "VST",
-        "BE"
+        "BE",
+        "CIEN",
+        "AAOI"
       ],
       "etf_proxies": [
         "XLU"
       ],
       "route_bias": "position_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 7,
-      "notes": "Direct beneficiaries of AI data-centre power demand: VRT (Vertiv \u2014 cooling and power infrastructure), ETN (Eaton \u2014 power management systems), PWR (Quanta Services \u2014 grid and electrical engineering), CEG (Constellation Energy \u2014 nuclear power supply, hyperscaler PPAs), GEV (GE Vernova \u2014 grid solutions, power conversion, gas/nuclear at scale; $259.7B FMP-verified), VST (Vistra Corp \u2014 second-largest US nuclear fleet, Microsoft PPA signed; $53.9B FMP-verified), BE (Bloom Energy \u2014 solid oxide fuel cells for on-site power generation; data centres and hyperscalers adopting as backup and primary baseload power, bypasses grid congestion). XLU as sector ETF proxy.",
-      "last_reviewed": "2026-05-29",
+      "max_candidates": 9,
+      "notes": "Direct beneficiaries of AI data-centre power demand: VRT (Vertiv \u2014 cooling and power infrastructure), ETN (Eaton \u2014 power management systems), PWR (Quanta Services \u2014 grid and electrical engineering), CEG (Constellation Energy \u2014 nuclear power supply, hyperscaler PPAs), GEV (GE Vernova \u2014 grid solutions, power conversion, gas/nuclear at scale; $259.7B FMP-verified), VST (Vistra Corp \u2014 second-largest US nuclear fleet, Microsoft PPA signed; $53.9B FMP-verified), BE (Bloom Energy \u2014 solid oxide fuel cells for on-site power generation; data centres and hyperscalers adopting as backup and primary baseload power, bypasses grid congestion). XLU as sector ETF proxy. CIEN (Ciena \u2014 1.6 Tb/s coherent optical networking for AI hyperscaler clusters; revenue +33% YoY, direct AI infrastructure pick-and-shovels). AAOI (Applied Optoelectronics \u2014 optical transceivers connecting AI compute clusters inside data centres).",
+      "last_reviewed": "2026-05-31",
       "source_label": "intelligence_first_static_rule"
     },
     {
@@ -91,16 +93,17 @@
         "NOC",
         "RTX",
         "GD",
-        "LHX"
+        "LHX",
+        "ONDS"
       ],
       "etf_proxies": [
         "ITA"
       ],
       "route_bias": "position_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 5,
-      "notes": "Geopolitical risk prime contractors: LMT (Lockheed Martin \u2014 F-35, missile systems), NOC (Northrop Grumman \u2014 stealth bombers, space), RTX (missiles, engines, radar), GD (General Dynamics \u2014 combat vehicles, submarines), LHX (L3Harris Technologies \u2014 electronic warfare, ISR systems, tactical communications, space sensors; $58.5B FMP-verified). ITA as aerospace/defence ETF proxy.",
-      "last_reviewed": "2026-05-29",
+      "max_candidates": 6,
+      "notes": "Geopolitical risk prime contractors: LMT (Lockheed Martin \u2014 F-35, missile systems), NOC (Northrop Grumman \u2014 stealth bombers, space), RTX (missiles, engines, radar), GD (General Dynamics \u2014 combat vehicles, submarines), LHX (L3Harris Technologies \u2014 electronic warfare, ISR systems, tactical communications, space sensors; $58.5B FMP-verified). ITA as aerospace/defence ETF proxy. ONDS (Ondas Holdings \u2014 AI-enabled drone communications for military and commercial applications; drone relay networks for defence and critical infrastructure).",
+      "last_reviewed": "2026-05-31",
       "source_label": "intelligence_first_static_rule"
     },
     {
@@ -185,14 +188,15 @@
         "IREN",
         "SMCI",
         "DELL",
-        "CRWV"
+        "CRWV",
+        "NVTS"
       ],
       "etf_proxies": [],
       "route_bias": "watchlist_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 4,
-      "notes": "Approved AI compute infrastructure names. IREN (approved with caution \u2014 power-constrained neocloud, speculative risk). SMCI (Super Micro Computer \u2014 high-density server and rack-scale AI solutions). DELL (Dell Technologies \u2014 server and storage infrastructure for enterprise AI). CRWV (CoreWeave \u2014 GPU-native hyperscaler purpose-built for AI training and inference, bare-metal GPU clusters for enterprise GenAI; $59.5B FMP-verified). Approval does not imply all neocloud or bitcoin-miner names are approved.",
-      "last_reviewed": "2026-05-29",
+      "max_candidates": 5,
+      "notes": "Approved AI compute infrastructure names. IREN (approved with caution \u2014 power-constrained neocloud, speculative risk). SMCI (Super Micro Computer \u2014 high-density server and rack-scale AI solutions). DELL (Dell Technologies \u2014 server and storage infrastructure for enterprise AI). CRWV (CoreWeave \u2014 GPU-native hyperscaler purpose-built for AI training and inference, bare-metal GPU clusters for enterprise GenAI; $59.5B FMP-verified). Approval does not imply all neocloud or bitcoin-miner names are approved. NVTS (Navitas Semiconductor \u2014 gallium nitride power semiconductors for data centre power efficiency and EV charging; GaN replacing silicon in high-frequency power conversion).",
+      "last_reviewed": "2026-05-31",
       "source_label": "reference_data_approved_theme",
       "approval_source": "coverage_gap_review",
       "review_required_symbols": []
@@ -204,16 +208,18 @@
         "NOW",
         "ADBE",
         "DDOG",
-        "SNOW"
+        "SNOW",
+        "ORCL",
+        "RDDT"
       ],
       "etf_proxies": [
         "IGV"
       ],
       "route_bias": "position_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 5,
-      "notes": "SaaS and enterprise cloud platforms benefiting from falling yields and risk-on rotation. CRM (Salesforce), NOW (ServiceNow), ADBE (Adobe), DDOG (Datadog), SNOW (Snowflake \u2014 pure-play cloud data platform, high-beta SaaS name, direct enterprise cloud exposure with durable growth; $88.1B FMP-verified). IGV as iShares Expanded Tech-Software ETF proxy. MSFT covered separately in quality_cash_flow.",
-      "last_reviewed": "2026-05-29",
+      "max_candidates": 7,
+      "notes": "SaaS and enterprise cloud platforms benefiting from falling yields and risk-on rotation. CRM (Salesforce), NOW (ServiceNow), ADBE (Adobe), DDOG (Datadog), SNOW (Snowflake \u2014 pure-play cloud data platform, high-beta SaaS name, direct enterprise cloud exposure with durable growth; $88.1B FMP-verified). IGV as iShares Expanded Tech-Software ETF proxy. MSFT covered separately in quality_cash_flow. ORCL (Oracle \u2014 OCI cloud revenue +84% YoY, $523B remaining performance obligations; hyperscaler AI customers including OpenAI and Meta; underappreciated vs AWS/Azure). RDDT (Reddit \u2014 first profitable year, AI data licensing with Google/OpenAI on track for $400M annually; 69% revenue growth Q1 2026).",
+      "last_reviewed": "2026-05-31",
       "source_label": "intelligence_first_static_rule"
     },
     {
@@ -226,16 +232,17 @@
         "RBRK",
         "PLTR",
         "NET",
-        "OKTA"
+        "OKTA",
+        "BB"
       ],
       "etf_proxies": [
         "CIBR"
       ],
       "route_bias": "position_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 8,
-      "notes": "Cybersecurity platform vendors benefiting from AI-driven expansion of attack surface and enterprise security spend. CRWD (CrowdStrike), PANW (Palo Alto Networks), FTNT (Fortinet), ZS (Zscaler), RBRK (Rubrik \u2014 data security and cyber resilience), PLTR (Palantir \u2014 AI/data platform for defence and intelligence), NET (Cloudflare \u2014 Zero Trust network security and SASE platform, native beneficiary of AI-era attack surface expansion), OKTA (Okta \u2014 Identity federation and access management; enterprise AI deployments multiply OAuth/SAML integrations and identity attack surface; direct beneficiary of AI-capex-driven security spend). CIBR as First Trust NASDAQ Cybersecurity ETF proxy. CYBR removed 2026-05-31 \u2014 taken private (Alpaca inactive, last traded 2026-02-11).",
-      "last_reviewed": "2026-05-30",
+      "max_candidates": 9,
+      "notes": "Cybersecurity platform vendors benefiting from AI-driven expansion of attack surface and enterprise security spend. CRWD (CrowdStrike), PANW (Palo Alto Networks), FTNT (Fortinet), ZS (Zscaler), RBRK (Rubrik \u2014 data security and cyber resilience), PLTR (Palantir \u2014 AI/data platform for defence and intelligence), NET (Cloudflare \u2014 Zero Trust network security and SASE platform, native beneficiary of AI-era attack surface expansion), OKTA (Okta \u2014 Identity federation and access management; enterprise AI deployments multiply OAuth/SAML integrations and identity attack surface; direct beneficiary of AI-capex-driven security spend). CIBR as First Trust NASDAQ Cybersecurity ETF proxy. CYBR removed 2026-05-31 \u2014 taken private (Alpaca inactive, last traded 2026-02-11). BB (BlackBerry \u2014 transformed to pure software/cybersecurity business; eight consecutive quarters of improving GAAP net income; QNX embedded OS + Cylance AI endpoint security).",
+      "last_reviewed": "2026-05-31",
       "source_label": "intelligence_first_static_rule"
     },
     {
@@ -460,7 +467,84 @@
       "notes": "Building products and distribution names that directly benefit when yields fall and housing affordability improves. LPX (Louisiana-Pacific \u2014 structural panels and siding; housing starts leverage), FERG (Ferguson Enterprises \u2014 HVAC and plumbing distribution; largest US distributor, margin leverage on volume), CSL (Carlisle Companies \u2014 roofing systems and insulation; replacement and new construction demand). XHB as SPDR S&P Homebuilders ETF proxy. Activated by yields_falling driver.",
       "last_reviewed": "2026-05-30",
       "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "space_economy",
+      "core_symbols": [
+        "RKLB",
+        "LUNR",
+        "ASTS",
+        "PL",
+        "SPCE"
+      ],
+      "etf_proxies": [],
+      "route_bias": "swing_or_watchlist",
+      "minimum_liquidity_class": "mid",
+      "max_candidates": 5,
+      "notes": "Space economy names riding SpaceX IPO hype and NASA/defence contract momentum. RKLB (Rocket Lab \u2014 small-launch provider, Q1 revenue +64% YoY to $200M, $2.2B backlog; best public SpaceX alternative). LUNR (Intuitive Machines \u2014 NASA lunar mission contracts, +166% YTD). ASTS (AST SpaceMobile \u2014 direct-to-cell broadband satellites, 60 MNO partners covering 3B+ subscribers). PL (Planet Labs \u2014 near-daily satellite imaging, defence and commercial intelligence customers). SPCE (Virgin Galactic \u2014 space tourism, speculative; rides space sector sentiment). High-beta space sector; correlated to SpaceX IPO narrative and government space spend.",
+      "last_reviewed": "2026-05-31",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "quantum_computing",
+      "core_symbols": [
+        "IONQ",
+        "RGTI",
+        "QBTS"
+      ],
+      "etf_proxies": [],
+      "route_bias": "swing_or_watchlist",
+      "minimum_liquidity_class": "mid",
+      "max_candidates": 3,
+      "notes": "Quantum computing pure-plays riding US government $2B federal quantum investment (announced May 2026). IONQ (IonQ \u2014 leading pure-play by revenue, ~$130M 2025, guided $225-245M 2026; trapped-ion architecture). RGTI (Rigetti \u2014 superconducting qubits, Lyra chip roadmap to 100-qubit). QBTS (D-Wave \u2014 annealing quantum systems, 83% GAAP gross margin). Speculative: commercial quantum advantage timeline is uncertain; names move 20-30% on policy announcements. Route bias swing or watchlist only.",
+      "last_reviewed": "2026-05-31",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "digital_assets",
+      "core_symbols": [
+        "COIN",
+        "MARA"
+      ],
+      "etf_proxies": [],
+      "route_bias": "swing_or_watchlist",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 2,
+      "notes": "Digital assets infrastructure names. COIN (Coinbase \u2014 first crypto-native S&P 500 member, acquired Deribit for $2.9B giving it crypto derivatives revenue, OCC national bank trust charter conditional approval; diversified beyond spot trading). MARA (Marathon Digital \u2014 pivoting from pure Bitcoin mining to digital energy and AI/HPC infrastructure; acquired 1 GW power capacity with Starwood Capital). Correlated to Bitcoin price; volatility is extreme.",
+      "last_reviewed": "2026-05-31",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "glp1_health",
+      "core_symbols": [
+        "HIMS"
+      ],
+      "etf_proxies": [],
+      "route_bias": "swing_or_watchlist",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 2,
+      "notes": "GLP-1 and weight-loss health platform names. HIMS (Hims & Hers Health \u2014 GLP-1 subscription platform, revenue +59% YoY, Novo Nordisk partnership validating the platform; international expansion diversifying away from pure compounded GLP-1 dependency). Key risk: FDA compounding rules for GLP-1 drugs are a regulatory overhang; any reclassification hits revenue directly.",
+      "last_reviewed": "2026-05-31",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "ai_energy_nuclear",
+      "core_symbols": [
+        "BWXT",
+        "CCJ",
+        "UEC",
+        "FLR"
+      ],
+      "etf_proxies": [
+        "URA"
+      ],
+      "route_bias": "swing_or_watchlist",
+      "minimum_liquidity_class": "mid",
+      "max_candidates": 4,
+      "notes": "Nuclear energy and uranium names benefiting from AI data-centre power demand driving a nuclear renaissance. BWXT (BWX Technologies \u2014 monopoly US naval nuclear fuel supplier for 70+ years, $1.4B in Navy contracts May 2026; also SMR development). CCJ (Cameco \u2014 largest publicly traded uranium miner, 49% stake in Westinghouse Electric; uranium spot at $86/lb driven by AI power demand). UEC (Uranium Energy Corp \u2014 US-based uranium mining and refining, pure-play domestic uranium with maximum spot price exposure). FLR (Fluor \u2014 engineering giant winning SMR project work with X-Energy and AI data centre nuclear campus contracts, $25.7B backlog). URA as Global X Uranium ETF proxy.",
+      "last_reviewed": "2026-05-31",
+      "source_label": "intelligence_first_static_rule"
     }
   ],
-  "last_updated": "2026-05-29"
+  "last_updated": "2026-05-31"
 }
