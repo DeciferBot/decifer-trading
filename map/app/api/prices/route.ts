@@ -2,19 +2,27 @@ import { NextResponse } from "next/server";
 
 export const revalidate = 120;
 
-export async function GET() {
+export async function GET(request: Request) {
   const apiKey = process.env.FMP_API_KEY;
   if (!apiKey) return NextResponse.json({ prices: {} });
 
-  // All symbols in the graph
-  const symbols = [
-    "NVDA","AMD","INTC","MSFT","AMZN","GOOG","META","ORCL","CRM","NOW","PLTR",
-    "TSM","ASML","AMAT","KLAC","LRCX","CDNS","SNPS","MU","AVGO","MRVL","ANET",
-    "DELL","HPE","SMCI","NBIS","VRT","ETN","CEG","VST","NRG","EQIX","DLR","PWR",
-    "EME","CRWD","PANW","CIEN","COHR","LITE","IREN",
-    "RKLB","PL","SPIR","MNTS","LMT","NOC","RTX","LHX","VSAT","IRDM",
-    "MOGA","CW","HEI","TDY","HXL","ATI","KTOS","AXON"
-  ].join(",");
+  const url = new URL(request.url);
+  const symbolsParam = url.searchParams.get("symbols");
+
+  let symbols: string;
+  if (symbolsParam) {
+    const parsed = symbolsParam.split(",").map(s => s.trim()).filter(Boolean).slice(0, 100);
+    symbols = parsed.join(",");
+  } else {
+    symbols = [
+      "NVDA","AMD","INTC","MSFT","AMZN","GOOG","META","ORCL","CRM","NOW","PLTR",
+      "TSM","ASML","AMAT","KLAC","LRCX","CDNS","SNPS","MU","AVGO","MRVL","ANET",
+      "DELL","HPE","SMCI","NBIS","VRT","ETN","CEG","VST","NRG","EQIX","DLR","PWR",
+      "EME","CRWD","PANW","CIEN","COHR","LITE","IREN",
+      "RKLB","PL","SPIR","MNTS","LMT","NOC","RTX","LHX","VSAT","IRDM",
+      "MOGA","CW","HEI","TDY","HXL","ATI","KTOS","AXON"
+    ].join(",");
+  }
 
   try {
     const res = await fetch(

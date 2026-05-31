@@ -23,7 +23,6 @@ import bot_state
 from bot_account import get_account_data, get_fx_snapshot, get_news_headlines, save_equity_history
 from bot_ibkr import connect_ibkr, sync_orders_from_ibkr
 from bot_state import clog, dash
-from bot_voice import speak_natural
 from config import CONFIG
 from learning import (
     get_effective_capital,
@@ -640,16 +639,6 @@ def check_external_closes(regime: dict):
                     "TRADE",
                     f"External close detected: {sym} | Exit ${exit_price:.2f} | P&L ${pnl:+.2f} | {exit_reason}",
                 )
-                _news_stop = (dash.get("news_data") or {}).get(sym, {})
-                speak_natural(
-                    "exit_stop",
-                    fallback=f"{sym} was closed externally, {'up' if pnl >= 0 else 'down'} {abs(pnl):.0f} dollars.",
-                    symbol=sym,
-                    exit_type=(exit_type or "closed").replace("_", " "),
-                    pnl=f"{pnl:+.0f}",
-                    reason=exit_reason[:200] if exit_reason else "",
-                    news=_news_stop.get("claude_catalyst") or "none",
-                )
 
                 try:
                     log_trade(
@@ -854,12 +843,7 @@ def _eod_options_review(regime: dict):
         try:
             result = close_position(ib, key) or close_position(ib, sym)
             if result:
-                try:
-                    from bot_voice import speak_natural as _speak_eod
-                    _speak_eod("exit_pm", fallback=f"Closing {sym} into the bell.", symbol=sym,
-                               reason="intraday equity flat EOD", news="none")
-                except Exception:
-                    pass
+                pass
             else:
                 clog("ERROR", f"EOD INTRADAY equity close failed: {key}")
         except Exception as e:
@@ -882,9 +866,7 @@ def _eod_options_review(regime: dict):
         try:
             result = close_position(ib, key) or close_position(ib, sym)
             if result:
-                from bot_voice import speak_natural as _speak_eod
-                _speak_eod("exit_pm", fallback=f"Closing {sym} into the bell.", symbol=sym,
-                           reason="intraday flat EOD", news="none")
+                pass
             else:
                 clog("ERROR", f"EOD INTRADAY close failed for {key}")
         except Exception as e:
@@ -955,14 +937,6 @@ def _eod_options_review(regime: dict):
                 result = close_position(ib, key) or close_position(ib, sym)
                 if result:
                     clog("TRADE", f"EOD closed: {key} — {result}")
-                    from bot_voice import speak_natural as _speak_eod
-                    _speak_eod(
-                        "exit_pm",
-                        fallback=f"Closing {sym} into the bell.",
-                        symbol=sym,
-                        reason=reason or "end of day review",
-                        news="none",
-                    )
                 else:
                     clog("ERROR", f"EOD close failed for {key}")
             except Exception as e:
@@ -1456,7 +1430,6 @@ def run_scan():
         newly_halted = update_equity_high_water_mark(pv)
         if newly_halted:
             clog("RISK", "⛔ DRAWDOWN BRAKE: drawdown limit exceeded — flattening all positions")
-            speak_natural("drawdown", fallback="I've hit the drawdown limit. Flattening all positions now.")
             flatten_all(ib)
             dash["scanning"] = False
             return
@@ -1596,12 +1569,6 @@ def run_scan():
         )
     if strategy_mode["regime_changed"]:
         clog("RISK", "Regime changed since session open — thesis check active for open positions")
-        speak_natural(
-            "regime",
-            fallback="Heads up, the market regime has shifted.",
-            regime=regime.get("regime", "unknown"),
-            vix=regime.get("vix", "?"),
-        )
 
     # ── Controlled handoff wiring (Sprint 7E) ────────────────────────────────
     # When enable_active_opportunity_universe_handoff=False (default), scanner-led
@@ -2210,14 +2177,7 @@ def run_scan():
                             if execute_sell(ib, sym_pm, reason=_exit_reason_pm):
                                 _pm_order_placed = True
                         if _pm_order_placed:
-                            _news_pm = (dash.get("news_data") or {}).get(sym_pm, {})
-                            speak_natural(
-                                "exit_pm",
-                                fallback=f"I'm closing {sym_pm}.",
-                                symbol=sym_pm,
-                                reason=reason_pm or "portfolio review",
-                                news=_news_pm.get("claude_catalyst") or "none",
-                            )
+                            pass
                     if not _already_exiting and not _opt_keys_pm and sym_pm not in _pm_trades:
                         clog(
                             "WARN",
@@ -2310,13 +2270,7 @@ def run_scan():
                             ):
                                 _trim_order_placed = True
                         if _trim_order_placed:
-                            speak_natural(
-                                "trim",
-                                fallback=f"I trimmed {sym_pm}.",
-                                symbol=sym_pm,
-                                pct=_trim_pct_used,
-                                reason=reason_pm or "portfolio review",
-                            )
+                            pass
                             if pos_pm:
                                 _ep_trim = pos_pm.get("current", pos_pm.get("entry", 0))
                                 _entry = pos_pm.get("entry", 0)
@@ -2448,13 +2402,6 @@ def run_scan():
                                         # TRIM again if the signal later collapses.
                                         if _added:
                                             _trimmed_today.discard(sym_pm)
-                                            speak_natural(
-                                                "add",
-                                                fallback=f"I added to {sym_pm}.",
-                                                symbol=sym_pm,
-                                                qty=_add_qty,
-                                                reason=reason_pm or "conviction strengthened",
-                                            )
                 else:
                     clog("INFO", f"Portfolio manager HOLD: {sym_pm} — {reason_pm}")
             # Log all actions to audit log
@@ -2631,14 +2578,7 @@ def run_scan():
         exit_price = pos["current"] if pos else 0
         _sell_placed = execute_sell(ib, sym, reason="Agent sell signal")
         if _sell_placed:
-            _news_ctx = (dash.get("news_data") or {}).get(sym, {})
-            speak_natural(
-                "exit_agent",
-                fallback=f"I'm closing out {sym}.",
-                symbol=sym,
-                reason=decision.get("reasoning", "agent signal"),
-                news=_news_ctx.get("claude_catalyst") or _news_ctx.get("headlines", [""])[0] if _news_ctx else "none",
-            )
+            pass
         dash["trades"].insert(
             0, {"side": "SELL", "symbol": sym, "price": str(exit_price), "time": datetime.now(_ET).strftime("%H:%M:%S")}
         )

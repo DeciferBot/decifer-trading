@@ -120,17 +120,6 @@ sys.modules["ib_async"] = _ib_insync
 _anthropic = _fake_module("anthropic", Anthropic=MagicMock, AsyncAnthropic=MagicMock)
 
 # ---------------------------------------------------------------------------
-# bot_voice stub — prevents the real speech-worker daemon thread from starting
-# and ensures speak_natural/speak are silent no-ops in every test.
-# ---------------------------------------------------------------------------
-_bot_voice = _fake_module(
-    "bot_voice",
-    speak_natural=MagicMock(),
-    speak=MagicMock(),
-    answer_voice_query=MagicMock(),
-)
-
-# ---------------------------------------------------------------------------
 # yfinance stub
 # ---------------------------------------------------------------------------
 

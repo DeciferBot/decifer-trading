@@ -192,45 +192,46 @@ function buildStoryHero(data: DriversPayload): StoryHero {
 
 type Conviction = "high" | "medium" | "low" | "watchlist";
 
+// All colors reference CSS variables so dark/light toggle is automatic
 const CONVICTION_STYLE: Record<Conviction, {
   bg: string; border: string; leftAccent: string;
   badge: string; badgeColor: string; badgeBg: string; badgeBorder: string;
 }> = {
   high: {
-    bg: "#FFFCF0",
-    border: "#F5E6B8",
-    leftAccent: "#D97706",
+    bg: "var(--cv-high-bg)",
+    border: "var(--cv-high-border)",
+    leftAccent: "var(--cv-high-accent)",
     badge: "HIGH CONVICTION",
-    badgeColor: "#92400E",
-    badgeBg: "#FEF3C7",
-    badgeBorder: "#FCD34D",
+    badgeColor: "var(--cv-high-badge-color)",
+    badgeBg: "var(--cv-high-badge-bg)",
+    badgeBorder: "var(--cv-high-badge-border)",
   },
   medium: {
-    bg: "#F6FAFE",
-    border: "#BFDBFE",
-    leftAccent: "#2563EB",
+    bg: "var(--cv-medium-bg)",
+    border: "var(--cv-medium-border)",
+    leftAccent: "var(--cv-medium-accent)",
     badge: "ACTIVE",
-    badgeColor: "#1D4ED8",
-    badgeBg: "#EFF6FF",
-    badgeBorder: "#BFDBFE",
+    badgeColor: "var(--cv-medium-badge-color)",
+    badgeBg: "var(--cv-medium-badge-bg)",
+    badgeBorder: "var(--cv-medium-badge-border)",
   },
   low: {
-    bg: "#FAFFF8",
-    border: "#BBF7D0",
-    leftAccent: "#16A34A",
+    bg: "var(--cv-low-bg)",
+    border: "var(--cv-low-border)",
+    leftAccent: "var(--cv-low-accent)",
     badge: "ACTIVE",
-    badgeColor: "#166534",
-    badgeBg: "#F0FDF4",
-    badgeBorder: "#86EFAC",
+    badgeColor: "var(--cv-low-badge-color)",
+    badgeBg: "var(--cv-low-badge-bg)",
+    badgeBorder: "var(--cv-low-badge-border)",
   },
   watchlist: {
-    bg: "#FAFAFA",
-    border: "#E5E5E5",
-    leftAccent: "#A8A29E",
+    bg: "var(--cv-watch-bg)",
+    border: "var(--cv-watch-border)",
+    leftAccent: "var(--cv-watch-accent)",
     badge: "BUILDING",
-    badgeColor: "#78716C",
-    badgeBg: "#F5F5F4",
-    badgeBorder: "#D6D3D1",
+    badgeColor: "var(--cv-watch-badge-color)",
+    badgeBg: "var(--cv-watch-badge-bg)",
+    badgeBorder: "var(--cv-watch-badge-border)",
   },
 };
 
@@ -251,6 +252,18 @@ function themeConviction(theme: ActivatedTheme): Conviction {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function parseStaleReason(reason: string | null): string {
+  if (!reason) return "";
+  const match = reason.match(/data_(\d+)min_old/);
+  if (match) {
+    const mins = parseInt(match[1]);
+    if (mins < 60) return `last updated ${mins} minutes ago`;
+    if (mins < 1440) return `last updated ${Math.round(mins / 60)} hours ago`;
+    return `last updated ${Math.round(mins / 1440)} days ago`;
+  }
+  return reason;
+}
 
 function fmtEvidenceKey(key: string): string {
   return key
@@ -656,6 +669,27 @@ export default function MacroPage() {
   const [loading, setLoading] = useState(true);
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
   const [refreshIn, setRefreshIn] = useState(300);
+  const [isLight, setIsLight] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("decifer-theme");
+    if (stored === "light") {
+      setIsLight(true);
+      document.documentElement.classList.add("light");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !isLight;
+    setIsLight(next);
+    if (next) {
+      document.documentElement.classList.add("light");
+      localStorage.setItem("decifer-theme", "light");
+    } else {
+      document.documentElement.classList.remove("light");
+      localStorage.setItem("decifer-theme", "dark");
+    }
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -791,6 +825,32 @@ export default function MacroPage() {
               ↺ {refreshIn}s
             </span>
 
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              title={isLight ? "Switch to dark mode" : "Switch to light mode"}
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "14px",
+                color: "var(--text-secondary)",
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
+                padding: "4px 10px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                lineHeight: 1,
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent-orange)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
+              }}
+            >
+              {isLight ? "☾" : "☀"}
+            </button>
+
             <button
               onClick={() => { setLoading(true); fetchData(); }}
               style={{
@@ -871,8 +931,8 @@ export default function MacroPage() {
             >
               Data is 30+ minutes old — the pipeline may be sleeping.
               {data.stale_reason && (
-                <span style={{ color: "#D97706", marginLeft: "6px", fontFamily: "'DM Mono', monospace", fontSize: "11px" }}>
-                  {data.stale_reason}
+                <span style={{ color: "var(--accent-amber)", marginLeft: "6px" }}>
+                  {parseStaleReason(data.stale_reason)}
                 </span>
               )}
             </span>

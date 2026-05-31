@@ -4,7 +4,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Dark (default) ─────────────────────────────────────────────────────────── */
 :root {
+  --bg: #0A0A0A;
+  --surface: #111111;
+  --surface-warm: #161616;
+  --border: #222222;
+  --border-light: #1C1C1C;
+  --text-primary: #FFFFFF;
+  --text-secondary: #A0998E;
+  --text-muted: #5C5449;
+  --accent-orange: #F97316;
+  --accent-green: #22C55E;
+  --accent-green-bg: #071A0E;
+  --accent-green-border: #14532D;
+  --accent-red: #EF4444;
+  --accent-red-bg: #1A0505;
+  --accent-red-border: #7F1D1D;
+  --accent-amber: #F59E0B;
+  --accent-amber-bg: #1C1000;
+  --accent-amber-border: #78350F;
+  /* conviction card themes — dark */
+  --cv-high-bg: #1A1200;
+  --cv-high-border: #3D2E00;
+  --cv-high-accent: #D97706;
+  --cv-high-badge-bg: #2A1E00;
+  --cv-high-badge-border: #5C3D00;
+  --cv-high-badge-color: #FCD34D;
+  --cv-medium-bg: #080F1C;
+  --cv-medium-border: #1E3A5F;
+  --cv-medium-accent: #60A5FA;
+  --cv-medium-badge-bg: #0C1A30;
+  --cv-medium-badge-border: #1E3A5F;
+  --cv-medium-badge-color: #93C5FD;
+  --cv-low-bg: #071510;
+  --cv-low-border: #14532D;
+  --cv-low-accent: #22C55E;
+  --cv-low-badge-bg: #0A1F12;
+  --cv-low-badge-border: #166534;
+  --cv-low-badge-color: #86EFAC;
+  --cv-watch-bg: #111111;
+  --cv-watch-border: #2A2A2A;
+  --cv-watch-accent: #6B7280;
+  --cv-watch-badge-bg: #1A1A1A;
+  --cv-watch-badge-border: #374151;
+  --cv-watch-badge-color: #9CA3AF;
+}
+
+/* ── Light (toggle) ─────────────────────────────────────────────────────────── */
+html.light {
   --bg: #F7F5F1;
   --surface: #FFFFFF;
   --surface-warm: #FDFBF8;
@@ -14,15 +62,39 @@
   --text-secondary: #5C5449;
   --text-muted: #9A9088;
   --accent-orange: #E8521A;
-  --accent-green: #1A7A3C;
+  --accent-green: #16A34A;
   --accent-green-bg: #F0FAF4;
-  --accent-green-border: #C3E8D0;
+  --accent-green-border: #BBF7D0;
   --accent-red: #B91C1C;
   --accent-red-bg: #FFF5F5;
   --accent-red-border: #FECACA;
   --accent-amber: #B45309;
   --accent-amber-bg: #FFFBEB;
   --accent-amber-border: #FDE68A;
+  --cv-high-bg: #FFFCF0;
+  --cv-high-border: #F5E6B8;
+  --cv-high-accent: #D97706;
+  --cv-high-badge-bg: #FEF3C7;
+  --cv-high-badge-border: #FCD34D;
+  --cv-high-badge-color: #92400E;
+  --cv-medium-bg: #F0F7FF;
+  --cv-medium-border: #BFDBFE;
+  --cv-medium-accent: #2563EB;
+  --cv-medium-badge-bg: #EFF6FF;
+  --cv-medium-badge-border: #BFDBFE;
+  --cv-medium-badge-color: #1D4ED8;
+  --cv-low-bg: #F0FDF4;
+  --cv-low-border: #BBF7D0;
+  --cv-low-accent: #16A34A;
+  --cv-low-badge-bg: #DCFCE7;
+  --cv-low-badge-border: #86EFAC;
+  --cv-low-badge-color: #166534;
+  --cv-watch-bg: #FAFAFA;
+  --cv-watch-border: #E5E5E5;
+  --cv-watch-accent: #9CA3AF;
+  --cv-watch-badge-bg: #F5F5F4;
+  --cv-watch-badge-border: #D6D3D1;
+  --cv-watch-badge-color: #78716C;
 }
 
 * { box-sizing: border-box; }
@@ -33,14 +105,12 @@ html, body {
   font-family: 'DM Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
-
-.font-serif { font-family: 'Instrument Serif', Georgia, serif; }
-.font-data { font-family: 'DM Mono', 'IBM Plex Mono', monospace; }
 
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+  50% { opacity: 0.3; }
 }
 
 @keyframes fade-up {
@@ -48,13 +118,7 @@ html, body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes slide-in {
-  from { opacity: 0; transform: translateX(-8px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
 .animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
-.animate-fade-up { animation: fade-up 0.4s ease-out forwards; }
 
 .card-grid-item {
   animation: fade-up 0.3s ease-out forwards;
@@ -77,4 +141,3 @@ html, body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #CCC7BF; }

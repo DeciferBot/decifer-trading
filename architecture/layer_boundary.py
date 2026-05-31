@@ -167,7 +167,6 @@ _DASHBOARD_ADMIN_MODULES: frozenset[str] = frozenset({
     "bot_account",
     "bot_state",
     "bot_sentinel",
-    "bot_voice",
     "bot_hot_reload",
 })
 

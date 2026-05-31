@@ -157,21 +157,17 @@ def _log_voice_audit_bot(action: str, symbol, voice_text: str, result: str) -> N
 
 def _execute_voice_sell(ib, dash: dict, symbol: str, cmd: dict) -> None:
     from orders_core import execute_sell
-    from bot_voice import speak as _speak
 
     clog("TRADE", f"[VOICE] Executing sell for {symbol}")
     success = execute_sell(ib, symbol, reason="voice_command")
     if success:
-        _speak(f"Closing {symbol}.")
         _log_voice_audit_bot("execute_sell", symbol, cmd.get("voice_text", ""), "success")
     else:
-        _speak(f"Could not close {symbol}. It may not be in the portfolio.")
         _log_voice_audit_bot("execute_sell", symbol, cmd.get("voice_text", ""), "failed")
 
 
 def _execute_voice_buy(ib, dash: dict, symbol: str, cmd: dict) -> None:
     import pandas as pd
-    from bot_voice import speak as _speak
 
     clog("TRADE", f"[VOICE] Executing buy for {symbol}")
 
@@ -194,7 +190,6 @@ def _execute_voice_buy(ib, dash: dict, symbol: str, cmd: dict) -> None:
             clog("WARN", f"[VOICE] Alpaca price failed for {symbol}: {e}")
 
     if price <= 0:
-        _speak(f"Could not get a price for {symbol}. Trade aborted.")
         _log_voice_audit_bot("execute_buy", symbol, cmd.get("voice_text", ""), "no_price")
         return
 
@@ -234,10 +229,8 @@ def _execute_voice_buy(ib, dash: dict, symbol: str, cmd: dict) -> None:
         reasoning="voice_command",
     )
     if success:
-        _speak(f"Buy order placed for {symbol}.")
         _log_voice_audit_bot("execute_buy", symbol, cmd.get("voice_text", ""), "success")
     else:
-        _speak(f"Could not buy {symbol}. Check the logs for details.")
         _log_voice_audit_bot("execute_buy", symbol, cmd.get("voice_text", ""), "failed_guards")
 
 
@@ -249,7 +242,6 @@ def _process_voice_commands(ib, dash: dict) -> None:
     scan finishes (typically 15–45 s delay, acceptable for a paper account).
     """
     from datetime import datetime, timezone
-    from bot_voice import speak as _speak
 
     if dash.get("scanning") or dash.get("killed"):
         return
@@ -269,7 +261,6 @@ def _process_voice_commands(ib, dash: dict) -> None:
         except ValueError:
             pass
         sym = cmd.get("symbol", "unknown")
-        _speak(f"The pending {cmd['type'].lower().replace('_', ' ')} for {sym} expired. Please try again.")
         _log_voice_audit_bot("expired", sym, cmd.get("voice_text", ""), "expired")
 
     # Process confirmed commands from the front of the queue

@@ -1522,21 +1522,6 @@ def _on_order_status_event(trade):
 
                 # Voice: fires only on first fill (pre-update status is PENDING/SUBMITTED).
                 # Guard matches the SHORT path — prevents double-speak if IBKR re-sends FILLED.
-                try:
-                    from bot_voice import speak_natural as _speak_natural
-                    if _t_pre.get("direction") == "LONG" and _t_pre.get("status") in ("PENDING", "SUBMITTED"):
-                        _news = (dash.get("news_data") or {}).get(sym, {})
-                        _speak_natural(
-                            "entry",
-                            fallback=f"Long on {sym} filled at {fill_price:.2f}.",
-                            symbol=sym,
-                            direction="long",
-                            score=_t.get("score", 0),
-                            reason=_t.get("reasoning", "strong signal")[:200],
-                            news=_news.get("claude_catalyst") or "none",
-                        )
-                except Exception as _ve:
-                    clog("WARNING", f"Voice entry alert failed for {sym}: {_ve}")
 
             elif order.action == "SELL":
                 # Snapshot pre-update status for voice idempotency guard.
@@ -1588,22 +1573,6 @@ def _on_order_status_event(trade):
                     except Exception as _elf_es:
                         clog("WARNING", f"ORDER_FILLED write failed for short {sym}: {_elf_es}")
 
-                # Voice for short entry fill
-                try:
-                    from bot_voice import speak_natural as _speak_natural
-                    if _t_pre.get("direction") == "SHORT" and _t_pre.get("status") == "PENDING":
-                        _news = (dash.get("news_data") or {}).get(sym, {})
-                        _speak_natural(
-                            "entry",
-                            fallback=f"Short on {sym} filled at {fill_price:.2f}.",
-                            symbol=sym,
-                            direction="short",
-                            score=_t.get("score", 0),
-                            reason=_t.get("reasoning", "strong signal")[:200],
-                            news=_news.get("claude_catalyst") or "none",
-                        )
-                except Exception as _ve:
-                    clog("WARNING", f"Voice short entry alert failed for {sym}: {_ve}")
 
                 # RC-5: SHORT exit fill — BUY order fills when covering a SHORT position.
                 # The SELL fill handler below (lines ~1516+) only fires for SELL fills,

@@ -62,10 +62,6 @@ _ic_calc = types.ModuleType("ic_calculator")
 _ic_calc.get_current_weights = MagicMock(return_value=None)
 sys.modules.setdefault("ic_calculator", _ic_calc)
 
-_bot_voice = types.ModuleType("bot_voice")
-_bot_voice.speak_natural = MagicMock()
-sys.modules.setdefault("bot_voice", _bot_voice)
-
 _config_mod = types.ModuleType("config")
 _config_mod.CONFIG = {
     "options_enabled": True,

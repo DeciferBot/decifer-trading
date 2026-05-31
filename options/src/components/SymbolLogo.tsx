@@ -37,7 +37,7 @@ export function SymbolLogo({ symbol, size = SIZE }: { symbol: string; size?: num
         width: size, height: size,
         borderRadius: size * 0.25,
         objectFit: "contain",
-        background: "#fff",
+        background: "transparent",
         flexShrink: 0,
         display: "block",
       }}

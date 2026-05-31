@@ -14,7 +14,17 @@ export function Header({ lastUpdated }: { lastUpdated: string | null }) {
   const age = lastUpdated
     ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000)
     : null;
-  const ageLabel = age === null ? "—" : age < 60 ? `${age}s ago` : `${Math.round(age / 60)}m ago`;
+  const ageLabel = age === null
+    ? "—"
+    : age < 60
+      ? `${age}s ago`
+      : age < 3600
+        ? `${Math.round(age / 60)}m ago`
+        : `Last scan: ${new Date(lastUpdated!).toLocaleString("en-US", {
+            timeZone: "America/New_York",
+            weekday: "short", month: "short", day: "numeric",
+            hour: "2-digit", minute: "2-digit",
+          })} ET`;
 
   return (
     <header style={{

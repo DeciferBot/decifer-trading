@@ -2171,10 +2171,8 @@ class DashHandler(BaseHTTPRequestHandler):
                 _ask_last_ts = _time.monotonic()
                 try:
                     from voice_agent import answer_voice_question
-                    from bot_voice import speak
 
                     answer = answer_voice_question(question, dash)
-                    speak(answer)
 
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")

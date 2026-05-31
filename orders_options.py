@@ -873,17 +873,7 @@ def flush_pending_option_exits(ib: IB) -> None:
         _save_pending_exits()
         _flushed = execute_sell_option(ib, opt_key, reason=f"deferred:{reason}")
         if _flushed:
-            try:
-                from bot_voice import speak_natural as _speak_deferred
-                _sym = opt_key.split("_")[0]
-                _speak_deferred(
-                    "deferred_exit",
-                    fallback=f"Closing {_sym} option — deferred exit from earlier.",
-                    symbol=_sym,
-                    reason=reason,
-                )
-            except Exception:
-                pass
+            pass
 
 
 def update_tranche_status(ib: IB) -> None:

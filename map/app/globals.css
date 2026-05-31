@@ -14,3 +14,6 @@ body {
 ::-webkit-scrollbar-thumb { background: #ffffff20; border-radius: 4px; }
 
 svg text { user-select: none; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
