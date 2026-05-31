@@ -2,11 +2,27 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Symbol Intelligence — Decifer",
+  metadataBase: new URL("https://symbol.decifertrading.com"),
+  title: {
+    default: "Symbol Intelligence — Decifer",
+    template: "%s — Decifer",
+  },
   description: "Theme membership, intelligence feed status, and macro driver context for any tracked symbol.",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     apple: "/favicon.svg",
+  },
+  openGraph: {
+    title: "Symbol Intelligence — Decifer",
+    description: "Theme membership, intelligence feed status, and macro driver context for any tracked symbol.",
+    url: "https://symbol.decifertrading.com",
+    siteName: "Decifer",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Symbol Intelligence — Decifer",
+    description: "Theme membership, intelligence feed status, and macro driver context for any tracked symbol.",
   },
 };
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import EarningsPageClient from "./EarningsPageClient";
 
 export const metadata: Metadata = {
-  title: "Earnings Calendar — Decifer",
+  title: "Earnings Calendar",
   description: "Upcoming earnings for tracked stocks — with theme context and Decifer signal coverage.",
   openGraph: {
     title: "Earnings Calendar — Decifer",

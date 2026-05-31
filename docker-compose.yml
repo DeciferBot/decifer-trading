@@ -49,6 +49,11 @@ services:
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        limits:
+          memory: 1536m
+          cpus: "1.0"
     healthcheck:
       # Pass if heartbeat file was written within the last 20 minutes (1200s).
       # Fails if publisher has not completed a cycle recently.
@@ -85,6 +90,11 @@ services:
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.25"
 
   # ── Live Trading Bot ───────────────────────────────────────────────────────
   # Always-on during market hours. Requires IBKR Gateway accessible on the host.
@@ -121,6 +131,11 @@ services:
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        limits:
+          memory: 1536m
+          cpus: "1.5"
     # Informational port list (host networking — ports: is ignored at runtime)
     # ports:
     #   - "8080:8080"   # bot dashboard
@@ -174,6 +189,11 @@ services:
       - DECIFER_CUSTOMER_OUTPUT_MODE=true
       - DECIFER_MOBILE_READ_ONLY=true
       - DECIFER_DASHBOARD_CONTROL_ENABLED=false
+    deploy:
+      resources:
+        limits:
+          memory: 2560m
+          cpus: "1.5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -216,6 +236,11 @@ services:
       - PYTHONUNBUFFERED=1
       - DECIFER_RUNTIME_MODE=intelligence_cloud
       - DECIFER_EXECUTION_ENABLED=false
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
     healthcheck:
       test:
         - "CMD"

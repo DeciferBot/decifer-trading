@@ -2,8 +2,25 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Decifer Market Map",
+  metadataBase: new URL("https://map.decifertrading.com"),
+  title: "Market Map — Decifer",
   description: "Exploratory market intelligence graph. Find hot spots, trace connections, discover what's moving.",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    apple: "/favicon.svg",
+  },
+  openGraph: {
+    title: "Market Map — Decifer",
+    description: "Exploratory market intelligence graph. Find hot spots, trace connections, discover what's moving.",
+    url: "https://map.decifertrading.com",
+    siteName: "Decifer",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Market Map — Decifer",
+    description: "Exploratory market intelligence graph. Find hot spots, trace connections, discover what's moving.",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

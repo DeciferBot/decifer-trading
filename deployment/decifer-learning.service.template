@@ -1,0 +1,56 @@
+# deployment/decifer-learning.service.template
+#
+# Template systemd unit for Decifer Learning — DigitalOcean droplet.
+# Copy to /etc/systemd/system/decifer-learning.service and fill in
+# the ExecStart line to match the Learning repo's entry point.
+#
+# Isolation: hard-limited to 2 GB RAM and 1.5 CPU cores.
+# Decifer Trading runs alongside at /opt/decifer-trading with 6 GB / 3.5 cores.
+# The two programs cannot starve each other.
+#
+# Installation:
+#   sudo cp deployment/decifer-learning.service.template \
+#            /etc/systemd/system/decifer-learning.service
+#   # Edit ExecStart to match the learning entry point
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable decifer-learning
+#   sudo systemctl start decifer-learning
+#
+# Logs:
+#   journalctl -u decifer-learning -f
+
+[Unit]
+Description=Decifer Learning Workers
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=decifer
+Group=decifer
+WorkingDirectory=/opt/decifer-learning/repo
+
+# Hard memory ceiling — 2 GB for the entire learning stack.
+MemoryMax=2G
+CPUQuota=150%
+
+EnvironmentFile=-/opt/decifer-learning/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# Replace this with the actual learning entry point
+ExecStart=/opt/decifer-learning/venv/bin/python3 <YOUR_ENTRY_POINT>
+
+Restart=on-failure
+RestartSec=15
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/decifer-learning/data /opt/decifer-learning/logs /var/log/decifer-learning
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=decifer-learning
+
+[Install]
+WantedBy=multi-user.target

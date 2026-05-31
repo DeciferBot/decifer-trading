@@ -964,22 +964,6 @@
       "last_reviewed": "2026-05-26"
     },
     {
-      "symbol": "CYBR",
-      "label": "CyberArk Software",
-      "driver_id": "ai_capex_growth",
-      "theme_id": "cybersecurity_digital_resilience",
-      "bucket_id": "identity_privileged_access",
-      "exposure_type": "direct_beneficiary",
-      "confidence": 0.78,
-      "reason_to_care": "CyberArk specialises in Privileged Access Management (PAM). Breach costs and insider threat risks drive PAM adoption across enterprise and government.",
-      "evidence_basis": "company_profile",
-      "source_type": "curated_reference",
-      "route_hint": "In focus",
-      "status": "active",
-      "risk_note": null,
-      "last_reviewed": "2026-05-26"
-    },
-    {
       "symbol": "CIBR",
       "label": "First Trust Nasdaq Cybersecurity ETF",
       "driver_id": "ai_capex_growth",

@@ -2,7 +2,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Decifer Market Intelligence",
+  metadataBase: new URL("https://mobile.decifertrading.com"),
+  title: {
+    default: "Decifer",
+    template: "%s — Decifer",
+  },
   description: "Market intelligence — signals, themes, and evidence. Not financial advice.",
   manifest: "/manifest.json",
   icons: {
@@ -13,6 +17,18 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Decifer",
+  },
+  openGraph: {
+    title: "Decifer Market Intelligence",
+    description: "Market intelligence — signals, themes, and evidence.",
+    url: "https://mobile.decifertrading.com",
+    siteName: "Decifer",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Decifer Market Intelligence",
+    description: "Market intelligence — signals, themes, and evidence.",
   },
 };
 

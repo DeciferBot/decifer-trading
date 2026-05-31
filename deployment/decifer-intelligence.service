@@ -38,15 +38,20 @@
 #   sudo systemctl start decifer-intelligence
 #
 # Assumptions:
-#   - Repo is checked out at /opt/decifer
-#   - Intelligence-only venv is at /opt/decifer/venv
+#   - Repo is checked out at /opt/decifer-trading/repo
+#   - Intelligence-only venv is at /opt/decifer-trading/venv
 #     (pip install -r requirements.intelligence.txt)
-#   - A non-root user 'decifer' owns /opt/decifer
+#   - A non-root user 'decifer' owns /opt/decifer-trading
 #   - Log directory /var/log/decifer-intelligence is created and owned by decifer:
 #     sudo mkdir -p /var/log/decifer-intelligence
 #     sudo chown decifer:decifer /var/log/decifer-intelligence
-#   - .env file at /opt/decifer/.env (intelligence cloud values only —
+#   - .env file at /opt/decifer-trading/.env (intelligence cloud values only —
 #     see .env.intelligence.example for required keys)
+#
+# Isolation note:
+#   Decifer Trading is isolated from Decifer Learning at /opt/decifer-learning.
+#   This unit is hard-limited to 6 GB RAM and 3.5 CPU cores so the two programs
+#   cannot starve each other on the shared droplet.
 
 [Unit]
 Description=Decifer Intelligence API (gunicorn)
@@ -58,10 +63,16 @@ Wants=network-online.target
 Type=simple
 User=decifer
 Group=decifer
-WorkingDirectory=/opt/decifer
+WorkingDirectory=/opt/decifer-trading/repo
+
+# Hard memory ceiling for the entire trading stack — 6 GB.
+# Decifer Learning runs in /opt/decifer-learning with its own 2 GB limit.
+# If this unit exceeds 6 GB the OOM killer targets this cgroup only.
+MemoryMax=6G
+CPUQuota=350%
 
 # Load API keys from .env file (intelligence-cloud keys only — no IBKR keys)
-EnvironmentFile=-/opt/decifer/.env
+EnvironmentFile=-/opt/decifer-trading/.env
 
 # Runtime mode — hardcoded. These override any .env value.
 # DECIFER_RUNTIME_MODE=intelligence_cloud ensures assert_execution_allowed()
@@ -77,7 +88,7 @@ Environment=PYTHONDONTWRITEBYTECODE=1
 # gunicorn: 2 workers, 30s timeout, bound to localhost only.
 # Nginx (nginx-intelligence.conf) proxies from port 8090 to this.
 # Do not bind to 0.0.0.0 — Cloudflare Tunnel or Nginx handles external access.
-ExecStart=/opt/decifer/venv/bin/gunicorn intelligence_api:app \
+ExecStart=/opt/decifer-trading/venv/bin/gunicorn intelligence_api:app \
     --bind 127.0.0.1:8000 \
     --workers 2 \
     --timeout 30 \
@@ -94,7 +105,7 @@ RestartSec=10
 # Limit blast radius: no new privileges, read-only /usr and /boot
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/opt/decifer/data /opt/decifer/logs /var/log/decifer-intelligence
+ReadWritePaths=/opt/decifer-trading/data /opt/decifer-trading/logs /var/log/decifer-intelligence
 
 # Forward stdout/stderr to journald
 StandardOutput=journal

@@ -225,7 +225,6 @@
         "RBRK",
         "PLTR",
         "NET",
-        "CYBR",
         "OKTA"
       ],
       "etf_proxies": [
@@ -233,8 +232,8 @@
       ],
       "route_bias": "position_or_swing",
       "minimum_liquidity_class": "high",
-      "max_candidates": 9,
-      "notes": "Cybersecurity platform vendors benefiting from AI-driven expansion of attack surface and enterprise security spend. CRWD (CrowdStrike), PANW (Palo Alto Networks), FTNT (Fortinet), ZS (Zscaler), RBRK (Rubrik \u2014 data security and cyber resilience), PLTR (Palantir \u2014 AI/data platform for defence and intelligence), NET (Cloudflare \u2014 Zero Trust network security and SASE platform, native beneficiary of AI-era attack surface expansion; $85.5B FMP-verified), CYBR (CyberArk \u2014 Privileged Access Management and identity security, fastest-growing cybersecurity segment as AI agents multiply privileged credential attack surface; $20.6B FMP-verified), OKTA (Okta \u2014 Identity federation and access management; enterprise AI deployments multiply OAuth/SAML integrations and identity attack surface; direct beneficiary of AI-capex-driven security spend; identity attacks are the most common breach vector per IBM Cost of a Data Breach 2025). CIBR as First Trust NASDAQ Cybersecurity ETF proxy.",
+      "max_candidates": 8,
+      "notes": "Cybersecurity platform vendors benefiting from AI-driven expansion of attack surface and enterprise security spend. CRWD (CrowdStrike), PANW (Palo Alto Networks), FTNT (Fortinet), ZS (Zscaler), RBRK (Rubrik \u2014 data security and cyber resilience), PLTR (Palantir \u2014 AI/data platform for defence and intelligence), NET (Cloudflare \u2014 Zero Trust network security and SASE platform, native beneficiary of AI-era attack surface expansion), OKTA (Okta \u2014 Identity federation and access management; enterprise AI deployments multiply OAuth/SAML integrations and identity attack surface; direct beneficiary of AI-capex-driven security spend). CIBR as First Trust NASDAQ Cybersecurity ETF proxy. CYBR removed 2026-05-31 \u2014 taken private (Alpaca inactive, last traded 2026-02-11).",
       "last_reviewed": "2026-05-30",
       "source_label": "intelligence_first_static_rule"
     },
