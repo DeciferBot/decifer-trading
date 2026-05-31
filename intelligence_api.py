@@ -43,6 +43,7 @@ import os
 import time
 from datetime import UTC, datetime
 from functools import wraps
+from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
@@ -456,6 +457,37 @@ def intelligence_universe() -> Response:
 
 
 # ---------------------------------------------------------------------------
+# Label registry — single source of truth for human-readable labels
+# ---------------------------------------------------------------------------
+
+_LABEL_REGISTRY_PATH = Path(__file__).parent / "data" / "intelligence" / "label_registry.json"
+_label_registry_cache: dict | None = None
+
+def _load_label_registry() -> dict:
+    global _label_registry_cache
+    if _label_registry_cache is None:
+        try:
+            _label_registry_cache = _json.loads(_LABEL_REGISTRY_PATH.read_text())
+        except Exception as exc:
+            log.warning("label_registry load failed: %s", exc)
+            _label_registry_cache = {}
+    return _label_registry_cache
+
+
+@app.route("/api/labels", methods=["GET", "OPTIONS"])
+def label_registry() -> Response:
+    """Single source of truth for all human-readable labels (themes, drivers, buckets).
+
+    All products — map, mobile, and any future surface — should read from this
+    endpoint rather than hardcoding labels locally.
+    """
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    registry = _load_label_registry()
+    return _json_response({**registry, "ts": _now_iso()})
+
+
+# ---------------------------------------------------------------------------
 # Market data endpoints — generic FMP data for customer surfaces
 # Shadow mode: these endpoints exist but mobile is not yet wired to them.
 # ---------------------------------------------------------------------------
@@ -553,8 +585,8 @@ def conviction_universe_route() -> Response:
         symbols = []
         tradeable_count = 0
         waiting_count = 0
-        for entry in cache_entries:
-            zone = entry.get("zone", "")
+        for entry in cache_entries.values():
+            zone = entry.get("zone", "") if isinstance(entry, dict) else ""
             if zone == "READY":
                 tradeable_count += 1
             elif zone == "WAITING_ROOM":
