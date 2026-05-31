@@ -10,6 +10,7 @@ v1_api.py — Product API v1 blueprint.
 Routes
 ──────
   GET /v1/health               — public liveness check (no auth)
+  GET /v1/universe             — browseable symbol list (authenticated)
   GET /v1/symbol/<ticker>      — Symbol Intelligence Card (authenticated)
 
 Symbol Intelligence Card combines three intelligence lenses:
@@ -296,6 +297,113 @@ def v1_health() -> Response:
         "drivers_mode": driver_state.get("mode", "unknown"),
         "drivers_ts": driver_state.get("generated_at"),
     })
+
+
+def _conviction_score(
+    ttg_confidence: float,
+    driver_active: bool,
+    in_feed: bool,
+    feed_confidence: float,
+) -> dict:
+    """
+    Compute a 0-100 conviction score from available intelligence signals.
+
+    Scoring:
+      - TTG evidence quality: up to 40 pts (confidence * 40)
+      - Driver active:        +35 pts (live macro tailwind)
+      - In intelligence feed: +15 pts
+      - Feed confidence:      up to 10 pts (feed_confidence * 10)
+
+    Tiers:
+      high      >= 70  — driver active + confirmed in feed + strong evidence
+      medium    40-69  — partially confirmed, at least one live signal
+      watchlist  < 40  — narrative building, not yet ready
+    """
+    score = round(
+        (ttg_confidence * 40)
+        + (35 if driver_active else 0)
+        + (15 if in_feed else 0)
+        + (feed_confidence * 10 if in_feed else 0)
+    )
+    score = min(score, 100)
+
+    if score >= 70:
+        tier = "high"
+    elif score >= 40:
+        tier = "medium"
+    else:
+        tier = "watchlist"
+
+    return {"score": score, "tier": tier}
+
+
+@v1_bp.route("/universe", methods=["GET"])
+@require_api_key
+def universe_list() -> Response:
+    """
+    Browseable Symbol Universe.
+
+    Returns all active TTG symbols with their primary theme, company label,
+    exposure type, driver-active status, and Decifer conviction score + tier.
+    """
+    raw = _read_json(_DATA_DIR / "theme_graph" / "symbol_exposures.json")
+    all_exposures = [e for e in raw.get("exposures", []) if e.get("status") == "active"]
+
+    nodes = _load_nodes()
+    driver_state = _read_drivers()
+    active_drivers = set(driver_state.get("active_drivers", []))
+
+    # Build feed lookup: symbol -> candidate
+    feed_raw = _read_json(_DATA_DIR / "economic_candidate_feed.json")
+    feed_by_sym: dict[str, dict] = {
+        c.get("symbol", "").upper(): c
+        for c in feed_raw.get("candidates", [])
+        if c.get("symbol")
+    }
+
+    # Deduplicate: one entry per symbol, highest-confidence exposure as primary
+    by_symbol: dict[str, dict] = {}
+    for exp in all_exposures:
+        sym = exp.get("symbol", "").upper()
+        if not sym:
+            continue
+        existing = by_symbol.get(sym)
+        if existing is None or (exp.get("confidence") or 0) > (existing.get("confidence") or 0):
+            by_symbol[sym] = exp
+
+    symbols = []
+    for sym, exp in sorted(by_symbol.items()):
+        theme_node = nodes.get(exp.get("theme_id", ""), {})
+        driver_id = exp.get("driver_id", "")
+        driver_active = driver_id in active_drivers
+        feed_entry = feed_by_sym.get(sym)
+        in_feed = feed_entry is not None
+        feed_confidence = float(feed_entry.get("confidence") or 0) if feed_entry else 0.0
+        ttg_confidence = float(exp.get("confidence") or 0)
+
+        conviction = _conviction_score(ttg_confidence, driver_active, in_feed, feed_confidence)
+
+        symbols.append({
+            "symbol": sym,
+            "label": exp.get("label", sym),
+            "theme_id": exp.get("theme_id"),
+            "theme_label": theme_node.get("label", exp.get("theme_id")),
+            "exposure_type": exp.get("exposure_type"),
+            "confidence": ttg_confidence,
+            "driver_id": driver_id,
+            "driver_active": driver_active,
+            "in_feed": in_feed,
+            "conviction_score": conviction["score"],
+            "conviction_tier": conviction["tier"],
+        })
+
+    r = jsonify({
+        "symbols": symbols,
+        "total": len(symbols),
+        "ts": datetime.now(UTC).isoformat(),
+    })
+    r.status_code = 200
+    return r
 
 
 @v1_bp.route("/symbol/<ticker>", methods=["GET"])
