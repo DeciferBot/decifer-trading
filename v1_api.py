@@ -247,6 +247,8 @@ def _build_symbol_card(ticker: str) -> dict | None:
 
     # Intelligence feed section — safe fields only
     intel_feed = None
+    in_feed = candidate is not None
+    feed_confidence = float(candidate.get("confidence") or 0) if candidate else 0.0
     if candidate:
         intel_feed = {
             "in_feed": True,
@@ -259,10 +261,30 @@ def _build_symbol_card(ticker: str) -> dict | None:
             "feed_ts": candidate.get("generated_at"),
         }
 
+    # Conviction score — same formula as /v1/universe
+    primary_exp = exposures[0] if exposures else {}
+    primary_driver_id = primary_exp.get("driver_id", "")
+    primary_driver_active = primary_driver_id in active_drivers
+    primary_confidence = float(primary_exp.get("confidence") or 0)
+    conviction = _conviction_score(primary_confidence, primary_driver_active, in_feed, feed_confidence)
+
+    # Conviction breakdown — explains each contributing signal
+    breakdown = []
+    if primary_driver_active:
+        breakdown.append({"signal": "Driver active", "detail": primary_driver_id.replace("_", " "), "pts": 35})
+    if in_feed:
+        breakdown.append({"signal": "In intelligence feed", "detail": f"{round(feed_confidence * 100)}% feed confidence", "pts": round(15 + feed_confidence * 10)})
+    breakdown.append({"signal": "Theme evidence", "detail": f"{round(primary_confidence * 100)}% evidence quality", "pts": round(primary_confidence * 40)})
+    if not primary_driver_active:
+        breakdown.append({"signal": "Driver inactive", "detail": primary_driver_id.replace("_", " ") + " not currently firing", "pts": 0})
+
     return {
         "symbol": ticker.upper(),
         "api_version": "1",
         "ts": datetime.now(UTC).isoformat(),
+        "conviction_score": conviction["score"],
+        "conviction_tier": conviction["tier"],
+        "conviction_breakdown": breakdown,
         "themes": themes,
         "intelligence_feed": intel_feed,
         "options_flow": flow,

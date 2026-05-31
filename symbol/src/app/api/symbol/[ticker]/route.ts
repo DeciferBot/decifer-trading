@@ -16,7 +16,7 @@ export async function GET(
   try {
     const res = await fetch(url, {
       headers: { "X-API-Key": apiKey },
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
 
     if (res.status === 404) {

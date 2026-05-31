@@ -39,8 +39,16 @@ interface MarketContext {
   blocked_conditions: string[];
   drivers_mode: string;
 }
+interface ConvictionBreakdown {
+  signal: string;
+  detail: string;
+  pts: number;
+}
 interface SymbolData {
   symbol: string;
+  conviction_score: number;
+  conviction_tier: "high" | "medium" | "watchlist";
+  conviction_breakdown: ConvictionBreakdown[];
   themes: Theme[];
   intelligence_feed: IntelFeed | null;
   options_flow: OptionsFlow | null;
@@ -218,6 +226,9 @@ export default async function TickerPage({
     options_flow: flow,
     market_context: ctx,
     data_freshness,
+    conviction_score,
+    conviction_tier,
+    conviction_breakdown,
   } = data;
   const primaryTheme = themes[0];
   const lean = computeLean(themes, feed, flow, ctx);
@@ -227,6 +238,20 @@ export default async function TickerPage({
       : lean.variant === "bear"
       ? "text-red-400 border-red-800 bg-red-950"
       : "text-text-muted border-border bg-surface-2";
+
+  const tierColor =
+    conviction_tier === "high"
+      ? "text-emerald-400"
+      : conviction_tier === "medium"
+      ? "text-amber-400"
+      : "text-text-muted";
+
+  const tierLabel =
+    conviction_tier === "high"
+      ? "High conviction"
+      : conviction_tier === "medium"
+      ? "Building"
+      : "Watchlist";
 
   const priceUp =
     price?.changesPercentage != null && price.changesPercentage >= 0;
@@ -265,14 +290,13 @@ export default async function TickerPage({
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-2 mt-1">
+          <div className="flex flex-col items-end gap-2 mt-1 shrink-0">
             <Link
               href="/"
-              className="font-mono text-xs text-text-muted border border-border rounded-sm px-3 py-1.5 hover:border-accent hover:text-accent transition-colors shrink-0"
+              className="font-mono text-xs text-text-muted border border-border rounded-sm px-3 py-1.5 hover:border-accent hover:text-accent transition-colors"
             >
               ← Browse
             </Link>
-            {/* Bull/Bear lean */}
             <span
               className={`font-mono text-xs border rounded-sm px-2.5 py-1 tracking-wide ${leanCls}`}
             >
@@ -283,7 +307,7 @@ export default async function TickerPage({
 
         {/* Price strip */}
         {price?.price != null && (
-          <div className="flex flex-wrap items-baseline gap-4 mb-3">
+          <div className="flex flex-wrap items-baseline gap-4 mb-4">
             <span className="font-mono text-2xl text-text">
               ${price.price.toFixed(2)}
             </span>
@@ -306,25 +330,50 @@ export default async function TickerPage({
           </div>
         )}
 
-        {/* Company description */}
-        {price?.description && (
-          <p className="text-text-muted text-sm leading-relaxed mb-3 line-clamp-3">
-            {price.description}
-          </p>
-        )}
-
         {/* Theme breadcrumb */}
         {primaryTheme && (
-          <p className="text-text-muted font-mono text-xs tracking-wide">
-            in{" "}
-            <span className="text-text">{primaryTheme.theme_label}</span>
+          <p className="text-text-muted font-mono text-xs tracking-wide mb-1">
+            in <span className="text-text">{primaryTheme.theme_label}</span>
             {" · "}
             <span>{primaryTheme.bucket_label}</span>
           </p>
         )}
-        <p className="font-mono text-xs text-text-muted mt-1">
-          Drivers: {ctx.drivers_mode.replace(/_/g, " ")}
-        </p>
+      </div>
+
+      {/* Conviction score */}
+      <div className={`fade-up fade-up-2 border rounded-sm p-5 ${
+        conviction_tier === "high"
+          ? "border-emerald-800 bg-emerald-950/20"
+          : conviction_tier === "medium"
+          ? "border-amber-800/60 bg-amber-950/10"
+          : "border-border bg-surface"
+      }`}>
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-mono text-xs text-text-muted tracking-widest uppercase">
+            Decifer Conviction
+          </p>
+          <div className="flex items-baseline gap-2">
+            <span className={`font-mono text-3xl font-semibold ${tierColor}`}>
+              {conviction_score}
+            </span>
+            <span className={`font-mono text-xs ${tierColor}`}>
+              {tierLabel}
+            </span>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {conviction_breakdown.map((b, i) => (
+            <div key={i} className="flex items-center justify-between gap-4">
+              <div>
+                <span className="text-text text-sm">{b.signal}</span>
+                <span className="text-text-muted text-xs ml-2">{b.detail}</span>
+              </div>
+              <span className={`font-mono text-sm shrink-0 ${b.pts > 0 ? tierColor : "text-text-muted"}`}>
+                {b.pts > 0 ? `+${b.pts}` : "—"}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Themes */}
