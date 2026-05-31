@@ -1697,6 +1697,24 @@ def run_scan():
     except Exception:
         pass
 
+    # Tier D — Position Research Universe (PRU): add discovery symbols to universe.
+    # PRU symbols are scored alongside Tier A/B/C; signal_pipeline stamps them
+    # scanner_tier="D" after scoring. Fail-soft — never blocks the scan cycle.
+    try:
+        from universe_position import load_position_research_universe as _load_pru
+        _pru_tickers, _, _pru_built_at = _load_pru()
+        if _pru_tickers:
+            _pru_before = len(universe)
+            universe = list(set(universe + _pru_tickers))
+            _pru_added = len(universe) - _pru_before
+            clog(
+                "INFO",
+                f"Tier D (PRU): {len(_pru_tickers)} discovery symbols loaded "
+                f"({_pru_added} new, built_at={_pru_built_at})",
+            )
+    except Exception as _pru_e:
+        log.debug("Tier D PRU load skipped (non-fatal): %s", _pru_e)
+
     # Pre-warm FMP fundamentals cache for the full universe so that
     # trade_context.py finds revenue growth and EPS data without blocking.
     try:

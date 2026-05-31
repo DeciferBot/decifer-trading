@@ -162,6 +162,117 @@ class SignalPipelineResult:
 # ── Internal helpers ───────────────────────────────────────────────────────────
 
 
+def _load_pru_dict() -> tuple[list[str], dict]:
+    """Load PRU tickers and metadata keyed by symbol. Fail-soft — returns empty on error."""
+    try:
+        from universe_position import load_position_research_universe
+        tickers, symbols_list, _ = load_position_research_universe()
+        meta = {r["ticker"]: r for r in symbols_list if isinstance(r, dict) and "ticker" in r}
+        return tickers, meta
+    except Exception:
+        return [], {}
+
+
+def _tag_tier_d(scored: list, tier_d_meta: dict) -> None:
+    """Attach scanner_tier='D' and PRU metadata to scored dicts IN PLACE."""
+    if not tier_d_meta:
+        return
+    for s in scored:
+        sym = s.get("symbol", "")
+        if sym in tier_d_meta:
+            meta = tier_d_meta[sym]
+            s["scanner_tier"] = "D"
+            s["position_research_universe_member"] = True
+            s["discovery_score"] = meta.get("discovery_score", 0)
+            s["adjusted_discovery_score"] = meta.get("adjusted_discovery_score")
+            s["primary_archetype"] = meta.get("primary_archetype")
+            s["universe_bucket"] = meta.get("universe_bucket")
+            s["risk_penalty_pts"] = meta.get("risk_penalty_pts", 0)
+            s["matched_position_archetypes"] = meta.get("matched_position_archetypes", [])
+            s["discovery_signals"] = meta.get("discovery_signals", [])
+            s["universe_entry_reason"] = meta.get("universe_entry_reason", "")
+
+
+def _apply_tier_d_scoring_cap(
+    filtered: list[str],
+    regime_name: str,
+) -> tuple[list[str], dict]:
+    """
+    Rank PRU symbols already in filtered and cap them before score_universe().
+    Writes stage=scoring_cap counters to tier_d_funnel.jsonl.
+
+    Returns (new_filtered, counters).
+    """
+    from config import CONFIG as _cap_cfg
+    max_tier_d = int(_cap_cfg.get("tier_d_pre_scoring_max", 60))
+    min_tier_d = int(_cap_cfg.get("tier_d_pre_scoring_min", 40))
+    global_cap = int(_cap_cfg.get("max_symbols_to_score", 140))
+
+    pru_syms, pru_meta = _load_pru_dict()
+    pru_sym_set = frozenset(pru_syms)
+
+    non_tier_d: list[str] = []
+    tier_d_pool: list[str] = []
+    for sym in filtered:
+        if sym in pru_sym_set:
+            tier_d_pool.append(sym)
+        else:
+            non_tier_d.append(sym)
+
+    tier_d_pool_count = len(tier_d_pool)
+
+    empty_counters = {
+        "total_normal_symbols":            len(non_tier_d),
+        "tier_d_discovery_pool_count":     0,
+        "tier_d_selected_for_scoring":     0,
+        "total_symbols_before_global_cap": len(non_tier_d),
+        "total_symbols_after_global_cap":  len(non_tier_d),
+        "tier_d_removed_before_scoring":   0,
+        "symbols_removed_by_global_cap":   0,
+    }
+    if tier_d_pool_count == 0:
+        return filtered, empty_counters
+
+    def _rank(sym: str) -> float:
+        m = pru_meta.get(sym, {})
+        return (
+            (m.get("adjusted_discovery_score") or 0) * 2
+            + min((m.get("discovery_score") or 0), 20)
+            + len(m.get("matched_position_archetypes") or []) * 3
+            + int(bool(m.get("priority_overlap"))) * 5
+        )
+
+    tier_d_pool.sort(key=_rank, reverse=True)
+    n_select = max(min(max_tier_d, tier_d_pool_count), min(min_tier_d, tier_d_pool_count))
+    tier_d_selected = tier_d_pool[:n_select]
+
+    total_before_cap = len(non_tier_d) + len(tier_d_selected)
+    symbols_removed_by_cap = 0
+    if total_before_cap > global_cap:
+        available = max(0, global_cap - len(non_tier_d))
+        tier_d_selected = tier_d_selected[:available]
+        symbols_removed_by_cap = total_before_cap - (len(non_tier_d) + len(tier_d_selected))
+
+    new_filtered = non_tier_d + tier_d_selected
+    tier_d_removed = tier_d_pool_count - len(tier_d_selected)
+
+    log.info(
+        "Tier D scoring cap [%s]: pool=%d selected=%d removed=%d | normal=%d total=%d cap_trimmed=%d",
+        regime_name, tier_d_pool_count, len(tier_d_selected), tier_d_removed,
+        len(non_tier_d), len(new_filtered), symbols_removed_by_cap,
+    )
+
+    return new_filtered, {
+        "total_normal_symbols":            len(non_tier_d),
+        "tier_d_discovery_pool_count":     tier_d_pool_count,
+        "tier_d_selected_for_scoring":     len(tier_d_selected),
+        "total_symbols_before_global_cap": total_before_cap,
+        "total_symbols_after_global_cap":  len(new_filtered),
+        "tier_d_removed_before_scoring":   tier_d_removed,
+        "symbols_removed_by_global_cap":   symbols_removed_by_cap,
+    }
+
+
 def _fetch_news(universe: list, timeout_sec: int = 8) -> dict:
     """
     Fetch news sentiment for up to 50 symbols with a hard timeout.
@@ -536,6 +647,25 @@ def run_signal_pipeline(
     # Resolve regime_name early — needed by the scoring cap and VIX gate below.
     regime_name = regime.get("regime", "UNKNOWN")
 
+    # 1c. Tier D scoring cap — rank PRU symbols in filtered by discovery metadata and
+    #     cap before score_universe(). Writes stage=scoring_cap to tier_d_funnel.jsonl.
+    _scoring_cap_counters: dict = {}
+    try:
+        filtered, _scoring_cap_counters = _apply_tier_d_scoring_cap(filtered, regime_name)
+        import json as _scj, os as _scos
+        _funnel_path_sc = _scos.path.join(
+            _scos.path.dirname(_scos.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
+        )
+        with open(_funnel_path_sc, "a") as _scf:
+            _scf.write(_scj.dumps({
+                "ts": datetime.now(UTC).isoformat(),
+                "regime": regime_name,
+                "stage": "scoring_cap",
+                **_scoring_cap_counters,
+            }) + "\n")
+    except Exception as _sce:
+        log.debug("Tier D scoring_cap failed (non-critical): %s", _sce)
+
     # 2. News sentiment (always)
     log.info("Fetching news sentiment (Yahoo RSS + keyword scoring)...")
     news_sentiment = _fetch_news(filtered)
@@ -577,6 +707,19 @@ def run_signal_pipeline(
         regime_dict=regime,
     )
     log.info(f"score_universe: {len(scored)} above threshold, {len(all_scored)} total")
+
+    # 4c. Tier D tagging — attach scanner_tier="D" and PRU metadata to scored dicts
+    #     BEFORE _apply_strategy_threshold so the lower Tier D floor can apply.
+    try:
+        _, _tier_d_meta = _load_pru_dict()
+        if _tier_d_meta:
+            _tag_tier_d(all_scored, _tier_d_meta)
+            _tag_tier_d(scored, _tier_d_meta)
+            _n_tagged = sum(1 for s in all_scored if s.get("scanner_tier") == "D")
+            if _n_tagged:
+                log.info("Tier D: tagged %d/%d scored symbols with PRU metadata", _n_tagged, len(all_scored))
+    except Exception as _tde:
+        log.debug("Tier D tagging failed (non-critical): %s", _tde)
 
     # Check for data-fetch failure (all_scored empty from DATA_FETCH_BLOCKED,
     # not from a genuine zero-signal scan).  Distinguishes DATA_FETCH_BLOCKED
