@@ -88,27 +88,34 @@ class ConvictionScore:
 # ---------------------------------------------------------------------------
 
 def _fmp(endpoint: str, params: dict, timeout: int = 8) -> list | dict | None:
-    """Single FMP stable GET. Returns parsed JSON or None on failure."""
+    """Single FMP stable GET with one 429 retry. Returns parsed JSON or None."""
     key = _FMP_KEY or os.environ.get("FMP_API_KEY", "")
     if not key:
         return None
-    try:
-        resp = _requests.get(
-            f"{_FMP_BASE}/{endpoint}",
-            params={**params, "apikey": key},
-            timeout=timeout,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        # FMP returns rate-limit / subscription errors as HTTP 200 with an error body
-        if isinstance(data, dict) and ("Error Message" in data or "error" in data):
-            log.warning("conviction_engine: FMP %s app-error — %s", endpoint,
-                        data.get("Error Message") or data.get("error"))
+    for attempt in range(2):
+        try:
+            resp = _requests.get(
+                f"{_FMP_BASE}/{endpoint}",
+                params={**params, "apikey": key},
+                timeout=timeout,
+            )
+            if resp.status_code == 429:
+                if attempt == 0:
+                    time.sleep(3)   # back off and retry once
+                    continue
+                return None
+            resp.raise_for_status()
+            data = resp.json()
+            # FMP returns rate-limit / subscription errors as HTTP 200 with error body
+            if isinstance(data, dict) and ("Error Message" in data or "error" in data):
+                log.warning("conviction_engine: FMP %s app-error — %s", endpoint,
+                            data.get("Error Message") or data.get("error"))
+                return None
+            return data
+        except Exception as exc:
+            log.debug("conviction_engine: FMP %s failed — %s", endpoint, exc)
             return None
-        return data
-    except Exception as exc:
-        log.debug("conviction_engine: FMP %s failed — %s", endpoint, exc)
-        return None
+    return None
 
 
 def _first(raw) -> dict:
@@ -518,16 +525,26 @@ def fetch_price_changes(symbols: list[str]) -> dict[str, float]:
     key = _FMP_KEY or os.environ.get("FMP_API_KEY", "")
     if not key:
         return {}
-    try:
-        resp = _requests.get(
-            f"{_FMP_BASE}/stock-price-change",
-            params={"symbol": ",".join(all_syms), "apikey": key},
-            timeout=15,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as exc:
-        log.warning("conviction_engine: price-change fetch failed — %s", exc)
+    for attempt in range(2):
+        try:
+            resp = _requests.get(
+                f"{_FMP_BASE}/stock-price-change",
+                params={"symbol": ",".join(all_syms), "apikey": key},
+                timeout=15,
+            )
+            if resp.status_code == 429:
+                if attempt == 0:
+                    time.sleep(5)
+                    continue
+                log.warning("conviction_engine: price-change 429 — giving up")
+                return {}
+            resp.raise_for_status()
+            data = resp.json()
+            break
+        except Exception as exc:
+            log.warning("conviction_engine: price-change fetch failed — %s", exc)
+            return {}
+    else:
         return {}
 
     result: dict[str, float] = {}
@@ -871,13 +888,9 @@ def _score_peer_network(symbol: str, price_changes: dict[str, float]) -> Dimensi
     peers_with_data = [(p, price_changes.get(p)) for p in peers
                        if price_changes.get(p) is not None]
 
-    # If peer prices are missing from the batch (single-symbol rescore path),
-    # fetch them on demand — one batch call for all peers.
-    if len(peers_with_data) < 2 and peers:
-        peer_prices = fetch_price_changes(peers[:20])  # cap at 20 to stay fast
-        peers_with_data = [(p, peer_prices.get(p)) for p in peers
-                           if peer_prices.get(p) is not None]
-
+    # No on-demand fetches — would cascade 429s during batch warm-up.
+    # Universe-level batch (refresh_all) always contains all peers.
+    # Single-symbol rescores return 0 here; that is acceptable.
     if len(peers_with_data) < 2:
         return DimensionScore(raw_pts=0, max_pts=MAX,
                               signal="no_price_data_for_peers")
