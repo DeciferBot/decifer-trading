@@ -280,6 +280,7 @@ services:
       - IBEAM_GATEWAY_BASE_URL=https://localhost:4002
       - IBEAM_LOG_TO_FILE=True
       - IBEAM_PAPER_ACCOUNT=1
+      - IBEAM_GATEWAY_STARTUP=60
     ports:
       - "127.0.0.1:4002:4002"
       - "127.0.0.1:5000:5000"
