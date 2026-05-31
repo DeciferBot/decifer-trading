@@ -29,7 +29,14 @@ from market_intelligence import apex_call
 from scanner import get_market_regime
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SYMBOLS = ["ARM", "NVDA", "TSM", "ALAB", "NOW", "IBM", "ORCL", "MSFT"]
+SYMBOLS = [
+    # Original watchlist
+    "ARM", "NVDA", "TSM", "ALAB", "NOW", "IBM", "ORCL", "MSFT",
+    # Added 2026-06-01
+    "GOOGL", "AAOI", "ASTS", "BKSY", "COIN", "GLW", "DOCN", "FLY",
+    "INTC", "IREN", "IRDM", "LITE", "MTSI", "MRVL", "MU", "PLTR",
+    "QCOM", "RGTI", "RKLB", "SATS", "SPIR", "VRT", "VSAT",
+]
 
 VERCEL_URL = os.getenv(
     "VERCEL_APP_URL", "https://mobile.decifertrading.com"
