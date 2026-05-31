@@ -1824,13 +1824,7 @@ canvas{display:block;width:100% !important}
 
 
 <script>
-// ── Remote mode (tunnel / non-localhost access) ────────────
-(function(){
-  const h = window.location.hostname;
-  if(h !== 'localhost' && h !== '127.0.0.1'){
-    document.body.classList.add('remote-mode');
-  }
-})();
+// ── Remote mode — disabled. Auth handled by nginx basic auth. ──────────────
 
 // ── State ──────────────────────────────────────────────────
 let allTrades = [];
