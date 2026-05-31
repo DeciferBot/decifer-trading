@@ -9,134 +9,3556 @@
       "id": "space",
       "label": "Space & Defence",
       "color": "#f59e0b"
+    },
+    {
+      "id": "healthcare",
+      "label": "GLP-1 & Healthcare",
+      "color": "#ec4899"
+    },
+    {
+      "id": "minerals",
+      "label": "Critical Minerals & Energy",
+      "color": "#f97316"
+    },
+    {
+      "id": "digital",
+      "label": "Digital Assets",
+      "color": "#a855f7"
+    },
+    {
+      "id": "industrial",
+      "label": "Reshoring & Industrial",
+      "color": "#84cc16"
     }
   ],
   "nodes": [
-    { "id": "NVDA", "label": "Nvidia", "cluster": "ai", "tier": 0, "subcluster": "compute", "description": "Designs the GPUs that power AI training and inference. Every major AI system runs on NVDA silicon.", "chain_note": "The origin node of the AI compute chain." },
-    { "id": "AMD",  "label": "AMD",    "cluster": "ai", "tier": 0, "subcluster": "compute", "description": "CPUs and GPUs competing directly with NVDA in AI training. MI300X is their flagship AI chip.", "chain_note": "Primary competition to NVDA. When NVDA supply tightens, AMD benefits." },
-    { "id": "INTC", "label": "Intel",  "cluster": "ai", "tier": 0, "subcluster": "compute", "description": "CPUs and Gaudi AI accelerators. Struggling to compete in AI GPUs but dominant in server CPUs.", "chain_note": "Lagging NVDA in AI silicon. Turnaround story." },
-    { "id": "MSFT", "label": "Microsoft", "cluster": "ai", "tier": 0, "subcluster": "software", "description": "Azure cloud and OpenAI partnership. Largest enterprise buyer of NVDA compute.", "chain_note": "When MSFT AI revenue grows, it confirms the AI spending cycle is intact." },
-    { "id": "AMZN", "label": "Amazon",    "cluster": "ai", "tier": 0, "subcluster": "software", "description": "AWS cloud, Bedrock AI platform, and Trainium custom AI chips.", "chain_note": "Second largest hyperscaler AI buyer. Also building custom silicon to reduce NVDA dependency." },
-    { "id": "GOOG", "label": "Alphabet",  "cluster": "ai", "tier": 0, "subcluster": "software", "description": "Google Cloud, Gemini AI, and TPU custom chips. Both buyer and competitor in AI infrastructure.", "chain_note": "Builds its own TPUs to reduce NVDA dependency. Google Cloud is key revenue driver." },
-    { "id": "META", "label": "Meta",      "cluster": "ai", "tier": 0, "subcluster": "software", "description": "Llama open-source AI, MTIA custom chips. One of the largest GPU cluster operators globally.", "chain_note": "Massive capex buyer. When META guides capex higher, the whole compute chain benefits." },
-    { "id": "ORCL", "label": "Oracle",    "cluster": "ai", "tier": 0, "subcluster": "software", "description": "OCI cloud growing fast as second-tier alternative to AWS/Azure. GPU clusters for enterprise AI.", "chain_note": "Beneficiary of enterprises that want AI infrastructure outside the hyperscaler trio." },
-    { "id": "CRM",  "label": "Salesforce","cluster": "ai", "tier": 0, "subcluster": "software", "description": "Agentforce AI platform embedded into enterprise CRM. AI monetisation story.", "chain_note": "Enterprise AI software. Downstream of the AI infrastructure buildout." },
-    { "id": "NOW",  "label": "ServiceNow","cluster": "ai", "tier": 0, "subcluster": "software", "description": "AI-native workflow automation for enterprises. One of the strongest AI software charts.", "chain_note": "Enterprise AI software beneficiary. Workflow automation expanding into AI agents." },
-    { "id": "PLTR", "label": "Palantir",  "cluster": "ai", "tier": 0, "subcluster": "software", "description": "AI platform for government and enterprise. AIP product driving commercial growth.", "chain_note": "Defence and enterprise AI. Government contracts anchor the business." },
-
-    { "id": "TSM",  "label": "TSMC",      "cluster": "ai", "tier": 1, "subcluster": "foundry", "description": "Manufactures NVDA, AMD, and Apple chips. The world's most advanced semiconductor foundry.", "chain_note": "Every NVDA GPU starts here. TSMC order volume is a leading indicator of AI chip demand." },
-    { "id": "ASML", "label": "ASML",      "cluster": "ai", "tier": 1, "subcluster": "foundry", "description": "Makes the EUV lithography machines that TSMC uses. Monopoly position in advanced chip manufacturing equipment.", "chain_note": "One step upstream of TSMC. TSMC capacity expansion = ASML machine orders." },
-    { "id": "AMAT", "label": "Applied Materials", "cluster": "ai", "tier": 1, "subcluster": "foundry", "description": "Semiconductor equipment — deposition, etching, inspection. Essential for every chip fab.", "chain_note": "Benefits from any fab capacity expansion, including TSMC and Intel." },
-    { "id": "KLAC", "label": "KLA Corp",  "cluster": "ai", "tier": 1, "subcluster": "foundry", "description": "Process control and inspection equipment for fabs. Every defect caught before shipping.", "chain_note": "Picks-and-shovels for chip manufacturing. Revenue tied to fab utilisation." },
-    { "id": "LRCX", "label": "Lam Research","cluster": "ai","tier": 1, "subcluster": "foundry", "description": "Etch and deposition equipment. Works alongside AMAT in every leading-edge fab.", "chain_note": "Foundry equipment duopoly with AMAT. AI capex benefits both." },
-    { "id": "CDNS", "label": "Cadence",   "cluster": "ai", "tier": 1, "subcluster": "foundry", "description": "EDA software — designs the chip before it goes to fab. Every custom AI chip uses Cadence or Synopsys.", "chain_note": "Design tools are the first step in any new chip. AI chip proliferation = Cadence revenue." },
-    { "id": "SNPS", "label": "Synopsys",  "cluster": "ai", "tier": 1, "subcluster": "foundry", "description": "EDA and chip simulation software. Duopoly with Cadence in the design tool market.", "chain_note": "Every AI chip designed using Synopsys or Cadence tools." },
-    { "id": "MU",   "label": "Micron",    "cluster": "ai", "tier": 1, "subcluster": "memory",  "description": "HBM memory for AI GPUs and DRAM for data centres. HBM3E powers NVDA H200.", "chain_note": "AI GPU demand is HBM demand. Micron is the US memory supplier." },
-    { "id": "AVGO", "label": "Broadcom",  "cluster": "ai", "tier": 1, "subcluster": "networking", "description": "Networking chips and custom AI silicon (XPUs for Google and Meta). Dual role: enabler and competitor.", "chain_note": "Networking backbone of every GPU cluster. Also building custom AI chips for hyperscalers." },
-    { "id": "MRVL", "label": "Marvell",   "cluster": "ai", "tier": 1, "subcluster": "networking", "description": "Custom AI silicon and data centre networking. Growing fast as hyperscalers diversify from NVDA.", "chain_note": "Custom silicon for AWS and other hyperscalers. Direct NVDA alternative path." },
-    { "id": "ANET", "label": "Arista Networks","cluster":"ai","tier":1,"subcluster":"networking","description":"High-speed networking switches for AI clusters. 400G and 800G ethernet connecting thousands of GPUs.","chain_note":"Every large GPU cluster needs Arista switching. AI scale = networking revenue." },
-
-    { "id": "DELL", "label": "Dell",      "cluster": "ai", "tier": 1, "subcluster": "systems",  "description": "Integrates NVDA GPUs into AI servers sold to enterprises. PowerEdge servers dominate the market.", "chain_note": "AI server demand amplifier. DELL earnings confirm enterprise AI spend is real." },
-    { "id": "HPE",  "label": "HPE",       "cluster": "ai", "tier": 1, "subcluster": "systems",  "description": "Enterprise servers and supercomputers. Cray supercomputers for AI research.", "chain_note": "Enterprise AI infrastructure. Competitor to DELL in AI server market." },
-    { "id": "SMCI", "label": "Super Micro","cluster": "ai","tier": 1, "subcluster": "systems",  "description": "Fastest ship-times for GPU servers. Preferred integrator for AI startups and hyperscalers.", "chain_note": "SMCI moves with NVDA earnings and DELL sympathy. First mover in GPU server delivery." },
-    { "id": "NBIS", "label": "Nebius",    "cluster": "ai", "tier": 1, "subcluster": "systems",  "description": "GPU cloud for AI developers. NVDA-backed. Growing rapidly in European AI infrastructure.", "chain_note": "NVDA investment. When AI cloud demand grows, NBIS is a leveraged play on it." },
-
-    { "id": "VRT",  "label": "Vertiv",    "cluster": "ai", "tier": 2, "subcluster": "power",    "description": "Power management and liquid cooling for data centres. Every AI GPU rack needs Vertiv equipment.", "chain_note": "AI data centre build-out = Vertiv revenue. Direct capex beneficiary." },
-    { "id": "ETN",  "label": "Eaton",     "cluster": "ai", "tier": 2, "subcluster": "power",    "description": "Electrical equipment and power management. Data centre power distribution.", "chain_note": "Infrastructure layer of AI capex. Benefits from data centre construction wave." },
-    { "id": "CEG",  "label": "Constellation Energy","cluster":"ai","tier":2,"subcluster":"power","description":"Nuclear power operator. Signed PPAs with hyperscalers including restarting Three Mile Island for Microsoft.","chain_note":"Hyperscalers need 24/7 clean power. Nuclear is the only 24/7 clean source. CEG is the largest US nuclear operator." },
-    { "id": "VST",  "label": "Vistra",    "cluster": "ai", "tier": 2, "subcluster": "power",    "description": "Power generation including nuclear. Signed data centre power agreements.", "chain_note": "Competitor to CEG for AI data centre power contracts." },
-    { "id": "NRG",  "label": "NRG Energy","cluster": "ai", "tier": 2, "subcluster": "power",    "description": "Power generation. Growing data centre power contracts.", "chain_note": "AI power generation beneficiary." },
-    { "id": "EQIX", "label": "Equinix",   "cluster": "ai", "tier": 2, "subcluster": "infrastructure","description":"The largest data centre REIT. Co-location facilities where AI compute lives.", "chain_note":"AI infrastructure real estate. Every hyperscaler cluster needs physical space." },
-    { "id": "DLR",  "label": "Digital Realty","cluster":"ai","tier":2,"subcluster":"infrastructure","description":"Data centre REIT. Builds and leases AI-ready facilities to hyperscalers.", "chain_note":"Data centre real estate beneficiary. Slower moving than pure tech but real capex chain." },
-    { "id": "PWR",  "label": "Quanta Services","cluster":"ai","tier":2,"subcluster":"infrastructure","description":"Builds electrical infrastructure and data centres. Electricians and engineers for the AI build-out.", "chain_note":"Construction pick-and-shovel for AI capex. Revenue tied to data centre build timelines." },
-    { "id": "EME",  "label": "EMCOR",     "cluster": "ai", "tier": 2, "subcluster": "infrastructure","description":"Mechanical and electrical construction. Installs power and cooling in data centres.", "chain_note":"EMCOR builds the infrastructure inside the data centres Equinix and DLR own." },
-    { "id": "CRWD", "label": "CrowdStrike","cluster":"ai", "tier": 1, "subcluster": "software",  "description": "AI-native cybersecurity platform. Falcon platform uses AI for threat detection.", "chain_note": "Every AI-connected enterprise needs security. CRWD is the AI era security leader." },
-    { "id": "PANW", "label": "Palo Alto", "cluster": "ai", "tier": 1, "subcluster": "software",  "description": "Cybersecurity platform consolidation play. Competing with CRWD for AI-era security budgets.", "chain_note": "Enterprise security spending companion to AI adoption." },
-    { "id": "CIEN", "label": "Ciena",     "cluster": "ai", "tier": 2, "subcluster": "networking","description":"Optical networking equipment. As AI clusters scale, fibre optic bandwidth becomes critical.", "chain_note":"Long-haul and metro optical networking. AI data centre interconnect demand." },
-    { "id": "COHR", "label": "Coherent",  "cluster": "ai", "tier": 3, "subcluster": "photonics", "description": "Optical components and transceivers. Copper hits physics limits above ~10k GPUs — photonics is next.", "chain_note": "Non-obvious AI beneficiary. As GPU clusters scale past copper limits, optical interconnects become mandatory." },
-    { "id": "LITE", "label": "Lumentum", "cluster": "ai", "tier": 3, "subcluster": "photonics", "description": "Laser and optical components. Supplies optical transceivers for data centre interconnects.", "chain_note": "Same photonics chain as COHR. Signal travels last but the tailwind is structural." },
-    { "id": "IREN", "label": "Iris Energy","cluster":"ai", "tier": 2, "subcluster": "systems",  "description": "Bitcoin mining company pivoting to AI GPU cloud. NVDA-backed infrastructure.", "chain_note": "NVDA investment. GPU cloud for AI inference. Leveraged to AI compute demand." },
-
-    { "id": "RKLB", "label": "Rocket Lab", "cluster": "space", "tier": 0, "subcluster": "launch",   "description": "Small satellite launch vehicles. Electron rocket and forthcoming Neutron.", "chain_note": "Most active small-launch operator. Revenue tied to satellite deployment demand." },
-    { "id": "PL",   "label": "Planet Labs","cluster": "space", "tier": 0, "subcluster": "earth_obs","description": "Daily earth observation imagery from 200+ satellites. Agriculture, defence, intelligence.", "chain_note": "Revenue from satellite imagery subscriptions. Defence and agriculture customers." },
-    { "id": "SPIR", "label": "Spire Global","cluster":"space", "tier": 0, "subcluster": "earth_obs","description":"Weather and maritime tracking from space. Data-as-a-service satellite company.", "chain_note":"Satellite data company. Maritime AIS and weather data streams." },
-    { "id": "MNTS", "label": "Momentus",  "cluster": "space", "tier": 0, "subcluster": "launch",   "description": "In-space transportation — last-mile delivery for satellites.", "chain_note": "Fills the gap between launch and final orbit. Growing with small satellite demand." },
-    { "id": "LMT",  "label": "Lockheed",  "cluster": "space", "tier": 0, "subcluster": "defence",  "description": "F-35, missile systems, and space vehicles. One of two dominant US defence primes.", "chain_note": "Defence budget beneficiary. Space systems division growing with government contracts." },
-    { "id": "NOC",  "label": "Northrop",  "cluster": "space", "tier": 0, "subcluster": "defence",  "description": "B-21 bomber, space satellites, missile defence. The other dominant defence prime.", "chain_note": "Space systems and hypersonics. Stealth and satellite technology." },
-    { "id": "RTX",  "label": "RTX",       "cluster": "space", "tier": 0, "subcluster": "defence",  "description": "Raytheon missiles, Pratt engines. Missiles and propulsion systems.", "chain_note": "Missile systems and jet engines. Ukraine conflict expanded the order book." },
-    { "id": "LHX",  "label": "L3Harris",  "cluster": "space", "tier": 0, "subcluster": "defence",  "description": "Communications and electronic warfare for military. Space sensor systems.", "chain_note": "Electronic warfare and military communications. Space intelligence systems." },
-    { "id": "VSAT", "label": "Viasat",    "cluster": "space", "tier": 1, "subcluster": "comms",    "description": "Satellite internet and communications. Military satellite networks.", "chain_note": "Satellite connectivity. Government and commercial customers." },
-    { "id": "IRDM", "label": "Iridium",   "cluster": "space", "tier": 1, "subcluster": "comms",    "description": "Satellite phone network. True global coverage including polar regions.", "chain_note": "Defence and maritime communications. Monopoly on global satellite voice." },
-    { "id": "MOGA", "label": "Moog",      "cluster": "space", "tier": 1, "subcluster": "components","description":"Precision flight control systems for rockets, satellites, and defence.", "chain_note":"Components supplier to both launch vehicles and missiles. Both space and defence exposure." },
-    { "id": "CW",   "label": "Curtiss-Wright","cluster":"space","tier":1,"subcluster":"components","description":"Defence electronics and industrial controls. Ruggedised systems for harsh environments.", "chain_note":"Defence electronics. Naval and aerospace systems." },
-    { "id": "HEI",  "label": "Heico",     "cluster": "space", "tier": 1, "subcluster": "components","description":"FAA-approved aircraft parts at lower cost. Aerospace component aftermarket.", "chain_note":"Aerospace aftermarket. Benefits from both commercial and military aircraft growth." },
-    { "id": "TDY",  "label": "Teledyne",  "cluster": "space", "tier": 1, "subcluster": "components","description":"High-performance sensors, cameras, and electronics for space and defence.", "chain_note":"Space-grade sensors. Cameras on many NASA missions and military satellites." },
-    { "id": "HXL",  "label": "Hexcel",    "cluster": "space", "tier": 2, "subcluster": "materials", "description":"Carbon fibre composites for aerospace. Lighter rockets need advanced composites.", "chain_note":"Materials pick-and-shovel. Every rocket body and satellite structure uses composites." },
-    { "id": "ATI",  "label": "ATI Inc",   "cluster": "space", "tier": 2, "subcluster": "materials", "description":"Titanium and specialty alloys for aerospace and defence.", "chain_note":"Materials layer. Titanium for rocket engines, airframes, and hypersonic systems." },
-    { "id": "KTOS", "label": "Kratos",    "cluster": "space", "tier": 1, "subcluster": "defence",  "description":"Drone warfare systems, satellite ground stations, and jet-powered drones.", "chain_note":"Low-cost drone attrition warfare. Ground stations for satellite command." },
-    { "id": "AXON", "label": "Axon",      "cluster": "space", "tier": 1, "subcluster": "defence",  "description":"Tasers, body cameras, and drone-based public safety systems.", "chain_note":"Defence-tech crossover. Drone and AI for public safety." }
+    {
+      "id": "NVDA",
+      "label": "Nvidia",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "compute",
+      "description": "Designs the GPUs that power AI training and inference. Every major AI system runs on NVDA silicon.",
+      "chain_note": "The origin node of the AI compute chain."
+    },
+    {
+      "id": "AMD",
+      "label": "AMD",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "compute",
+      "description": "CPUs and GPUs competing directly with NVDA in AI training. MI300X is their flagship AI chip.",
+      "chain_note": "Primary competition to NVDA. When NVDA supply tightens, AMD benefits."
+    },
+    {
+      "id": "INTC",
+      "label": "Intel",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "compute",
+      "description": "CPUs and Gaudi AI accelerators. Struggling to compete in AI GPUs but dominant in server CPUs.",
+      "chain_note": "Lagging NVDA in AI silicon. Turnaround story."
+    },
+    {
+      "id": "MSFT",
+      "label": "Microsoft",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "software",
+      "description": "Azure cloud and OpenAI partnership. Largest enterprise buyer of NVDA compute.",
+      "chain_note": "When MSFT AI revenue grows, it confirms the AI spending cycle is intact."
+    },
+    {
+      "id": "AMZN",
+      "label": "Amazon",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "software",
+      "description": "AWS cloud, Bedrock AI platform, and Trainium custom AI chips.",
+      "chain_note": "Second largest hyperscaler AI buyer. Also building custom silicon to reduce NVDA dependency."
+    },
+    {
+      "id": "GOOG",
+      "label": "Alphabet",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "software",
+      "description": "Google Cloud, Gemini AI, and TPU custom chips. Both buyer and competitor in AI infrastructure.",
+      "chain_note": "Builds its own TPUs to reduce NVDA dependency. Google Cloud is key revenue driver."
+    },
+    {
+      "id": "META",
+      "label": "Meta",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "software",
+      "description": "Llama open-source AI, MTIA custom chips. One of the largest GPU cluster operators globally.",
+      "chain_note": "Massive capex buyer. When META guides capex higher, the whole compute chain benefits."
+    },
+    {
+      "id": "ORCL",
+      "label": "Oracle",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "software",
+      "description": "OCI cloud growing fast as second-tier alternative to AWS/Azure. GPU clusters for enterprise AI.",
+      "chain_note": "Beneficiary of enterprises that want AI infrastructure outside the hyperscaler trio."
+    },
+    {
+      "id": "CRM",
+      "label": "Salesforce",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "software",
+      "description": "Agentforce AI platform embedded into enterprise CRM. AI monetisation story.",
+      "chain_note": "Enterprise AI software. Downstream of the AI infrastructure buildout."
+    },
+    {
+      "id": "NOW",
+      "label": "ServiceNow",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "software",
+      "description": "AI-native workflow automation for enterprises. One of the strongest AI software charts.",
+      "chain_note": "Enterprise AI software beneficiary. Workflow automation expanding into AI agents."
+    },
+    {
+      "id": "PLTR",
+      "label": "Palantir",
+      "cluster": "ai",
+      "tier": 0,
+      "subcluster": "software",
+      "description": "AI platform for government and enterprise. AIP product driving commercial growth.",
+      "chain_note": "Defence and enterprise AI. Government contracts anchor the business."
+    },
+    {
+      "id": "TSM",
+      "label": "TSMC",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "foundry",
+      "description": "Manufactures NVDA, AMD, and Apple chips. The world's most advanced semiconductor foundry.",
+      "chain_note": "Every NVDA GPU starts here. TSMC order volume is a leading indicator of AI chip demand."
+    },
+    {
+      "id": "ASML",
+      "label": "ASML",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "foundry",
+      "description": "Makes the EUV lithography machines that TSMC uses. Monopoly position in advanced chip manufacturing equipment.",
+      "chain_note": "One step upstream of TSMC. TSMC capacity expansion = ASML machine orders."
+    },
+    {
+      "id": "AMAT",
+      "label": "Applied Materials",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "foundry",
+      "description": "Semiconductor equipment \u2014 deposition, etching, inspection. Essential for every chip fab.",
+      "chain_note": "Benefits from any fab capacity expansion, including TSMC and Intel."
+    },
+    {
+      "id": "KLAC",
+      "label": "KLA Corp",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "foundry",
+      "description": "Process control and inspection equipment for fabs. Every defect caught before shipping.",
+      "chain_note": "Picks-and-shovels for chip manufacturing. Revenue tied to fab utilisation."
+    },
+    {
+      "id": "LRCX",
+      "label": "Lam Research",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "foundry",
+      "description": "Etch and deposition equipment. Works alongside AMAT in every leading-edge fab.",
+      "chain_note": "Foundry equipment duopoly with AMAT. AI capex benefits both."
+    },
+    {
+      "id": "CDNS",
+      "label": "Cadence",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "foundry",
+      "description": "EDA software \u2014 designs the chip before it goes to fab. Every custom AI chip uses Cadence or Synopsys.",
+      "chain_note": "Design tools are the first step in any new chip. AI chip proliferation = Cadence revenue."
+    },
+    {
+      "id": "SNPS",
+      "label": "Synopsys",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "foundry",
+      "description": "EDA and chip simulation software. Duopoly with Cadence in the design tool market.",
+      "chain_note": "Every AI chip designed using Synopsys or Cadence tools."
+    },
+    {
+      "id": "MU",
+      "label": "Micron",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "memory",
+      "description": "HBM memory for AI GPUs and DRAM for data centres. HBM3E powers NVDA H200.",
+      "chain_note": "AI GPU demand is HBM demand. Micron is the US memory supplier."
+    },
+    {
+      "id": "AVGO",
+      "label": "Broadcom",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "networking",
+      "description": "Networking chips and custom AI silicon (XPUs for Google and Meta). Dual role: enabler and competitor.",
+      "chain_note": "Networking backbone of every GPU cluster. Also building custom AI chips for hyperscalers."
+    },
+    {
+      "id": "MRVL",
+      "label": "Marvell",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "networking",
+      "description": "Custom AI silicon and data centre networking. Growing fast as hyperscalers diversify from NVDA.",
+      "chain_note": "Custom silicon for AWS and other hyperscalers. Direct NVDA alternative path."
+    },
+    {
+      "id": "ANET",
+      "label": "Arista Networks",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "networking",
+      "description": "High-speed networking switches for AI clusters. 400G and 800G ethernet connecting thousands of GPUs.",
+      "chain_note": "Every large GPU cluster needs Arista switching. AI scale = networking revenue."
+    },
+    {
+      "id": "DELL",
+      "label": "Dell",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "systems",
+      "description": "Integrates NVDA GPUs into AI servers sold to enterprises. PowerEdge servers dominate the market.",
+      "chain_note": "AI server demand amplifier. DELL earnings confirm enterprise AI spend is real."
+    },
+    {
+      "id": "HPE",
+      "label": "HPE",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "systems",
+      "description": "Enterprise servers and supercomputers. Cray supercomputers for AI research.",
+      "chain_note": "Enterprise AI infrastructure. Competitor to DELL in AI server market."
+    },
+    {
+      "id": "SMCI",
+      "label": "Super Micro",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "systems",
+      "description": "Fastest ship-times for GPU servers. Preferred integrator for AI startups and hyperscalers.",
+      "chain_note": "SMCI moves with NVDA earnings and DELL sympathy. First mover in GPU server delivery."
+    },
+    {
+      "id": "NBIS",
+      "label": "Nebius",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "systems",
+      "description": "GPU cloud for AI developers. NVDA-backed. Growing rapidly in European AI infrastructure.",
+      "chain_note": "NVDA investment. When AI cloud demand grows, NBIS is a leveraged play on it."
+    },
+    {
+      "id": "VRT",
+      "label": "Vertiv",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "power",
+      "description": "Power management and liquid cooling for data centres. Every AI GPU rack needs Vertiv equipment.",
+      "chain_note": "AI data centre build-out = Vertiv revenue. Direct capex beneficiary."
+    },
+    {
+      "id": "ETN",
+      "label": "Eaton",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "power",
+      "description": "Electrical equipment and power management. Data centre power distribution.",
+      "chain_note": "Infrastructure layer of AI capex. Benefits from data centre construction wave."
+    },
+    {
+      "id": "CEG",
+      "label": "Constellation Energy",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "power",
+      "description": "Nuclear power operator. Signed PPAs with hyperscalers including restarting Three Mile Island for Microsoft.",
+      "chain_note": "Hyperscalers need 24/7 clean power. Nuclear is the only 24/7 clean source. CEG is the largest US nuclear operator."
+    },
+    {
+      "id": "VST",
+      "label": "Vistra",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "power",
+      "description": "Power generation including nuclear. Signed data centre power agreements.",
+      "chain_note": "Competitor to CEG for AI data centre power contracts."
+    },
+    {
+      "id": "NRG",
+      "label": "NRG Energy",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "power",
+      "description": "Power generation. Growing data centre power contracts.",
+      "chain_note": "AI power generation beneficiary."
+    },
+    {
+      "id": "EQIX",
+      "label": "Equinix",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "infrastructure",
+      "description": "The largest data centre REIT. Co-location facilities where AI compute lives.",
+      "chain_note": "AI infrastructure real estate. Every hyperscaler cluster needs physical space."
+    },
+    {
+      "id": "DLR",
+      "label": "Digital Realty",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "infrastructure",
+      "description": "Data centre REIT. Builds and leases AI-ready facilities to hyperscalers.",
+      "chain_note": "Data centre real estate beneficiary. Slower moving than pure tech but real capex chain."
+    },
+    {
+      "id": "PWR",
+      "label": "Quanta Services",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "infrastructure",
+      "description": "Builds electrical infrastructure and data centres. Electricians and engineers for the AI build-out.",
+      "chain_note": "Construction pick-and-shovel for AI capex. Revenue tied to data centre build timelines."
+    },
+    {
+      "id": "EME",
+      "label": "EMCOR",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "infrastructure",
+      "description": "Mechanical and electrical construction. Installs power and cooling in data centres.",
+      "chain_note": "EMCOR builds the infrastructure inside the data centres Equinix and DLR own."
+    },
+    {
+      "id": "CRWD",
+      "label": "CrowdStrike",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "software",
+      "description": "AI-native cybersecurity platform. Falcon platform uses AI for threat detection.",
+      "chain_note": "Every AI-connected enterprise needs security. CRWD is the AI era security leader."
+    },
+    {
+      "id": "PANW",
+      "label": "Palo Alto",
+      "cluster": "ai",
+      "tier": 1,
+      "subcluster": "software",
+      "description": "Cybersecurity platform consolidation play. Competing with CRWD for AI-era security budgets.",
+      "chain_note": "Enterprise security spending companion to AI adoption."
+    },
+    {
+      "id": "CIEN",
+      "label": "Ciena",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "networking",
+      "description": "Optical networking equipment. As AI clusters scale, fibre optic bandwidth becomes critical.",
+      "chain_note": "Long-haul and metro optical networking. AI data centre interconnect demand."
+    },
+    {
+      "id": "COHR",
+      "label": "Coherent",
+      "cluster": "ai",
+      "tier": 3,
+      "subcluster": "photonics",
+      "description": "Optical components and transceivers. Copper hits physics limits above ~10k GPUs \u2014 photonics is next.",
+      "chain_note": "Non-obvious AI beneficiary. As GPU clusters scale past copper limits, optical interconnects become mandatory."
+    },
+    {
+      "id": "LITE",
+      "label": "Lumentum",
+      "cluster": "ai",
+      "tier": 3,
+      "subcluster": "photonics",
+      "description": "Laser and optical components. Supplies optical transceivers for data centre interconnects.",
+      "chain_note": "Same photonics chain as COHR. Signal travels last but the tailwind is structural."
+    },
+    {
+      "id": "IREN",
+      "label": "Iris Energy",
+      "cluster": "ai",
+      "tier": 2,
+      "subcluster": "systems",
+      "description": "Bitcoin mining company pivoting to AI GPU cloud. NVDA-backed infrastructure.",
+      "chain_note": "NVDA investment. GPU cloud for AI inference. Leveraged to AI compute demand."
+    },
+    {
+      "id": "RKLB",
+      "label": "Rocket Lab",
+      "cluster": "space",
+      "tier": 0,
+      "subcluster": "launch",
+      "description": "Small satellite launch vehicles. Electron rocket and forthcoming Neutron.",
+      "chain_note": "Most active small-launch operator. Revenue tied to satellite deployment demand."
+    },
+    {
+      "id": "PL",
+      "label": "Planet Labs",
+      "cluster": "space",
+      "tier": 0,
+      "subcluster": "earth_obs",
+      "description": "Daily earth observation imagery from 200+ satellites. Agriculture, defence, intelligence.",
+      "chain_note": "Revenue from satellite imagery subscriptions. Defence and agriculture customers."
+    },
+    {
+      "id": "SPIR",
+      "label": "Spire Global",
+      "cluster": "space",
+      "tier": 0,
+      "subcluster": "earth_obs",
+      "description": "Weather and maritime tracking from space. Data-as-a-service satellite company.",
+      "chain_note": "Satellite data company. Maritime AIS and weather data streams."
+    },
+    {
+      "id": "MNTS",
+      "label": "Momentus",
+      "cluster": "space",
+      "tier": 0,
+      "subcluster": "launch",
+      "description": "In-space transportation \u2014 last-mile delivery for satellites.",
+      "chain_note": "Fills the gap between launch and final orbit. Growing with small satellite demand."
+    },
+    {
+      "id": "LMT",
+      "label": "Lockheed",
+      "cluster": "space",
+      "tier": 0,
+      "subcluster": "defence",
+      "description": "F-35, missile systems, and space vehicles. One of two dominant US defence primes.",
+      "chain_note": "Defence budget beneficiary. Space systems division growing with government contracts."
+    },
+    {
+      "id": "NOC",
+      "label": "Northrop",
+      "cluster": "space",
+      "tier": 0,
+      "subcluster": "defence",
+      "description": "B-21 bomber, space satellites, missile defence. The other dominant defence prime.",
+      "chain_note": "Space systems and hypersonics. Stealth and satellite technology."
+    },
+    {
+      "id": "RTX",
+      "label": "RTX",
+      "cluster": "space",
+      "tier": 0,
+      "subcluster": "defence",
+      "description": "Raytheon missiles, Pratt engines. Missiles and propulsion systems.",
+      "chain_note": "Missile systems and jet engines. Ukraine conflict expanded the order book."
+    },
+    {
+      "id": "LHX",
+      "label": "L3Harris",
+      "cluster": "space",
+      "tier": 0,
+      "subcluster": "defence",
+      "description": "Communications and electronic warfare for military. Space sensor systems.",
+      "chain_note": "Electronic warfare and military communications. Space intelligence systems."
+    },
+    {
+      "id": "VSAT",
+      "label": "Viasat",
+      "cluster": "space",
+      "tier": 1,
+      "subcluster": "comms",
+      "description": "Satellite internet and communications. Military satellite networks.",
+      "chain_note": "Satellite connectivity. Government and commercial customers."
+    },
+    {
+      "id": "IRDM",
+      "label": "Iridium",
+      "cluster": "space",
+      "tier": 1,
+      "subcluster": "comms",
+      "description": "Satellite phone network. True global coverage including polar regions.",
+      "chain_note": "Defence and maritime communications. Monopoly on global satellite voice."
+    },
+    {
+      "id": "MOGA",
+      "label": "Moog",
+      "cluster": "space",
+      "tier": 1,
+      "subcluster": "components",
+      "description": "Precision flight control systems for rockets, satellites, and defence.",
+      "chain_note": "Components supplier to both launch vehicles and missiles. Both space and defence exposure."
+    },
+    {
+      "id": "CW",
+      "label": "Curtiss-Wright",
+      "cluster": "space",
+      "tier": 1,
+      "subcluster": "components",
+      "description": "Defence electronics and industrial controls. Ruggedised systems for harsh environments.",
+      "chain_note": "Defence electronics. Naval and aerospace systems."
+    },
+    {
+      "id": "HEI",
+      "label": "Heico",
+      "cluster": "space",
+      "tier": 1,
+      "subcluster": "components",
+      "description": "FAA-approved aircraft parts at lower cost. Aerospace component aftermarket.",
+      "chain_note": "Aerospace aftermarket. Benefits from both commercial and military aircraft growth."
+    },
+    {
+      "id": "TDY",
+      "label": "Teledyne",
+      "cluster": "space",
+      "tier": 1,
+      "subcluster": "components",
+      "description": "High-performance sensors, cameras, and electronics for space and defence.",
+      "chain_note": "Space-grade sensors. Cameras on many NASA missions and military satellites."
+    },
+    {
+      "id": "HXL",
+      "label": "Hexcel",
+      "cluster": "space",
+      "tier": 2,
+      "subcluster": "materials",
+      "description": "Carbon fibre composites for aerospace. Lighter rockets need advanced composites.",
+      "chain_note": "Materials pick-and-shovel. Every rocket body and satellite structure uses composites."
+    },
+    {
+      "id": "ATI",
+      "label": "ATI Inc",
+      "cluster": "space",
+      "tier": 2,
+      "subcluster": "materials",
+      "description": "Titanium and specialty alloys for aerospace and defence.",
+      "chain_note": "Materials layer. Titanium for rocket engines, airframes, and hypersonic systems."
+    },
+    {
+      "id": "KTOS",
+      "label": "Kratos",
+      "cluster": "space",
+      "tier": 1,
+      "subcluster": "defence",
+      "description": "Drone warfare systems, satellite ground stations, and jet-powered drones.",
+      "chain_note": "Low-cost drone attrition warfare. Ground stations for satellite command."
+    },
+    {
+      "id": "AXON",
+      "label": "Axon",
+      "cluster": "space",
+      "tier": 1,
+      "subcluster": "defence",
+      "description": "Tasers, body cameras, and drone-based public safety systems.",
+      "chain_note": "Defence-tech crossover. Drone and AI for public safety."
+    },
+    {
+      "id": "FCX",
+      "label": "Freeport-McMoRan",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "copper_mining",
+      "description": "World's largest publicly traded copper producer. Grasberg mine in Indonesia is one of the world's largest copper/gold deposits. AI data centre power cables, transformers, and cooling systems all require massive copper volumes.",
+      "chain_note": "Copper is the physical backbone of the AI power build-out. FCX is the primary swing producer."
+    },
+    {
+      "id": "TECK",
+      "label": "Teck Resources",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "copper_mining",
+      "description": "Canadian miner producing copper, zinc, and steelmaking coal. QB2 copper mine in Chile is its flagship growth asset.",
+      "chain_note": "Major copper producer with leverage to EV and infrastructure demand."
+    },
+    {
+      "id": "MP",
+      "label": "MP Materials",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "rare_earth",
+      "description": "Operates the only active rare earth mine in the US (Mountain Pass, California). Produces neodymium-praseodymium (NdPr) for permanent magnets used in EV motors and wind turbines.",
+      "chain_note": "US rare earth sovereignty play. NdPr magnets are in every EV drivetrain."
+    },
+    {
+      "id": "ALB",
+      "label": "Albemarle",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "lithium",
+      "description": "Largest lithium producer by market cap. Supplies lithium for EV batteries and energy storage. Customers include most major battery makers.",
+      "chain_note": "Lithium demand is a direct proxy for EV adoption rates."
+    },
+    {
+      "id": "SQM",
+      "label": "SQM",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "lithium",
+      "description": "Chilean lithium producer operating in the Atacama salt flat. Second largest lithium producer globally.",
+      "chain_note": "Atacama brine is the lowest-cost lithium source globally."
+    },
+    {
+      "id": "VALE",
+      "label": "Vale",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "iron_nickel",
+      "description": "Brazilian mining giant. World's largest iron ore producer and major nickel producer. Nickel is critical for EV battery cathodes.",
+      "chain_note": "Nickel supply is a key constraint on EV battery energy density improvements."
+    },
+    {
+      "id": "RIO",
+      "label": "Rio Tinto",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "copper_mining",
+      "description": "Anglo-Australian miner. Major copper, aluminium, iron ore, and lithium producer. Jadar lithium project in Serbia is a major upcoming supply source.",
+      "chain_note": "Diversified miner with exposure across the critical minerals supply chain."
+    },
+    {
+      "id": "AA",
+      "label": "Alcoa",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "aluminum",
+      "description": "World's largest aluminium producer. Supplies aluminium for aerospace, automotive, and data centre enclosures.",
+      "chain_note": "Aluminium is the structural metal of the energy transition and defence buildout."
+    },
+    {
+      "id": "CENX",
+      "label": "Century Aluminum",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "aluminum",
+      "description": "US primary aluminium smelter. Benefits from reshoring demand and defence aluminium requirements.",
+      "chain_note": "Domestic aluminium supply for reshoring and defence industrial base."
+    },
+    {
+      "id": "UUUU",
+      "label": "Energy Fuels",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "uranium",
+      "description": "US uranium and rare earth producer. Produces uranium for nuclear power. Also produces rare earth oxides at White Mesa Mill.",
+      "chain_note": "Dual exposure: uranium for the nuclear power renaissance + rare earth for EV/defence magnets."
+    },
+    {
+      "id": "FSLR",
+      "label": "First Solar",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "solar",
+      "description": "US manufacturer of thin-film CdTe solar panels. Largest US solar panel maker, benefiting from IRA domestic content incentives.",
+      "chain_note": "Beneficiary of IRA domestic manufacturing credits. Avoids Chinese polysilicon supply chain."
+    },
+    {
+      "id": "ENPH",
+      "label": "Enphase Energy",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "solar",
+      "description": "Designs microinverters for residential solar. Each panel gets its own inverter. Market leader in US residential solar.",
+      "chain_note": "Residential solar platform. Microinverter architecture provides higher yield and monitoring vs string inverters."
+    },
+    {
+      "id": "BEP",
+      "label": "Brookfield Renewable",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "renewable",
+      "description": "Owner-operator of renewable energy assets (hydro, wind, solar). Large buyer of solar panels and wind turbines.",
+      "chain_note": "Pure-play renewable energy operator. Power purchase agreements with data centres and utilities."
+    },
+    {
+      "id": "FREYR",
+      "label": "FREYR Battery",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "battery",
+      "description": "Norwegian battery manufacturer building gigafactories in the US and Norway. Targets utility-scale storage and EV batteries.",
+      "chain_note": "Utility-scale battery storage is the grid-stabilisation layer for intermittent renewables."
+    },
+    {
+      "id": "QS",
+      "label": "QuantumScape",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "battery",
+      "description": "Solid-state lithium-metal battery developer backed by Volkswagen. Pre-revenue, developing batteries with higher energy density and safety than current Li-ion.",
+      "chain_note": "If solid-state succeeds, it obsoletes current Li-ion chemistry and reshapes the entire battery supply chain."
+    },
+    {
+      "id": "TSLA",
+      "label": "Tesla",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "ev",
+      "description": "Designs and manufactures EVs, battery storage (Megapack), and solar products. Operates Gigafactories globally for vertical integration.",
+      "chain_note": "Largest EV demand signal globally. TSLA delivery numbers move the entire EV supply chain."
+    },
+    {
+      "id": "RIVN",
+      "label": "Rivian",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "ev",
+      "description": "EV maker focused on trucks and commercial delivery vans. Amazon is a major investor and customer for delivery vans.",
+      "chain_note": "Commercial EV fleet play. Amazon's 100k van order is the anchor contract."
+    },
+    {
+      "id": "CHPT",
+      "label": "ChargePoint",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "ev_charging",
+      "description": "Operates the largest EV charging network in North America and Europe. B2B model selling hardware and software subscriptions to businesses and fleets.",
+      "chain_note": "EV charging infrastructure is the utility layer enabling mass EV adoption."
+    },
+    {
+      "id": "BLNK",
+      "label": "Blink Charging",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "ev_charging",
+      "description": "Owns and operates EV charging stations. Smaller than ChargePoint, more hardware-focused.",
+      "chain_note": "Level 2 and DC fast charging operator. Smaller network than ChargePoint or EVgo."
+    },
+    {
+      "id": "EVGO",
+      "label": "EVgo",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "ev_charging",
+      "description": "Operates DC fast charging network. Focus on highway corridors and urban locations.",
+      "chain_note": "DC fast charging at scale. GM partnership anchors fleet charging contracts."
+    },
+    {
+      "id": "NEE",
+      "label": "NextEra Energy",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "utility",
+      "description": "Largest electric utility in the US. World's largest generator of renewable energy (wind and solar). Also operates Florida Power & Light.",
+      "chain_note": "NextEra's capex is the largest single buyer signal in the renewable energy supply chain."
+    },
+    {
+      "id": "DUK",
+      "label": "Duke Energy",
+      "cluster": "minerals",
+      "tier": 0,
+      "subcluster": "utility",
+      "description": "Large US electric utility serving the Southeast and Midwest. Transitioning from coal to natural gas and renewables.",
+      "chain_note": "Traditional utility transitioning to clean energy. Rate base growth underpins steady earnings."
+    },
+    {
+      "id": "SO",
+      "label": "Southern Company",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "utility",
+      "description": "US utility operating nuclear, gas, and solar assets. Vogtle units 3 and 4 are the first new US nuclear plants in decades.",
+      "chain_note": "Vogtle nuclear expansion is the proof-of-concept for new US nuclear construction."
+    },
+    {
+      "id": "EXAS",
+      "label": "Exact Sciences",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "diagnostics",
+      "description": "Makes Cologuard, the non-invasive colorectal cancer screening test. Also Oncotype DX for cancer genomics.",
+      "chain_note": "Precision diagnostics enabling earlier disease detection without invasive procedures."
+    },
+    {
+      "id": "ILMN",
+      "label": "Illumina",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "genomics",
+      "description": "Dominates the DNA sequencing market. Its sequencers are used in drug discovery, oncology diagnostics, and precision medicine. GRAIL cancer detection spinout re-acquired.",
+      "chain_note": "The picks-and-shovels of genomics. Every genome sequenced runs on Illumina hardware."
+    },
+    {
+      "id": "RXRX",
+      "label": "Recursion Pharma",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "ai_drug_discovery",
+      "description": "Combines biology and AI to accelerate drug discovery. Partners with NVIDIA to use GPU compute for phenomics at scale.",
+      "chain_note": "AI meets pharma R&D. NVDA partnership makes this a node bridging AI and healthcare clusters."
+    },
+    {
+      "id": "SEER",
+      "label": "Seer Bio",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "proteomics",
+      "description": "Proteomics platform for protein profiling at scale. Focused on protein biomarker discovery.",
+      "chain_note": "Proteomics complements genomics \u2014 proteins are the functional molecules genomics predicts."
+    },
+    {
+      "id": "NVO",
+      "label": "Novo Nordisk",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "pharma",
+      "description": "Danish pharma giant. Makes Ozempic and Wegovy (semaglutide, GLP-1 agonists). Largest European company by market cap. Insulin market leader for over a century.",
+      "chain_note": "GLP-1 anchor. Ozempic demand is reshaping the entire healthcare supply chain from CROs to distributors."
+    },
+    {
+      "id": "LLY",
+      "label": "Eli Lilly",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "pharma",
+      "description": "Makes Mounjaro and Zepbound (tirzepatide, GLP-1/GIP dual agonist). US pharma giant with the most valuable GLP-1 pipeline.",
+      "chain_note": "Tirzepatide shows superior weight loss vs semaglutide in head-to-head trials."
+    },
+    {
+      "id": "VKTX",
+      "label": "Viking Therapeutics",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "pharma",
+      "description": "Clinical-stage biotech with VK2735 oral GLP-1 candidate. Potentially easier to manufacture and administer than injectable semaglutide.",
+      "chain_note": "Oral GLP-1 could massively expand the addressable market by removing injection barrier."
+    },
+    {
+      "id": "AMGN",
+      "label": "Amgen",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "pharma",
+      "description": "Large-cap biotech with MariTide (GLP-1/GIPR) in pipeline. Also major biologic drugs including Enbrel and Prolia.",
+      "chain_note": "Late GLP-1 entrant with strong manufacturing and distribution capabilities."
+    },
+    {
+      "id": "IQV",
+      "label": "IQVIA",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "cro",
+      "description": "World's largest CRO and healthcare data company. Runs clinical trials for NVO, LLY, AMGN, VKTX. Also has a massive real-world health data business.",
+      "chain_note": "Every GLP-1 trial runs through a CRO. IQVIA is the largest and most diversified."
+    },
+    {
+      "id": "MEDP",
+      "label": "Medpace",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "cro",
+      "description": "Mid-size CRO specialising in metabolic, cardiovascular, and oncology trials. Known for high quality and biotech focus.",
+      "chain_note": "Specialty CRO. Metabolic disease focus puts it directly in the GLP-1 trial wave."
+    },
+    {
+      "id": "ICLR",
+      "label": "ICON PLC",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "cro",
+      "description": "Global CRO headquartered in Ireland. One of the top 3 CROs globally alongside IQVIA and Labcorp.",
+      "chain_note": "Scale CRO with global trial execution capability."
+    },
+    {
+      "id": "CRL",
+      "label": "Charles River Labs",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "cro",
+      "description": "Preclinical CRO providing animal models, safety testing, and early-stage research services to pharma companies.",
+      "chain_note": "Every drug starts at preclinical. Charles River is the upstream CRO before IQV and MEDP."
+    },
+    {
+      "id": "DXCM",
+      "label": "Dexcom",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "med_devices",
+      "description": "Makes continuous glucose monitors (CGMs). Ozempic/Wegovy patients often pair CGM with GLP-1 therapy for metabolic management. Core product is the G7 sensor.",
+      "chain_note": "CGM adoption grows structurally with GLP-1 use. Metabolic patients need ongoing glucose visibility."
+    },
+    {
+      "id": "ABT",
+      "label": "Abbott Labs",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "med_devices",
+      "description": "Diversified medical device and diagnostics company. Makes FreeStyle Libre CGM competing with Dexcom. Also diagnostics, cardiac devices, and nutrition.",
+      "chain_note": "Abbott's FreeStyle Libre competes directly with Dexcom G7 for GLP-1 patient monitoring."
+    },
+    {
+      "id": "PHR",
+      "label": "Phreesia",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "healthtech",
+      "description": "Patient intake and engagement software for medical practices. Helps obesity clinics and primary care practices manage GLP-1 patient workflows.",
+      "chain_note": "Workflow software for high-volume GLP-1 prescribing practices."
+    },
+    {
+      "id": "PODD",
+      "label": "Insulet",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "med_devices",
+      "description": "Makes the Omnipod tubeless insulin pump. Benefits from increased diabetes management focus alongside GLP-1 therapy.",
+      "chain_note": "Insulin pump paired with CGM and GLP-1 therapy for type 1 and type 2 diabetes management."
+    },
+    {
+      "id": "MCK",
+      "label": "McKesson",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "distribution",
+      "description": "Largest US drug distributor. Distributes approximately 30% of all pharmaceuticals in the US including Ozempic and Wegovy.",
+      "chain_note": "Every Ozempic prescription flows through McKesson, Cardinal, or ABC. Distribution margin expands with GLP-1 volume."
+    },
+    {
+      "id": "CAH",
+      "label": "Cardinal Health",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "distribution",
+      "description": "Second largest US drug distributor. Also makes medical products.",
+      "chain_note": "GLP-1 distribution volume is the single largest new revenue driver for drug distributors."
+    },
+    {
+      "id": "ABC",
+      "label": "Cencora",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "distribution",
+      "description": "Third major US drug distributor (formerly AmerisourceBergen). Strong in specialty and oncology drugs.",
+      "chain_note": "Specialty drug distribution expertise applies directly to GLP-1 injectables."
+    },
+    {
+      "id": "CVS",
+      "label": "CVS Health",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "pharmacy",
+      "description": "Vertically integrated: pharmacy chain, PBM (Caremark), and health insurer (Aetna). Major retail outlet for GLP-1 prescriptions.",
+      "chain_note": "Triple exposure: retail pharmacy fills scripts, Caremark PBM manages formulary, Aetna covers the patient."
+    },
+    {
+      "id": "HCA",
+      "label": "HCA Healthcare",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "care",
+      "description": "Largest for-profit hospital operator in the US with 180+ hospitals. Treats obesity and metabolic disease patients who may need GLP-1 therapy.",
+      "chain_note": "Hospital utilisation shifts as GLP-1s reduce obesity-related comorbidity admissions."
+    },
+    {
+      "id": "THC",
+      "label": "Tenet Healthcare",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "care",
+      "description": "Second largest for-profit hospital operator. Similar business model to HCA but smaller scale.",
+      "chain_note": "For-profit hospital exposure to metabolic disease patient volumes."
+    },
+    {
+      "id": "UNH",
+      "label": "UnitedHealth",
+      "cluster": "healthcare",
+      "tier": 0,
+      "subcluster": "insurance",
+      "description": "Largest US health insurer by revenue. Optum health services division. Coverage decisions directly impact GLP-1 prescription volumes.",
+      "chain_note": "UNH formulary decisions determine whether 50m+ Americans can afford GLP-1 therapy."
+    },
+    {
+      "id": "TDOC",
+      "label": "Teladoc Health",
+      "cluster": "healthcare",
+      "tier": 1,
+      "subcluster": "telehealth",
+      "description": "Largest US telehealth platform. Rapidly growing GLP-1 prescribing through online visits without requiring in-person appointments.",
+      "chain_note": "Telehealth removes the access barrier for GLP-1 prescriptions. Volume growing rapidly."
+    },
+    {
+      "id": "MARA",
+      "label": "Marathon Digital",
+      "cluster": "digital",
+      "tier": 0,
+      "subcluster": "bitcoin_mining",
+      "description": "Largest publicly traded Bitcoin miner by hashrate in North America. Operates at utility scale.",
+      "chain_note": "BTC price is the primary revenue driver. Hashrate growth requires power and silicon procurement."
+    },
+    {
+      "id": "RIOT",
+      "label": "Riot Platforms",
+      "cluster": "digital",
+      "tier": 0,
+      "subcluster": "bitcoin_mining",
+      "description": "Major Bitcoin miner operating in Texas. Whinstone facility is one of the largest BTC mining sites in North America.",
+      "chain_note": "Texas grid exposure makes RIOT sensitive to power pricing volatility."
+    },
+    {
+      "id": "CLSK",
+      "label": "CleanSpark",
+      "cluster": "digital",
+      "tier": 1,
+      "subcluster": "bitcoin_mining",
+      "description": "Bitcoin miner focused on sustainable energy. Operations in Georgia and other states.",
+      "chain_note": "Sustainable energy focus differentiates CLSK as institutional ESG criteria tighten for BTC exposure."
+    },
+    {
+      "id": "HUT",
+      "label": "Hut 8",
+      "cluster": "digital",
+      "tier": 1,
+      "subcluster": "bitcoin_mining",
+      "description": "Canadian Bitcoin miner with US operations. Also pivoting to AI compute hosting.",
+      "chain_note": "BTC miner pivoting to AI compute hosting \u2014 dual revenue stream thesis as GPU demand exceeds supply."
+    },
+    {
+      "id": "COIN",
+      "label": "Coinbase",
+      "cluster": "digital",
+      "tier": 0,
+      "subcluster": "exchange",
+      "description": "Largest US crypto exchange. Also provides custody for institutional clients and the IBIT Bitcoin ETF for BlackRock.",
+      "chain_note": "Coinbase is the on-ramp for institutional and retail BTC flows. Custodian of the largest BTC ETF."
+    },
+    {
+      "id": "HOOD",
+      "label": "Robinhood",
+      "cluster": "digital",
+      "tier": 1,
+      "subcluster": "exchange",
+      "description": "Retail investing app with crypto trading. More retail-focused than Coinbase. Also offers stock trading.",
+      "chain_note": "Retail crypto sentiment proxy. Robinhood volumes spike with BTC/ETH volatility."
+    },
+    {
+      "id": "MSTR",
+      "label": "Strategy (MicroStrategy)",
+      "cluster": "digital",
+      "tier": 1,
+      "subcluster": "btc_treasury",
+      "description": "Enterprise software company turned Bitcoin treasury vehicle. Holds the largest BTC reserve of any public company with 210k+ BTC.",
+      "chain_note": "MSTR trades as a leveraged BTC proxy. Premium/discount to NAV reflects market sentiment on BTC."
+    },
+    {
+      "id": "IBIT",
+      "label": "iShares Bitcoin Trust",
+      "cluster": "digital",
+      "tier": 0,
+      "subcluster": "btc_etf",
+      "description": "Largest Bitcoin ETF by AUM. Custodied by Coinbase. Provides institutional BTC exposure through traditional ETF channels.",
+      "chain_note": "IBIT inflows are the cleanest signal of institutional BTC demand."
+    },
+    {
+      "id": "PYPL",
+      "label": "PayPal",
+      "cluster": "digital",
+      "tier": 0,
+      "subcluster": "payments",
+      "description": "Payments giant offering crypto buying and selling on its platform. Also launched PYUSD stablecoin. Bridge between traditional payments and crypto rails.",
+      "chain_note": "PYUSD stablecoin positions PayPal as a bridge between TradFi and crypto settlement rails."
+    },
+    {
+      "id": "MA",
+      "label": "Mastercard",
+      "cluster": "digital",
+      "tier": 0,
+      "subcluster": "payments",
+      "description": "Global payments network. Partnering with crypto companies to issue crypto-backed cards. Infrastructure for stablecoin settlement pilots.",
+      "chain_note": "Mastercard is building stablecoin settlement rails while defending its core card network."
+    },
+    {
+      "id": "NXPI",
+      "label": "NXP Semiconductors",
+      "cluster": "digital",
+      "tier": 1,
+      "subcluster": "payment_chips",
+      "description": "Makes secure element chips for contactless payments (NFC), smart cards, and crypto hardware wallets. Every payment terminal uses NXP silicon.",
+      "chain_note": "NXP silicon is inside every contactless payment device globally."
+    },
+    {
+      "id": "NUE",
+      "label": "Nucor",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "steel",
+      "description": "Largest US steel producer by capacity. Uses electric arc furnaces which are more flexible and lower carbon than blast furnaces. Supplies steel for construction, automotive, and infrastructure.",
+      "chain_note": "EAF steel is the domestic reshoring metal. Nucor's flexibility makes it the primary beneficiary of US manufacturing growth."
+    },
+    {
+      "id": "STLD",
+      "label": "Steel Dynamics",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "steel",
+      "description": "Second largest US EAF steel producer. Flat roll, structural, and rail steel products.",
+      "chain_note": "EAF steel with flat-rolled focus for automotive and construction. Highly cash-generative business."
+    },
+    {
+      "id": "RS",
+      "label": "Reliance Steel",
+      "cluster": "industrial",
+      "tier": 1,
+      "subcluster": "metals_distribution",
+      "description": "Largest US metals service center. Buys from mills, processes and distributes steel and aluminium to manufacturers.",
+      "chain_note": "Metals distribution is the value-added step between mill output and factory input."
+    },
+    {
+      "id": "VMC",
+      "label": "Vulcan Materials",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "aggregates",
+      "description": "Largest US producer of construction aggregates (crushed stone, sand, gravel). Infrastructure and construction projects require massive aggregate volumes.",
+      "chain_note": "Aggregates are the first physical input in every infrastructure project. VMC pricing power is structural."
+    },
+    {
+      "id": "MLM",
+      "label": "Martin Marietta",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "aggregates",
+      "description": "Second largest US aggregate producer. Also produces cement and ready-mix concrete.",
+      "chain_note": "Aggregates and cement duopoly with VMC. Infrastructure bill spending directly increases volumes."
+    },
+    {
+      "id": "AECOM",
+      "label": "AECOM",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "engineering",
+      "description": "Global infrastructure engineering and design firm. Designs bridges, highways, water systems, and industrial facilities.",
+      "chain_note": "Engineering design is the first phase of every infrastructure project. AECOM backlog is a 2-3 year revenue visibility indicator."
+    },
+    {
+      "id": "ICF",
+      "label": "ICF International",
+      "cluster": "industrial",
+      "tier": 1,
+      "subcluster": "consulting",
+      "description": "Management and technology consulting firm. Works on government infrastructure, energy transition, and reshoring policy programs.",
+      "chain_note": "Government consulting on infrastructure and climate policy. Beneficiary of federal programme spending."
+    },
+    {
+      "id": "KBR",
+      "label": "KBR",
+      "cluster": "industrial",
+      "tier": 1,
+      "subcluster": "engineering",
+      "description": "Engineering and construction for government, defence, and energy sectors. Specialises in ammonia/hydrogen plants and military logistics.",
+      "chain_note": "Hydrogen and ammonia EPC plus defence logistics. Dual exposure to energy transition and defence spending."
+    },
+    {
+      "id": "PRIM",
+      "label": "Primoris Services",
+      "cluster": "industrial",
+      "tier": 1,
+      "subcluster": "construction",
+      "description": "Specialty contractor for energy, utility, and industrial construction. Builds pipelines, solar, and data centre power infrastructure.",
+      "chain_note": "Specialty construction directly in the path of data centre power and renewable energy build-out."
+    },
+    {
+      "id": "FLR",
+      "label": "Fluor",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "epc",
+      "description": "Global EPC contractor. Builds petrochemical plants, semiconductor fabs, and mining facilities.",
+      "chain_note": "EPC for large complex industrial projects. Semiconductor fab construction (Intel, TSMC US) is a new revenue stream."
+    },
+    {
+      "id": "MDU",
+      "label": "MDU Resources",
+      "cluster": "industrial",
+      "tier": 1,
+      "subcluster": "construction",
+      "description": "Diversified utility and construction services company. Builds utility infrastructure and pipeline construction.",
+      "chain_note": "Utility infrastructure construction. Pipeline and power infrastructure build-out exposure."
+    },
+    {
+      "id": "ROK",
+      "label": "Rockwell Automation",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "automation",
+      "description": "Leader in industrial automation and digital manufacturing. Connects factory equipment with software and IT systems. Key to reshoring because automated factories reduce labour cost disadvantage.",
+      "chain_note": "Factory automation is what makes US reshoring economically viable versus low-wage offshore production."
+    },
+    {
+      "id": "HON",
+      "label": "Honeywell",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "industrial",
+      "description": "Diversified industrial conglomerate: building controls, aerospace, performance materials, and process automation. Makes safety and control systems for factories and refineries.",
+      "chain_note": "Process automation and industrial software are the productivity multipliers in reshored factories."
+    },
+    {
+      "id": "EMR",
+      "label": "Emerson Electric",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "automation",
+      "description": "Process automation and precision measurement for manufacturing, energy, and life sciences. Acquired AspenTech for industrial software.",
+      "chain_note": "Process control software and hardware for chemical, energy, and life science manufacturing."
+    },
+    {
+      "id": "PH",
+      "label": "Parker Hannifin",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "motion_control",
+      "description": "Motion and control technologies: hydraulics, pneumatics, electromechanical. Used in aerospace, industrial machinery, and EVs.",
+      "chain_note": "Motion control is the physical execution layer of factory automation."
+    },
+    {
+      "id": "ITW",
+      "label": "Illinois Tool Works",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "industrial",
+      "description": "Diversified manufacturer of fasteners, welding equipment, food equipment, and specialty coatings. Very high margins through 80/20 portfolio strategy.",
+      "chain_note": "ITW fasteners and welding equipment are inside every piece of heavy equipment and aerospace structure."
+    },
+    {
+      "id": "CAT",
+      "label": "Caterpillar",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "heavy_equipment",
+      "description": "World's largest construction and mining equipment manufacturer. Diesel engines, excavators, bulldozers, mining trucks. Major beneficiary of infrastructure spending.",
+      "chain_note": "CAT equipment demand is the physical expression of infrastructure and mining capex cycles."
+    },
+    {
+      "id": "DE",
+      "label": "Deere & Co",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "agricultural_equipment",
+      "description": "Makes John Deere tractors, combines, and construction equipment. Precision agriculture leader with autonomous equipment. Overlaps with CAT in construction equipment.",
+      "chain_note": "Precision agriculture automation is the food-security dimension of the reshoring/autonomy theme."
+    },
+    {
+      "id": "UPS",
+      "label": "UPS",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "logistics",
+      "description": "Second largest US package delivery company. Operates air and ground networks. Beneficiary of reshoring as domestic manufacturing creates more B2B freight.",
+      "chain_note": "Domestic manufacturing growth increases B2B parcel and freight volumes structurally."
+    },
+    {
+      "id": "FDX",
+      "label": "FedEx",
+      "cluster": "industrial",
+      "tier": 0,
+      "subcluster": "logistics",
+      "description": "Express delivery and freight. FedEx Express (air), FedEx Ground, FedEx Freight. Key logistics partner for manufacturing supply chains.",
+      "chain_note": "FedEx Freight serves manufacturers shipping industrial goods. Air express critical for JIT manufacturing."
+    },
+    {
+      "id": "XPO",
+      "label": "XPO",
+      "cluster": "industrial",
+      "tier": 1,
+      "subcluster": "logistics",
+      "description": "Less-than-truckload (LTL) freight specialist. Serves manufacturers and distributors shipping pallets of industrial goods.",
+      "chain_note": "LTL is the freight mode of reshored manufacturing. Palletised industrial goods move via LTL."
+    },
+    {
+      "id": "CHRW",
+      "label": "C.H. Robinson",
+      "cluster": "industrial",
+      "tier": 1,
+      "subcluster": "logistics",
+      "description": "Largest North American freight broker. Connects shippers (manufacturers) with carriers. Asset-light model.",
+      "chain_note": "Freight brokerage scales with manufacturing activity without requiring asset investment."
+    },
+    {
+      "id": "LUNR",
+      "label": "Intuitive Machines",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "lunar_mining",
+      "description": "Operates lunar landers for NASA. Pioneer in cislunar logistics and lunar surface operations, positioning for future rare earth and helium-3 extraction from the Moon.",
+      "chain_note": "Represents the frontier of critical mineral extraction beyond Earth."
+    },
+    {
+      "id": "FLUX",
+      "label": "Flux Power",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "battery",
+      "description": "Makes lithium-ion battery packs for industrial equipment \u2014 forklifts, ground support, and industrial vehicles. Replacing lead-acid batteries in warehouse and logistics fleets.",
+      "chain_note": "Industrial battery adoption node \u2014 downstream of lithium mining."
+    },
+    {
+      "id": "NKLA",
+      "label": "Nikola",
+      "cluster": "minerals",
+      "tier": 1,
+      "subcluster": "ev",
+      "description": "Makes hydrogen fuel cell and battery-electric Class 8 semi-trucks. Financially troubled but represents hydrogen fuel cell commercialisation attempt for heavy transport.",
+      "chain_note": "Hydrogen/battery truck bet \u2014 upstream dependency on hydrogen infrastructure and battery supply chain."
+    }
   ],
   "edges": [
-    { "source": "NVDA", "target": "TSM",  "type": "supply_chain_up",   "strength": 1.0, "label": "TSMC manufactures all NVDA GPUs",           "lag_weeks": 4  },
-    { "source": "NVDA", "target": "MU",   "type": "supply_chain_up",   "strength": 0.9, "label": "Micron supplies HBM memory for NVDA GPUs",  "lag_weeks": 4  },
-    { "source": "NVDA", "target": "AVGO", "type": "ecosystem",         "strength": 0.7, "label": "Broadcom provides networking for GPU clusters","lag_weeks": 6 },
-    { "source": "NVDA", "target": "MSFT", "type": "customer",          "strength": 1.0, "label": "Microsoft is largest NVDA compute buyer",    "lag_weeks": 2  },
-    { "source": "NVDA", "target": "AMZN", "type": "customer",          "strength": 0.9, "label": "AWS is a major NVDA GPU buyer",              "lag_weeks": 2  },
-    { "source": "NVDA", "target": "GOOG", "type": "customer",          "strength": 0.8, "label": "Google Cloud buys NVDA GPUs alongside TPUs", "lag_weeks": 2  },
-    { "source": "NVDA", "target": "META", "type": "customer",          "strength": 0.9, "label": "Meta operates one of the largest GPU clusters","lag_weeks":2  },
-    { "source": "NVDA", "target": "ORCL", "type": "customer",          "strength": 0.7, "label": "Oracle Cloud Infrastructure built on NVDA GPUs","lag_weeks":3 },
-    { "source": "NVDA", "target": "DELL", "type": "customer",          "strength": 0.8, "label": "Dell integrates NVDA GPUs into AI servers",   "lag_weeks": 3  },
-    { "source": "NVDA", "target": "HPE",  "type": "customer",          "strength": 0.7, "label": "HPE builds AI supercomputers with NVDA chips","lag_weeks": 3  },
-    { "source": "NVDA", "target": "SMCI", "type": "customer",          "strength": 0.9, "label": "Super Micro integrates NVDA GPUs fastest",   "lag_weeks": 2  },
-    { "source": "NVDA", "target": "NBIS", "type": "investment",        "strength": 0.8, "label": "NVDA invested in Nebius GPU cloud",           "lag_weeks": 1  },
-    { "source": "NVDA", "target": "IREN", "type": "investment",        "strength": 0.7, "label": "NVDA invested in Iris Energy GPU cloud",      "lag_weeks": 1  },
-    { "source": "NVDA", "target": "AMD",  "type": "competition",       "strength": 0.9, "label": "AMD MI300X directly competes with NVDA H100", "lag_weeks": 0  },
-    { "source": "NVDA", "target": "INTC", "type": "competition",       "strength": 0.6, "label": "Intel Gaudi competes with NVDA in AI training","lag_weeks":0  },
-    { "source": "TSM",  "target": "ASML", "type": "supply_chain_up",   "strength": 1.0, "label": "TSMC buys EUV machines exclusively from ASML","lag_weeks": 8  },
-    { "source": "TSM",  "target": "AMAT", "type": "supply_chain_up",   "strength": 0.8, "label": "TSMC buys deposition equipment from Applied Materials","lag_weeks":8},
-    { "source": "TSM",  "target": "KLAC", "type": "supply_chain_up",   "strength": 0.8, "label": "TSMC uses KLA inspection systems throughout fab","lag_weeks":8 },
-    { "source": "TSM",  "target": "LRCX", "type": "supply_chain_up",   "strength": 0.8, "label": "TSMC uses Lam etch equipment in every process","lag_weeks":8  },
-    { "source": "AMD",  "target": "TSM",  "type": "supply_chain_up",   "strength": 1.0, "label": "TSMC also manufactures AMD GPUs and CPUs",    "lag_weeks": 4  },
-    { "source": "AVGO", "target": "TSM",  "type": "supply_chain_up",   "strength": 0.8, "label": "TSMC manufactures Broadcom networking chips",  "lag_weeks": 4  },
-    { "source": "MSFT", "target": "NBIS", "type": "ecosystem",         "strength": 0.6, "label": "Microsoft Azure and Nebius serve overlapping AI developer market","lag_weeks":0},
-    { "source": "MSFT", "target": "CRWD", "type": "ecosystem",         "strength": 0.7, "label": "CrowdStrike secures Microsoft Azure enterprise customers","lag_weeks":2},
-    { "source": "MSFT", "target": "ORCL", "type": "competition",       "strength": 0.8, "label": "Azure and OCI compete for enterprise cloud workloads","lag_weeks":0},
-    { "source": "MSFT", "target": "GOOG", "type": "competition",       "strength": 0.8, "label": "Azure vs Google Cloud in enterprise AI",       "lag_weeks": 0  },
-    { "source": "DELL", "target": "SMCI", "type": "competition",       "strength": 0.8, "label": "SMCI and Dell compete in GPU server market. SMCI benefits from DELL earnings via sympathy","lag_weeks":1},
-    { "source": "DELL", "target": "VRT",  "type": "supply_chain_up",   "strength": 0.7, "label": "Dell buys Vertiv power and cooling for its data centre solutions","lag_weeks":4},
-    { "source": "VRT",  "target": "ETN",  "type": "ecosystem",         "strength": 0.6, "label": "Vertiv and Eaton both supply data centre power infrastructure","lag_weeks":0},
-    { "source": "EQIX", "target": "VRT",  "type": "supply_chain_up",   "strength": 0.8, "label": "Equinix data centres run on Vertiv power and cooling systems","lag_weeks":4},
-    { "source": "EQIX", "target": "DLR",  "type": "competition",       "strength": 0.7, "label": "Equinix and Digital Realty are the two dominant data centre REITs","lag_weeks":0},
-    { "source": "MSFT", "target": "CEG",  "type": "customer",          "strength": 0.9, "label": "Microsoft signed 20-year PPA with CEG including restarting Three Mile Island","lag_weeks":0},
-    { "source": "AMZN", "target": "CEG",  "type": "customer",          "strength": 0.7, "label": "Amazon signed nuclear power agreements for AWS data centres","lag_weeks":0},
-    { "source": "CEG",  "target": "VST",  "type": "competition",       "strength": 0.7, "label": "Vistra competes with CEG for data centre power contracts","lag_weeks":0},
-    { "source": "AVGO", "target": "MRVL", "type": "competition",       "strength": 0.8, "label": "Both building custom AI silicon for hyperscalers",  "lag_weeks": 0 },
-    { "source": "AVGO", "target": "ANET", "type": "competition",       "strength": 0.6, "label": "Broadcom and Arista both supply data centre networking","lag_weeks":0},
-    { "source": "ANET", "target": "CIEN", "type": "ecosystem",         "strength": 0.5, "label": "Arista campus switching connects to Ciena long-haul optical","lag_weeks":0},
-    { "source": "CIEN", "target": "COHR", "type": "supply_chain_up",   "strength": 0.7, "label": "Ciena buys optical transceivers from Coherent",  "lag_weeks": 6  },
-    { "source": "COHR", "target": "LITE", "type": "competition",       "strength": 0.7, "label": "Coherent and Lumentum both supply optical components","lag_weeks":0  },
-    { "source": "CRWD", "target": "PANW", "type": "competition",       "strength": 0.9, "label": "Direct competitors for enterprise AI security budgets","lag_weeks":0 },
-    { "source": "CDNS", "target": "SNPS", "type": "competition",       "strength": 0.9, "label": "Cadence and Synopsys are the EDA tool duopoly",  "lag_weeks": 0  },
-    { "source": "PWR",  "target": "EME",  "type": "competition",       "strength": 0.7, "label": "Both build electrical and mechanical infrastructure for data centres","lag_weeks":0},
-    { "source": "RKLB", "target": "PL",   "type": "customer",          "strength": 0.7, "label": "Rocket Lab has launched Planet Labs satellites","lag_weeks":0     },
-    { "source": "RKLB", "target": "SPIR", "type": "customer",          "strength": 0.5, "label": "Rocket Lab launches small satellites for companies like Spire","lag_weeks":0},
-    { "source": "LMT",  "target": "RTX",  "type": "competition",       "strength": 0.7, "label": "Both compete for US defence prime contracts",   "lag_weeks": 0    },
-    { "source": "LMT",  "target": "NOC",  "type": "competition",       "strength": 0.7, "label": "Both compete for US defence prime contracts",   "lag_weeks": 0    },
-    { "source": "NOC",  "target": "LHX",  "type": "ecosystem",         "strength": 0.6, "label": "Northrop and L3Harris both supply electronic warfare systems","lag_weeks":0},
-    { "source": "LMT",  "target": "RKLB", "type": "ecosystem",         "strength": 0.5, "label": "Lockheed partners with Rocket Lab for small payload launches","lag_weeks":0},
-    { "source": "NOC",  "target": "PL",   "type": "customer",          "strength": 0.6, "label": "Northrop uses Planet Labs imagery for intelligence work","lag_weeks":0},
-    { "source": "KTOS", "target": "LMT",  "type": "competition",       "strength": 0.5, "label": "Kratos drones compete with Lockheed for lower-cost attrition warfare","lag_weeks":0},
-    { "source": "MOGA", "target": "LMT",  "type": "supply_chain_up",   "strength": 0.7, "label": "Moog supplies flight control actuators for Lockheed aircraft and missiles","lag_weeks":4},
-    { "source": "MOGA", "target": "RKLB", "type": "supply_chain_up",   "strength": 0.7, "label": "Moog precision components in Electron rocket systems","lag_weeks":4},
-    { "source": "HXL",  "target": "RKLB", "type": "supply_chain_up",   "strength": 0.6, "label": "Hexcel carbon fibre composites used in rocket bodies","lag_weeks":6},
-    { "source": "HXL",  "target": "LMT",  "type": "supply_chain_up",   "strength": 0.7, "label": "Hexcel composites in F-35 airframe",            "lag_weeks": 6    },
-    { "source": "ATI",  "target": "RKLB", "type": "supply_chain_up",   "strength": 0.6, "label": "ATI titanium alloys in Electron rocket engines", "lag_weeks": 6    },
-    { "source": "ATI",  "target": "RTX",  "type": "supply_chain_up",   "strength": 0.7, "label": "ATI titanium in Pratt & Whitney jet engines",   "lag_weeks": 6    },
-    { "source": "TDY",  "target": "PL",   "type": "supply_chain_up",   "strength": 0.6, "label": "Teledyne cameras and sensors in Planet Labs satellites","lag_weeks":8},
-    { "source": "TDY",  "target": "NOC",  "type": "supply_chain_up",   "strength": 0.6, "label": "Teledyne electronics in Northrop military satellites","lag_weeks":8},
-    { "source": "VSAT", "target": "IRDM", "type": "competition",       "strength": 0.6, "label": "Viasat and Iridium both offer satellite connectivity","lag_weeks":0},
-    { "source": "NVDA", "target": "CDNS", "type": "supply_chain_up",   "strength": 0.7, "label": "Cadence EDA tools used to design NVDA chips",   "lag_weeks": 12   },
-    { "source": "NVDA", "target": "SNPS", "type": "supply_chain_up",   "strength": 0.7, "label": "Synopsys EDA tools used to design NVDA chips",  "lag_weeks": 12   },
-    { "source": "EQIX", "target": "PWR",  "type": "supply_chain_up",   "strength": 0.6, "label": "Quanta builds electrical infrastructure for Equinix sites","lag_weeks":8}
+    {
+      "source": "NVDA",
+      "target": "TSM",
+      "type": "supply_chain_up",
+      "strength": 1.0,
+      "label": "TSMC manufactures all NVDA GPUs",
+      "lag_weeks": 4
+    },
+    {
+      "source": "NVDA",
+      "target": "MU",
+      "type": "supply_chain_up",
+      "strength": 0.9,
+      "label": "Micron supplies HBM memory for NVDA GPUs",
+      "lag_weeks": 4
+    },
+    {
+      "source": "NVDA",
+      "target": "AVGO",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "Broadcom provides networking for GPU clusters",
+      "lag_weeks": 6
+    },
+    {
+      "source": "NVDA",
+      "target": "MSFT",
+      "type": "customer",
+      "strength": 1.0,
+      "label": "Microsoft is largest NVDA compute buyer",
+      "lag_weeks": 2
+    },
+    {
+      "source": "NVDA",
+      "target": "AMZN",
+      "type": "customer",
+      "strength": 0.9,
+      "label": "AWS is a major NVDA GPU buyer",
+      "lag_weeks": 2
+    },
+    {
+      "source": "NVDA",
+      "target": "GOOG",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "Google Cloud buys NVDA GPUs alongside TPUs",
+      "lag_weeks": 2
+    },
+    {
+      "source": "NVDA",
+      "target": "META",
+      "type": "customer",
+      "strength": 0.9,
+      "label": "Meta operates one of the largest GPU clusters",
+      "lag_weeks": 2
+    },
+    {
+      "source": "NVDA",
+      "target": "ORCL",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Oracle Cloud Infrastructure built on NVDA GPUs",
+      "lag_weeks": 3
+    },
+    {
+      "source": "NVDA",
+      "target": "DELL",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "Dell integrates NVDA GPUs into AI servers",
+      "lag_weeks": 3
+    },
+    {
+      "source": "NVDA",
+      "target": "HPE",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "HPE builds AI supercomputers with NVDA chips",
+      "lag_weeks": 3
+    },
+    {
+      "source": "NVDA",
+      "target": "SMCI",
+      "type": "customer",
+      "strength": 0.9,
+      "label": "Super Micro integrates NVDA GPUs fastest",
+      "lag_weeks": 2
+    },
+    {
+      "source": "NVDA",
+      "target": "NBIS",
+      "type": "investment",
+      "strength": 0.8,
+      "label": "NVDA invested in Nebius GPU cloud",
+      "lag_weeks": 1
+    },
+    {
+      "source": "NVDA",
+      "target": "IREN",
+      "type": "investment",
+      "strength": 0.7,
+      "label": "NVDA invested in Iris Energy GPU cloud",
+      "lag_weeks": 1
+    },
+    {
+      "source": "NVDA",
+      "target": "AMD",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "AMD MI300X directly competes with NVDA H100",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NVDA",
+      "target": "INTC",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Intel Gaudi competes with NVDA in AI training",
+      "lag_weeks": 0
+    },
+    {
+      "source": "TSM",
+      "target": "ASML",
+      "type": "supply_chain_up",
+      "strength": 1.0,
+      "label": "TSMC buys EUV machines exclusively from ASML",
+      "lag_weeks": 8
+    },
+    {
+      "source": "TSM",
+      "target": "AMAT",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "TSMC buys deposition equipment from Applied Materials",
+      "lag_weeks": 8
+    },
+    {
+      "source": "TSM",
+      "target": "KLAC",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "TSMC uses KLA inspection systems throughout fab",
+      "lag_weeks": 8
+    },
+    {
+      "source": "TSM",
+      "target": "LRCX",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "TSMC uses Lam etch equipment in every process",
+      "lag_weeks": 8
+    },
+    {
+      "source": "AMD",
+      "target": "TSM",
+      "type": "supply_chain_up",
+      "strength": 1.0,
+      "label": "TSMC also manufactures AMD GPUs and CPUs",
+      "lag_weeks": 4
+    },
+    {
+      "source": "AVGO",
+      "target": "TSM",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "TSMC manufactures Broadcom networking chips",
+      "lag_weeks": 4
+    },
+    {
+      "source": "MSFT",
+      "target": "NBIS",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Microsoft Azure and Nebius serve overlapping AI developer market",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MSFT",
+      "target": "CRWD",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "CrowdStrike secures Microsoft Azure enterprise customers",
+      "lag_weeks": 2
+    },
+    {
+      "source": "MSFT",
+      "target": "ORCL",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Azure and OCI compete for enterprise cloud workloads",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MSFT",
+      "target": "GOOG",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Azure vs Google Cloud in enterprise AI",
+      "lag_weeks": 0
+    },
+    {
+      "source": "DELL",
+      "target": "SMCI",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "SMCI and Dell compete in GPU server market. SMCI benefits from DELL earnings via sympathy",
+      "lag_weeks": 1
+    },
+    {
+      "source": "DELL",
+      "target": "VRT",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Dell buys Vertiv power and cooling for its data centre solutions",
+      "lag_weeks": 4
+    },
+    {
+      "source": "VRT",
+      "target": "ETN",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Vertiv and Eaton both supply data centre power infrastructure",
+      "lag_weeks": 0
+    },
+    {
+      "source": "EQIX",
+      "target": "VRT",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Equinix data centres run on Vertiv power and cooling systems",
+      "lag_weeks": 4
+    },
+    {
+      "source": "EQIX",
+      "target": "DLR",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Equinix and Digital Realty are the two dominant data centre REITs",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MSFT",
+      "target": "CEG",
+      "type": "customer",
+      "strength": 0.9,
+      "label": "Microsoft signed 20-year PPA with CEG including restarting Three Mile Island",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AMZN",
+      "target": "CEG",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Amazon signed nuclear power agreements for AWS data centres",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CEG",
+      "target": "VST",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Vistra competes with CEG for data centre power contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AVGO",
+      "target": "MRVL",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Both building custom AI silicon for hyperscalers",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AVGO",
+      "target": "ANET",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Broadcom and Arista both supply data centre networking",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ANET",
+      "target": "CIEN",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Arista campus switching connects to Ciena long-haul optical",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CIEN",
+      "target": "COHR",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Ciena buys optical transceivers from Coherent",
+      "lag_weeks": 6
+    },
+    {
+      "source": "COHR",
+      "target": "LITE",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Coherent and Lumentum both supply optical components",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CRWD",
+      "target": "PANW",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Direct competitors for enterprise AI security budgets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CDNS",
+      "target": "SNPS",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Cadence and Synopsys are the EDA tool duopoly",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PWR",
+      "target": "EME",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Both build electrical and mechanical infrastructure for data centres",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RKLB",
+      "target": "PL",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Rocket Lab has launched Planet Labs satellites",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RKLB",
+      "target": "SPIR",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "Rocket Lab launches small satellites for companies like Spire",
+      "lag_weeks": 0
+    },
+    {
+      "source": "LMT",
+      "target": "RTX",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Both compete for US defence prime contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "LMT",
+      "target": "NOC",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Both compete for US defence prime contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NOC",
+      "target": "LHX",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Northrop and L3Harris both supply electronic warfare systems",
+      "lag_weeks": 0
+    },
+    {
+      "source": "LMT",
+      "target": "RKLB",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Lockheed partners with Rocket Lab for small payload launches",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NOC",
+      "target": "PL",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Northrop uses Planet Labs imagery for intelligence work",
+      "lag_weeks": 0
+    },
+    {
+      "source": "KTOS",
+      "target": "LMT",
+      "type": "competition",
+      "strength": 0.5,
+      "label": "Kratos drones compete with Lockheed for lower-cost attrition warfare",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MOGA",
+      "target": "LMT",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Moog supplies flight control actuators for Lockheed aircraft and missiles",
+      "lag_weeks": 4
+    },
+    {
+      "source": "MOGA",
+      "target": "RKLB",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Moog precision components in Electron rocket systems",
+      "lag_weeks": 4
+    },
+    {
+      "source": "HXL",
+      "target": "RKLB",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Hexcel carbon fibre composites used in rocket bodies",
+      "lag_weeks": 6
+    },
+    {
+      "source": "HXL",
+      "target": "LMT",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Hexcel composites in F-35 airframe",
+      "lag_weeks": 6
+    },
+    {
+      "source": "ATI",
+      "target": "RKLB",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "ATI titanium alloys in Electron rocket engines",
+      "lag_weeks": 6
+    },
+    {
+      "source": "ATI",
+      "target": "RTX",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "ATI titanium in Pratt & Whitney jet engines",
+      "lag_weeks": 6
+    },
+    {
+      "source": "TDY",
+      "target": "PL",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Teledyne cameras and sensors in Planet Labs satellites",
+      "lag_weeks": 8
+    },
+    {
+      "source": "TDY",
+      "target": "NOC",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Teledyne electronics in Northrop military satellites",
+      "lag_weeks": 8
+    },
+    {
+      "source": "VSAT",
+      "target": "IRDM",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Viasat and Iridium both offer satellite connectivity",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NVDA",
+      "target": "CDNS",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Cadence EDA tools used to design NVDA chips",
+      "lag_weeks": 12
+    },
+    {
+      "source": "NVDA",
+      "target": "SNPS",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Synopsys EDA tools used to design NVDA chips",
+      "lag_weeks": 12
+    },
+    {
+      "source": "EQIX",
+      "target": "PWR",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Quanta builds electrical infrastructure for Equinix sites",
+      "lag_weeks": 8
+    },
+    {
+      "source": "FCX",
+      "target": "ETN",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Eaton buys copper for power distribution equipment and transformers",
+      "lag_weeks": 10
+    },
+    {
+      "source": "FCX",
+      "target": "VRT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Vertiv buys copper for data centre cooling and power systems",
+      "lag_weeks": 10
+    },
+    {
+      "source": "FCX",
+      "target": "TECK",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Both large copper miners with correlated price exposure",
+      "lag_weeks": 0
+    },
+    {
+      "source": "TECK",
+      "target": "FCX",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Teck and Freeport are the two largest publicly traded copper producers",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MP",
+      "target": "TSLA",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "MP Materials supplies rare earth NdPr magnets for Tesla EV motors",
+      "lag_weeks": 8
+    },
+    {
+      "source": "MP",
+      "target": "UUUU",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Both US rare earth producers benefiting from domestic supply push",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ALB",
+      "target": "TSLA",
+      "type": "customer",
+      "strength": 0.9,
+      "label": "Albemarle supplies lithium for Tesla battery cells across Gigafactories",
+      "lag_weeks": 12
+    },
+    {
+      "source": "ALB",
+      "target": "SQM",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "Both major lithium producers with correlated price and demand exposure",
+      "lag_weeks": 0
+    },
+    {
+      "source": "SQM",
+      "target": "ALB",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "SQM and Albemarle are the two largest lithium producers globally",
+      "lag_weeks": 0
+    },
+    {
+      "source": "VALE",
+      "target": "FCX",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Both diversified mining giants with copper and base metal exposure",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RIO",
+      "target": "FCX",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Rio Tinto and Freeport both produce large volumes of copper",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RIO",
+      "target": "VALE",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Both Anglo-Australian and Brazilian mining giants in iron ore and base metals",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AA",
+      "target": "RIO",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Alcoa buys alumina from Rio Tinto operations for smelting",
+      "lag_weeks": 6
+    },
+    {
+      "source": "AA",
+      "target": "LMT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Lockheed buys Alcoa aluminium for defence airframes and components",
+      "lag_weeks": 8
+    },
+    {
+      "source": "AA",
+      "target": "CAT",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "Caterpillar uses Alcoa aluminium in equipment castings and components",
+      "lag_weeks": 8
+    },
+    {
+      "source": "CENX",
+      "target": "AA",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Century Aluminum and Alcoa are both US primary aluminium smelters",
+      "lag_weeks": 0
+    },
+    {
+      "source": "UUUU",
+      "target": "CEG",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Constellation Energy buys uranium fuel from US domestic producers including Energy Fuels",
+      "lag_weeks": 4
+    },
+    {
+      "source": "FSLR",
+      "target": "NEE",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "NextEra buys First Solar panels for utility-scale solar projects",
+      "lag_weeks": 12
+    },
+    {
+      "source": "FSLR",
+      "target": "BEP",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Brookfield Renewable buys First Solar panels for solar assets",
+      "lag_weeks": 12
+    },
+    {
+      "source": "ENPH",
+      "target": "FSLR",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Enphase microinverters and First Solar panels serve different solar segments (residential vs utility)",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ENPH",
+      "target": "NEE",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "NextEra partnerships for residential solar inverter deployments",
+      "lag_weeks": 8
+    },
+    {
+      "source": "BEP",
+      "target": "FSLR",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Brookfield Renewable buys solar panels from First Solar for utility projects",
+      "lag_weeks": 12
+    },
+    {
+      "source": "BEP",
+      "target": "ENPH",
+      "type": "supply_chain_up",
+      "strength": 0.5,
+      "label": "Brookfield buys Enphase inverters for distributed solar deployments",
+      "lag_weeks": 8
+    },
+    {
+      "source": "FREYR",
+      "target": "ALB",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "FREYR buys lithium from Albemarle for gigafactory battery cells",
+      "lag_weeks": 12
+    },
+    {
+      "source": "FREYR",
+      "target": "QS",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Both building next-generation battery manufacturing for utility and EV applications",
+      "lag_weeks": 0
+    },
+    {
+      "source": "QS",
+      "target": "ALB",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "QuantumScape buys lithium for solid-state battery cell development",
+      "lag_weeks": 12
+    },
+    {
+      "source": "QS",
+      "target": "TSLA",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "EV battery innovation ecosystem \u2014 solid-state success would benefit TSLA",
+      "lag_weeks": 0
+    },
+    {
+      "source": "TSLA",
+      "target": "ALB",
+      "type": "supply_chain_up",
+      "strength": 0.9,
+      "label": "Tesla buys lithium from Albemarle for Gigafactory battery cell production",
+      "lag_weeks": 12
+    },
+    {
+      "source": "TSLA",
+      "target": "MP",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Tesla buys rare earth NdPr magnets from MP Materials for EV drivetrains",
+      "lag_weeks": 8
+    },
+    {
+      "source": "TSLA",
+      "target": "RIVN",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Tesla and Rivian compete in electric trucks and commercial vehicles",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RIVN",
+      "target": "ALB",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Rivian buys lithium for EV battery packs",
+      "lag_weeks": 12
+    },
+    {
+      "source": "RIVN",
+      "target": "TSLA",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Rivian trucks compete with Tesla Cybertruck in electric pickup segment",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AMZN",
+      "target": "RIVN",
+      "type": "customer",
+      "strength": 0.9,
+      "label": "Amazon placed 100k delivery van order anchoring Rivian commercial business",
+      "lag_weeks": 4
+    },
+    {
+      "source": "CHPT",
+      "target": "TSLA",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "ChargePoint and Tesla Supercharger are both EV charging networks",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CHPT",
+      "target": "BLNK",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "ChargePoint and Blink Charging compete in Level 2 EV charging market",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CHPT",
+      "target": "EVGO",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "ChargePoint and EVgo compete for EV fleet and commercial charging contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "BLNK",
+      "target": "CHPT",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Blink and ChargePoint compete in owned-and-operated EV charging",
+      "lag_weeks": 0
+    },
+    {
+      "source": "BLNK",
+      "target": "EVGO",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Blink and EVgo both operate public EV charging networks",
+      "lag_weeks": 0
+    },
+    {
+      "source": "EVGO",
+      "target": "CHPT",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "EVgo and ChargePoint compete in DC fast charging network deployment",
+      "lag_weeks": 0
+    },
+    {
+      "source": "EVGO",
+      "target": "BLNK",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "EVgo and Blink Charging compete in public charging network market",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NEE",
+      "target": "FSLR",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "NextEra is a major buyer of First Solar utility-scale panels",
+      "lag_weeks": 12
+    },
+    {
+      "source": "NEE",
+      "target": "CEG",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "NextEra and Constellation both supply clean electricity to hyperscalers",
+      "lag_weeks": 0
+    },
+    {
+      "source": "DUK",
+      "target": "NEE",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Duke and NextEra compete in Southeast US utility markets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "DUK",
+      "target": "SO",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Duke and Southern Company are both large Southeast US utilities",
+      "lag_weeks": 0
+    },
+    {
+      "source": "SO",
+      "target": "DUK",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Southern Company and Duke Energy compete in Southeast US utility markets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "SO",
+      "target": "CEG",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Both utilities operating nuclear as baseload anchor for AI power demand",
+      "lag_weeks": 0
+    },
+    {
+      "source": "EXAS",
+      "target": "ILMN",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Exact Sciences uses genomic sequencing technology from Illumina platform",
+      "lag_weeks": 0
+    },
+    {
+      "source": "EXAS",
+      "target": "UNH",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "UnitedHealth insurance covers Cologuard and Oncotype DX tests",
+      "lag_weeks": 2
+    },
+    {
+      "source": "ILMN",
+      "target": "NVO",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Novo Nordisk uses Illumina sequencers in genomic drug discovery R&D",
+      "lag_weeks": 4
+    },
+    {
+      "source": "ILMN",
+      "target": "LLY",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Eli Lilly uses Illumina sequencing in genomic drug discovery pipelines",
+      "lag_weeks": 4
+    },
+    {
+      "source": "ILMN",
+      "target": "RXRX",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Recursion AI drug discovery uses Illumina genomic data as training input",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RXRX",
+      "target": "NVDA",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Recursion uses NVIDIA DGX GPU clusters for phenomics AI at scale",
+      "lag_weeks": 2
+    },
+    {
+      "source": "RXRX",
+      "target": "ILMN",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Recursion AI models trained on Illumina genomic and biology datasets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "SEER",
+      "target": "ILMN",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Seer Bio proteomics complements Illumina genomics \u2014 both in omics ecosystem",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NVO",
+      "target": "IQV",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Novo Nordisk uses IQVIA for clinical trial operations globally",
+      "lag_weeks": 4
+    },
+    {
+      "source": "NVO",
+      "target": "ICLR",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Novo uses ICON PLC for clinical research organisation services",
+      "lag_weeks": 4
+    },
+    {
+      "source": "NVO",
+      "target": "MCK",
+      "type": "customer",
+      "strength": 0.9,
+      "label": "McKesson distributes Ozempic and Wegovy across US pharmacy networks",
+      "lag_weeks": 2
+    },
+    {
+      "source": "NVO",
+      "target": "CAH",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "Cardinal Health distributes Novo Nordisk GLP-1 drugs in the US",
+      "lag_weeks": 2
+    },
+    {
+      "source": "NVO",
+      "target": "CVS",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "CVS pharmacies are a primary retail outlet for Ozempic prescriptions",
+      "lag_weeks": 1
+    },
+    {
+      "source": "NVO",
+      "target": "CRL",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Novo uses Charles River for preclinical safety research on new compounds",
+      "lag_weeks": 4
+    },
+    {
+      "source": "NVO",
+      "target": "MEDP",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Novo uses Medpace for metabolic and cardiovascular clinical trials",
+      "lag_weeks": 4
+    },
+    {
+      "source": "NVO",
+      "target": "LLY",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Ozempic vs Mounjaro \u2014 the two dominant GLP-1 drugs competing head to head",
+      "lag_weeks": 0
+    },
+    {
+      "source": "LLY",
+      "target": "IQV",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Eli Lilly uses IQVIA for clinical trial operations on tirzepatide and pipeline drugs",
+      "lag_weeks": 4
+    },
+    {
+      "source": "LLY",
+      "target": "MEDP",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Lilly uses Medpace for speciality metabolic clinical trials",
+      "lag_weeks": 4
+    },
+    {
+      "source": "LLY",
+      "target": "MCK",
+      "type": "customer",
+      "strength": 0.9,
+      "label": "McKesson distributes Mounjaro and Zepbound across US pharmacy networks",
+      "lag_weeks": 2
+    },
+    {
+      "source": "LLY",
+      "target": "CVS",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "CVS pharmacies fill Mounjaro and Zepbound prescriptions at scale",
+      "lag_weeks": 1
+    },
+    {
+      "source": "LLY",
+      "target": "CRL",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Lilly uses Charles River for preclinical research on pipeline compounds",
+      "lag_weeks": 4
+    },
+    {
+      "source": "LLY",
+      "target": "NVO",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Mounjaro vs Ozempic \u2014 Lilly and Novo locked in direct GLP-1 competition",
+      "lag_weeks": 0
+    },
+    {
+      "source": "VKTX",
+      "target": "NVO",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "VK2735 oral GLP-1 candidate could disrupt Novo Nordisk's injectable franchise",
+      "lag_weeks": 0
+    },
+    {
+      "source": "VKTX",
+      "target": "LLY",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "VK2735 oral GLP-1 competes with Lilly's tirzepatide in weight loss market",
+      "lag_weeks": 0
+    },
+    {
+      "source": "VKTX",
+      "target": "CRL",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Viking uses Charles River for preclinical safety studies on VK2735",
+      "lag_weeks": 4
+    },
+    {
+      "source": "AMGN",
+      "target": "NVO",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Amgen MariTide competes with Novo Nordisk in the GLP-1 weight loss market",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AMGN",
+      "target": "LLY",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Amgen MariTide competes with Lilly tirzepatide in obesity treatment market",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AMGN",
+      "target": "IQV",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Amgen uses IQVIA for global clinical trial operations",
+      "lag_weeks": 4
+    },
+    {
+      "source": "IQV",
+      "target": "MEDP",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "IQVIA and Medpace compete for metabolic and oncology clinical trial mandates",
+      "lag_weeks": 0
+    },
+    {
+      "source": "IQV",
+      "target": "ICLR",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "IQVIA and ICON PLC are the two largest CROs globally",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MEDP",
+      "target": "IQV",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Medpace and IQVIA compete for metabolic and cardiovascular trial business",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MEDP",
+      "target": "ICLR",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Medpace and ICON both target biotech and specialty pharma CRO contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ICLR",
+      "target": "IQV",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "ICON and IQVIA are the two largest global CROs",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ICLR",
+      "target": "MEDP",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "ICON and Medpace compete in specialty clinical trial services",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CRL",
+      "target": "IQV",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Charles River (preclinical) hands off studies to IQVIA (clinical) \u2014 complementary CRO chain",
+      "lag_weeks": 0
+    },
+    {
+      "source": "DXCM",
+      "target": "NVO",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "CGM adoption grows structurally with GLP-1 use for metabolic management",
+      "lag_weeks": 0
+    },
+    {
+      "source": "DXCM",
+      "target": "LLY",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "Dexcom CGM paired with Lilly GLP-1 therapy for diabetes and obesity patients",
+      "lag_weeks": 0
+    },
+    {
+      "source": "DXCM",
+      "target": "ABT",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Dexcom G7 competes directly with Abbott FreeStyle Libre in CGM market",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ABT",
+      "target": "DXCM",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Abbott FreeStyle Libre competes directly with Dexcom G7 in CGM market",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ABT",
+      "target": "UNH",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "UnitedHealth insurance coverage decisions drive Abbott CGM reimbursement",
+      "lag_weeks": 2
+    },
+    {
+      "source": "ABT",
+      "target": "NVO",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Abbott CGM devices are used alongside GLP-1 therapy for metabolic management",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PHR",
+      "target": "NVO",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Phreesia patient intake software used in practices prescribing Ozempic",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PHR",
+      "target": "UNH",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "UnitedHealth Optum practices use Phreesia for patient engagement",
+      "lag_weeks": 2
+    },
+    {
+      "source": "PODD",
+      "target": "DXCM",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "Omnipod insulin pump paired with Dexcom CGM for closed-loop diabetes management",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PODD",
+      "target": "UNH",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "UnitedHealth coverage of Omnipod drives reimbursement volumes",
+      "lag_weeks": 2
+    },
+    {
+      "source": "MCK",
+      "target": "CAH",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "McKesson and Cardinal Health are the largest US drug distributors",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MCK",
+      "target": "ABC",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "McKesson and Cencora are the top two US pharmaceutical distributors",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CAH",
+      "target": "MCK",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Cardinal Health and McKesson compete in pharmaceutical distribution",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CAH",
+      "target": "ABC",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Cardinal Health and Cencora compete across drug distribution channels",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ABC",
+      "target": "MCK",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Cencora and McKesson compete for pharmaceutical distribution contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ABC",
+      "target": "CAH",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Cencora and Cardinal Health compete in specialty drug distribution",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CVS",
+      "target": "MCK",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "CVS buys pharmaceuticals from McKesson for retail pharmacy operations",
+      "lag_weeks": 2
+    },
+    {
+      "source": "CVS",
+      "target": "UNH",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "CVS Aetna and UnitedHealth compete in vertically integrated health insurance",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HCA",
+      "target": "UNH",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "UnitedHealth pays HCA for hospital services across its insured membership",
+      "lag_weeks": 1
+    },
+    {
+      "source": "HCA",
+      "target": "CVS",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "HCA and CVS Health both operate in the care delivery ecosystem",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HCA",
+      "target": "THC",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "HCA and Tenet Healthcare are the two largest for-profit hospital operators",
+      "lag_weeks": 0
+    },
+    {
+      "source": "THC",
+      "target": "HCA",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Tenet and HCA compete for hospital admissions and commercial insurance contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "THC",
+      "target": "UNH",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "UnitedHealth pays Tenet for hospital services across its insured population",
+      "lag_weeks": 1
+    },
+    {
+      "source": "UNH",
+      "target": "MCK",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Optum pharmacy buys from McKesson for its pharmacy benefit operations",
+      "lag_weeks": 2
+    },
+    {
+      "source": "UNH",
+      "target": "NVO",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "UNH formulary decisions on Ozempic coverage determine GLP-1 access for millions",
+      "lag_weeks": 0
+    },
+    {
+      "source": "UNH",
+      "target": "LLY",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "UNH formulary coverage of Mounjaro directly impacts Lilly GLP-1 volumes",
+      "lag_weeks": 0
+    },
+    {
+      "source": "TDOC",
+      "target": "NVO",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Teladoc physicians prescribe Ozempic and Wegovy in online GLP-1 consultations",
+      "lag_weeks": 0
+    },
+    {
+      "source": "TDOC",
+      "target": "LLY",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Teladoc prescribes Mounjaro and Zepbound through telehealth visits",
+      "lag_weeks": 0
+    },
+    {
+      "source": "TDOC",
+      "target": "DXCM",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Teladoc remote monitoring integrates with Dexcom CGM data for metabolic care",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MARA",
+      "target": "CEG",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Marathon Digital has nuclear power contracts for low-cost mining energy",
+      "lag_weeks": 4
+    },
+    {
+      "source": "MARA",
+      "target": "RIOT",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Marathon and Riot are the two largest publicly traded Bitcoin miners",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MARA",
+      "target": "CLSK",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Marathon and CleanSpark compete in large-scale Bitcoin mining operations",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RIOT",
+      "target": "MARA",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Riot and Marathon compete in institutional-scale Bitcoin mining",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RIOT",
+      "target": "CLSK",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Riot and CleanSpark compete in North American Bitcoin mining capacity",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RIOT",
+      "target": "NRG",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Riot Platforms uses Texas grid power from NRG for Whinstone mining facility",
+      "lag_weeks": 4
+    },
+    {
+      "source": "CLSK",
+      "target": "MARA",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "CleanSpark and Marathon compete in sustainable Bitcoin mining",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CLSK",
+      "target": "RIOT",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "CleanSpark and Riot compete in US Bitcoin mining infrastructure",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CLSK",
+      "target": "HUT",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "CleanSpark and Hut 8 compete in North American Bitcoin mining",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HUT",
+      "target": "MARA",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Hut 8 and Marathon compete in Bitcoin mining and AI compute hosting",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HUT",
+      "target": "RIOT",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Hut 8 and Riot both operate large-scale Bitcoin mining operations",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HUT",
+      "target": "NBIS",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Hut 8 and Nebius both pivoting Bitcoin mining infrastructure to AI GPU compute",
+      "lag_weeks": 0
+    },
+    {
+      "source": "COIN",
+      "target": "MARA",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Marathon sells mined Bitcoin on Coinbase exchange and custody platform",
+      "lag_weeks": 0
+    },
+    {
+      "source": "COIN",
+      "target": "RIOT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Riot Platforms sells mined Bitcoin through Coinbase",
+      "lag_weeks": 0
+    },
+    {
+      "source": "COIN",
+      "target": "IBIT",
+      "type": "ecosystem",
+      "strength": 0.9,
+      "label": "Coinbase is the custodian for BlackRock's IBIT Bitcoin ETF",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HOOD",
+      "target": "COIN",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Robinhood and Coinbase compete for retail crypto trading customers",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HOOD",
+      "target": "PYPL",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Robinhood and PayPal both offer retail crypto and payments on consumer apps",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MSTR",
+      "target": "COIN",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Strategy uses Coinbase for Bitcoin custody and exchange operations",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MSTR",
+      "target": "IBIT",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "MSTR and IBIT are both institutional BTC proxy vehicles in equity markets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "IBIT",
+      "target": "COIN",
+      "type": "supply_chain_up",
+      "strength": 0.9,
+      "label": "iShares Bitcoin Trust custodied by Coinbase \u2014 operational dependency",
+      "lag_weeks": 0
+    },
+    {
+      "source": "IBIT",
+      "target": "MSTR",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "IBIT and MSTR both provide BTC exposure through traditional equity channels",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PYPL",
+      "target": "COIN",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "PayPal and Coinbase both offer retail crypto but on different platforms",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PYPL",
+      "target": "MA",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "PayPal and Mastercard partner on digital payments while competing in digital wallets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PYPL",
+      "target": "HOOD",
+      "type": "competition",
+      "strength": 0.5,
+      "label": "PayPal and Robinhood compete in retail financial services and crypto",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MA",
+      "target": "PYPL",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Mastercard and PayPal partner on card-linked services while competing in digital payments",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MA",
+      "target": "COIN",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Mastercard crypto card programs use Coinbase as crypto on/off ramp",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MA",
+      "target": "NXPI",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "NXP NFC chips enable Mastercard contactless payment terminal acceptance",
+      "lag_weeks": 8
+    },
+    {
+      "source": "NXPI",
+      "target": "MA",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "NXP NFC secure elements embedded in Mastercard contactless payment devices",
+      "lag_weeks": 8
+    },
+    {
+      "source": "NXPI",
+      "target": "PYPL",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "NXP payment chips in hardware supporting PayPal in-person payment products",
+      "lag_weeks": 8
+    },
+    {
+      "source": "NXPI",
+      "target": "AVGO",
+      "type": "competition",
+      "strength": 0.5,
+      "label": "NXP and Broadcom compete in semiconductor networking and communications chips",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NUE",
+      "target": "CAT",
+      "type": "customer",
+      "strength": 0.8,
+      "label": "Caterpillar buys Nucor steel for heavy equipment structures and components",
+      "lag_weeks": 8
+    },
+    {
+      "source": "NUE",
+      "target": "DE",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Deere buys Nucor steel for agricultural and construction equipment frames",
+      "lag_weeks": 8
+    },
+    {
+      "source": "NUE",
+      "target": "PWR",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Quanta Services buys Nucor structural steel for construction projects",
+      "lag_weeks": 6
+    },
+    {
+      "source": "NUE",
+      "target": "STLD",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Nucor and Steel Dynamics are the two largest US EAF steel producers",
+      "lag_weeks": 0
+    },
+    {
+      "source": "STLD",
+      "target": "NUE",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Steel Dynamics and Nucor compete directly in flat-rolled and structural steel",
+      "lag_weeks": 0
+    },
+    {
+      "source": "STLD",
+      "target": "CAT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Caterpillar uses Steel Dynamics steel for equipment manufacturing",
+      "lag_weeks": 8
+    },
+    {
+      "source": "STLD",
+      "target": "DE",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Deere buys Steel Dynamics flat-rolled steel for machinery",
+      "lag_weeks": 8
+    },
+    {
+      "source": "RS",
+      "target": "NUE",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Reliance Steel buys hot-rolled coil from Nucor for service centre processing",
+      "lag_weeks": 4
+    },
+    {
+      "source": "RS",
+      "target": "STLD",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Reliance buys flat-rolled steel from Steel Dynamics for distribution",
+      "lag_weeks": 4
+    },
+    {
+      "source": "RS",
+      "target": "AA",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Reliance Steel buys aluminium from Alcoa for its metals service centre business",
+      "lag_weeks": 6
+    },
+    {
+      "source": "VMC",
+      "target": "PWR",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Quanta Services buys Vulcan aggregates for infrastructure construction projects",
+      "lag_weeks": 4
+    },
+    {
+      "source": "VMC",
+      "target": "EME",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "EMCOR buys Vulcan aggregates for construction projects",
+      "lag_weeks": 4
+    },
+    {
+      "source": "VMC",
+      "target": "MLM",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Vulcan Materials and Martin Marietta are the US aggregates duopoly",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MLM",
+      "target": "VMC",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "Martin Marietta and Vulcan Materials are the two dominant US aggregate producers",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MLM",
+      "target": "PWR",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Quanta Services buys Martin Marietta aggregates and cement for projects",
+      "lag_weeks": 4
+    },
+    {
+      "source": "MLM",
+      "target": "FLR",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "Fluor buys Martin Marietta materials for industrial construction projects",
+      "lag_weeks": 4
+    },
+    {
+      "source": "AECOM",
+      "target": "KBR",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "AECOM and KBR partner and compete on large-scale government and industrial projects",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AECOM",
+      "target": "PWR",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "AECOM designs projects that Quanta Services builds \u2014 engineering to construction handoff",
+      "lag_weeks": 8
+    },
+    {
+      "source": "AECOM",
+      "target": "EME",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "AECOM engineering designs flow to EMCOR for mechanical and electrical construction",
+      "lag_weeks": 8
+    },
+    {
+      "source": "AECOM",
+      "target": "FLR",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "AECOM and Fluor compete for large infrastructure engineering mandates",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ICF",
+      "target": "AECOM",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "ICF consulting on government programmes feeds into AECOM engineering work",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ICF",
+      "target": "KBR",
+      "type": "ecosystem",
+      "strength": 0.4,
+      "label": "ICF and KBR both serve government infrastructure and energy programmes",
+      "lag_weeks": 0
+    },
+    {
+      "source": "KBR",
+      "target": "AECOM",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "KBR and AECOM partner on government infrastructure and EPC projects",
+      "lag_weeks": 0
+    },
+    {
+      "source": "KBR",
+      "target": "FLR",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "KBR and Fluor both pursue large industrial EPC contracts and sometimes JV",
+      "lag_weeks": 0
+    },
+    {
+      "source": "KBR",
+      "target": "LMT",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Lockheed buys KBR defence logistics and base operations services",
+      "lag_weeks": 4
+    },
+    {
+      "source": "PRIM",
+      "target": "VMC",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Primoris buys Vulcan aggregates for utility and industrial construction",
+      "lag_weeks": 4
+    },
+    {
+      "source": "PRIM",
+      "target": "NUE",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Primoris buys Nucor structural steel for construction projects",
+      "lag_weeks": 6
+    },
+    {
+      "source": "PRIM",
+      "target": "PWR",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "Primoris and Quanta Services both serve energy and utility construction markets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PRIM",
+      "target": "EME",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Primoris and EMCOR both build electrical and mechanical infrastructure",
+      "lag_weeks": 0
+    },
+    {
+      "source": "FLR",
+      "target": "VMC",
+      "type": "supply_chain_up",
+      "strength": 0.5,
+      "label": "Fluor buys Vulcan aggregates for large industrial and infrastructure construction",
+      "lag_weeks": 4
+    },
+    {
+      "source": "FLR",
+      "target": "NUE",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Fluor buys Nucor steel for EPC project fabrication",
+      "lag_weeks": 8
+    },
+    {
+      "source": "FLR",
+      "target": "KBR",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "Fluor and KBR are peer EPC contractors that compete and sometimes JV",
+      "lag_weeks": 0
+    },
+    {
+      "source": "FLR",
+      "target": "AECOM",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Fluor and AECOM compete for large infrastructure engineering and EPC mandates",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MDU",
+      "target": "NUE",
+      "type": "supply_chain_up",
+      "strength": 0.5,
+      "label": "MDU Resources buys Nucor steel for utility and pipeline infrastructure",
+      "lag_weeks": 6
+    },
+    {
+      "source": "MDU",
+      "target": "PRIM",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "MDU Resources and Primoris both serve utility infrastructure construction markets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ROK",
+      "target": "CAT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Caterpillar uses Rockwell Automation in manufacturing plants and smart equipment",
+      "lag_weeks": 4
+    },
+    {
+      "source": "ROK",
+      "target": "DE",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Deere uses Rockwell Automation for precision agriculture and factory systems",
+      "lag_weeks": 4
+    },
+    {
+      "source": "ROK",
+      "target": "HON",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Rockwell (discrete automation) and Honeywell (process automation) serve different factory types",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ROK",
+      "target": "EMR",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Rockwell and Emerson both serve industrial automation but in discrete vs process segments",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HON",
+      "target": "EMR",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Honeywell and Emerson compete in industrial process automation and controls",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HON",
+      "target": "ROK",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Honeywell process automation complements Rockwell discrete manufacturing automation",
+      "lag_weeks": 0
+    },
+    {
+      "source": "HON",
+      "target": "LMT",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Lockheed buys Honeywell aerospace components for aircraft systems",
+      "lag_weeks": 8
+    },
+    {
+      "source": "EMR",
+      "target": "HON",
+      "type": "competition",
+      "strength": 0.8,
+      "label": "Emerson and Honeywell compete in process automation and industrial controls",
+      "lag_weeks": 0
+    },
+    {
+      "source": "EMR",
+      "target": "ROK",
+      "type": "ecosystem",
+      "strength": 0.6,
+      "label": "Emerson process control and Rockwell discrete automation are complementary in factories",
+      "lag_weeks": 0
+    },
+    {
+      "source": "EMR",
+      "target": "NUE",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "Nucor steel mills use Emerson process control systems",
+      "lag_weeks": 4
+    },
+    {
+      "source": "PH",
+      "target": "LMT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Lockheed buys Parker Hannifin hydraulic and flight control components for aircraft",
+      "lag_weeks": 8
+    },
+    {
+      "source": "PH",
+      "target": "RTX",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "RTX buys Parker hydraulics and pneumatics for jet engine and airframe systems",
+      "lag_weeks": 8
+    },
+    {
+      "source": "PH",
+      "target": "CAT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Caterpillar uses Parker Hannifin hydraulic systems in excavators and bulldozers",
+      "lag_weeks": 8
+    },
+    {
+      "source": "PH",
+      "target": "EMR",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Parker Hannifin and Emerson compete in motion control and industrial automation",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ITW",
+      "target": "HON",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Illinois Tool Works and Honeywell both serve diversified industrial markets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "ITW",
+      "target": "CAT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Caterpillar buys ITW fasteners and welding equipment for heavy equipment assembly",
+      "lag_weeks": 6
+    },
+    {
+      "source": "ITW",
+      "target": "DE",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Deere uses ITW fasteners and components in agricultural machinery assembly",
+      "lag_weeks": 6
+    },
+    {
+      "source": "CAT",
+      "target": "NUE",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Caterpillar buys Nucor steel for heavy equipment structural components",
+      "lag_weeks": 8
+    },
+    {
+      "source": "CAT",
+      "target": "STLD",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Caterpillar uses Steel Dynamics steel in equipment manufacturing",
+      "lag_weeks": 8
+    },
+    {
+      "source": "CAT",
+      "target": "ROK",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Caterpillar uses Rockwell Automation in its manufacturing plants",
+      "lag_weeks": 4
+    },
+    {
+      "source": "CAT",
+      "target": "ITW",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Caterpillar buys ITW fasteners and welding systems for assembly",
+      "lag_weeks": 6
+    },
+    {
+      "source": "CAT",
+      "target": "DE",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Caterpillar and Deere compete in construction equipment market",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CAT",
+      "target": "CHRW",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "Caterpillar uses CH Robinson for freight brokerage of parts and finished equipment",
+      "lag_weeks": 2
+    },
+    {
+      "source": "DE",
+      "target": "NUE",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Deere buys Nucor steel for tractor and combine manufacturing",
+      "lag_weeks": 8
+    },
+    {
+      "source": "DE",
+      "target": "STLD",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Deere uses Steel Dynamics flat-rolled steel for agricultural machinery",
+      "lag_weeks": 8
+    },
+    {
+      "source": "DE",
+      "target": "ROK",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Deere uses Rockwell Automation for precision agriculture control systems",
+      "lag_weeks": 4
+    },
+    {
+      "source": "DE",
+      "target": "CAT",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Deere and Caterpillar compete in construction and small equipment markets",
+      "lag_weeks": 0
+    },
+    {
+      "source": "DE",
+      "target": "CHRW",
+      "type": "customer",
+      "strength": 0.4,
+      "label": "Deere uses CH Robinson freight brokerage for parts logistics",
+      "lag_weeks": 2
+    },
+    {
+      "source": "UPS",
+      "target": "FDX",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "UPS and FedEx are the two dominant US parcel and freight carriers",
+      "lag_weeks": 0
+    },
+    {
+      "source": "UPS",
+      "target": "XPO",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "UPS parcel and XPO LTL freight serve complementary B2B logistics needs",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AMZN",
+      "target": "UPS",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Amazon uses UPS for overflow parcel delivery beyond its internal network",
+      "lag_weeks": 1
+    },
+    {
+      "source": "FDX",
+      "target": "UPS",
+      "type": "competition",
+      "strength": 0.9,
+      "label": "FedEx and UPS compete across express, ground, and freight delivery",
+      "lag_weeks": 0
+    },
+    {
+      "source": "FDX",
+      "target": "XPO",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "FedEx Freight and XPO both operate LTL freight networks",
+      "lag_weeks": 0
+    },
+    {
+      "source": "DELL",
+      "target": "FDX",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "Dell ships servers and equipment via FedEx to enterprise customers",
+      "lag_weeks": 1
+    },
+    {
+      "source": "XPO",
+      "target": "FDX",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "XPO LTL and FedEx Freight compete for industrial freight contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "XPO",
+      "target": "UPS",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "XPO LTL and UPS ground serve different segments of B2B freight",
+      "lag_weeks": 0
+    },
+    {
+      "source": "XPO",
+      "target": "CHRW",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "XPO (asset carrier) and CH Robinson (broker) are complementary freight services",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CHRW",
+      "target": "XPO",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "CH Robinson brokers freight that XPO and other carriers execute",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CHRW",
+      "target": "UPS",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "CH Robinson brokers multi-modal shipments including UPS ground services",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CHRW",
+      "target": "CAT",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "Caterpillar uses CH Robinson for freight brokerage of manufacturing parts",
+      "lag_weeks": 2
+    },
+    {
+      "source": "CHRW",
+      "target": "DE",
+      "type": "customer",
+      "strength": 0.4,
+      "label": "Deere uses CH Robinson for agricultural equipment and parts logistics",
+      "lag_weeks": 2
+    },
+    {
+      "source": "LUNR",
+      "target": "MP",
+      "type": "ecosystem",
+      "strength": 0.3,
+      "label": "Both US-based critical material extraction, lunar vs terrestrial",
+      "lag_weeks": 0
+    },
+    {
+      "source": "FLUX",
+      "target": "ALB",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Flux Power buys lithium cells from ALB supply chain",
+      "lag_weeks": 8
+    },
+    {
+      "source": "NKLA",
+      "target": "ALB",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Battery-electric trucks require lithium cells",
+      "lag_weeks": 8
+    },
+    {
+      "source": "NKLA",
+      "target": "TSLA",
+      "type": "competition",
+      "strength": 0.5,
+      "label": "Both EV/clean transport, different segments",
+      "lag_weeks": 0
+    }
   ]
 }
