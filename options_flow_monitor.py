@@ -70,7 +70,7 @@ _windows: dict[str, UnderlyingWindow] = {}   # underlying → window
 _quote_cache: dict[str, float] = {}          # occ_symbol → best ask
 _all_events: list[FlowEvent] = []            # rolling event log
 _universe: frozenset[str] = frozenset()
-_friday_snapshot_taken: bool = False   # reset each monitor process start
+_eod_snapshot_taken: bool = False   # reset each monitor process start
 
 
 def _get_or_create_window(underlying: str) -> UnderlyingWindow:
@@ -227,24 +227,25 @@ _FRIDAY_SNAPSHOT_MINUTE_START = 55   # take snapshot in 15:55–16:04 ET window
 _FRIDAY_SNAPSHOT_MINUTE_END = 64     # (16:00–16:04 are minute 60–64 conceptually, handled via hour check)
 
 
-def _maybe_take_friday_snapshot() -> None:
-    """Write Friday close snapshot once per monitor session at ~15:55 ET."""
-    global _friday_snapshot_taken
-    if _friday_snapshot_taken:
+def _maybe_take_eod_snapshot() -> None:
+    """Write EOD snapshot once per monitor session at ~15:55 ET on any trading day."""
+    global _eod_snapshot_taken
+    if _eod_snapshot_taken:
         return
     now_et = datetime.now(tz=_ET)
-    if now_et.weekday() != 4:   # 4 = Friday
+    if now_et.weekday() >= 5:   # skip Sat/Sun
         return
-    # Window: 15:55–16:04 ET (minute 55–64; handle hour rollover)
+    # Window: 15:55–16:04 ET
     total_minutes = now_et.hour * 60 + now_et.minute
     if not (15 * 60 + 55 <= total_minutes <= 16 * 60 + 4):
         return
-    _friday_snapshot_taken = True
+    _eod_snapshot_taken = True
+    is_friday = now_et.weekday() == 4
     try:
-        from options_flow_scanner import save_friday_close_snapshot
-        save_friday_close_snapshot()
+        from options_flow_scanner import save_eod_snapshot
+        save_eod_snapshot(is_friday=is_friday)
     except Exception as exc:
-        log.error("options_flow_monitor: Friday snapshot failed — %s", exc)
+        log.error("options_flow_monitor: EOD snapshot failed — %s", exc)
 
 
 def _writer_thread() -> None:
@@ -252,7 +253,7 @@ def _writer_thread() -> None:
         time.sleep(WRITE_INTERVAL_SECONDS)
         try:
             _evaluate_and_write()
-            _maybe_take_friday_snapshot()
+            _maybe_take_eod_snapshot()
         except Exception as exc:
             log.error("options_flow_monitor: evaluate/write error — %s", exc)
 

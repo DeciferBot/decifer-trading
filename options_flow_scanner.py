@@ -40,6 +40,7 @@ _MAX_WORKERS = 12
 _MIN_DTE = 7
 _MAX_DTE = 45
 _FRIDAY_CLOSE_PATH = _OUT_DIR / "leaderboard_friday_close.json"
+_EOD_PATH = _OUT_DIR / "leaderboard_eod.json"
 _OI_NOTE = (
     "Open interest unavailable from current provider (Alpaca). "
     "Signal uses day-over-day volume expansion only."
@@ -262,26 +263,33 @@ def scan_universe(write: bool = True) -> dict:
     return payload
 
 
-def save_friday_close_snapshot() -> dict:
-    """Run scan_universe() and persist result as leaderboard_friday_close.json.
+def save_eod_snapshot(is_friday: bool = False) -> dict:
+    """Run scan_universe() and persist result as leaderboard_eod.json.
 
-    Called once at ~15:55 ET on Fridays by options_flow_monitor. The API falls
-    back to this file over the weekend so the leaderboard shows Friday's data
-    rather than an empty state.
+    Called once per trading day at ~15:55 ET by options_flow_monitor.
+    The API falls back to this file when the stream-based leaderboard is empty.
+    On Fridays also writes leaderboard_friday_close.json for weekend fallback.
 
     Returns the payload dict (same shape as scan_universe()).
     """
-    log.info("options_flow_scanner: taking Friday close snapshot")
+    log.info("options_flow_scanner: taking EOD snapshot (friday=%s)", is_friday)
     payload = scan_universe(write=False)
-    payload["friday_close"] = True
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
-    _FRIDAY_CLOSE_PATH.write_text(json.dumps(payload, indent=2))
+    _EOD_PATH.write_text(json.dumps(payload, indent=2))
+    if is_friday:
+        payload["friday_close"] = True
+        _FRIDAY_CLOSE_PATH.write_text(json.dumps(payload, indent=2))
     log.info(
-        "options_flow_scanner: Friday close snapshot written — %d symbols, %d unusual",
+        "options_flow_scanner: EOD snapshot written — %d symbols, %d unusual",
         payload.get("scanned", 0),
         payload.get("unusual_count", 0),
     )
     return payload
+
+
+def save_friday_close_snapshot() -> dict:
+    """Backward-compat alias — calls save_eod_snapshot(is_friday=True)."""
+    return save_eod_snapshot(is_friday=True)
 
 
 if __name__ == "__main__":

@@ -46,6 +46,7 @@ except ImportError:
 _BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _EVENTS_PATH = str(_BASE_DIR / "data" / "options_flow" / "live_events.json")
 _LEADERBOARD_PATH = _BASE_DIR / "data" / "options_flow" / "leaderboard.json"
+_EOD_PATH = _BASE_DIR / "data" / "options_flow" / "leaderboard_eod.json"
 _FRIDAY_CLOSE_PATH = _BASE_DIR / "data" / "options_flow" / "leaderboard_friday_close.json"
 
 _DEFAULT_FEED_LIMIT = 100
@@ -60,12 +61,25 @@ def _is_market_weekend() -> bool:
     return datetime.now(tz=_ET).weekday() >= 5
 
 
+def _load_eod() -> dict | None:
+    """Load today's EOD snapshot if it exists, else None."""
+    try:
+        return json.loads(_EOD_PATH.read_text())
+    except Exception:
+        return None
+
+
 def _load_friday_close() -> dict | None:
     """Load Friday close snapshot if it exists, else None."""
     try:
         return json.loads(_FRIDAY_CLOSE_PATH.read_text())
     except Exception:
         return None
+
+
+def _live_leaderboard_empty(data: dict | None) -> bool:
+    """True when the stream-based leaderboard has no symbols."""
+    return data is None or not data.get("leaderboard")
 
 
 def _load_json(path: str) -> dict | None:
@@ -145,11 +159,16 @@ def options_leaderboard() -> Response:
 
     data = _load_json(_LEADERBOARD_PATH)
     source = "live"
-    if data is None or (not data.get("leaderboard") and _is_market_weekend()):
-        friday = _load_friday_close()
-        if friday:
-            data = friday
-            source = "friday_close"
+    if _live_leaderboard_empty(data):
+        eod = _load_eod()
+        if eod and eod.get("leaderboard"):
+            data = eod
+            source = "eod"
+        elif _is_market_weekend():
+            friday = _load_friday_close()
+            if friday:
+                data = friday
+                source = "friday_close"
     if data is None:
         return _unavailable("Leaderboard not yet available. Stream may be starting.")
 
@@ -171,8 +190,8 @@ def options_leaderboard() -> Response:
         "returned": min(limit, len(rows)),
         "leaderboard": rows[:limit],
     }
-    if source == "friday_close":
-        payload["source"] = "friday_close"
+    if source in ("friday_close", "eod"):
+        payload["source"] = source
         payload["friday_close_ts"] = data.get("ts")
     return _ok(payload)
 
@@ -255,13 +274,19 @@ def v1_universe_scan() -> Response:
     data = _load_leaderboard()
     source = "live"
 
-    # On weekends with no live data, fall back to Friday close snapshot
-    if _is_market_weekend() and (data is None or not data.get("leaderboard")):
-        friday = _load_friday_close()
-        if friday:
-            data = friday
-            source = "friday_close"
-            stale = False  # friday close is intentionally stale — don't trigger scan
+    # Fall back to EOD snapshot when stream leaderboard is empty
+    if _live_leaderboard_empty(data):
+        eod = _load_eod()
+        if eod and eod.get("leaderboard"):
+            data = eod
+            source = "eod"
+            stale = False
+        elif _is_market_weekend():
+            friday = _load_friday_close()
+            if friday:
+                data = friday
+                source = "friday_close"
+                stale = False
 
     if not _is_market_weekend() and stale:
         # Trigger fresh scan in background — don't block the response
@@ -282,8 +307,8 @@ def v1_universe_scan() -> Response:
         }, 202)
 
     response: dict = {"status": "ok", "stale": stale, **data}
-    if source == "friday_close":
-        response["source"] = "friday_close"
+    if source in ("friday_close", "eod"):
+        response["source"] = source
         response["friday_close_ts"] = data.get("ts")
     return _ok(response)
 

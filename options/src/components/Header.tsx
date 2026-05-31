@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export function Header({ lastUpdated, source }: { lastUpdated: string | null; source?: "live" | "friday_close" }) {
+export function Header({ lastUpdated, source }: { lastUpdated: string | null; source?: "live" | "friday_close" | "eod" }) {
   const [now, setNow] = useState("");
   useEffect(() => {
     const fmt = () =>
@@ -16,8 +16,9 @@ export function Header({ lastUpdated, source }: { lastUpdated: string | null; so
     : null;
 
   let ageLabel: string;
-  if (source === "friday_close" && lastUpdated) {
-    ageLabel = `Friday close · ${new Date(lastUpdated).toLocaleString("en-US", {
+  if ((source === "friday_close" || source === "eod") && lastUpdated) {
+    const prefix = source === "friday_close" ? "Friday close" : "EOD snapshot";
+    ageLabel = `${prefix} · ${new Date(lastUpdated).toLocaleString("en-US", {
       timeZone: "America/New_York",
       month: "short", day: "numeric",
       hour: "2-digit", minute: "2-digit",

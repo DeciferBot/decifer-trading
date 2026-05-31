@@ -389,7 +389,7 @@ function ExpansionPill({ label, value, active }: { label: string; value: number 
   );
 }
 
-function LeaderRow({ row, info, onSymbolClick }: {
+function LeaderCard({ row, info, onSymbolClick }: {
   row: LeaderboardRow;
   info?: CompanyInfo;
   onSymbolClick: (s: string) => void;
@@ -398,60 +398,81 @@ function LeaderRow({ row, info, onSymbolClick }: {
   const signal = plainSignal(row);
   const side = deriveSide(row);
   const { text: scoreText, color: scoreColor } = scoreLabel(row.top_score, side);
+  const vl = volumeLabel(row.call_volume, row.put_volume);
 
   return (
     <div
       onClick={() => onSymbolClick(row.underlying)}
-      style={{ padding: "14px 0", cursor: "pointer", borderBottom: "1px solid var(--border)" }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#0d0d0d")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 10,
+        padding: "14px 14px 12px",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        gap: 0,
+        transition: "border-color 0.12s, background 0.12s",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border2)";
+        (e.currentTarget as HTMLDivElement).style.background = "#111";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)";
+        (e.currentTarget as HTMLDivElement).style.background = "var(--surface)";
+      }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
-        <SymbolLogo symbol={row.underlying} size={34} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-            <span style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--mono)", flexShrink: 0 }}>
-              {row.underlying}
-            </span>
+      {/* Header row: logo + ticker + side */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <SymbolLogo symbol={row.underlying} size={28} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--mono)" }}>{row.underlying}</div>
             {info?.name && (
-              <span style={{ fontSize: 12, color: "var(--muted2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {info.name}
-              </span>
+              <div style={{ fontSize: 10, color: "var(--muted2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>
+                {info.name.replace(/,?\s*(Inc|Corp|Ltd|Co)\.?(\s|$)/gi, "").trim()}
+              </div>
             )}
-          </div>
-          {/* Company context — secondary, not the story */}
-          {brief && (
-            <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.45, marginBottom: 6 }}>
-              {brief}
-            </div>
-          )}
-          {/* What this flow is actually saying */}
-          <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.55, marginBottom: 8 }}>
-            {signal}
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <ExpansionPill label="Calls" value={row.call_expansion} active={row.unusual_calls} />
-            <ExpansionPill label="Puts" value={row.put_expansion} active={row.unusual_puts} />
-            {row.call_volume != null && row.put_volume != null && (
-              <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "var(--mono)" }}>
-                {fmtContracts(row.call_volume)}C · {fmtContracts(row.put_volume)}P
-              </span>
-            )}
-            {(() => {
-              const vl = volumeLabel(row.call_volume, row.put_volume);
-              return vl ? (
-                <span style={{ fontSize: 10, fontWeight: 600, color: vl.color, letterSpacing: "0.04em" }}>
-                  {vl.text}
-                </span>
-              ) : null;
-            })()}
-            {(row.driver_tags ?? []).slice(0, 1).map((t) => <DriverTag key={t} tag={t} />)}
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0, minWidth: 80 }}>
-          <SideBadge side={side} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: scoreColor }}>{scoreText}</span>
+        <SideBadge side={side} />
+      </div>
+
+      {/* Company brief */}
+      {brief && (
+        <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.45, marginBottom: 8 }}>
+          {brief}
+        </div>
+      )}
+
+      {/* Signal narrative */}
+      <div style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.55, marginBottom: 10, flex: 1 }}>
+        {signal}
+      </div>
+
+      {/* Expansion pills */}
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+        <ExpansionPill label="Calls" value={row.call_expansion} active={row.unusual_calls} />
+        <ExpansionPill label="Puts" value={row.put_expansion} active={row.unusual_puts} />
+        {row.call_volume != null && row.put_volume != null && (
+          <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "var(--mono)" }}>
+            {fmtContracts(row.call_volume)}C · {fmtContracts(row.put_volume)}P
+          </span>
+        )}
+      </div>
+
+      {/* Footer: score + volume label + theme tags */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <ScoreBar score={row.top_score} side={side} />
+          <span style={{ fontSize: 10, fontWeight: 700, color: scoreColor }}>{scoreText}</span>
+        </div>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+          {vl && (
+            <span style={{ fontSize: 10, fontWeight: 600, color: vl.color, letterSpacing: "0.04em" }}>{vl.text}</span>
+          )}
+          {(row.driver_tags ?? []).slice(0, 2).map((t) => <DriverTag key={t} tag={t} />)}
         </div>
       </div>
     </div>
@@ -485,7 +506,85 @@ function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void 
   );
 }
 
-// ── Filter bar ────────────────────────────────────────────────────────────────
+// ── Label registry (driver_tags → human labels) ───────────────────────────────
+
+import labelRegistry from "@/data/label_registry.json";
+
+const DRIVER_LABELS: Record<string, string> = {
+  ...(labelRegistry.drivers as Record<string, string>),
+  ...(labelRegistry.themes as Record<string, string>),
+  ...(labelRegistry.subthemes as Record<string, string>),
+};
+
+function tagLabel(tag: string): string {
+  return DRIVER_LABELS[tag] ?? tag.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── Theme filter bar ──────────────────────────────────────────────────────────
+
+function ThemeFilterBar({
+  rows,
+  activeTheme,
+  setActiveTheme,
+  side,
+  setSide,
+}: {
+  rows: LeaderboardRow[];
+  activeTheme: string;
+  setActiveTheme: (t: string) => void;
+  side: string;
+  setSide: (s: string) => void;
+}) {
+  // Collect all unique driver_tags present in current leaderboard
+  const allTags = Array.from(
+    new Set(rows.flatMap(r => r.driver_tags ?? []))
+  ).sort((a, b) => {
+    // Sort by frequency descending
+    const fa = rows.filter(r => r.driver_tags?.includes(a)).length;
+    const fb = rows.filter(r => r.driver_tags?.includes(b)).length;
+    return fb - fa;
+  });
+
+  const chip = (label: string, active: boolean, onClick: () => void, accent?: string) => (
+    <button
+      key={label}
+      onClick={onClick}
+      style={{
+        background: active ? (accent ? `${accent}22` : "rgba(232,125,46,0.15)") : "var(--surface2)",
+        border: `1px solid ${active ? (accent ?? "rgba(232,125,46,0.4)") : "var(--border)"}`,
+        color: active ? (accent ?? "var(--orange)") : "var(--muted2)",
+        borderRadius: 20, padding: "4px 13px",
+        fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
+        cursor: "pointer", whiteSpace: "nowrap",
+        transition: "all 0.12s",
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div style={{ borderBottom: "1px solid var(--border)", padding: "10px 20px 10px" }}>
+      {/* Row 1: side + theme filters together */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {chip("All", !activeTheme && !side, () => { setActiveTheme(""); setSide(""); })}
+        <span style={{ width: 1, height: 16, background: "var(--border)", alignSelf: "center" }} />
+        {chip("Calls", side === "CALL", () => setSide(side === "CALL" ? "" : "CALL"), "#2ecc71")}
+        {chip("Puts", side === "PUT", () => setSide(side === "PUT" ? "" : "PUT"), "#e74c3c")}
+        {allTags.length > 0 && (
+          <span style={{ width: 1, height: 16, background: "var(--border)", alignSelf: "center" }} />
+        )}
+        {allTags.map(tag => chip(
+          tagLabel(tag),
+          activeTheme === tag,
+          () => setActiveTheme(activeTheme === tag ? "" : tag),
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Filter bar (live feed) ────────────────────────────────────────────────────
 
 function FilterBar({
   signal, setSignal, side, setSide,
@@ -503,6 +602,7 @@ function FilterBar({
         color: active ? "var(--orange)" : "var(--muted2)",
         borderRadius: 20, padding: "3px 12px",
         fontSize: 11, fontWeight: 600, letterSpacing: "0.05em",
+        cursor: "pointer",
       }}
     >
       {label}
@@ -554,11 +654,12 @@ export default function OptionsPage() {
   const [tab, setTab] = useState<Tab>("leaderboard");
   const [signal, setSignal] = useState("");
   const [side, setSide] = useState("");
+  const [activeTheme, setActiveTheme] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [feed, setFeed] = useState<FlowEvent[]>([]);
   const [feedAvailable, setFeedAvailable] = useState<boolean | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [dataSource, setDataSource] = useState<"live" | "friday_close">("live");
+  const [dataSource, setDataSource] = useState<"live" | "friday_close" | "eod">("live");
   const [unavailable, setUnavailable] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [companyMap, setCompanyMap] = useState<Record<string, CompanyInfo>>({});
@@ -611,13 +712,13 @@ export default function OptionsPage() {
     <div style={{ minHeight: "100vh" }}>
       <Header lastUpdated={lastUpdated} source={dataSource} />
 
-      <div style={{ maxWidth: selectedSymbol ? "calc(100% - 380px)" : "900px", margin: "0 auto" }}>
+      <div style={{ maxWidth: selectedSymbol ? "calc(100% - 380px)" : "1200px", margin: "0 auto" }}>
         <TabBar active={tab} onChange={setTab} />
         {tab === "feed" && (
           <FilterBar signal={signal} setSignal={setSignal} side={side} setSide={setSide} />
         )}
 
-        <div style={{ padding: "0 20px 48px" }}>
+        <div style={{ padding: "0 20px 48px", paddingTop: tab === "leaderboard" ? 0 : undefined }}>
           {unavailable && (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)", fontSize: 14 }}>
               <div style={{ marginBottom: 8 }}>Stream not yet active</div>
@@ -629,25 +730,62 @@ export default function OptionsPage() {
             <>
               {pulse && <MarketPulseBanner pulse={pulse} ts={lastUpdated} />}
 
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingTop: 4, paddingBottom: 8 }}>
-                <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                  {leaderboard.length} symbols ranked by unusual flow
-                </span>
-                <span style={{ fontSize: 10, color: "var(--muted)" }}>
-                  Score = how unusual today&apos;s activity is vs. yesterday
-                </span>
-              </div>
-
-              {leaderboard.length === 0 && (
-                <div style={{ color: "var(--muted)", fontSize: 13, padding: "24px 0" }}>
-                  {dataSource === "friday_close"
-                    ? "No unusual flow was detected at Friday close."
-                    : "No unusual flow detected yet."}
-                </div>
+              {/* Theme filters */}
+              {leaderboard.length > 0 && (
+                <ThemeFilterBar
+                  rows={leaderboard}
+                  activeTheme={activeTheme}
+                  setActiveTheme={setActiveTheme}
+                  side={side}
+                  setSide={setSide}
+                />
               )}
-              {leaderboard.map((row) => (
-                <LeaderRow key={row.underlying} row={row} info={companyMap[row.underlying]} onSymbolClick={setSelectedSymbol} />
-              ))}
+
+              {(() => {
+                const filtered = leaderboard.filter(row => {
+                  if (activeTheme && !(row.driver_tags ?? []).includes(activeTheme)) return false;
+                  if (side) {
+                    const s = deriveSide(row);
+                    if (s !== side) return false;
+                  }
+                  return true;
+                });
+
+                return (
+                  <>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingTop: 12, paddingBottom: 10 }}>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                        {filtered.length} symbol{filtered.length !== 1 ? "s" : ""}{activeTheme || side ? " (filtered)" : " ranked by unusual flow"}
+                      </span>
+                      <span style={{ fontSize: 10, color: "var(--muted)" }}>
+                        Score = how unusual today&apos;s activity is vs. yesterday
+                      </span>
+                    </div>
+
+                    {filtered.length === 0 && (
+                      <div style={{ color: "var(--muted)", fontSize: 13, padding: "24px 0" }}>
+                        {leaderboard.length === 0
+                          ? dataSource === "friday_close"
+                            ? "No unusual flow was detected at Friday close."
+                            : dataSource === "eod"
+                            ? "No unusual flow was detected at market close."
+                            : "No unusual flow detected yet."
+                          : "No symbols match this filter."}
+                      </div>
+                    )}
+
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, 1fr)",
+                      gap: 12,
+                    }}>
+                      {filtered.map((row) => (
+                        <LeaderCard key={row.underlying} row={row} info={companyMap[row.underlying]} onSymbolClick={setSelectedSymbol} />
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </>
           )}
 

@@ -55,7 +55,7 @@ export interface LeaderboardResponse {
   total: number;
   returned: number;
   leaderboard: LeaderboardRow[];
-  source?: "live" | "friday_close";
+  source?: "live" | "friday_close" | "eod";
   friday_close_ts?: string;
 }
 
