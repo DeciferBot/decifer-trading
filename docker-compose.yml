@@ -281,11 +281,9 @@ services:
       - TWS_SETTINGS_PATH=/home/ibgateway/Jts
       - TWOFA_TIMEOUT_ACTION=exit
       - EXISTING_SESSION_DETECTED_ACTION=primary
-    ports:
-      - "127.0.0.1:4002:4002"
-      - "127.0.0.1:4001:4001"
     volumes:
       - ibeam-conf:/home/ibgateway/Jts
+    network_mode: host
     shm_size: '1gb'
     deploy:
       resources:
