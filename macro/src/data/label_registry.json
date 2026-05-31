@@ -24,6 +24,7 @@
     "consumer":                         "Consumer",
     "automotive_ev":                    "Automotive & EV",
     "space":                            "Space",
+    "quantum_computing":                "Quantum Computing",
     "precious_metals":                  "Precious Metals",
     "ai_energy_nuclear_ai":             "AI Infrastructure",
     "ai_energy_nuclear_energy":         "Nuclear & Clean Power"
@@ -69,7 +70,12 @@
     "consumer_discretionary":         "Consumer Spending",
     "mega_cap_platforms":             "Mega-Cap Tech",
     "travel_leisure":                 "Travel & Leisure",
-    "energy":                         "Energy"
+    "energy":                         "Energy",
+    "ai_energy_nuclear":              "Nuclear & Clean Power",
+    "space_economy":                  "Space Economy",
+    "quantum_computing":              "Quantum Computing",
+    "digital_assets":                 "Digital Assets",
+    "glp1_health":                    "GLP-1 Health Platforms"
   },
 
   "buckets": {
