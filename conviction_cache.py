@@ -150,21 +150,26 @@ def refresh_all(symbols: list[str]) -> None:
     Synchronous full-universe rescore. Called at scheduled rescore times.
     Blocks until all symbols are scored. Updates cache and persists to disk.
     """
-    from conviction_engine import fetch_price_changes, fetch_analyst_changes, score_symbol
+    from conviction_engine import (
+        fetch_price_changes, fetch_analyst_changes,
+        fetch_earnings_calendar, score_symbol,
+    )
 
     log.info("conviction_cache: full rescore starting for %d symbols", len(symbols))
     t0 = time.time()
 
-    # Batch-fetch shared data once
+    # Batch-fetch all shared data in 3 calls instead of per-symbol serial fetches
     price_changes    = fetch_price_changes(symbols)
     analyst_changes  = fetch_analyst_changes(symbols)
+    earnings_days    = fetch_earnings_calendar(symbols)  # {symbol: days_to_earnings}
 
     results: dict[str, dict] = {}
 
     def _score_one(sym: str) -> tuple[str, dict | None]:
         try:
             cs = score_symbol(sym, price_changes=price_changes,
-                              analyst_changes=analyst_changes)
+                              analyst_changes=analyst_changes,
+                              earnings_days=earnings_days)
             return sym, cs.to_dict()
         except Exception as exc:
             log.warning("conviction_cache: score_symbol(%s) failed — %s", sym, exc)

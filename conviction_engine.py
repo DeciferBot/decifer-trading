@@ -347,43 +347,58 @@ def _score_momentum(
 # hasn't priced the outcome yet. Proximity to catalyst = higher conviction.
 # Analyst estimate upward revisions signal building institutional conviction.
 
-def _score_forward_catalyst(symbol: str) -> DimensionScore:
+def _score_forward_catalyst(
+    symbol: str,
+    symbol_earnings_days: dict[str, int] | None = None,
+) -> DimensionScore:
     MAX = 15
     pts = 0
     signals = []
 
     # Earnings calendar — check next 30 days
-    cal_raw = _fmp("earnings-calendar", {"symbol": symbol, "limit": 3})
+    # earnings_calendar is a pre-fetched batch dict: symbol -> days_to_earnings
+    # passed in from refresh_all to avoid per-symbol FMP calls during warm-up.
+    # Falls back to live fetch for single-symbol rescores.
     now = datetime.now(UTC)
-    for item in (cal_raw if isinstance(cal_raw, list) else []):
-        date_str = item.get("date") or item.get("reportDate") or ""
-        if not date_str:
-            continue
-        try:
-            event_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            if event_dt.tzinfo is None:
-                event_dt = event_dt.replace(tzinfo=UTC)
-            days_away = (event_dt - now).days
-            if 0 <= days_away <= 7:
-                pts = max(pts, 12); signals.append(f"earnings_in_{days_away}d→+12")
-            elif 8 <= days_away <= 14:
-                pts = max(pts, 8);  signals.append(f"earnings_in_{days_away}d→+8")
-            elif 15 <= days_away <= 30:
-                pts = max(pts, 4);  signals.append(f"earnings_in_{days_away}d→+4")
-        except Exception:
-            continue
+    days_away = symbol_earnings_days.get(symbol.upper()) if symbol_earnings_days else None
+    if days_away is None:
+        # Single-symbol path: fetch live
+        cal_raw = _fmp("earnings-calendar", {"symbol": symbol, "limit": 3})
+        for item in (cal_raw if isinstance(cal_raw, list) else []):
+            date_str = item.get("date") or item.get("reportDate") or ""
+            if not date_str:
+                continue
+            try:
+                event_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                if event_dt.tzinfo is None:
+                    event_dt = event_dt.replace(tzinfo=UTC)
+                d = (event_dt - now).days
+                if 0 <= d <= 30:
+                    days_away = d
+                    break
+            except Exception:
+                continue
 
-    # Analyst estimate revisions — upward revision in last 30 days
-    rev_raw = _fmp("analyst-estimates", {"symbol": symbol, "period": "quarter", "limit": 2})
-    if isinstance(rev_raw, list) and len(rev_raw) >= 2:
-        latest_eps  = _f(rev_raw[0].get("epsAvg") or rev_raw[0].get("estimatedEpsAvg"))
-        prev_eps    = _f(rev_raw[1].get("epsAvg") or rev_raw[1].get("estimatedEpsAvg"))
-        if latest_eps is not None and prev_eps is not None and prev_eps != 0:
-            revision_pct = (latest_eps - prev_eps) / abs(prev_eps) * 100
-            if revision_pct >= 5:
-                pts = max(pts, pts + 6); signals.append(f"eps_rev={revision_pct:+.0f}%→+6")
-            elif revision_pct <= -5:
-                pts = max(-5, pts - 4); signals.append(f"eps_rev={revision_pct:+.0f}%→-4")
+    if days_away is not None and 0 <= days_away <= 30:
+        if days_away <= 7:
+            pts = max(pts, 12); signals.append(f"earnings_in_{days_away}d→+12")
+        elif days_away <= 14:
+            pts = max(pts, 8);  signals.append(f"earnings_in_{days_away}d→+8")
+        else:
+            pts = max(pts, 4);  signals.append(f"earnings_in_{days_away}d→+4")
+
+    # EPS revisions — only fetch in single-symbol path to keep batch warm-up fast
+    if symbol_earnings_days is None:
+        rev_raw = _fmp("analyst-estimates", {"symbol": symbol, "period": "quarter", "limit": 2})
+        if isinstance(rev_raw, list) and len(rev_raw) >= 2:
+            latest_eps = _f(rev_raw[0].get("epsAvg") or rev_raw[0].get("estimatedEpsAvg"))
+            prev_eps   = _f(rev_raw[1].get("epsAvg") or rev_raw[1].get("estimatedEpsAvg"))
+            if latest_eps is not None and prev_eps is not None and prev_eps != 0:
+                revision_pct = (latest_eps - prev_eps) / abs(prev_eps) * 100
+                if revision_pct >= 5:
+                    pts += 6; signals.append(f"eps_rev={revision_pct:+.0f}%→+6")
+                elif revision_pct <= -5:
+                    pts = max(-5, pts - 4); signals.append(f"eps_rev={revision_pct:+.0f}%→-4")
 
     if not signals:
         signals.append("no_upcoming_catalyst")
@@ -665,6 +680,38 @@ def fetch_analyst_changes(symbols: list[str]) -> list[dict]:
             "published_date": pub_str,
         })
     return results
+
+
+def fetch_earnings_calendar(symbols: list[str]) -> dict[str, int]:
+    """
+    Batch-fetch upcoming earnings dates for all symbols in one FMP call.
+    Returns {SYMBOL: days_until_earnings} for earnings within next 30 days.
+    Called once per refresh_all to avoid per-symbol serial calls.
+    """
+    now = datetime.now(UTC)
+    from_date = now.strftime("%Y-%m-%d")
+    to_date   = (now + timedelta(days=30)).strftime("%Y-%m-%d")
+    sym_set   = {s.upper() for s in symbols}
+
+    raw = _fmp("earnings-calendar", {"from": from_date, "to": to_date})
+    result: dict[str, int] = {}
+    for item in (raw if isinstance(raw, list) else []):
+        sym = (item.get("symbol") or "").upper()
+        if sym not in sym_set:
+            continue
+        date_str = item.get("date") or item.get("reportDate") or ""
+        try:
+            event_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            if event_dt.tzinfo is None:
+                event_dt = event_dt.replace(tzinfo=UTC)
+            days_away = (event_dt - now).days
+            if 0 <= days_away <= 30:
+                # Keep the nearest upcoming earnings per symbol
+                if sym not in result or days_away < result[sym]:
+                    result[sym] = days_away
+        except Exception:
+            continue
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -1106,6 +1153,7 @@ def score_symbol(
     symbol: str,
     price_changes: dict[str, float] | None = None,
     analyst_changes: list[dict] | None = None,
+    earnings_days: dict[str, int] | None = None,
 ) -> ConvictionScore:
     """
     Score a single symbol across all conviction dimensions.
@@ -1130,7 +1178,7 @@ def score_symbol(
 
     # D2 uses quality context from D1/D3 to distinguish reversal from deterioration
     d2  = _score_momentum(symbol, price_changes, d1_raw=d1.raw_pts, d3_raw=d3.raw_pts)
-    d2b = _score_forward_catalyst(symbol)
+    d2b = _score_forward_catalyst(symbol, symbol_earnings_days=earnings_days)
     d4  = _score_distance_from_highs(symbol)
     d5  = _score_macro_theme(symbol)
 
