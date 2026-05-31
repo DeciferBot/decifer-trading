@@ -5,6 +5,27 @@ import * as d3 from "d3";
 import type { EnrichedNode, GraphEdge, Cluster } from "@/lib/types";
 import { EDGE_COLORS } from "@/lib/types";
 
+// Per-subcluster base colour — more visual variety than a flat cluster colour
+const SUBCLUSTER_COLORS: Record<string, string> = {
+  // AI / tech
+  compute:        "#6366f1", // indigo  — core silicon (NVDA, AMD, INTC)
+  software:       "#818cf8", // lavender — platforms & SaaS (MSFT, PLTR, CRM…)
+  foundry:        "#4338ca", // deep indigo — chip fabs (TSM, ASML, AMAT…)
+  memory:         "#7c3aed", // violet — memory & storage (MU)
+  networking:     "#06b6d4", // cyan — data-centre fabric (ANET, CIEN…)
+  systems:        "#a78bfa", // soft purple — servers & systems (DELL, HPE, SMCI…)
+  power:          "#f97316", // orange — AI power infra (VRT, ETN, CEG, NRG…)
+  infrastructure: "#8b5cf6", // purple — data-centre real-estate (EQIX, DLR…)
+  photonics:      "#38bdf8", // sky-blue — optical (CIEN, COHR, LITE…)
+  // Space / defence
+  launch:         "#f59e0b", // amber — launch vehicles (RKLB…)
+  earth_obs:      "#84cc16", // lime — earth observation (PL, SPIR…)
+  defence:        "#ef4444", // red — defence primes (LMT, NOC, RTX…)
+  comms:          "#22d3ee", // teal — satellite comms (VSAT, IRDM…)
+  components:     "#d97706", // dark amber — aero components (MOGA, CW, HEI…)
+  materials:      "#a3e635", // lime-green — advanced materials (HXL, ATI…)
+};
+
 interface Props {
   nodes: EnrichedNode[];
   edges: GraphEdge[];
@@ -47,17 +68,21 @@ export default function MarketGraph({ nodes, edges, clusters, onSelect, selected
   }, []);
 
   const radius = useCallback((n: EnrichedNode) => {
-    const base = n.tier === 0 ? 20 : n.tier === 1 ? 14 : 10;
-    return base + (n.brightness / 100) * 8;
+    // Aggressive tier sizing so tier-0 anchors are unmistakably large
+    const base = n.tier === 0 ? 28 : n.tier === 1 ? 15 : 8;
+    return base + (n.brightness / 100) * 10;
   }, []);
 
   const color = useCallback((n: EnrichedNode) => {
-    const base = clusters.find(c => c.id === n.cluster)?.color ?? "#6366f1";
+    // Subcluster shade first, cluster colour as fallback
+    const base = SUBCLUSTER_COLORS[n.subcluster]
+      ?? clusters.find(c => c.id === n.cluster)?.color
+      ?? "#6366f1";
     const p = n.price?.change_pct ?? 0;
-    if (p > 2)   return "#10b981";
-    if (p > 0.5) return "#34d399";
-    if (p < -2)  return "#ef4444";
-    if (p < -0.5) return "#f87171";
+    if (p > 2)    return "#10b981"; // strong green
+    if (p > 0.5)  return "#34d399"; // soft green
+    if (p < -2)   return "#ef4444"; // strong red
+    if (p < -0.5) return "#f87171"; // soft red
     return base;
   }, [clusters]);
 

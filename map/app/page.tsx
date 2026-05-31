@@ -207,12 +207,24 @@ export default function MapPage() {
             </button>
           </div>
 
-          {viewMode === "market" && !isMobile && clusters.map(c => (
-            <div key={c.id} className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ background: c.color }} />
-              <span className="text-xs text-gray-500">{c.label}</span>
+          {viewMode === "market" && !isMobile && (
+            <div className="flex items-center gap-3">
+              {[
+                { color: "#6366f1", label: "Compute" },
+                { color: "#818cf8", label: "Software" },
+                { color: "#4338ca", label: "Foundry" },
+                { color: "#06b6d4", label: "Networking" },
+                { color: "#f97316", label: "Power" },
+                { color: "#f59e0b", label: "Launch" },
+                { color: "#ef4444", label: "Defence" },
+              ].map(({ color, label }) => (
+                <div key={label} className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                  <span className="text-xs text-gray-500 hidden xl:block">{label}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
 
           {viewMode === "brain" && brainData && (
             <div className="flex items-center gap-2">
