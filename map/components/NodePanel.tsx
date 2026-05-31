@@ -97,14 +97,16 @@ export default function NodePanel({ node, edges, allNodes, onClose, onNavigate }
                   className="w-full flex items-start gap-2.5 rounded-lg p-2.5 bg-white/5 hover:bg-white/10 transition-colors text-left group"
                 >
                   <div
-                    className="mt-0.5 w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: EDGE_COLORS[edge.type], marginTop: 5 }}
+                    className="mt-0.5 w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ background: EDGE_COLORS[edge.type], marginTop: 4 }}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-mono font-semibold text-white">{other?.id}</span>
-                      <span className="text-xs text-gray-600">·</span>
-                      <span className="text-xs text-gray-500">{EDGE_LABELS[edge.type]}</span>
+                      <span className="text-xs font-medium px-1 py-0.5 rounded text-[10px]"
+                        style={{ color: EDGE_COLORS[edge.type], background: EDGE_COLORS[edge.type] + "22" }}>
+                        {EDGE_LABELS[edge.type]}
+                      </span>
                       {!isOutgoing && <span className="text-xs text-gray-600">(←)</span>}
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5 truncate">{edge.label}</div>
