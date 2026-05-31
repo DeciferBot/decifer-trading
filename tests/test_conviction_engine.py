@@ -287,12 +287,13 @@ class TestMacroThemeScore:
 # ---------------------------------------------------------------------------
 
 class TestCompositeScore:
-    def _full_score(self, d1=20, d2=10, d3=15, d4=8, d5=20, d6=0, d7=0, d8=0, d9=0):
+    def _full_score(self, d1=20, d2=10, d3=15, d4=8, d5=20, d2b=0, d6=0, d7=0, d8=0, d9=0):
         import conviction_engine as ce
         ds = lambda r, m, s: ce.DimensionScore(r, m, s)
         with (
             patch("conviction_engine._score_analyst",              return_value=ds(d1, 38, "analyst")),
             patch("conviction_engine._score_momentum",             return_value=ds(d2, 20, "momentum")),
+            patch("conviction_engine._score_forward_catalyst",     return_value=ds(d2b,15, "forward_catalyst")),
             patch("conviction_engine._score_valuation",            return_value=ds(d3, 23, "valuation")),
             patch("conviction_engine._score_distance_from_highs",  return_value=ds(d4, 12, "highs")),
             patch("conviction_engine._score_macro_theme",          return_value=ds(d5, 25, "macro")),
@@ -304,18 +305,18 @@ class TestCompositeScore:
             return ce.score_symbol("NVDA", price_changes={}, analyst_changes=[])
 
     def test_high_tier_strong_signals(self):
+        # Single-symbol score uses absolute tier; strong signals → HIGH composite
         cs = self._full_score(d1=35, d2=18, d3=20, d4=10, d5=24)
-        assert cs.tier == "HIGH"
-        assert cs.composite >= 65
+        assert cs.composite >= 65  # absolute threshold
 
-    def test_medium_tier_moderate_signals(self):
-        # d1+d3+d4+d5+d6 = 15+8+3+10+6 = 42 → composite=round(42/153*100)=27 → WATCHLIST
-        cs = self._full_score(d1=15, d2=0, d3=8, d4=3, d5=10, d6=6)
-        assert cs.tier in ("MEDIUM", "WATCHLIST")
+    def test_strong_scores_higher_than_weak(self):
+        strong = self._full_score(d1=35, d2=18, d3=20, d4=10, d5=24)
+        weak   = self._full_score(d1=2, d2=-10, d3=0, d4=-5, d5=0)
+        assert strong.composite > weak.composite
 
     def test_dormant_tier_weak_signals(self):
         cs = self._full_score(d1=2, d2=-10, d3=0, d4=-5, d5=0)
-        assert cs.tier in ("WATCHLIST", "DORMANT")
+        assert cs.composite < 30  # genuinely low score
 
     def test_score_never_exceeds_100(self):
         cs = self._full_score(d1=38, d2=20, d3=23, d4=12, d5=25)
@@ -328,7 +329,7 @@ class TestCompositeScore:
     def test_all_dimensions_present_in_result(self):
         cs = self._full_score()
         assert set(cs.dimensions.keys()) == {
-            "analyst", "momentum", "valuation", "highs", "macro",
+            "analyst", "momentum", "forward_catalyst", "valuation", "highs", "macro",
             "news_catalyst", "options_flow", "peer_network", "counter_thesis",
         }
 

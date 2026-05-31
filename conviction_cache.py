@@ -177,6 +177,10 @@ def refresh_all(symbols: list[str]) -> None:
             if result is not None:
                 results[sym] = result
 
+    # Apply relative tiers — rank all symbols by composite, tier by percentile.
+    # Conviction is relative: top 20% = HIGH regardless of absolute market level.
+    _apply_relative_tiers(results)
+
     now = time.time()
     with _lock:
         for sym, entry in results.items():
@@ -186,6 +190,19 @@ def refresh_all(symbols: list[str]) -> None:
     _save_to_disk()
     elapsed = time.time() - t0
     log.info("conviction_cache: full rescore complete — %d scored in %.1fs", len(results), elapsed)
+
+
+def _apply_relative_tiers(results: dict[str, dict]) -> None:
+    """
+    Re-tier all scored symbols by percentile rank within the batch.
+    Mutates results in place — adds 'tier' (relative) and 'absolute_tier'.
+    """
+    from conviction_engine import tier_from_percentile
+    ranked = sorted(results.items(), key=lambda x: -(x[1].get("composite") or 0))
+    total = len(ranked)
+    for rank, (sym, entry) in enumerate(ranked, start=1):
+        entry["absolute_tier"] = entry.get("tier", "DORMANT")
+        entry["tier"] = tier_from_percentile(rank, total)
 
 
 # ---------------------------------------------------------------------------

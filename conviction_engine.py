@@ -275,14 +275,26 @@ def _score_analyst(symbol: str, recent_changes: list[dict]) -> DimensionScore:
 
 
 # ---------------------------------------------------------------------------
-# D2 — Price momentum 1D/5D vs SPY  (max 20 pts)
+# D2 — Context-aware momentum  (max 20 pts)
 # ---------------------------------------------------------------------------
-# Corrected per trader Q&A:
-#   5D relative to SPY: ≥5%=+15, ≥2%=+10, ≥0.5%=+5, neutral=0, <-1%=-8, <-3%=-15
-#   1D relative bonus: ≥2%=+5, ≤-2%=-5
-# Max: 15+5 = 20
+# Momentum is interpreted relative to the quality of the name (D1+D3 signals).
+#
+# High-quality name (analyst BUY + positive DCF) that is DOWN: reversal setup.
+#   The dip creates asymmetry — beaten-down quality before a catalyst is your
+#   best trade, not your worst. Score: +8 (better entry, more room to run).
+#
+# Any name UP strongly: thesis confirming. Score: +10 to +15.
+# Weak-quality name DOWN: avoid. Score: -10 to -15.
+# Neutral: 0.
+#
+# quality_score is computed from raw D1/D3 pts passed in — avoids re-fetching.
 
-def _score_momentum(symbol: str, price_changes: dict[str, float]) -> DimensionScore:
+def _score_momentum(
+    symbol: str,
+    price_changes: dict[str, float],
+    d1_raw: int = 0,
+    d3_raw: int = 0,
+) -> DimensionScore:
     MAX = 20
     pts = 0
     signals = []
@@ -292,10 +304,13 @@ def _score_momentum(symbol: str, price_changes: dict[str, float]) -> DimensionSc
     spy_1d = price_changes.get("SPY_1D")
     sym_1d = price_changes.get(f"{symbol.upper()}_1D")
 
+    # Quality = analyst BUY-level conviction AND positive valuation signal
+    quality_strong = d1_raw >= 12 and d3_raw >= 10
+
     if sym_5d is not None and spy_5d is not None:
         rel5 = sym_5d - spy_5d
         if rel5 >= 5.0:
-            pts += 15; signals.append(f"5d_rel={rel5:+.1f}%→+15")
+            pts += 15; signals.append(f"5d_rel={rel5:+.1f}%→+15(thesis_confirming)")
         elif rel5 >= 2.0:
             pts += 10; signals.append(f"5d_rel={rel5:+.1f}%→+10")
         elif rel5 >= 0.5:
@@ -303,20 +318,78 @@ def _score_momentum(symbol: str, price_changes: dict[str, float]) -> DimensionSc
         elif rel5 > -1.0:
             signals.append(f"5d_rel={rel5:+.1f}%→0")
         elif rel5 > -3.0:
-            pts -= 8;  signals.append(f"5d_rel={rel5:+.1f}%→-8")
+            if quality_strong:
+                pts += 5;  signals.append(f"5d_rel={rel5:+.1f}%→+5(quality_dip)")
+            else:
+                pts -= 8;  signals.append(f"5d_rel={rel5:+.1f}%→-8")
         else:
-            pts -= 15; signals.append(f"5d_rel={rel5:+.1f}%→-15")
+            if quality_strong:
+                pts += 8;  signals.append(f"5d_rel={rel5:+.1f}%→+8(reversal_setup)")
+            else:
+                pts -= 15; signals.append(f"5d_rel={rel5:+.1f}%→-15")
 
     if sym_1d is not None and spy_1d is not None:
         rel1 = sym_1d - spy_1d
         if rel1 >= 2.0:
             pts += 5;  signals.append(f"1d_rel={rel1:+.1f}%→+5")
-        elif rel1 <= -2.0:
+        elif rel1 <= -2.0 and not quality_strong:
             pts -= 5;  signals.append(f"1d_rel={rel1:+.1f}%→-5")
 
     pts = max(-20, min(MAX, pts))
     return DimensionScore(raw_pts=pts, max_pts=MAX,
                           signal="; ".join(signals) or "no price data")
+
+
+# ---------------------------------------------------------------------------
+# D2b — Forward catalyst  (max 15 pts)
+# ---------------------------------------------------------------------------
+# Upcoming earnings or known events create asymmetric setups — the market
+# hasn't priced the outcome yet. Proximity to catalyst = higher conviction.
+# Analyst estimate upward revisions signal building institutional conviction.
+
+def _score_forward_catalyst(symbol: str) -> DimensionScore:
+    MAX = 15
+    pts = 0
+    signals = []
+
+    # Earnings calendar — check next 30 days
+    cal_raw = _fmp("earnings-calendar", {"symbol": symbol, "limit": 3})
+    now = datetime.now(UTC)
+    for item in (cal_raw if isinstance(cal_raw, list) else []):
+        date_str = item.get("date") or item.get("reportDate") or ""
+        if not date_str:
+            continue
+        try:
+            event_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            if event_dt.tzinfo is None:
+                event_dt = event_dt.replace(tzinfo=UTC)
+            days_away = (event_dt - now).days
+            if 0 <= days_away <= 7:
+                pts = max(pts, 12); signals.append(f"earnings_in_{days_away}d→+12")
+            elif 8 <= days_away <= 14:
+                pts = max(pts, 8);  signals.append(f"earnings_in_{days_away}d→+8")
+            elif 15 <= days_away <= 30:
+                pts = max(pts, 4);  signals.append(f"earnings_in_{days_away}d→+4")
+        except Exception:
+            continue
+
+    # Analyst estimate revisions — upward revision in last 30 days
+    rev_raw = _fmp("analyst-estimates", {"symbol": symbol, "period": "quarter", "limit": 2})
+    if isinstance(rev_raw, list) and len(rev_raw) >= 2:
+        latest_eps  = _f(rev_raw[0].get("epsAvg") or rev_raw[0].get("estimatedEpsAvg"))
+        prev_eps    = _f(rev_raw[1].get("epsAvg") or rev_raw[1].get("estimatedEpsAvg"))
+        if latest_eps is not None and prev_eps is not None and prev_eps != 0:
+            revision_pct = (latest_eps - prev_eps) / abs(prev_eps) * 100
+            if revision_pct >= 5:
+                pts = max(pts, pts + 6); signals.append(f"eps_rev={revision_pct:+.0f}%→+6")
+            elif revision_pct <= -5:
+                pts = max(-5, pts - 4); signals.append(f"eps_rev={revision_pct:+.0f}%→-4")
+
+    if not signals:
+        signals.append("no_upcoming_catalyst")
+
+    pts = max(-5, min(MAX, pts))
+    return DimensionScore(raw_pts=pts, max_pts=MAX, signal="; ".join(signals))
 
 
 # ---------------------------------------------------------------------------
@@ -989,27 +1062,43 @@ def _score_counter_thesis(symbol: str, driver_id: str) -> DimensionScore:
 
 # All enabled dimensions and their max_pts (Phase 1 + Phase 2)
 _ALL_DIMS = {
-    "analyst":       38,
-    "momentum":      20,
-    "valuation":     23,
-    "highs":         12,
-    "macro":         25,
-    "news_catalyst": 12,
-    "options_flow":  12,
-    "peer_network":   8,
-    "counter_thesis": 3,
+    "analyst":          38,
+    "momentum":         20,
+    "forward_catalyst": 15,
+    "valuation":        23,
+    "highs":            12,
+    "macro":            25,
+    "news_catalyst":    12,
+    "options_flow":     12,
+    "peer_network":      8,
+    "counter_thesis":    3,
 }
-_ALL_DIMS_MAX = sum(_ALL_DIMS.values())   # 153
+_ALL_DIMS_MAX = sum(_ALL_DIMS.values())   # 168
 
-# Keep legacy name as alias for any callers that referenced it
-_PHASE1_DIMS = {k: _ALL_DIMS[k] for k in ("analyst", "momentum", "valuation", "highs", "macro")}
-_PHASE1_MAX = sum(_PHASE1_DIMS.values())  # 118
+# D1-D5 base dims (structural conviction thesis)
+_PHASE1_DIMS = {k: _ALL_DIMS[k] for k in
+                ("analyst", "momentum", "forward_catalyst", "valuation", "highs", "macro")}
+_PHASE1_MAX = sum(_PHASE1_DIMS.values())  # 133
 
 
 def _tier(score: int) -> str:
+    """Absolute tier — used as secondary label. Primary tier is percentile-based."""
     if score >= 65: return "HIGH"
     if score >= 45: return "MEDIUM"
     if score >= 25: return "WATCHLIST"
+    return "DORMANT"
+
+
+def tier_from_percentile(rank: int, total: int) -> str:
+    """
+    Relative tier based on rank within scored universe.
+    Always produces a healthy distribution: top 20% = HIGH regardless of market.
+    Conviction is relative — these are your best ideas vs alternatives today.
+    """
+    pct = rank / max(total, 1)
+    if pct <= 0.20: return "HIGH"
+    if pct <= 0.45: return "MEDIUM"
+    if pct <= 0.70: return "WATCHLIST"
     return "DORMANT"
 
 
@@ -1019,7 +1108,7 @@ def score_symbol(
     analyst_changes: list[dict] | None = None,
 ) -> ConvictionScore:
     """
-    Score a single symbol across all Phase 1+2 conviction dimensions.
+    Score a single symbol across all conviction dimensions.
 
     price_changes and analyst_changes are batch-fetched at universe level
     and passed in to avoid redundant API calls.
@@ -1035,42 +1124,43 @@ def score_symbol(
     theme_id  = primary_exposure.get("theme_id", "")
     driver_id = primary_exposure.get("driver_id", "")
 
-    # Phase 1
+    # Score D1 and D3 first so D2 can use quality context
     d1 = _score_analyst(symbol, analyst_changes)
-    d2 = _score_momentum(symbol, price_changes)
     d3 = _score_valuation(symbol)
-    d4 = _score_distance_from_highs(symbol)
-    d5 = _score_macro_theme(symbol)
 
-    # Phase 2
+    # D2 uses quality context from D1/D3 to distinguish reversal from deterioration
+    d2  = _score_momentum(symbol, price_changes, d1_raw=d1.raw_pts, d3_raw=d3.raw_pts)
+    d2b = _score_forward_catalyst(symbol)
+    d4  = _score_distance_from_highs(symbol)
+    d5  = _score_macro_theme(symbol)
+
+    # Confirmation dims
     d6 = _score_news_catalyst(symbol, theme_id)
     d7 = _score_options_flow(symbol)
     d8 = _score_peer_network(symbol, price_changes)
     d9 = _score_counter_thesis(symbol, driver_id)
 
-    # D1-D5 are the structural conviction thesis — normalise these against their
-    # max (118) to produce a 0-100 base. Zero on D6/D7/D8 means "no data today",
-    # not "no conviction" — treating them as part of the denominator would deflate
-    # every score by ~23% when news/options/peers are absent. D6-D9 are applied
-    # as bounded modifiers (+15 / -15) on top of the base.
-    base_raw = d1.raw_pts + d2.raw_pts + d3.raw_pts + d4.raw_pts + d5.raw_pts
-    base = round(max(0, base_raw) / _PHASE1_MAX * 100)   # 0-100
+    # Base = structural conviction (D1–D5 + forward catalyst), normalised 0-100
+    base_raw = d1.raw_pts + d2.raw_pts + d2b.raw_pts + d3.raw_pts + d4.raw_pts + d5.raw_pts
+    base = round(max(0, base_raw) / _PHASE1_MAX * 100)
 
+    # Confirmation modifiers bounded ±15
     modifiers = d6.raw_pts + d7.raw_pts + d8.raw_pts + d9.raw_pts
-    modifiers = max(-15, min(15, modifiers))              # bounded ±15
+    modifiers = max(-15, min(15, modifiers))
 
     composite = max(0, min(100, base + modifiers))
 
     dims = {
-        "analyst":       d1.to_dict(),
-        "momentum":      d2.to_dict(),
-        "valuation":     d3.to_dict(),
-        "highs":         d4.to_dict(),
-        "macro":         d5.to_dict(),
-        "news_catalyst": d6.to_dict(),
-        "options_flow":  d7.to_dict(),
-        "peer_network":  d8.to_dict(),
-        "counter_thesis":d9.to_dict(),
+        "analyst":          d1.to_dict(),
+        "momentum":         d2.to_dict(),
+        "forward_catalyst": d2b.to_dict(),
+        "valuation":        d3.to_dict(),
+        "highs":            d4.to_dict(),
+        "macro":            d5.to_dict(),
+        "news_catalyst":    d6.to_dict(),
+        "options_flow":     d7.to_dict(),
+        "peer_network":     d8.to_dict(),
+        "counter_thesis":   d9.to_dict(),
     }
 
     return ConvictionScore(
