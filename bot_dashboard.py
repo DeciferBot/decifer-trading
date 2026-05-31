@@ -2252,9 +2252,16 @@ def _pnl_refresh_loop():
 
 
 def start_dashboard():
-    server = ThreadingHTTPServer(("0.0.0.0", CONFIG["dashboard_port"]), DashHandler)
+    # On cloud (DASHBOARD_HOST=127.0.0.1): nginx handles external access, bind loopback only.
+    # On Mac (default 0.0.0.0): accessible from LAN devices (iPad, phone).
+    import os as _os
+    _host = _os.environ.get("DASHBOARD_HOST", "0.0.0.0")
+    server = ThreadingHTTPServer((_host, CONFIG["dashboard_port"]), DashHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     threading.Thread(target=_pnl_refresh_loop, daemon=True, name="pnl-refresh").start()
     import socket as _socket
     _local_ip = _socket.gethostbyname(_socket.gethostname())
-    clog("INFO", f"Dashboard live → http://localhost:{CONFIG['dashboard_port']}  |  network: http://{_local_ip}:{CONFIG['dashboard_port']}")
+    if _host == "0.0.0.0":
+        clog("INFO", f"Dashboard live → http://localhost:{CONFIG['dashboard_port']}  |  network: http://{_local_ip}:{CONFIG['dashboard_port']}")
+    else:
+        clog("INFO", f"Dashboard live → http://localhost:{CONFIG['dashboard_port']}  (cloud: nginx → {_host}:{CONFIG['dashboard_port']})")
