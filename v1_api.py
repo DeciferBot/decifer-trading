@@ -33,6 +33,9 @@ import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Optional
+
+import requests as _requests
 
 from flask import Blueprint, jsonify, request, Response
 
@@ -46,11 +49,133 @@ _BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _DATA_DIR = _BASE_DIR / "data" / "intelligence"
 _CACHE_DIR = _BASE_DIR / "data" / "api_cache"
 _CACHE_TTL_SECONDS = 300  # 5 minutes
+_MOMENTUM_CACHE_TTL = 1800  # 30 minutes
 
 _DISCLAIMER = (
     "Intelligence data powered by Decifer. "
     "Not financial advice. For informational purposes only."
 )
+
+# ---------------------------------------------------------------------------
+# Price momentum cache — 5-day return vs SPY via FMP batch-quote
+# ---------------------------------------------------------------------------
+
+_momentum_cache: dict[str, float] = {}   # symbol -> 5d relative return vs SPY
+_momentum_cache_ts: float = 0.0
+_momentum_lock = threading.Lock()
+_momentum_refresh_in_flight = False
+_MOMENTUM_CACHE_FILE = _CACHE_DIR / "price_momentum.json"
+_FMP_BASE = "https://financialmodelingprep.com/stable"
+
+
+def _fetch_momentum_data(symbols: list[str]) -> dict[str, float]:
+    """
+    Fetch 5-day price-change percentages for `symbols` (+ SPY as benchmark)
+    from FMP's stock-price-change endpoint. Returns a dict symbol -> 5d_pct.
+    Returns empty dict on any failure.
+    """
+    api_key = os.environ.get("FMP_API_KEY", "")
+    if not api_key:
+        return {}
+
+    all_symbols = list({s.upper() for s in symbols} | {"SPY"})
+    url = f"{_FMP_BASE}/stock-price-change"
+    try:
+        resp = _requests.get(
+            url,
+            params={"symbol": ",".join(all_symbols), "apikey": api_key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        log.warning("v1_api: momentum fetch failed — %s", exc)
+        return {}
+
+    result: dict[str, float] = {}
+    for item in (data if isinstance(data, list) else []):
+        sym = (item.get("symbol") or "").upper()
+        pct = item.get("5D")
+        if sym and pct is not None:
+            try:
+                result[sym] = float(pct)
+            except (TypeError, ValueError):
+                pass
+    return result
+
+
+def _momentum_pts(symbol: str, momentum_data: dict[str, float]) -> int:
+    """
+    Compute conviction bonus/penalty (-15 to +15) based on 5-day return
+    relative to SPY. Returns 0 if data is unavailable.
+    """
+    sym_ret = momentum_data.get(symbol.upper())
+    spy_ret = momentum_data.get("SPY")
+    if sym_ret is None or spy_ret is None:
+        return 0
+    relative = sym_ret - spy_ret
+    if relative >= 5.0:
+        return 15
+    if relative >= 2.0:
+        return 10
+    if relative >= 0.5:
+        return 5
+    if relative > -1.0:
+        return 0
+    if relative > -3.0:
+        return -8
+    return -15
+
+
+def _get_momentum_data(symbols: list[str]) -> dict[str, float]:
+    """
+    Return cached momentum data, triggering a background refresh if stale.
+    Always returns immediately — serves cached data while refresh runs.
+    """
+    global _momentum_cache, _momentum_cache_ts, _momentum_refresh_in_flight
+
+    now = time.time()
+
+    # Load from disk on cold start
+    if not _momentum_cache and _MOMENTUM_CACHE_FILE.exists():
+        try:
+            saved = json.loads(_MOMENTUM_CACHE_FILE.read_text())
+            _momentum_cache = saved.get("data", {})
+            _momentum_cache_ts = saved.get("ts", 0.0)
+        except Exception:
+            pass
+
+    cache_age = now - _momentum_cache_ts
+    if cache_age < _MOMENTUM_CACHE_TTL:
+        return _momentum_cache
+
+    # Stale — trigger background refresh (only one at a time)
+    with _momentum_lock:
+        if not _momentum_refresh_in_flight:
+            _momentum_refresh_in_flight = True
+
+            def _refresh():
+                global _momentum_cache, _momentum_cache_ts, _momentum_refresh_in_flight
+                try:
+                    fresh = _fetch_momentum_data(symbols)
+                    if fresh:
+                        with _momentum_lock:
+                            _momentum_cache = fresh
+                            _momentum_cache_ts = time.time()
+                        try:
+                            _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                            _MOMENTUM_CACHE_FILE.write_text(
+                                json.dumps({"ts": _momentum_cache_ts, "data": fresh})
+                            )
+                        except Exception as exc:
+                            log.warning("v1_api: momentum cache write failed — %s", exc)
+                finally:
+                    with _momentum_lock:
+                        _momentum_refresh_in_flight = False
+
+            threading.Thread(target=_refresh, daemon=True).start()
+
+    return _momentum_cache
 
 _BLOCKED_RESPONSE_KEYS = frozenset({
     "strike", "expiry", "delta", "gamma", "theta", "vega",
@@ -266,15 +391,20 @@ def _build_symbol_card(ticker: str) -> dict | None:
     primary_driver_id = primary_exp.get("driver_id", "")
     primary_driver_active = primary_driver_id in active_drivers
     primary_confidence = float(primary_exp.get("confidence") or 0)
-    conviction = _conviction_score(primary_confidence, primary_driver_active, in_feed, feed_confidence)
+    momentum_data = _get_momentum_data([ticker])
+    mom_pts = _momentum_pts(ticker, momentum_data)
+    conviction = _conviction_score(primary_confidence, primary_driver_active, in_feed, feed_confidence, mom_pts)
 
     # Conviction breakdown — explains each contributing signal
     breakdown = []
     if primary_driver_active:
-        breakdown.append({"signal": "Driver active", "detail": primary_driver_id.replace("_", " "), "pts": 35})
+        breakdown.append({"signal": "Driver active", "detail": primary_driver_id.replace("_", " "), "pts": 25})
     if in_feed:
-        breakdown.append({"signal": "In intelligence feed", "detail": f"{round(feed_confidence * 100)}% feed confidence", "pts": round(15 + feed_confidence * 10)})
-    breakdown.append({"signal": "Theme evidence", "detail": f"{round(primary_confidence * 100)}% evidence quality", "pts": round(primary_confidence * 40)})
+        breakdown.append({"signal": "In intelligence feed", "detail": f"{round(feed_confidence * 100)}% feed confidence", "pts": round(15 + feed_confidence * 20)})
+    breakdown.append({"signal": "Theme evidence", "detail": f"{round(primary_confidence * 100)}% evidence quality", "pts": round(primary_confidence * 15)})
+    if mom_pts != 0:
+        label = "Outperforming market" if mom_pts > 0 else "Underperforming market"
+        breakdown.append({"signal": label, "detail": "5-day return vs S&P 500", "pts": mom_pts})
     if not primary_driver_active:
         breakdown.append({"signal": "Driver inactive", "detail": primary_driver_id.replace("_", " ") + " not currently firing", "pts": 0})
 
@@ -326,28 +456,34 @@ def _conviction_score(
     driver_active: bool,
     in_feed: bool,
     feed_confidence: float,
+    momentum_pts: int = 0,
 ) -> dict:
     """
     Compute a 0-100 conviction score from available intelligence signals.
 
     Scoring:
-      - TTG evidence quality: up to 40 pts (confidence * 40)
-      - Driver active:        +35 pts (live macro tailwind)
-      - In intelligence feed: +15 pts
-      - Feed confidence:      up to 10 pts (feed_confidence * 10)
+      - TTG evidence quality: up to 15 pts  (ttg_confidence * 15)
+      - Driver active:        +25 pts        (live macro tailwind is on)
+      - In intelligence feed: +15 pts        (symbol actively promoted today)
+      - Feed confidence:      up to 20 pts   (feed_confidence * 20)
+      - Price momentum vs SPY: -15 to +15 pts (5-day relative return)
+
+    Max without momentum: 15 + 25 + 15 + 20 = 75
+    Max with outperformance: 90
 
     Tiers:
-      high      >= 70  — driver active + confirmed in feed + strong evidence
-      medium    40-69  — partially confirmed, at least one live signal
-      watchlist  < 40  — narrative building, not yet ready
+      high      >= 70  — driver active + in feed + strong evidence + not lagging
+      medium    40-69  — partially confirmed or lagging
+      watchlist  < 40  — narrative only, no live signal
     """
     score = round(
-        (ttg_confidence * 40)
-        + (35 if driver_active else 0)
+        (ttg_confidence * 15)
+        + (25 if driver_active else 0)
         + (15 if in_feed else 0)
-        + (feed_confidence * 10 if in_feed else 0)
+        + (feed_confidence * 20 if in_feed else 0)
+        + momentum_pts
     )
-    score = min(score, 100)
+    score = max(0, min(score, 100))
 
     if score >= 70:
         tier = "high"
@@ -393,6 +529,10 @@ def universe_list() -> Response:
         if existing is None or (exp.get("confidence") or 0) > (existing.get("confidence") or 0):
             by_symbol[sym] = exp
 
+    # Fetch price momentum data (serves cached data; refreshes in background if stale)
+    all_syms = list(by_symbol.keys())
+    momentum_data = _get_momentum_data(all_syms)
+
     symbols = []
     for sym, exp in sorted(by_symbol.items()):
         theme_node = nodes.get(exp.get("theme_id", ""), {})
@@ -402,8 +542,9 @@ def universe_list() -> Response:
         in_feed = feed_entry is not None
         feed_confidence = float(feed_entry.get("confidence") or 0) if feed_entry else 0.0
         ttg_confidence = float(exp.get("confidence") or 0)
+        mom_pts = _momentum_pts(sym, momentum_data)
 
-        conviction = _conviction_score(ttg_confidence, driver_active, in_feed, feed_confidence)
+        conviction = _conviction_score(ttg_confidence, driver_active, in_feed, feed_confidence, mom_pts)
 
         symbols.append({
             "symbol": sym,

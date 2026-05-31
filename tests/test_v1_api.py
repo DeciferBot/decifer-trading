@@ -418,6 +418,99 @@ class TestOptionsFlowCache:
 # Health endpoint test
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Conviction score and momentum tests
+# ---------------------------------------------------------------------------
+
+class TestConvictionScore:
+    def test_full_signals_high_tier(self):
+        import v1_api
+        result = v1_api._conviction_score(0.9, True, True, 0.85, momentum_pts=10)
+        assert result["tier"] == "high"
+        assert result["score"] >= 70
+
+    def test_no_active_driver_reduces_score(self):
+        import v1_api
+        with_driver = v1_api._conviction_score(0.9, True, True, 0.85)
+        without_driver = v1_api._conviction_score(0.9, False, True, 0.85)
+        assert with_driver["score"] > without_driver["score"]
+
+    def test_not_in_feed_reduces_score(self):
+        import v1_api
+        in_feed = v1_api._conviction_score(0.9, True, True, 0.85)
+        not_in_feed = v1_api._conviction_score(0.9, True, False, 0.0)
+        assert in_feed["score"] > not_in_feed["score"]
+
+    def test_underperforming_drops_tier(self):
+        import v1_api
+        # Driver active + in feed + strong evidence should be high, but underperforming knocks it down
+        at_neutral = v1_api._conviction_score(0.85, True, True, 0.80, momentum_pts=0)
+        underperforming = v1_api._conviction_score(0.85, True, True, 0.80, momentum_pts=-15)
+        assert underperforming["score"] < at_neutral["score"]
+
+    def test_outperforming_boosts_score(self):
+        import v1_api
+        neutral = v1_api._conviction_score(0.85, True, True, 0.80, momentum_pts=0)
+        outperforming = v1_api._conviction_score(0.85, True, True, 0.80, momentum_pts=15)
+        assert outperforming["score"] == neutral["score"] + 15
+
+    def test_score_capped_at_100(self):
+        import v1_api
+        result = v1_api._conviction_score(1.0, True, True, 1.0, momentum_pts=15)
+        assert result["score"] <= 100
+
+    def test_score_floor_at_zero(self):
+        import v1_api
+        result = v1_api._conviction_score(0.0, False, False, 0.0, momentum_pts=-15)
+        assert result["score"] >= 0
+
+
+class TestMomentumPts:
+    def test_strong_outperformer_gets_max_pts(self):
+        import v1_api
+        data = {"AAPL": 8.0, "SPY": 1.0}
+        assert v1_api._momentum_pts("AAPL", data) == 15
+
+    def test_modest_outperformer(self):
+        import v1_api
+        data = {"AAPL": 3.5, "SPY": 1.0}
+        assert v1_api._momentum_pts("AAPL", data) == 10
+
+    def test_slight_outperformer(self):
+        import v1_api
+        data = {"AAPL": 2.0, "SPY": 1.0}  # relative = +1.0 >= 0.5 → 5 pts
+        assert v1_api._momentum_pts("AAPL", data) == 5
+
+    def test_neutral_no_pts(self):
+        import v1_api
+        data = {"AAPL": 1.0, "SPY": 1.0}
+        assert v1_api._momentum_pts("AAPL", data) == 0
+
+    def test_mild_underperformer(self):
+        import v1_api
+        data = {"AAPL": -1.0, "SPY": 0.5}
+        assert v1_api._momentum_pts("AAPL", data) == -8
+
+    def test_strong_underperformer_gets_min_pts(self):
+        import v1_api
+        data = {"AAPL": -4.0, "SPY": 0.5}
+        assert v1_api._momentum_pts("AAPL", data) == -15
+
+    def test_missing_symbol_returns_zero(self):
+        import v1_api
+        data = {"SPY": 1.0}
+        assert v1_api._momentum_pts("AAPL", data) == 0
+
+    def test_missing_spy_returns_zero(self):
+        import v1_api
+        data = {"AAPL": 5.0}
+        assert v1_api._momentum_pts("AAPL", data) == 0
+
+    def test_empty_data_returns_zero(self):
+        import v1_api
+        assert v1_api._momentum_pts("NVDA", {}) == 0
+
+
 class TestHealthEndpoint:
     def test_health_returns_200(self, app_dev):
         with app_dev.test_client() as c:
