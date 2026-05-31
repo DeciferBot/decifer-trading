@@ -410,8 +410,43 @@ def resolve(output_path: str = _OUTPUT_PATH) -> dict:
         active_drivers, blocked_conditions, fetch_ok, _total_sensors
     )
 
+    # ── Macro Event Layer annotation ──────────────────────────────────────────
+    # Read active macro events and annotate each driver with confirmation status.
+    # Macro events are the primary signal; price sensors are the confirmation gate.
+    # If no macro event exists for a driver, price-only activation is unchanged.
+    macro_context: dict[str, Any] = {}
+    driver_confirmation: dict[str, str] = {}
+    event_unconfirmed_drivers: list[str] = []
+    try:
+        from macro_event_layer import get_active_context
+        macro_context = get_active_context()
+        event_backed = macro_context.get("drivers_with_event_backing", {})
+
+        for driver, evs in event_backed.items():
+            if not evs:
+                continue
+            if driver in active_drivers:
+                driver_confirmation[driver] = "CONFIRMED"
+            else:
+                driver_confirmation[driver] = "EVENT_UNCONFIRMED"
+                event_unconfirmed_drivers.append(driver)
+
+        for driver in list(active_drivers):
+            if driver not in driver_confirmation:
+                driver_confirmation[driver] = "PRICE_ONLY"
+
+    except Exception as _mac_exc:
+        log.debug("live_driver_resolver: macro_event_layer read failed — %s", _mac_exc)
+
     result = _build_result(
-        now_iso, active_drivers, blocked_conditions, evidence, warnings, mode=mode
+        now_iso, active_drivers, blocked_conditions, evidence, warnings, mode=mode,
+        driver_confirmation=driver_confirmation,
+        event_unconfirmed_drivers=event_unconfirmed_drivers,
+        macro_context_summary={
+            "active_domains": macro_context.get("active_domains", []),
+            "risk_direction": macro_context.get("risk_direction", "neutral"),
+            "event_count": len(macro_context.get("events", [])),
+        },
     )
     _write(result, output_path)
     return result
@@ -428,6 +463,9 @@ def _build_result(
     evidence: dict,
     warnings: list[str],
     mode: str = "live_market_data",
+    driver_confirmation: dict | None = None,
+    event_unconfirmed_drivers: list[str] | None = None,
+    macro_context_summary: dict | None = None,
 ) -> dict:
     return {
         "schema_version": _SCHEMA_VERSION,
@@ -437,6 +475,9 @@ def _build_result(
         "blocked_conditions": blocked_conditions,
         "evidence": evidence,
         "warnings": warnings,
+        "driver_confirmation": driver_confirmation or {},
+        "event_unconfirmed_drivers": event_unconfirmed_drivers or [],
+        "macro_context_summary": macro_context_summary or {},
         "live_output_changed": False,
         "broker_called": False,
         "llm_used": False,

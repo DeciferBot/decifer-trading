@@ -143,6 +143,8 @@ _INTELLIGENCE_MODULES: frozenset[str] = frozenset({
     "hmm_regime",
     # ── Sprint M12A — Theme Transmission Graph ──
     "theme_graph",
+    # ── Macro Event Layer — news → structured macro intelligence ──
+    "macro_event_layer",
     # ── Source-of-truth market data (movers/news/tape) for intelligence cloud ──
     "market_data_provider",
 })

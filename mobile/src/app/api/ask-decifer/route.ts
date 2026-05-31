@@ -8,6 +8,7 @@ import {
   extractUniverseSymbols,
   type AskNewsItem,
   type ChatMessage,
+  type MacroEvent,
 } from "@/lib/askDeciferModel";
 import type { MarketNowPayload, TtgTheme } from "@/lib/customerApi";
 
@@ -31,6 +32,19 @@ async function fetchMarketNow(): Promise<MarketNowPayload | null> {
     return res.json();
   } catch {
     return null;
+  }
+}
+
+async function fetchMacroEvents(): Promise<MacroEvent[]> {
+  try {
+    const res = await fetch(`${INTELLIGENCE_BASE}/api/intelligence/macro-events?hours=48`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.macro_events ?? [];
+  } catch {
+    return [];
   }
 }
 
@@ -117,14 +131,15 @@ export async function POST(req: Request) {
   const history: ChatMessage[] = (body.history ?? []).slice(-MAX_HISTORY_TURNS);
 
   // Fetch all intelligence context in parallel
-  const [marketNow, ttgThemes] = await Promise.all([
+  const [marketNow, ttgThemes, macroEvents] = await Promise.all([
     fetchMarketNow(),
     fetchTtgThemes(),
+    fetchMacroEvents(),
   ]);
 
   const universeSymbols = extractUniverseSymbols(marketNow);
   const news = await fetchUniverseNews(universeSymbols);
-  const systemPrompt = buildSystemPrompt(marketNow, ttgThemes, news);
+  const systemPrompt = buildSystemPrompt(marketNow, ttgThemes, news, macroEvents);
 
   // Build message array — history + new user question
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [

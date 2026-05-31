@@ -1314,6 +1314,110 @@ _warmup_conviction_cache()
 
 
 # ---------------------------------------------------------------------------
+# Macro Event Layer routes
+# ---------------------------------------------------------------------------
+
+@app.route("/api/intelligence/macro-events", methods=["GET", "OPTIONS"])
+def macro_events() -> Response:
+    """
+    Recent structured macro events from the macro event layer.
+
+    Query params:
+      hours   — how many hours back to fetch (default 24, max 336)
+      driver  — filter to events implicating a specific driver_id
+      domain  — filter to events affecting a specific domain
+    """
+    if request.method == "OPTIONS":
+        return _apply_cors(_json_response({}))
+    try:
+        from macro_event_layer import get_recent_events, get_events_for_driver
+
+        hours_raw = request.args.get("hours", "24")
+        try:
+            hours = min(float(hours_raw), 336.0)
+        except (ValueError, TypeError):
+            hours = 24.0
+
+        driver_filter = request.args.get("driver", "").strip() or None
+        domain_filter = request.args.get("domain", "").strip() or None
+
+        if driver_filter:
+            events = get_events_for_driver(driver_filter)
+        else:
+            events = get_recent_events(within_hours=hours)
+
+        if domain_filter:
+            events = [e for e in events if domain_filter in (e.get("affected_domains") or [])]
+
+        safe_events = []
+        for ev in events:
+            safe_events.append({
+                "event_id": ev.get("event_id", ""),
+                "recorded_at": ev.get("recorded_at", ""),
+                "published_at": ev.get("published_at", ""),
+                "expires_at": ev.get("expires_at", ""),
+                "source": ev.get("source", ""),
+                "headline": ev.get("headline", ""),
+                "event_type": ev.get("event_type", ""),
+                "event_summary": ev.get("event_summary", ""),
+                "direction_of_risk": ev.get("direction_of_risk", "neutral"),
+                "drivers_implicated": ev.get("drivers_implicated", []),
+                "theme_impacts": ev.get("theme_impacts", []),
+                "affected_domains": ev.get("affected_domains", []),
+                "price_confirmation_signals": ev.get("price_confirmation_signals", []),
+                "confidence": ev.get("confidence", 0.5),
+            })
+
+        return _apply_cors(_json_response({
+            "macro_events": safe_events,
+            "count": len(safe_events),
+            "filter_hours": hours,
+            "filter_driver": driver_filter,
+            "filter_domain": domain_filter,
+        }))
+    except Exception as exc:
+        log.warning("macro_events route failed: %s", exc)
+        return _apply_cors(_json_response({"macro_events": [], "count": 0}))
+
+
+@app.route("/api/intelligence/macro-context", methods=["GET", "OPTIONS"])
+def macro_context_route() -> Response:
+    """
+    Structured macro context summary: drivers backed by events, active domains,
+    risk direction. Consumed by the driver resolver and Ask Decifer.
+    """
+    if request.method == "OPTIONS":
+        return _apply_cors(_json_response({}))
+    try:
+        from macro_event_layer import get_active_context
+        ctx = get_active_context()
+        safe = {
+            "drivers_with_event_backing": {
+                drv: [
+                    {
+                        "event_id": e.get("event_id", ""),
+                        "event_type": e.get("event_type", ""),
+                        "event_summary": e.get("event_summary", ""),
+                        "direction_of_risk": e.get("direction_of_risk", "neutral"),
+                        "confidence": e.get("confidence", 0.5),
+                        "recorded_at": e.get("recorded_at", ""),
+                    }
+                    for e in evs
+                ]
+                for drv, evs in ctx.get("drivers_with_event_backing", {}).items()
+            },
+            "active_domains": ctx.get("active_domains", []),
+            "risk_direction": ctx.get("risk_direction", "neutral"),
+            "event_count": len(ctx.get("events", [])),
+            "generated_at": ctx.get("generated_at", ""),
+        }
+        return _apply_cors(_json_response(safe))
+    except Exception as exc:
+        log.warning("macro_context route failed: %s", exc)
+        return _apply_cors(_json_response({"drivers_with_event_backing": {}, "event_count": 0}))
+
+
+# ---------------------------------------------------------------------------
 # Entry point (development only — production uses gunicorn)
 # ---------------------------------------------------------------------------
 

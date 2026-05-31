@@ -157,6 +157,26 @@ class AlpacaNewsStream:
         except Exception as _exc:
             log.debug("AlpacaNewsStream: customer_event_tape emit failed (%s)", _exc)
 
+        # Macro Event Layer — fail-soft emit.
+        # Fires BEFORE universe filter (same as customer tape) so macro headlines
+        # with no universe symbols still reach the macro event store.
+        try:
+            from macro_event_layer import maybe_record_macro_event
+            created = getattr(article, "created_at", None)
+            pub_at = None
+            if created is not None and hasattr(created, "isoformat"):
+                try:
+                    pub_at = created.isoformat()
+                except Exception:
+                    pass
+            maybe_record_macro_event(
+                headline=headline,
+                source="alpaca_benzinga",
+                published_at=pub_at,
+            )
+        except Exception as _exc:
+            log.debug("AlpacaNewsStream: macro_event_layer emit failed (%s)", _exc)
+
         if not symbols:
             return
 

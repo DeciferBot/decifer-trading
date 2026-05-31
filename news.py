@@ -627,6 +627,20 @@ def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None =
             except Exception as _exc:
                 log.debug("customer_event_tape emit (RSS): %s", _exc)
 
+            # Macro Event Layer — fail-soft emit.
+            # Fresh headlines forwarded for LLM macro significance check.
+            # Does not alter trigger dispatch, scoring, or NEWS_INTERRUPT.
+            try:
+                from macro_event_layer import maybe_record_macro_event
+                for h in headlines[:5]:
+                    if h and recency < 4.0:
+                        maybe_record_macro_event(
+                            headline=h,
+                            source="yahoo_rss",
+                        )
+            except Exception as _exc:
+                log.debug("macro_event_layer emit (RSS): %s", _exc)
+
     # ── Phase 2: Alpha Vantage Tier 2 — structured NLP from professional sources ──
     # One call covers the whole batch. Cached 4 hours (25 call/day free tier).
     # AV aggregates Reuters, Bloomberg, AP etc. — higher quality than Yahoo RSS keywords.

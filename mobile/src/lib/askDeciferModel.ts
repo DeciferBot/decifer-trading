@@ -12,6 +12,25 @@ export interface AskNewsItem {
   source: string;
 }
 
+export interface MacroEvent {
+  event_id: string;
+  recorded_at: string;
+  headline: string;
+  event_type: string;
+  event_summary: string;
+  direction_of_risk: string;
+  drivers_implicated: string[];
+  theme_impacts: Array<{
+    theme: string;
+    direction: string;
+    confidence: number;
+    reasoning: string;
+  }>;
+  affected_domains: string[];
+  price_confirmation_signals: string[];
+  confidence: number;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -31,6 +50,7 @@ export function buildSystemPrompt(
   marketNow: MarketNowPayload | null,
   ttgThemes: TtgTheme[],
   news: AskNewsItem[],
+  macroEvents: MacroEvent[] = [],
 ): string {
   const lines: string[] = [];
   const today = new Date().toLocaleDateString("en-US", {
@@ -117,6 +137,33 @@ export function buildSystemPrompt(
       }
       if (e.likely_negative_exposures?.length) {
         lines.push(`  Negative exposure: ${e.likely_negative_exposures.join(", ")}`);
+      }
+    });
+    lines.push(``);
+  }
+
+  if (macroEvents.length) {
+    lines.push(`### Macro Events (structured intelligence from news)`);
+    lines.push(`These are real-world events classified from news. Each shows what drivers they implicate, how confident the classification is, and what price action would confirm the thesis.`);
+    macroEvents.forEach(e => {
+      const conf = Math.round(e.confidence * 100);
+      const dir = e.direction_of_risk !== "neutral" ? ` [${e.direction_of_risk}]` : "";
+      lines.push(`- **${e.event_type.replace(/_/g, " ")}**${dir} (${conf}% confidence): ${e.event_summary}`);
+      if (e.drivers_implicated.length) {
+        lines.push(`  Drivers: ${e.drivers_implicated.join(", ")}`);
+      }
+      if (e.affected_domains.length) {
+        lines.push(`  Domains: ${e.affected_domains.join(", ")}`);
+      }
+      if (e.theme_impacts.length) {
+        const impacts = e.theme_impacts
+          .filter(t => t.confidence >= 0.6)
+          .map(t => `${t.theme} (${t.direction})`)
+          .join(", ");
+        if (impacts) lines.push(`  Theme impacts: ${impacts}`);
+      }
+      if (e.price_confirmation_signals.length) {
+        lines.push(`  Watch for: ${e.price_confirmation_signals.slice(0, 2).join("; ")}`);
       }
     });
     lines.push(``);

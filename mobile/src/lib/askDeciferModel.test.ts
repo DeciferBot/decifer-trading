@@ -6,6 +6,7 @@ import {
   buildSystemPrompt,
   extractUniverseSymbols,
   type AskNewsItem,
+  type MacroEvent,
 } from "./askDeciferModel";
 import type { MarketNowPayload, TtgTheme } from "./customerApi";
 
@@ -259,6 +260,112 @@ describe("buildSystemPrompt — universe news", () => {
     ];
     const prompt = buildSystemPrompt(makePayload(), [], news);
     expect(prompt).toContain("Recent News (universe symbols only)");
+  });
+});
+
+// ── buildSystemPrompt — macro events ─────────────────────────────────────
+
+function makeMacroEvent(overrides: Partial<MacroEvent> = {}): MacroEvent {
+  return {
+    event_id: "abc123",
+    recorded_at: "2026-05-31T12:00:00Z",
+    headline: "Iran turns Strait of Hormuz into toll booth — $2M per tanker",
+    event_type: "infrastructure_disruption",
+    event_summary: "Iran's IRGC is charging tankers to transit Hormuz. The strait was not closed — it was privatised.",
+    direction_of_risk: "risk_off",
+    drivers_implicated: ["oil_supply_shock", "geopolitical_risk_rising"],
+    theme_impacts: [
+      { theme: "Defence Rearmament", direction: "tailwind", confidence: 0.9, reasoning: "Geopolitical risk premium" },
+      { theme: "Travel & Leisure", direction: "headwind", confidence: 0.8, reasoning: "Oil cost pass-through" },
+      { theme: "Gold Real Assets", direction: "tailwind", confidence: 0.7, reasoning: "Safe haven bid" },
+    ],
+    affected_domains: ["oil", "defence", "supply_chain"],
+    price_confirmation_signals: ["USO > +4% 5-day return", "ITA outperforms SPY by > 2%"],
+    confidence: 0.88,
+    ...overrides,
+  };
+}
+
+describe("buildSystemPrompt — macro events", () => {
+  it("includes macro events section when events provided", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [makeMacroEvent()]);
+    expect(prompt).toContain("Macro Events");
+  });
+
+  it("includes event type formatted as plain English", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [makeMacroEvent()]);
+    expect(prompt).toContain("infrastructure disruption");
+  });
+
+  it("includes event summary", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [makeMacroEvent()]);
+    expect(prompt).toContain("strait was not closed");
+  });
+
+  it("includes risk direction", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [makeMacroEvent()]);
+    expect(prompt).toContain("risk_off");
+  });
+
+  it("includes drivers implicated", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [makeMacroEvent()]);
+    expect(prompt).toContain("oil_supply_shock");
+    expect(prompt).toContain("geopolitical_risk_rising");
+  });
+
+  it("includes affected domains", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [makeMacroEvent()]);
+    expect(prompt).toContain("oil");
+    expect(prompt).toContain("defence");
+  });
+
+  it("includes high-confidence theme impacts only (>= 0.6)", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [makeMacroEvent()]);
+    expect(prompt).toContain("Defence Rearmament (tailwind)");
+    expect(prompt).toContain("Travel & Leisure (headwind)");
+    expect(prompt).toContain("Gold Real Assets (tailwind)");
+  });
+
+  it("excludes low-confidence theme impacts (< 0.6)", () => {
+    const event = makeMacroEvent({
+      theme_impacts: [
+        { theme: "Crypto Infrastructure", direction: "tailwind", confidence: 0.3, reasoning: "weak signal" },
+      ],
+    });
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [event]);
+    expect(prompt).not.toContain("Crypto Infrastructure");
+  });
+
+  it("includes price confirmation signals", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [makeMacroEvent()]);
+    expect(prompt).toContain("USO > +4% 5-day return");
+  });
+
+  it("omits macro events section when no events", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, []);
+    expect(prompt).not.toContain("Macro Events");
+  });
+
+  it("omits macro events section when param not provided (backward compat)", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS);
+    expect(prompt).not.toContain("Macro Events");
+  });
+
+  it("includes confidence percentage", () => {
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, [makeMacroEvent()]);
+    expect(prompt).toContain("88% confidence");
+  });
+
+  it("handles multiple events", () => {
+    const events = [
+      makeMacroEvent({ event_type: "infrastructure_disruption", event_summary: "Hormuz toll." }),
+      makeMacroEvent({ event_type: "central_bank_rate_decision", event_summary: "Fed holds rates.", drivers_implicated: ["yields_falling"] }),
+    ];
+    const prompt = buildSystemPrompt(makePayload(), [], NO_NEWS, events);
+    expect(prompt).toContain("infrastructure disruption");
+    expect(prompt).toContain("central bank rate decision");
+    expect(prompt).toContain("Hormuz toll.");
+    expect(prompt).toContain("Fed holds rates.");
   });
 });
 
