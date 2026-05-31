@@ -494,3 +494,167 @@ class TestCounterThesisScoring:
         ])
         # conflict is for a different driver — should not penalise ai_compute_demand
         assert d.raw_pts == 0
+
+
+# ---------------------------------------------------------------------------
+# D1 — Analyst grade trend
+# ---------------------------------------------------------------------------
+
+class TestAnalystGradeTrend:
+    def _grades(self, shares):
+        """Build analyst-grades entries from a list of bull-share fractions."""
+        return [
+            {"strongBuy": int(s * 100), "buy": 0, "hold": int((1 - s) * 100),
+             "sell": 0, "strongSell": 0}
+            for s in shares
+        ]
+
+    def _score(self, grade_entries):
+        import conviction_engine as ce
+        with patch("conviction_engine._fmp") as mock_fmp:
+            def side(endpoint, params, **kw):
+                if "analyst-grades" in endpoint:
+                    return grade_entries
+                if "grades-consensus" in endpoint:
+                    return [{"consensus": "BUY"}]
+                if "price-target-consensus" in endpoint:
+                    return []
+                if "quote-short" in endpoint:
+                    return []
+                if "upgrades-downgrades" in endpoint:
+                    return []
+                return []
+            mock_fmp.side_effect = side
+            return ce._score_analyst("NVDA", [])
+
+    def test_improving_grade_trend_adds_points(self):
+        # Recent: 90% bull, older avg: 60% bull → delta +0.30 → +4
+        entries = self._grades([0.90, 0.60, 0.60, 0.60])
+        d = self._score(entries)
+        assert "improving" in d.signal
+
+    def test_deteriorating_grade_trend_removes_points(self):
+        # Recent: 40% bull, older avg: 80% → delta -0.40 → -4
+        entries = self._grades([0.40, 0.80, 0.80, 0.80])
+        d = self._score(entries)
+        assert "deteriorating" in d.signal
+
+    def test_stable_grade_trend_is_neutral(self):
+        # All entries ~60% bull — delta near zero
+        entries = self._grades([0.62, 0.60, 0.61, 0.60])
+        d = self._score(entries)
+        assert "improving" not in d.signal
+        assert "deteriorating" not in d.signal
+
+
+# ---------------------------------------------------------------------------
+# D3 — Sector-relative P/E
+# ---------------------------------------------------------------------------
+
+class TestSectorRelativePE:
+    def _score(self, pe_ttm, theme_id="ai_infrastructure"):
+        import conviction_engine as ce
+        with (
+            patch("conviction_engine._fmp") as mock_fmp,
+            patch("conviction_engine._exposures_for") as mock_exp,
+            patch("conviction_engine._read_json") as mock_read,
+        ):
+            def fmp_side(endpoint, params, **kw):
+                if "discounted-cash-flow" in endpoint:
+                    return []
+                if "financial-growth" in endpoint:
+                    return []
+                if "key-metrics-ttm" in endpoint:
+                    return [{"peRatioTTM": pe_ttm}]
+                return []
+            mock_fmp.side_effect = fmp_side
+            mock_exp.return_value = [{"theme_id": theme_id}]
+            mock_read.return_value = {"nodes": []}
+            return ce._score_valuation("NVDA")
+
+    def test_cheap_vs_sector_adds_points(self):
+        # AI infra sector PE = 35. Symbol PE = 20 → ratio 0.57 < 0.75 → +3
+        d = self._score(pe_ttm=20.0)
+        assert "sector" in d.signal.lower() or "PE" in d.signal
+
+    def test_expensive_vs_sector_removes_points(self):
+        # AI infra sector PE = 35. Symbol PE = 80 → ratio 2.3 > 2.0 → -3
+        d = self._score(pe_ttm=80.0)
+        assert "PE" in d.signal
+
+    def test_inline_with_sector_is_neutral(self):
+        # Symbol PE = 35 = sector → ratio 1.0 → 0
+        d = self._score(pe_ttm=35.0)
+        assert "+3" not in d.signal and "-3" not in d.signal
+
+
+# ---------------------------------------------------------------------------
+# D6 — FMP news fallback + catalyst score
+# ---------------------------------------------------------------------------
+
+class TestNewsCatalystFallback:
+    def _score(self, fmp_news=None, catalyst_score=None, tape_events=None):
+        import conviction_engine as ce
+        with (
+            patch("conviction_engine._read_json") as mock_read,
+            patch("conviction_engine._fmp") as mock_fmp,
+            patch("conviction_engine._catalyst_score_for") as mock_cat,
+        ):
+            mock_read.return_value = {"events": tape_events or []}
+            def fmp_side(endpoint, params, **kw):
+                if "stock_news" in endpoint:
+                    return fmp_news or []
+                return []
+            mock_fmp.side_effect = fmp_side
+            mock_cat.return_value = catalyst_score
+            return ce._score_news_catalyst("NVDA", "ai_compute")
+
+    def test_fmp_positive_news_scores_positive_when_tape_empty(self):
+        from datetime import datetime, timezone, timedelta
+        recent = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+        d = self._score(fmp_news=[
+            {"publishedDate": recent, "sentiment": "Positive"},
+        ])
+        assert d.raw_pts > 0
+        assert "fmp_news" in d.signal
+
+    def test_fmp_negative_news_scores_negative(self):
+        from datetime import datetime, timezone, timedelta
+        recent = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+        d = self._score(fmp_news=[
+            {"publishedDate": recent, "sentiment": "Negative"},
+        ])
+        assert d.raw_pts < 0
+
+    def test_high_catalyst_score_adds_points(self):
+        d = self._score(catalyst_score=9.0)
+        assert d.raw_pts >= 10
+        assert "catalyst" in d.signal
+
+    def test_moderate_catalyst_score_adds_moderate_points(self):
+        d = self._score(catalyst_score=7.5)
+        assert d.raw_pts >= 6
+        assert "catalyst" in d.signal
+
+    def test_low_catalyst_score_ignored(self):
+        d = self._score(catalyst_score=5.0)
+        assert d.raw_pts == 0
+
+    def test_tape_hit_takes_priority_over_fmp(self):
+        from datetime import datetime, timezone, timedelta
+        recent = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+        tape_event = {
+            "materiality": "high",
+            "tickers_first_order": ["NVDA"],
+            "tickers_second_order": [],
+            "themes_strengthened": ["ai_compute"],
+            "themes_weakened": [],
+            "event_family": "earnings",
+            "source_published_at": recent,
+        }
+        d = self._score(tape_events=[tape_event], fmp_news=[
+            {"publishedDate": recent, "sentiment": "Negative"},
+        ])
+        # tape positive should win — not negative FMP
+        assert d.raw_pts > 0
+        assert "tape" in d.signal
