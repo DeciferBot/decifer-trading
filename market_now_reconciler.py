@@ -114,6 +114,78 @@ _CONFLICT_RULES: dict[tuple[str, str], str] = {
         "Gold has been bid for safe-haven reasons, but fresh de-escalation may "
         "reduce that demand."
     ),
+    # ── AI drivers ────────────────────────────────────────────────────────────
+    ("ai_capex_growth", "chip_export_restriction"): (
+        "AI infrastructure capex is active, but fresh chip export restrictions "
+        "threaten the GPU supply chain that buildout depends on."
+    ),
+    ("ai_capex_growth", "hot_inflation_print"): (
+        "AI infrastructure capex assumes stable financing costs, but hot inflation "
+        "data may reset rates higher — squeezing hyperscaler capex ROI math."
+    ),
+    ("ai_capex_growth", "negative_surprise"): (
+        "AI infrastructure capex is active, but an earnings miss at a major "
+        "hyperscaler challenges the revenue-vs-capex growth story."
+    ),
+    ("ai_compute_demand", "chip_export_restriction"): (
+        "AI compute demand is active, but fresh chip export restrictions directly "
+        "threaten NVIDIA and AMD revenue from restricted markets."
+    ),
+    ("ai_compute_demand", "negative_surprise"): (
+        "AI compute demand is active, but a negative earnings surprise at a "
+        "key semiconductor name signals potential demand softening."
+    ),
+    # ── Credit drivers ────────────────────────────────────────────────────────
+    ("credit_stress_rising", "weak_data_rate_cut_rally"): (
+        "Credit stress is rising, but weak data has sparked a rate-cut rally — "
+        "the relief may be temporary if credit deterioration continues."
+    ),
+    ("credit_stress_rising", "positive_surprise"): (
+        "Credit stress is rising, but a strong earnings beat may create false "
+        "comfort — idiosyncratic strength does not resolve systemic credit risk."
+    ),
+    ("credit_stress_easing", "bank_or_credit_stress"): (
+        "Credit stress appeared to be easing in price action, but fresh bank or "
+        "credit stress headlines directly contradict that read."
+    ),
+    ("credit_stress_easing", "escalation"): (
+        "Credit stress has been easing, but fresh geopolitical escalation can "
+        "quickly tighten financial conditions and reverse the signal."
+    ),
+    # ── Small-cap / futures ───────────────────────────────────────────────────
+    ("small_cap_risk_on", "hot_inflation_print"): (
+        "Small-cap breadth is expanding, but hot inflation data is a headwind — "
+        "small caps are rate-sensitive and reprice fast on a higher-for-longer reset."
+    ),
+    ("small_cap_risk_on", "escalation"): (
+        "Small-cap breadth expansion is active, but geopolitical escalation "
+        "typically hits small caps harder than large-caps — watch for reversal."
+    ),
+    ("futures_risk_on", "escalation"): (
+        "Futures are pointing bullish overnight, but fresh geopolitical escalation "
+        "may reverse the open — pre-market setups are fragile here."
+    ),
+    ("futures_risk_on", "hot_inflation_print"): (
+        "Futures are bullish overnight, but a hot inflation print landed — "
+        "rate-reset risk could gap the open lower."
+    ),
+    ("futures_risk_off", "weak_data_rate_cut_rally"): (
+        "Futures are bearish overnight, but weak economic data has sparked "
+        "rate-cut hopes — the open may not confirm the overnight signal."
+    ),
+    ("futures_risk_off", "de_escalation"): (
+        "Futures are bearish overnight, but fresh de-escalation headlines may "
+        "reverse the tone before the open."
+    ),
+    # ── Geopolitical risk falling ─────────────────────────────────────────────
+    ("geopolitical_risk_falling", "escalation"): (
+        "Geopolitical risk appeared to be fading in price action, but fresh "
+        "escalation headlines contradict that — the risk premium may return."
+    ),
+    ("geopolitical_risk_falling", "oil_supply_shock"): (
+        "Geopolitical risk is falling, but a fresh oil supply shock suggests "
+        "underlying tensions may not be as resolved as price action implied."
+    ),
 }
 
 

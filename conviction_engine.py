@@ -783,11 +783,23 @@ def _score_peer_network(symbol: str, price_changes: dict[str, float]) -> Dimensi
 # Reads counter_thesis_cache.json structural_conflicts for driver_id.
 # Reads thesis_divergence.json for thesis_intact status of symbol.
 #
-#   no conflicts AND thesis_intact=True: +3
-#   no conflicts, no divergence data: 0
-#   weak/speculative conflicts (< 2 conflicts): -3
-#   strong conflicts (>= 2 evidenced conflicts): -10
-#   thesis_intact=False (diverging): -8
+# Penalty weights by verification_status (cumulative across conflicts):
+#   verified:   -8 pts each
+#   partial:    -4 pts each
+#   unverified: -2 pts each  (only if confidence >= 0.4)
+#   refuted:    skip (positive data point — handled via thesis_intact)
+#
+# Divergence takes priority:
+#   thesis_intact=False:  -8 (price action already contradicting thesis)
+#   thesis_intact=True + no conflicts: +3
+
+# Penalty per conflict by verification_status
+_CONFLICT_PENALTY: dict[str, int] = {
+    "verified":   8,
+    "partial":    4,
+    "unverified": 2,
+}
+
 
 def _score_counter_thesis(symbol: str, driver_id: str) -> DimensionScore:
     MAX = 3
@@ -803,29 +815,36 @@ def _score_counter_thesis(symbol: str, driver_id: str) -> DimensionScore:
             thesis_intact = True
         elif raw_intact is False:
             thesis_intact = False
-        # None / null / "data_unavailable" → thesis_intact stays None
 
-    # thesis_intact=False takes priority regardless of conflicts
+    # thesis_intact=False takes priority regardless of structural conflicts
     if thesis_intact is False:
         return DimensionScore(raw_pts=-8, max_pts=MAX,
                               signal="thesis_intact=False→-8")
 
-    n_conflicts = len(conflicts)
+    # Compute penalty weighted by verification_status
+    penalty = 0
+    active_conflicts = []
+    for c in conflicts:
+        status = c.get("verification_status", "unverified")
+        conf   = float(c.get("confidence") or 0)
+        if status == "refuted":
+            continue
+        if status == "unverified" and conf < 0.4:
+            continue
+        pts = _CONFLICT_PENALTY.get(status, 0)
+        penalty += pts
+        active_conflicts.append(f"{status}({c.get('id','?')})")
 
-    if n_conflicts == 0:
+    if not active_conflicts:
         if thesis_intact is True:
             return DimensionScore(raw_pts=3, max_pts=MAX,
                                   signal="no_conflicts+thesis_intact→+3")
         return DimensionScore(raw_pts=0, max_pts=MAX,
                               signal="no_conflicts,no_divergence_data→0")
 
-    if n_conflicts >= 2:
-        return DimensionScore(raw_pts=-10, max_pts=MAX,
-                              signal=f"{n_conflicts}_evidenced_conflicts→-10")
-
-    # 1 conflict = weak/speculative
-    return DimensionScore(raw_pts=-3, max_pts=MAX,
-                          signal=f"{n_conflicts}_speculative_conflict→-3")
+    raw_pts = -min(penalty, 15)   # cap at -15 so one dimension can't dominate
+    signal  = f"conflicts={','.join(active_conflicts)}→{raw_pts}"
+    return DimensionScore(raw_pts=raw_pts, max_pts=MAX, signal=signal)
 
 
 # ---------------------------------------------------------------------------

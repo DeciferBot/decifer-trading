@@ -392,3 +392,105 @@ class TestTraderCorrections:
         import conviction_engine as ce
         # upgrade adds 8, downgrade costs 10
         assert 10 > 8
+
+
+# ---------------------------------------------------------------------------
+# D9 — Counter-thesis weighting by verification_status
+# ---------------------------------------------------------------------------
+
+class TestCounterThesisScoring:
+    """Verified conflicts penalise more than unverified; refuted claims are skipped."""
+
+    def _score(self, conflicts, divergence=None):
+        import conviction_engine as ce
+
+        ct_data = {"structural_conflicts": conflicts}
+        div_data = {"detail": ([divergence] if divergence else [])}
+
+        with (
+            patch("conviction_engine._read_json") as mock_read,
+        ):
+            def side_effect(path):
+                p = str(path)
+                if "counter_thesis_cache" in p:
+                    return ct_data
+                if "thesis_divergence" in p:
+                    return div_data
+                return {}
+            mock_read.side_effect = side_effect
+            return ce._score_counter_thesis("NVDA", "ai_compute_demand")
+
+    def test_no_conflicts_no_divergence_is_neutral(self):
+        d = self._score([])
+        assert d.raw_pts == 0
+
+    def test_no_conflicts_with_thesis_intact_is_positive(self):
+        d = self._score(
+            [],
+            divergence={"symbol": "NVDA", "thesis_intact": True},
+        )
+        assert d.raw_pts > 0
+
+    def test_thesis_intact_false_overrides_everything(self):
+        d = self._score(
+            [],
+            divergence={"symbol": "NVDA", "thesis_intact": False},
+        )
+        assert d.raw_pts == -8
+
+    def test_verified_conflict_penalises_more_than_unverified(self):
+        verified = self._score([
+            {"id": "x", "driver_id": "ai_compute_demand",
+             "verification_status": "verified", "confidence": 0.8, "claim": "x"},
+        ])
+        unverified = self._score([
+            {"id": "x", "driver_id": "ai_compute_demand",
+             "verification_status": "unverified", "confidence": 0.8, "claim": "x"},
+        ])
+        assert verified.raw_pts < unverified.raw_pts
+
+    def test_partial_conflict_between_verified_and_unverified(self):
+        partial = self._score([
+            {"id": "x", "driver_id": "ai_compute_demand",
+             "verification_status": "partial", "confidence": 0.6, "claim": "x"},
+        ])
+        verified = self._score([
+            {"id": "x", "driver_id": "ai_compute_demand",
+             "verification_status": "verified", "confidence": 0.8, "claim": "x"},
+        ])
+        unverified = self._score([
+            {"id": "x", "driver_id": "ai_compute_demand",
+             "verification_status": "unverified", "confidence": 0.8, "claim": "x"},
+        ])
+        assert verified.raw_pts <= partial.raw_pts <= unverified.raw_pts
+
+    def test_refuted_conflict_is_skipped(self):
+        d = self._score([
+            {"id": "x", "driver_id": "ai_compute_demand",
+             "verification_status": "refuted", "confidence": 0.9, "claim": "x"},
+        ])
+        assert d.raw_pts == 0
+
+    def test_low_confidence_unverified_is_skipped(self):
+        d = self._score([
+            {"id": "x", "driver_id": "ai_compute_demand",
+             "verification_status": "unverified", "confidence": 0.2, "claim": "x"},
+        ])
+        assert d.raw_pts == 0
+
+    def test_multiple_verified_conflicts_cap_at_minus_15(self):
+        many = [
+            {"id": f"c{i}", "driver_id": "ai_compute_demand",
+             "verification_status": "verified", "confidence": 0.9, "claim": "x"}
+            for i in range(5)
+        ]
+        d = self._score(many)
+        assert d.raw_pts >= -15
+
+    def test_wrong_driver_id_ignored(self):
+        d = self._score([
+            {"id": "x", "driver_id": "oil_supply_shock",
+             "verification_status": "verified", "confidence": 0.9, "claim": "x"},
+        ])
+        # conflict is for a different driver — should not penalise ai_compute_demand
+        assert d.raw_pts == 0

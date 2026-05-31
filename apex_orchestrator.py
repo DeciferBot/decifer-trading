@@ -45,8 +45,9 @@ log = logging.getLogger("decifer.apex_orchestrator")
 
 _shadow_log_lock = threading.Lock()
 
-_DRIVER_STATE_PATH = os.path.join("data", "intelligence", "live_driver_state.json")
-_THEME_STATE_PATH  = os.path.join("data", "intelligence", "theme_activation.json")
+_DRIVER_STATE_PATH       = os.path.join("data", "intelligence", "live_driver_state.json")
+_THEME_STATE_PATH        = os.path.join("data", "intelligence", "theme_activation.json")
+_COUNTER_THESIS_PATH     = os.path.join("data", "intelligence", "counter_thesis_cache.json")
 
 
 def _load_driver_notes() -> dict:
@@ -86,6 +87,31 @@ def _load_driver_notes() -> dict:
                                 f"{t['theme_id']} theme is WEAKENING despite {drv} still active"
                                 f" — probable late-cycle thesis exhaustion, monitor for reversal"
                             )
+        except Exception:
+            pass
+
+        # ── Structural counter-thesis: verified/partial conflicts for active drivers ──
+        try:
+            with open(_COUNTER_THESIS_PATH, encoding="utf-8") as f:
+                ct = json.load(f)
+            _status_rank = {"verified": 0, "partial": 1, "unverified": 2, "refuted": 99}
+            for conflict in sorted(
+                ct.get("structural_conflicts", []),
+                key=lambda c: _status_rank.get(c.get("verification_status", "unverified"), 99),
+            ):
+                if conflict.get("driver_id") not in active:
+                    continue
+                status = conflict.get("verification_status", "unverified")
+                if status == "refuted":
+                    continue
+                conf = conflict.get("confidence", 0)
+                if status == "unverified" and conf < 0.4:
+                    continue
+                label = "STRUCTURAL RISK" if status == "verified" else "STRUCTURAL CONCERN"
+                warnings.append(
+                    f"{label} ({conflict['driver_id']}): {conflict['claim']} "
+                    f"[{status}, conf={conf:.0%}] — {conflict.get('bull_counter', '')}"
+                )
         except Exception:
             pass
 

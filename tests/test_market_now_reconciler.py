@@ -112,6 +112,114 @@ class TestKnownConflicts:
         assert any("headline" in c.lower() or "market" in c.lower()
                    for c in out["known_conflicts"])
 
+    def test_ai_capex_vs_chip_export_restriction(self):
+        _seed("US Commerce Department expands chip export restrictions to additional countries, blocking advanced GPU sales.")
+        out = mnr.reconcile_market_map(
+            active_drivers=["ai_capex_growth"],
+            blocked_conditions=[],
+            active_theme_ids=[],
+            theme_states={},
+            regime_label="Trending up",
+            apex_read="",
+            manifest_published_at=datetime.now(UTC).isoformat(),
+            confidence_label="High",
+        )
+        assert out["known_conflicts"]
+        assert any("chip" in c.lower() or "GPU" in c or "supply chain" in c.lower()
+                   for c in out["known_conflicts"])
+
+    def test_ai_compute_vs_chip_export_restriction(self):
+        _seed("US Commerce Department expands chip export restrictions to additional countries, blocking advanced GPU sales.")
+        out = mnr.reconcile_market_map(
+            active_drivers=["ai_compute_demand"],
+            blocked_conditions=[],
+            active_theme_ids=[],
+            theme_states={},
+            regime_label="Trending up",
+            apex_read="",
+            manifest_published_at=datetime.now(UTC).isoformat(),
+            confidence_label="High",
+        )
+        assert out["known_conflicts"]
+
+    def test_credit_stress_easing_vs_bank_stress(self):
+        _seed("Regional bank shares tumble after Fed flags credit quality concerns and deposit outflows accelerate.")
+        out = mnr.reconcile_market_map(
+            active_drivers=["credit_stress_easing"],
+            blocked_conditions=[],
+            active_theme_ids=[],
+            theme_states={},
+            regime_label="Choppy",
+            apex_read="",
+            manifest_published_at=datetime.now(UTC).isoformat(),
+            confidence_label="Moderate",
+        )
+        assert out["known_conflicts"]
+        assert any("credit" in c.lower() or "bank" in c.lower()
+                   for c in out["known_conflicts"])
+
+    def test_futures_risk_on_vs_escalation(self):
+        _seed("Overnight missile strikes on NATO base raise fears of wider conflict as futures pare gains.")
+        out = mnr.reconcile_market_map(
+            active_drivers=["futures_risk_on"],
+            blocked_conditions=[],
+            active_theme_ids=[],
+            theme_states={},
+            regime_label="Trending up",
+            apex_read="",
+            manifest_published_at=datetime.now(UTC).isoformat(),
+            confidence_label="Moderate",
+        )
+        assert out["known_conflicts"]
+        assert any("futures" in c.lower() or "pre-market" in c.lower()
+                   for c in out["known_conflicts"])
+
+    def test_small_cap_risk_on_vs_hot_inflation(self):
+        _seed("CPI came in hotter than expected at 4.2 percent, crushing rate-cut hopes and sending two-year yields higher.")
+        out = mnr.reconcile_market_map(
+            active_drivers=["small_cap_risk_on"],
+            blocked_conditions=[],
+            active_theme_ids=[],
+            theme_states={},
+            regime_label="Trending up",
+            apex_read="",
+            manifest_published_at=datetime.now(UTC).isoformat(),
+            confidence_label="Moderate",
+        )
+        assert out["known_conflicts"]
+        assert any("small" in c.lower() or "inflation" in c.lower() or "rate" in c.lower()
+                   for c in out["known_conflicts"])
+
+    def test_geopolitical_risk_falling_vs_escalation(self):
+        _seed("Overnight missile strikes on NATO base raise fears of wider conflict as futures pare gains.")
+        out = mnr.reconcile_market_map(
+            active_drivers=["geopolitical_risk_falling"],
+            blocked_conditions=[],
+            active_theme_ids=[],
+            theme_states={},
+            regime_label="Choppy",
+            apex_read="",
+            manifest_published_at=datetime.now(UTC).isoformat(),
+            confidence_label="Moderate",
+        )
+        assert out["known_conflicts"]
+        assert any("geopolit" in c.lower() or "escalation" in c.lower() or "risk premium" in c.lower()
+                   for c in out["known_conflicts"])
+
+    def test_all_15_drivers_have_at_least_one_conflict_rule(self):
+        """Every driver in the resolver has at least one _CONFLICT_RULES entry."""
+        from market_now_reconciler import _CONFLICT_RULES
+        all_drivers = [
+            "ai_capex_growth", "ai_compute_demand", "yields_rising", "yields_falling",
+            "oil_supply_shock", "geopolitical_risk_rising", "geopolitical_risk_falling",
+            "credit_stress_rising", "risk_off_rotation", "risk_on_rotation",
+            "gold_safe_haven_bid", "credit_stress_easing", "small_cap_risk_on",
+            "futures_risk_on", "futures_risk_off",
+        ]
+        covered = {d for d, _ in _CONFLICT_RULES}
+        missing = [d for d in all_drivers if d not in covered]
+        assert not missing, f"Drivers with no conflict rules: {missing}"
+
 
 # ---------------------------------------------------------------------------
 
