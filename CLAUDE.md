@@ -168,7 +168,7 @@ TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller ord
 | HMM Regime Detection | ≥200 closed trades + IC Phase 2 review | **ACTIVE ✅** — bull regime, 97.3% confidence (2026-05-31) |
 | Walk-Forward Weight Calibration | HMM + Alphalens both complete | **ACTIVE ✅** — activated 2026-05-31, no weight changes warranted |
 | Signal Validation (Alphalens) | ≥200 trades across regimes | **RUN ✅** — 199 usable trades, overnight_drift confirmed blocked, all other dims noise/selection bias. Rerun at 500+ trades. |
-| ML training-readiness | ≥200 `ml_eligible=true` exact closed-trade records in `canonical_learning_dataset.jsonl`, ≥2 regimes, no regime >75% (50-trade gate **RETIRED** — `ml_engine.py` deleted) | **NOT MET — 0 exact-joined records** |
+| ML training-readiness | ≥200 `ml_eligible=true` exact closed-trade records in `canonical_learning_dataset.jsonl`, ≥2 regimes, no regime >75% (50-trade gate **RETIRED** — `ml_engine.py` deleted) | **NOT MET — 7 records (2026-06-01). `scripts/ml_outcome_joiner.py` runs automatically every 4h via droplet cron.** |
 
 ---
 
