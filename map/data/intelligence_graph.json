@@ -1,0 +1,3389 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-31",
+  "nodes": [
+    {
+      "id": "ai_capex_growth",
+      "label": "AI Infrastructure Buildout",
+      "type": "driver",
+      "tier": 0,
+      "description": "Hyperscalers and enterprises are investing record amounts in AI compute infrastructure, creating sustained demand across power, cooling, networking, and data-centre real estate.",
+      "status": "active"
+    },
+    {
+      "id": "ai_compute_demand",
+      "label": "AI Compute Demand",
+      "type": "driver",
+      "tier": 0,
+      "description": "Demand for AI training and inference compute is expanding the GPU, networking, and accelerator market.",
+      "status": "active"
+    },
+    {
+      "id": "geopolitical_risk_rising",
+      "label": "Geopolitical Risk Rising",
+      "type": "driver",
+      "tier": 0,
+      "description": "Rising geopolitical tensions, NATO budget commitments, and military conflict are driving defence spending growth globally.",
+      "status": "reference"
+    },
+    {
+      "id": "glp1_adoption",
+      "label": "GLP-1 Drug Adoption",
+      "type": "driver",
+      "tier": 0,
+      "description": "Obesity and diabetes treatment is being transformed by GLP-1 receptor agonists (Ozempic, Zepbound), with rapidly expanding prescription volumes, manufacturing constraints, and downstream economic consequences.",
+      "status": "reference"
+    },
+    {
+      "id": "domestic_manufacturing_investment",
+      "label": "Domestic Manufacturing Investment",
+      "type": "driver",
+      "tier": 0,
+      "description": "US CHIPS Act subsidies, tariff-driven reshoring, and supply-chain security concerns are directing record capital into domestic semiconductor fabs and industrial facilities.",
+      "status": "reference"
+    },
+    {
+      "id": "yields_falling",
+      "label": "Falling Yields / Mortgage Relief",
+      "type": "driver",
+      "tier": 0,
+      "description": "Declining bond yields and mortgage rates improve housing affordability, stimulate buyer demand, and re-open the refinance market.",
+      "status": "reference"
+    },
+    {
+      "id": "water_stress",
+      "label": "Water Scarcity & Infrastructure Stress",
+      "type": "driver",
+      "tier": 0,
+      "description": "Aging water infrastructure, drought cycles, and population growth are forcing municipal and industrial water system investment.",
+      "status": "reference"
+    },
+    {
+      "id": "electrification",
+      "label": "Grid Electrification & EV Adoption",
+      "type": "driver",
+      "tier": 0,
+      "description": "The global transition to electric vehicles, renewable energy, and grid modernisation is creating multi-decade copper and critical mineral demand growth.",
+      "status": "reference"
+    },
+    {
+      "id": "reserve_diversification",
+      "label": "Central Bank Gold Demand",
+      "type": "driver",
+      "tier": 0,
+      "description": "Central banks, particularly in emerging markets, are diversifying reserves away from USD assets by buying gold at record pace.",
+      "status": "reference"
+    },
+    {
+      "id": "crypto_liquidity",
+      "label": "Crypto Liquidity Cycle",
+      "type": "driver",
+      "tier": 0,
+      "description": "Spot Bitcoin ETF access, institutional adoption, and exchange volume cycles are driving Bitcoin price exposure and crypto infrastructure revenue.",
+      "status": "reference"
+    },
+    {
+      "id": "ai_energy_nuclear",
+      "label": "AI Energy & Nuclear Revival",
+      "type": "theme",
+      "tier": 1,
+      "description": "AI data-centre power demand is activating nuclear, grid equipment, cooling, uranium, and enrichment supply chains \u2014 the only path to reliable 24/7 carbon-free baseload at scale.",
+      "status": "active"
+    },
+    {
+      "id": "glp1_metabolic_health",
+      "label": "GLP-1 and Metabolic Health",
+      "type": "theme",
+      "tier": 1,
+      "description": "GLP-1 adoption is disrupting pharmaceuticals, medical devices, healthcare payers, and consumer food \u2014 creating direct beneficiaries, supply-chain names, and negative-exposure watches simultaneously.",
+      "status": "reference"
+    },
+    {
+      "id": "defence_rearmament",
+      "label": "Defence Rearmament & Security",
+      "type": "theme",
+      "tier": 1,
+      "description": "Rising defence budgets, NATO commitments, and geopolitical conflict are creating structural order backlog growth for prime contractors, missile systems, drones, and naval shipbuilding.",
+      "status": "active"
+    },
+    {
+      "id": "cybersecurity_digital_resilience",
+      "label": "Cybersecurity & Digital Resilience",
+      "type": "theme",
+      "tier": 1,
+      "description": "Rising breach costs, AI governance risk, identity attacks, and cloud migration are driving board-level security platform spend and zero-trust adoption.",
+      "status": "reference"
+    },
+    {
+      "id": "reshoring_industrial_capex",
+      "label": "Reshoring & Industrial Capex",
+      "type": "theme",
+      "tier": 1,
+      "description": "CHIPS Act subsidies, tariff policy, and supply-chain security are directing record industrial capex into semiconductor fabs, factory automation, and electrical infrastructure.",
+      "status": "reference"
+    },
+    {
+      "id": "housing_rate_sensitivity",
+      "label": "Housing & Rate Sensitivity",
+      "type": "theme",
+      "tier": 1,
+      "description": "Mortgage rates are the primary lever for US housing affordability. Rate relief unlocks buyer demand, homebuilder orders, building products, and mortgage services simultaneously.",
+      "status": "reference"
+    },
+    {
+      "id": "water_infrastructure",
+      "label": "Water Infrastructure",
+      "type": "theme",
+      "tier": 1,
+      "description": "Aging US water systems, drought risk, and industrial water treatment needs are driving regulated utility rate cases, infrastructure spending, and water technology adoption.",
+      "status": "reference"
+    },
+    {
+      "id": "critical_minerals_copper",
+      "label": "Critical Minerals & Copper",
+      "type": "theme",
+      "tier": 1,
+      "description": "Grid expansion, EV adoption, AI data-centre buildout, and supply-chain nationalisation are creating structural copper and critical mineral demand \u2014 separate from short-term commodity cycles.",
+      "status": "reference"
+    },
+    {
+      "id": "gold_real_assets",
+      "label": "Gold & Real Assets",
+      "type": "theme",
+      "tier": 1,
+      "description": "Central bank diversification, real-rate expectations, geopolitical risk, and USD reserve concerns are driving gold demand \u2014 creating a multi-year structural bid separate from inflation alone.",
+      "status": "reference"
+    },
+    {
+      "id": "digital_assets_infrastructure",
+      "label": "Digital Assets Infrastructure",
+      "type": "theme",
+      "tier": 1,
+      "description": "Spot Bitcoin ETF approval, institutional adoption, and exchange revenue cycles are creating investable equity exposure to crypto infrastructure without direct coin ownership.",
+      "status": "reference"
+    },
+    {
+      "id": "NVDA",
+      "label": "NVIDIA Corporation",
+      "type": "symbol",
+      "confidence": 0.95,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": "Export controls and competitive pressure from AMD and custom ASICs are key risks.",
+      "reason_to_care": "NVIDIA dominates the AI accelerator market with its H100/H200/Blackwell GPU architecture. Hyperscaler AI training and inference capital expenditure flows directly to GPU revenue. NVIDIA's data centre segment accounted for the majority of fiscal 2025 revenue.",
+      "tier": 2
+    },
+    {
+      "id": "AMD",
+      "label": "Advanced Micro Devices",
+      "type": "symbol",
+      "confidence": 0.8,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "AMD's Instinct MI300X and MI350X GPUs are competing for hyperscaler AI spend. GPU ramp is a direct AI infrastructure beneficiary and AMD provides EPYC CPU exposure to data-centre server buildout.",
+      "tier": 2
+    },
+    {
+      "id": "AVGO",
+      "label": "Broadcom Inc.",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Broadcom's custom AI ASICs for Google, Meta, and Apple and Tomahawk/Jericho networking chips are critical for AI cluster connectivity. Custom silicon is structural multi-year revenue.",
+      "tier": 2
+    },
+    {
+      "id": "MRVL",
+      "label": "Marvell Technology",
+      "type": "symbol",
+      "confidence": 0.75,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Marvell custom AI ASICs and optical interconnects benefit from data-centre build-out. Custom silicon ramp for Amazon and other hyperscalers is a growing revenue segment.",
+      "tier": 2
+    },
+    {
+      "id": "ANET",
+      "label": "Arista Networks",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Arista provides ultra-low-latency Ethernet switches for AI training cluster back-end networks. AI cluster networking is a direct and growing revenue driver with Microsoft and Meta as major customers.",
+      "tier": 2
+    },
+    {
+      "id": "SMCI",
+      "label": "Super Micro Computer",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": "Accounting and audit risk has previously created volatility.",
+      "reason_to_care": "Super Micro's AI server building blocks (rack-scale solutions, direct liquid cooling) directly serve hyperscaler GPU buildout. Revenue tied to GPU server shipment volumes.",
+      "tier": 2
+    },
+    {
+      "id": "DELL",
+      "label": "Dell Technologies",
+      "type": "symbol",
+      "confidence": 0.68,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Dell PowerEdge AI servers and infrastructure solutions benefit from enterprise AI buildout, particularly in on-premises AI deployment scenarios.",
+      "tier": 2
+    },
+    {
+      "id": "VRT",
+      "label": "Vertiv Holdings",
+      "type": "symbol",
+      "confidence": 0.92,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Vertiv provides power and cooling infrastructure directly for AI data centres. Revenue is directly correlated with data-centre power spend. Management has cited AI as the primary revenue driver.",
+      "tier": 2
+    },
+    {
+      "id": "ETN",
+      "label": "Eaton Corporation",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Eaton provides power management systems, switchgear, UPS, and data-centre power infrastructure. Revenue directly tied to power infrastructure spend for data centres and grid upgrades.",
+      "tier": 2
+    },
+    {
+      "id": "PWR",
+      "label": "Quanta Services",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Quanta installs grid infrastructure, substations, and electrical systems for data centres, utilities, and transmission projects. Growing backlog directly tracks power infrastructure spend.",
+      "tier": 2
+    },
+    {
+      "id": "EME",
+      "label": "EMCOR Group",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth",
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear",
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": null,
+      "reason_to_care": "EMCOR provides electrical and mechanical construction for data-centre power buildout. Data-centre segment is a growing proportion of revenue with increasing project backlog.",
+      "tier": 2
+    },
+    {
+      "id": "HUBB",
+      "label": "Hubbell Inc.",
+      "type": "symbol",
+      "confidence": 0.75,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Hubbell manufactures transformers, switchgear, and electrical components for data-centre power infrastructure and grid upgrades.",
+      "tier": 2
+    },
+    {
+      "id": "CEG",
+      "label": "Constellation Energy",
+      "type": "symbol",
+      "confidence": 0.9,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Constellation is the largest US nuclear operator and has signed power purchase agreements with AI hyperscalers including Microsoft. Nuclear provides reliable 24/7 carbon-free baseload power uniquely matching data-centre uptime SLAs.",
+      "tier": 2
+    },
+    {
+      "id": "VST",
+      "label": "Vistra Corp.",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Vistra operates nuclear and gas power generation. Nuclear and dispatchable power capacity serves long-term data-centre baseload demand contracts.",
+      "tier": 2
+    },
+    {
+      "id": "NEE",
+      "label": "NextEra Energy",
+      "type": "symbol",
+      "confidence": 0.52,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": "Broad utility \u2014 nuclear thesis is diluted.",
+      "reason_to_care": "NextEra has nuclear capacity but is primarily a renewables utility. Data-centre power exposure is secondary to regulated utility revenue. Broad utility portfolio dilutes pure-play thesis.",
+      "tier": 2
+    },
+    {
+      "id": "CCJ",
+      "label": "Cameco Corporation",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Cameco is the world's largest publicly traded uranium producer. Higher nuclear baseload demand for AI power drives uranium fuel demand, supporting long-term contract pricing.",
+      "tier": 2
+    },
+    {
+      "id": "UEC",
+      "label": "Uranium Energy Corp.",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Uranium Energy is a US uranium producer. Domestic uranium supply-chain investment and nuclear power demand are direct revenue tailwinds.",
+      "tier": 2
+    },
+    {
+      "id": "UUUU",
+      "label": "Energy Fuels Inc.",
+      "type": "symbol",
+      "confidence": 0.7,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Energy Fuels is a leading US uranium and rare earth producer. Nuclear revival driver directly supports uranium demand and fuel cycle investment.",
+      "tier": 2
+    },
+    {
+      "id": "DNN",
+      "label": "Denison Mines",
+      "type": "symbol",
+      "confidence": 0.62,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Denison Mines is a uranium developer with high-grade Canadian assets. Uranium demand growth benefits development pipeline valuations.",
+      "tier": 2
+    },
+    {
+      "id": "URA",
+      "label": "Global X Uranium ETF",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Global X Uranium ETF provides basket exposure to uranium miners and nuclear fuel cycle companies. Useful for investors seeking diversified uranium supply chain exposure.",
+      "tier": 2
+    },
+    {
+      "id": "URNM",
+      "label": "Sprott Uranium Miners ETF",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Sprott Uranium Miners ETF provides concentrated exposure to pure-play uranium companies. Higher uranium purity than URA.",
+      "tier": 2
+    },
+    {
+      "id": "LEU",
+      "label": "Centrus Energy Corp.",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Centrus Energy is the only US company licensed to produce HALEU (High-Assay Low-Enriched Uranium), the fuel required by most advanced reactor designs including SMRs. DOE has awarded production contracts, and the Piketon facility has reached the 900kg production mark.",
+      "tier": 2
+    },
+    {
+      "id": "BWXT",
+      "label": "BWX Technologies",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "BWX Technologies manufactures nuclear reactors and components for the US Navy and commercial nuclear programs. SMR reactor component manufacturing and government nuclear services are structural revenue.",
+      "tier": 2
+    },
+    {
+      "id": "GEV",
+      "label": "GE Vernova",
+      "type": "symbol",
+      "confidence": 0.75,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "GE Vernova provides power generation equipment including nuclear services and industrial gas turbines. Nuclear services and grid equipment benefit from the AI power demand cycle.",
+      "tier": 2
+    },
+    {
+      "id": "SMR",
+      "label": "NuScale Power",
+      "type": "symbol",
+      "confidence": 0.55,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": "Development stage; commercial revenue timeline is highly uncertain.",
+      "reason_to_care": "NuScale Power's SMR design is the first NRC-certified SMR design in the US. Catalyst-driven with commercial revenue timeline uncertainty. Benefit from nuclear revival narrative.",
+      "tier": 2
+    },
+    {
+      "id": "NLR",
+      "label": "VanEck Uranium & Nuclear ETF",
+      "type": "symbol",
+      "confidence": 0.8,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": null,
+      "reason_to_care": "VanEck Uranium & Nuclear ETF provides exposure to uranium mining, nuclear power generation, and nuclear equipment companies across the full nuclear value chain.",
+      "tier": 2
+    },
+    {
+      "id": "FCX",
+      "label": "Freeport-McMoRan",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth",
+        "electrification"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear",
+        "critical_minerals_copper"
+      ],
+      "risk_note": "Note: also appears in critical_minerals_copper theme.",
+      "reason_to_care": "Freeport-McMoRan is the world's largest publicly traded copper producer. AI data-centre construction and grid expansion both require significant copper for wiring, transformers, and electrical systems.",
+      "tier": 2
+    },
+    {
+      "id": "COPX",
+      "label": "Global X Copper Miners ETF",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "ai_capex_growth",
+        "electrification"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear",
+        "critical_minerals_copper"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Global X Copper Miners ETF provides basket exposure to global copper mining companies.",
+      "tier": 2
+    },
+    {
+      "id": "LLY",
+      "label": "Eli Lilly",
+      "type": "symbol",
+      "confidence": 0.95,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "Valuation and competitive pipeline risk.",
+      "reason_to_care": "Eli Lilly's Zepbound (tirzepatide) and Mounjaro are leading approved GLP-1 drugs. US Zepbound revenue grew 122% year-over-year in Q4 2025 per Lilly investor relations. Primary pharmaceutical revenue from obesity and diabetes treatment.",
+      "tier": 2
+    },
+    {
+      "id": "NVO",
+      "label": "Novo Nordisk",
+      "type": "symbol",
+      "confidence": 0.95,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "Manufacturing capacity and competitive pipeline are key variables.",
+      "reason_to_care": "Novo Nordisk's Ozempic and Wegovy (semaglutide) are the originator GLP-1 drugs with global manufacturing scale. Novo 2025 annual report shows strong GLP-1 and obesity-care sales with manufacturing investment as a key constraint.",
+      "tier": 2
+    },
+    {
+      "id": "WST",
+      "label": "West Pharmaceutical Services",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": null,
+      "reason_to_care": "West Pharmaceutical Services makes injectable drug delivery systems \u2014 the stoppers and closures for GLP-1 drug vials and cartridges. GLP-1 drug volume growth directly increases West's container demand.",
+      "tier": 2
+    },
+    {
+      "id": "TMO",
+      "label": "Thermo Fisher Scientific",
+      "type": "symbol",
+      "confidence": 0.78,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Thermo Fisher provides pharmaceutical manufacturing services including peptide API synthesis and fill-finish capacity critical for GLP-1 scale-up through its pharma services segment.",
+      "tier": 2
+    },
+    {
+      "id": "DHR",
+      "label": "Danaher Corporation",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Danaher's bioprocessing and life sciences tools support GLP-1 drug manufacturing and quality control through its Cytiva and Pall biotech brands.",
+      "tier": 2
+    },
+    {
+      "id": "BDX",
+      "label": "Becton Dickinson",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Becton Dickinson manufactures prefilled syringes and auto-injector pens used for GLP-1 drug delivery. Device volume tied directly to GLP-1 prescription growth.",
+      "tier": 2
+    },
+    {
+      "id": "DXCM",
+      "label": "DexCom",
+      "type": "symbol",
+      "confidence": 0.58,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "Mixed: metabolic monitoring demand may grow, device pressure if GLP-1 reduces insulin need.",
+      "reason_to_care": "DexCom makes continuous glucose monitors (CGMs). GLP-1 adoption improves metabolic management but may reduce insulin-dependent CGM use over time. Mixed exposure \u2014 monitor for direction.",
+      "tier": 2
+    },
+    {
+      "id": "PODD",
+      "label": "Insulet Corporation",
+      "type": "symbol",
+      "confidence": 0.58,
+      "exposure_type": "pressure_or_negative",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "GLP-1 adoption may reduce insulin-dependent patient volumes over time.",
+      "reason_to_care": "Insulet makes Omnipod insulin delivery systems. GLP-1 adoption may reduce insulin dependency, creating volume pressure on insulin delivery devices.",
+      "tier": 2
+    },
+    {
+      "id": "UNH",
+      "label": "UnitedHealth Group",
+      "type": "symbol",
+      "confidence": 0.5,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "Higher drug costs vs long-term savings \u2014 mixed direction.",
+      "reason_to_care": "UnitedHealth faces higher drug costs from GLP-1 coverage expansion offset by potential long-term comorbidity cost savings. Direction is unclear; monitor for payer coverage policy changes.",
+      "tier": 2
+    },
+    {
+      "id": "MDLZ",
+      "label": "Mondelez International",
+      "type": "symbol",
+      "confidence": 0.62,
+      "exposure_type": "pressure_or_negative",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "Negative/mixed \u2014 monitor, not a directional trade.",
+      "reason_to_care": "Mondelez sells calorie-dense snacks and chocolates. Reduced appetite from GLP-1 use creates structural volume pressure on snacking categories. Monitor-only negative exposure.",
+      "tier": 2
+    },
+    {
+      "id": "HSY",
+      "label": "Hershey Company",
+      "type": "symbol",
+      "confidence": 0.6,
+      "exposure_type": "pressure_or_negative",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "Negative/mixed \u2014 monitor, not a directional trade.",
+      "reason_to_care": "Hershey's confectionery products face demand headwinds from GLP-1 appetite reduction and shifting consumer preferences toward metabolic health.",
+      "tier": 2
+    },
+    {
+      "id": "KO",
+      "label": "Coca-Cola",
+      "type": "symbol",
+      "confidence": 0.52,
+      "exposure_type": "pressure_or_negative",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "Negative/mixed \u2014 monitor, not a directional trade.",
+      "reason_to_care": "Coca-Cola's sugary beverages face long-term demand headwinds from the GLP-1 metabolic health trend and reduced appetite for high-calorie drinks.",
+      "tier": 2
+    },
+    {
+      "id": "MCD",
+      "label": "McDonald's Corp.",
+      "type": "symbol",
+      "confidence": 0.5,
+      "exposure_type": "pressure_or_negative",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "Negative/mixed \u2014 monitor, not a directional trade.",
+      "reason_to_care": "McDonald's high-calorie menu faces potential volume headwinds from GLP-1 appetite reduction among obese/overweight demographics.",
+      "tier": 2
+    },
+    {
+      "id": "LMT",
+      "label": "Lockheed Martin",
+      "type": "symbol",
+      "confidence": 0.92,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Lockheed Martin is the world's largest defence contractor with F-35 jets, Patriot missiles, and hypersonic weapons programmes. NATO spending commitments and rising global defence budgets directly extend multi-year order backlogs.",
+      "tier": 2
+    },
+    {
+      "id": "RTX",
+      "label": "RTX Corporation (Raytheon)",
+      "type": "symbol",
+      "confidence": 0.9,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "RTX supplies Patriot/NASAMS air defence systems, Javelin missiles, and Pratt & Whitney engines. Munitions replenishment and air defence spending are structural tailwinds from NATO demand.",
+      "tier": 2
+    },
+    {
+      "id": "NOC",
+      "label": "Northrop Grumman",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Northrop Grumman provides B-21 Raider bomber, ground-based strategic deterrent, and space systems. Rising defence budgets directly support multi-year backlog growth.",
+      "tier": 2
+    },
+    {
+      "id": "GD",
+      "label": "General Dynamics",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "General Dynamics provides Stryker vehicles, Virginia-class submarines, and Gulfstream aircraft. Naval and ground defence spending drive backlog with submarine delivery schedule extending multi-year.",
+      "tier": 2
+    },
+    {
+      "id": "LHX",
+      "label": "L3Harris Technologies",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "L3Harris provides tactical radios, night vision, intelligence systems, and Electronic Warfare. NATO modernisation drives equipment upgrade cycles.",
+      "tier": 2
+    },
+    {
+      "id": "AVAV",
+      "label": "AeroVironment",
+      "type": "symbol",
+      "confidence": 0.8,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "AeroVironment makes tactical UAVs and Switchblade loitering munitions. Conflict-driven demand and NATO munitions replenishment are direct revenue drivers.",
+      "tier": 2
+    },
+    {
+      "id": "KTOS",
+      "label": "Kratos Defense & Security",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Kratos produces drone target systems, tactical missiles, and satellite systems. Rising defence drone demand is a direct revenue driver.",
+      "tier": 2
+    },
+    {
+      "id": "HII",
+      "label": "Huntington Ingalls Industries",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Huntington Ingalls is the largest US military shipbuilder building Virginia-class submarines and CVN carriers. Multi-year government programme spending provides structural revenue visibility.",
+      "tier": 2
+    },
+    {
+      "id": "RKLB",
+      "label": "Rocket Lab",
+      "type": "symbol",
+      "confidence": 0.62,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": "Pre-profitability; launch failure risk exists.",
+      "reason_to_care": "Rocket Lab provides small satellite launches and spacecraft components. Military space reconnaissance demand creates upside in a growing commercial and government space launch market.",
+      "tier": 2
+    },
+    {
+      "id": "PLTR",
+      "label": "Palantir Technologies",
+      "type": "symbol",
+      "confidence": 0.68,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Palantir provides AI data analytics platforms (Gotham, Foundry, AIP) for US and NATO defence agencies. Rising defence budgets support Palantir government segment revenue.",
+      "tier": 2
+    },
+    {
+      "id": "ITA",
+      "label": "iShares U.S. Aerospace & Defense ETF",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "ITA provides exposure to US aerospace and defence companies. Holdings are a discovery source for defence sector names.",
+      "tier": 2
+    },
+    {
+      "id": "XAR",
+      "label": "SPDR S&P Aerospace & Defense ETF",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": null,
+      "reason_to_care": "XAR provides broader exposure including mid-cap aerospace and defence names via the S&P TMI. Holdings serve as a candidate discovery source.",
+      "tier": 2
+    },
+    {
+      "id": "PANW",
+      "label": "Palo Alto Networks",
+      "type": "symbol",
+      "confidence": 0.9,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "cybersecurity_digital_resilience"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Palo Alto Networks is a leading cybersecurity platform provider. Rising cyber risk and board-level security spend drive PANW's Next-Generation Security platform adoption across enterprise and government.",
+      "tier": 2
+    },
+    {
+      "id": "CRWD",
+      "label": "CrowdStrike Holdings",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "cybersecurity_digital_resilience"
+      ],
+      "risk_note": null,
+      "reason_to_care": "CrowdStrike's Falcon platform is the leading endpoint detection and response (EDR/XDR) solution. AI-driven threat detection drives enterprise adoption growth and platform consolidation.",
+      "tier": 2
+    },
+    {
+      "id": "FTNT",
+      "label": "Fortinet",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "cybersecurity_digital_resilience"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Fortinet provides integrated security platforms including firewall, SASE, and SD-WAN. Enterprise security consolidation and network perimeter security spend are structural tailwinds.",
+      "tier": 2
+    },
+    {
+      "id": "ZS",
+      "label": "Zscaler",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "cybersecurity_digital_resilience"
+      ],
+      "risk_note": "Growth/valuation-sensitive.",
+      "reason_to_care": "Zscaler's Zero Trust Exchange is the leading SASE platform. Cloud migration and remote-work security mandates drive ZS Zero Trust network access adoption.",
+      "tier": 2
+    },
+    {
+      "id": "NET",
+      "label": "Cloudflare",
+      "type": "symbol",
+      "confidence": 0.8,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "cybersecurity_digital_resilience"
+      ],
+      "risk_note": "Growth/valuation-sensitive.",
+      "reason_to_care": "Cloudflare provides Zero Trust security and networking. AI-driven threat protection, DDoS mitigation, and secure access are structural enterprise demand drivers.",
+      "tier": 2
+    },
+    {
+      "id": "OKTA",
+      "label": "Okta Inc.",
+      "type": "symbol",
+      "confidence": 0.8,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "cybersecurity_digital_resilience"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Okta is the leading identity and access management platform. Identity attacks are the most common breach vector per IBM Cost of a Data Breach 2025 Report.",
+      "tier": 2
+    },
+    {
+      "id": "CIBR",
+      "label": "First Trust Nasdaq Cybersecurity ETF",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "cybersecurity_digital_resilience"
+      ],
+      "risk_note": null,
+      "reason_to_care": "CIBR provides basket exposure to cybersecurity companies. Holdings are a candidate discovery source for sector names.",
+      "tier": 2
+    },
+    {
+      "id": "HACK",
+      "label": "ETFMG Prime Cyber Security ETF",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "cybersecurity_digital_resilience"
+      ],
+      "risk_note": null,
+      "reason_to_care": "HACK provides diversified cybersecurity basket exposure including global security companies.",
+      "tier": 2
+    },
+    {
+      "id": "AMAT",
+      "label": "Applied Materials",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Applied Materials provides wafer fabrication equipment for semiconductor fabs. CHIPS Act investments and US fab construction by TSM, Intel, and Samsung directly drive capital equipment revenue.",
+      "tier": 2
+    },
+    {
+      "id": "LRCX",
+      "label": "Lam Research",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Lam Research provides etch and deposition equipment critical for every semiconductor fab. US fab construction drives equipment capital spend.",
+      "tier": 2
+    },
+    {
+      "id": "KLAC",
+      "label": "KLA Corporation",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": null,
+      "reason_to_care": "KLA provides process control and inspection equipment. Semiconductor fab yield improvement is a structural demand driver regardless of geography.",
+      "tier": 2
+    },
+    {
+      "id": "ASML",
+      "label": "ASML Holding NV",
+      "type": "symbol",
+      "confidence": 0.9,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": "China export restrictions are a risk to revenue.",
+      "reason_to_care": "ASML is the sole supplier of EUV lithography equipment. Indispensable for any advanced semiconductor node fab globally. No alternative supplier exists.",
+      "tier": 2
+    },
+    {
+      "id": "ROK",
+      "label": "Rockwell Automation",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Rockwell Automation provides factory automation systems. Domestic manufacturing investment and CHIPS Act factory construction directly drive industrial automation demand.",
+      "tier": 2
+    },
+    {
+      "id": "HON",
+      "label": "Honeywell International",
+      "type": "symbol",
+      "confidence": 0.68,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Honeywell provides industrial automation, process controls, and building systems for manufacturing facilities. Diversified industrial exposure to domestic capex cycle.",
+      "tier": 2
+    },
+    {
+      "id": "NUE",
+      "label": "Nucor Corporation",
+      "type": "symbol",
+      "confidence": 0.7,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": "Cyclical \u2014 price and demand gates required.",
+      "reason_to_care": "Nucor produces steel for construction and manufacturing. Domestic infrastructure investment and reshoring support domestic steel demand.",
+      "tier": 2
+    },
+    {
+      "id": "VMC",
+      "label": "Vulcan Materials",
+      "type": "symbol",
+      "confidence": 0.68,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": "Cyclical \u2014 price and demand gates required.",
+      "reason_to_care": "Vulcan Materials provides aggregates and construction materials for infrastructure and industrial construction projects.",
+      "tier": 2
+    },
+    {
+      "id": "PAVE",
+      "label": "Global X U.S. Infrastructure Development ETF",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "domestic_manufacturing_investment"
+      ],
+      "theme_ids": [
+        "reshoring_industrial_capex"
+      ],
+      "risk_note": null,
+      "reason_to_care": "PAVE provides exposure to US companies involved in raw materials, heavy equipment, engineering and construction for infrastructure activity.",
+      "tier": 2
+    },
+    {
+      "id": "DHI",
+      "label": "D.R. Horton",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "D.R. Horton is the largest US homebuilder by volume. Mortgage rate relief directly drives buyer affordability and order recovery, particularly for first-time buyers who dominate DHI's volume.",
+      "tier": 2
+    },
+    {
+      "id": "LEN",
+      "label": "Lennar Corporation",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Lennar operates nationally with entry-level and move-up segments. Rate relief increases buyer qualification and reduces incentive costs, directly expanding gross margins.",
+      "tier": 2
+    },
+    {
+      "id": "PHM",
+      "label": "PulteGroup",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "PulteGroup's multi-brand strategy serves first-time, move-up, and active adult (Del Webb) buyers. Rate sensitivity is moderate compared to pure entry-level builders.",
+      "tier": 2
+    },
+    {
+      "id": "NVR",
+      "label": "NVR Inc.",
+      "type": "symbol",
+      "confidence": 0.8,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "NVR's asset-light lot-option model minimises land risk and provides strong returns on equity. Rate cuts improve buyer affordability with lower NVR-specific execution risk.",
+      "tier": 2
+    },
+    {
+      "id": "BLDR",
+      "label": "Builders FirstSource",
+      "type": "symbol",
+      "confidence": 0.8,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Builders FirstSource is the largest US supplier of structural building products to homebuilders. Revenue tied directly to housing starts and builder order volumes.",
+      "tier": 2
+    },
+    {
+      "id": "OC",
+      "label": "Owens Corning",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Owens Corning provides insulation and roofing materials directly tied to housing starts and the repair/remodel cycle.",
+      "tier": 2
+    },
+    {
+      "id": "HD",
+      "label": "Home Depot",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Home Depot benefits from housing turnover and remodel activity. Rate cuts drive existing home sales and pull-forward of deferred maintenance spending.",
+      "tier": 2
+    },
+    {
+      "id": "LOW",
+      "label": "Lowe's Companies",
+      "type": "symbol",
+      "confidence": 0.7,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Lowe's benefits from repair and remodel cycles. Pro-customer segment provides more stable revenue than consumer-driven turnover projects.",
+      "tier": 2
+    },
+    {
+      "id": "RKT",
+      "label": "Rocket Companies",
+      "type": "symbol",
+      "confidence": 0.78,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": "High rate-path sensitivity and mortgage spread volatility.",
+      "reason_to_care": "Rocket Companies is the leading US mortgage originator. Rate cuts directly drive refinance and purchase mortgage volumes \u2014 the primary Rocket revenue driver.",
+      "tier": 2
+    },
+    {
+      "id": "FNF",
+      "label": "Fidelity National Financial",
+      "type": "symbol",
+      "confidence": 0.68,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Fidelity National Financial provides title insurance. Housing transaction volumes directly drive title premium revenue.",
+      "tier": 2
+    },
+    {
+      "id": "ITB",
+      "label": "iShares U.S. Home Construction ETF",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "ITB tracks US residential construction and related industries. Holdings focused on homebuilders and direct suppliers.",
+      "tier": 2
+    },
+    {
+      "id": "XHB",
+      "label": "SPDR S&P Homebuilders ETF",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "yields_falling"
+      ],
+      "theme_ids": [
+        "housing_rate_sensitivity"
+      ],
+      "risk_note": null,
+      "reason_to_care": "XHB includes homebuilders plus building products, furnishings, retail, and appliances. Broader than ITB, capturing the full housing supply chain.",
+      "tier": 2
+    },
+    {
+      "id": "AWK",
+      "label": "American Water Works",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "water_stress"
+      ],
+      "theme_ids": [
+        "water_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "American Water Works is the largest US investor-owned water utility. Infrastructure investment and regulatory rate-case recovery directly support earnings growth.",
+      "tier": 2
+    },
+    {
+      "id": "WTRG",
+      "label": "Essential Utilities",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "water_stress"
+      ],
+      "theme_ids": [
+        "water_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Essential Utilities provides water and natural gas utility services. Water infrastructure investment drives regulated rate base growth and capital recovery.",
+      "tier": 2
+    },
+    {
+      "id": "XYL",
+      "label": "Xylem Inc.",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "water_stress"
+      ],
+      "theme_ids": [
+        "water_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Xylem provides water technology including pumps, smart meters, and treatment systems. Water infrastructure investment directly drives Xylem revenue across utilities and industrial customers.",
+      "tier": 2
+    },
+    {
+      "id": "PNR",
+      "label": "Pentair plc",
+      "type": "symbol",
+      "confidence": 0.8,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "water_stress"
+      ],
+      "theme_ids": [
+        "water_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Pentair provides water treatment and fluid control systems for industrial, residential, and commercial applications.",
+      "tier": 2
+    },
+    {
+      "id": "ITRI",
+      "label": "Itron Inc.",
+      "type": "symbol",
+      "confidence": 0.75,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "water_stress"
+      ],
+      "theme_ids": [
+        "water_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Itron provides smart metering and network solutions for water and energy utilities. Smart meter replacement cycles and infrastructure modernisation drive demand.",
+      "tier": 2
+    },
+    {
+      "id": "ECL",
+      "label": "Ecolab Inc.",
+      "type": "symbol",
+      "confidence": 0.8,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "water_stress"
+      ],
+      "theme_ids": [
+        "water_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Ecolab provides water treatment, hygiene, and cleaning solutions to industrial and commercial customers. Industrial water efficiency and treatment demand are structural drivers.",
+      "tier": 2
+    },
+    {
+      "id": "PHO",
+      "label": "Invesco Water Resources ETF",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "water_stress"
+      ],
+      "theme_ids": [
+        "water_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "PHO seeks exposure to companies that create products to conserve and purify water. Holdings provide a discovery source for water sector names.",
+      "tier": 2
+    },
+    {
+      "id": "FIW",
+      "label": "First Trust Water ETF",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "water_stress"
+      ],
+      "theme_ids": [
+        "water_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "FIW provides broader water-sector basket exposure across utilities, equipment, and treatment companies.",
+      "tier": 2
+    },
+    {
+      "id": "SCCO",
+      "label": "Southern Copper",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "electrification"
+      ],
+      "theme_ids": [
+        "critical_minerals_copper"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Southern Copper operates large-scale Latin American mines with among the highest copper revenue purity of any listed miner.",
+      "tier": 2
+    },
+    {
+      "id": "TECK",
+      "label": "Teck Resources",
+      "type": "symbol",
+      "confidence": 0.68,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "electrification"
+      ],
+      "theme_ids": [
+        "critical_minerals_copper"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Teck Resources has growing copper exposure through Quebrada Blanca (QB2) and Carmen de Andacollo mines following its energy sale.",
+      "tier": 2
+    },
+    {
+      "id": "ALB",
+      "label": "Albemarle Corporation",
+      "type": "symbol",
+      "confidence": 0.78,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "electrification"
+      ],
+      "theme_ids": [
+        "critical_minerals_copper"
+      ],
+      "risk_note": "Requires battery/EV driver activation \u2014 not auto-included from electrification alone.",
+      "reason_to_care": "Albemarle is the world's largest lithium producer. EV battery demand and energy storage growth drive lithium demand \u2014 separate from copper bucket.",
+      "tier": 2
+    },
+    {
+      "id": "SQM",
+      "label": "Sociedad Qu\u00edmica y Minera",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "electrification"
+      ],
+      "theme_ids": [
+        "critical_minerals_copper"
+      ],
+      "risk_note": "Chile government regulation and lithium price cycle are key risks.",
+      "reason_to_care": "SQM is a leading Chilean lithium and specialty chemicals producer. Lithium carbonate and hydroxide production serve the EV battery supply chain.",
+      "tier": 2
+    },
+    {
+      "id": "MP",
+      "label": "MP Materials",
+      "type": "symbol",
+      "confidence": 0.75,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "critical_minerals_copper"
+      ],
+      "risk_note": "Geopolitical supply-chain driver required for full activation.",
+      "reason_to_care": "MP Materials operates the only rare earth mining and processing facility in the US at Mountain Pass, California. China rare earth export restrictions are a direct supply-chain risk driver.",
+      "tier": 2
+    },
+    {
+      "id": "ICOP",
+      "label": "iShares Copper and Metals Mining ETF",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "electrification"
+      ],
+      "theme_ids": [
+        "critical_minerals_copper"
+      ],
+      "risk_note": null,
+      "reason_to_care": "iShares Copper and Metals Mining ETF tracks global copper and metal-ore mining companies.",
+      "tier": 2
+    },
+    {
+      "id": "LIT",
+      "label": "Global X Lithium & Battery Tech ETF",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "electrification"
+      ],
+      "theme_ids": [
+        "critical_minerals_copper"
+      ],
+      "risk_note": null,
+      "reason_to_care": "LIT provides basket exposure to lithium producers and battery manufacturers in a single ETF.",
+      "tier": 2
+    },
+    {
+      "id": "GLD",
+      "label": "SPDR Gold Shares",
+      "type": "symbol",
+      "confidence": 0.92,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": null,
+      "reason_to_care": "SPDR Gold Shares is the largest gold ETF by assets under management. Provides direct bullion price exposure without operating company or mining risk.",
+      "tier": 2
+    },
+    {
+      "id": "IAU",
+      "label": "iShares Gold Trust",
+      "type": "symbol",
+      "confidence": 0.9,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": null,
+      "reason_to_care": "iShares Gold Trust provides lower-cost gold bullion exposure than GLD with a similar physically-backed structure.",
+      "tier": 2
+    },
+    {
+      "id": "NEM",
+      "label": "Newmont Corporation",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": "Mine cost and jurisdiction risk required.",
+      "reason_to_care": "Newmont is the world's largest gold miner. Higher gold prices directly amplify earnings due to fixed-cost leverage in mining operations.",
+      "tier": 2
+    },
+    {
+      "id": "GOLD",
+      "label": "Barrick Gold",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Barrick Gold is a major global gold and copper miner. Gold price leverage plus emerging copper upside from growing copper operations.",
+      "tier": 2
+    },
+    {
+      "id": "AEM",
+      "label": "Agnico Eagle Mines",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Agnico Eagle is a Canadian major gold producer with mines in stable jurisdictions (Canada, Finland, Australia). Lower geopolitical risk than African or South American miners.",
+      "tier": 2
+    },
+    {
+      "id": "FNV",
+      "label": "Franco-Nevada Corporation",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Franco-Nevada is the world's premier gold royalty/streaming company. No operating costs means pure gold-price leverage. Different risk profile from miners \u2014 revenue without mine execution risk.",
+      "tier": 2
+    },
+    {
+      "id": "WPM",
+      "label": "Wheaton Precious Metals",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Wheaton Precious Metals is the largest silver/gold streaming company. Streaming model provides low-cost precious metals exposure with a different risk profile from WPM vs NEM.",
+      "tier": 2
+    },
+    {
+      "id": "RGLD",
+      "label": "Royal Gold Inc.",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Royal Gold provides royalty and streaming financing to mining companies. Lower cost structure than operators means higher gold-price leverage per dollar invested.",
+      "tier": 2
+    },
+    {
+      "id": "GDX",
+      "label": "VanEck Gold Miners ETF",
+      "type": "symbol",
+      "confidence": 0.88,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": null,
+      "reason_to_care": "VanEck Gold Miners ETF provides exposure to senior and mid-tier gold mining companies. Higher beta to gold price than bullion ETFs.",
+      "tier": 2
+    },
+    {
+      "id": "GDXJ",
+      "label": "VanEck Junior Gold Miners ETF",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "reserve_diversification"
+      ],
+      "theme_ids": [
+        "gold_real_assets"
+      ],
+      "risk_note": null,
+      "reason_to_care": "VanEck Junior Gold Miners ETF provides higher-beta exposure to junior and mid-tier gold miners. Higher volatility than GDX.",
+      "tier": 2
+    },
+    {
+      "id": "IBIT",
+      "label": "iShares Bitcoin Trust ETF",
+      "type": "symbol",
+      "confidence": 0.9,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "iShares Bitcoin Trust is the largest spot Bitcoin ETF by assets. Provides direct Bitcoin price exposure via SEC-approved ETP structure, approved January 10, 2024.",
+      "tier": 2
+    },
+    {
+      "id": "FBTC",
+      "label": "Fidelity Wise Origin Bitcoin Fund",
+      "type": "symbol",
+      "confidence": 0.85,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Fidelity Wise Origin Bitcoin Fund is a spot Bitcoin ETF with direct Bitcoin exposure and competitive fee structure.",
+      "tier": 2
+    },
+    {
+      "id": "GBTC",
+      "label": "Grayscale Bitcoin Trust ETF",
+      "type": "symbol",
+      "confidence": 0.75,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": "Higher fees than IBIT or FBTC.",
+      "reason_to_care": "Grayscale Bitcoin Trust converted from closed-end trust to an ETF. Older structure with higher management fees than newer spot Bitcoin ETPs.",
+      "tier": 2
+    },
+    {
+      "id": "COIN",
+      "label": "Coinbase Global",
+      "type": "symbol",
+      "confidence": 0.82,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": "Revenue sensitive to trading volume, custody, subscriptions, and regulation.",
+      "reason_to_care": "Coinbase is the largest US crypto exchange. Revenue is directly tied to crypto trading volumes, custody assets, and USDC stablecoin interest income. Transaction and subscription revenue grow with crypto market cycles.",
+      "tier": 2
+    },
+    {
+      "id": "HOOD",
+      "label": "Robinhood Markets",
+      "type": "symbol",
+      "confidence": 0.6,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "Robinhood offers crypto trading alongside equities. Crypto volume expansion benefits transaction revenue but crypto is one of several revenue streams.",
+      "tier": 2
+    },
+    {
+      "id": "MSTR",
+      "label": "Strategy (MicroStrategy)",
+      "type": "symbol",
+      "confidence": 0.78,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": "High volatility, leverage, and valuation controls required.",
+      "reason_to_care": "Strategy (formerly MicroStrategy) holds over 500,000 Bitcoin on its balance sheet. Stock trades as a leveraged Bitcoin price proxy. Balance-sheet Bitcoin proxy with operating leverage.",
+      "tier": 2
+    },
+    {
+      "id": "MARA",
+      "label": "MARA Holdings",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": "Mining economics, hash price, energy cost, and balance-sheet risk required.",
+      "reason_to_care": "MARA Holdings (formerly Marathon Digital) is the largest US Bitcoin miner by hashrate. Mining revenue tied to hash price, energy costs, and Bitcoin holdings on balance sheet.",
+      "tier": 2
+    },
+    {
+      "id": "RIOT",
+      "label": "Riot Platforms",
+      "type": "symbol",
+      "confidence": 0.7,
+      "exposure_type": "direct_beneficiary",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": "Mining economics risk.",
+      "reason_to_care": "Riot Platforms is a major US Bitcoin miner. Mining profitability is tied to hash price, energy economics, and operational efficiency.",
+      "tier": 2
+    },
+    {
+      "id": "CLSK",
+      "label": "CleanSpark",
+      "type": "symbol",
+      "confidence": 0.62,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": "Mining economics risk.",
+      "reason_to_care": "CleanSpark is a Bitcoin miner focused on sustainable energy mining. Hash rate growth and energy cost management are key value drivers.",
+      "tier": 2
+    },
+    {
+      "id": "BLOK",
+      "label": "Amplify Transformational Data Sharing ETF",
+      "type": "symbol",
+      "confidence": 0.78,
+      "exposure_type": "etf_basket",
+      "driver_ids": [
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": null,
+      "reason_to_care": "BLOK provides exposure to companies actively involved in blockchain technology and digital asset infrastructure.",
+      "tier": 2
+    },
+    {
+      "id": "AMGN",
+      "label": "Amgen Inc.",
+      "type": "symbol",
+      "confidence": 0.6,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "glp1_adoption"
+      ],
+      "theme_ids": [
+        "glp1_metabolic_health"
+      ],
+      "risk_note": "Clinical stage pipeline exposure \u2014 not direct drug revenue.",
+      "reason_to_care": "Amgen's MariTide (AMG 133) is in Phase 2 obesity development. Not a direct GLP-1 revenue leader \u2014 catalyst-driven pipeline name.",
+      "tier": 2
+    },
+    {
+      "id": "ASTS",
+      "label": "AST SpaceMobile",
+      "type": "symbol",
+      "confidence": 0.65,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "geopolitical_risk_rising"
+      ],
+      "theme_ids": [
+        "defence_rearmament"
+      ],
+      "risk_note": "High cash burn pre-revenue. Constellation build-out risk. Dilution risk at current scale.",
+      "reason_to_care": "AST SpaceMobile is building a direct-to-device satellite broadband constellation using low-Earth-orbit satellites. Commercial launch milestones and government connectivity contracts connect it to the broader space infrastructure and dual-use satellite communications theme.",
+      "tier": 2
+    },
+    {
+      "id": "APLD",
+      "label": "Applied Digital Corporation",
+      "type": "symbol",
+      "confidence": 0.72,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth",
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear",
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": "Dual AI/crypto revenue mix creates volatility. Balance sheet leverage is a risk.",
+      "reason_to_care": "Applied Digital operates high-performance computing data centres purpose-built for AI workloads and cryptocurrency mining. HPC cloud revenue from AI hosting is a growing share of revenue as hyperscalers seek alternative GPU compute capacity.",
+      "tier": 2
+    },
+    {
+      "id": "IREN",
+      "label": "Iris Energy",
+      "type": "symbol",
+      "confidence": 0.75,
+      "exposure_type": "supply_chain_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth",
+        "crypto_liquidity"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear",
+        "digital_assets_infrastructure"
+      ],
+      "risk_note": "Revenue split between AI hosting and BTC mining creates regime sensitivity. Capacity build-out capex is significant.",
+      "reason_to_care": "Iris Energy operates renewable-powered data centres for AI HPC cloud services and Bitcoin mining. The company is actively converting Bitcoin mining capacity to GPU AI compute hosting, directly capturing the AI infrastructure buildout.",
+      "tier": 2
+    },
+    {
+      "id": "IBM",
+      "label": "IBM Corporation",
+      "type": "symbol",
+      "confidence": 0.6,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": "Mature business with declining legacy segments. AI thesis depends on WatsonX enterprise adoption rate.",
+      "reason_to_care": "IBM WatsonX and hybrid cloud platform (Red Hat OpenShift) serve enterprise AI adoption. IBM is one of the few large-caps with a dedicated enterprise AI platform positioned for on-premises and regulated-industry deployment where hyperscaler public cloud is restricted.",
+      "tier": 2
+    },
+    {
+      "id": "NOW",
+      "label": "ServiceNow Inc.",
+      "type": "symbol",
+      "confidence": 0.65,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "ai_energy_nuclear"
+      ],
+      "risk_note": "High valuation. Competitive pressure from Microsoft Copilot and Salesforce Einstein on workflow automation.",
+      "reason_to_care": "ServiceNow is embedding AI agents (Now Assist) across its enterprise workflow platform. AI feature attach rates drive premium pricing and NRR expansion. ServiceNow is uniquely positioned as the AI orchestration layer for enterprise IT, HR, and operations workflows \u2014 it monetises AI adoption without GPU spend.",
+      "tier": 2
+    },
+    {
+      "id": "ZETA",
+      "label": "Zeta Global Holdings",
+      "type": "symbol",
+      "confidence": 0.45,
+      "exposure_type": "second_order_beneficiary",
+      "driver_ids": [
+        "ai_capex_growth"
+      ],
+      "theme_ids": [
+        "cybersecurity_digital_resilience"
+      ],
+      "risk_note": "Adtech exposure to digital ad spend cycles. Not a pure AI infrastructure play \u2014 thematic link is indirect.",
+      "reason_to_care": "Zeta Global uses AI to power its marketing data platform. AI-driven customer intelligence and campaign personalisation are embedded in its revenue model. This is an indirect AI beneficiary \u2014 not a compute/infrastructure play but an AI-enabled software platform.",
+      "tier": 2
+    }
+  ],
+  "edges": [
+    {
+      "source": "ai_capex_growth",
+      "target": "ai_energy_nuclear",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "NVDA",
+      "type": "exposes",
+      "strength": 0.95,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "AMD",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "AVGO",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "MRVL",
+      "type": "exposes",
+      "strength": 0.75,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "ANET",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "SMCI",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "DELL",
+      "type": "exposes",
+      "strength": 0.68,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "VRT",
+      "type": "exposes",
+      "strength": 0.92,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "power_management_electrical_equipment"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "ETN",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "power_management_electrical_equipment"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "PWR",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "power_management_electrical_equipment"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "EME",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "power_management_electrical_equipment"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "HUBB",
+      "type": "exposes",
+      "strength": 0.75,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "power_management_electrical_equipment"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "CEG",
+      "type": "exposes",
+      "strength": 0.9,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "nuclear_operators_utilities"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "VST",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "nuclear_operators_utilities"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "NEE",
+      "type": "exposes",
+      "strength": 0.52,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "nuclear_operators_utilities"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "CCJ",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "uranium_supply_bucket"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "UEC",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "uranium_supply_bucket"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "UUUU",
+      "type": "exposes",
+      "strength": 0.7,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "uranium_supply_bucket"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "DNN",
+      "type": "exposes",
+      "strength": 0.62,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "uranium_supply_bucket"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "URA",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "etf_basket",
+      "bucket_id": "uranium_supply_bucket"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "URNM",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "etf_basket",
+      "bucket_id": "uranium_supply_bucket"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "LEU",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "enrichment_haleu"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "BWXT",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "reactor_services_smr"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "GEV",
+      "type": "exposes",
+      "strength": 0.75,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "reactor_services_smr"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "SMR",
+      "type": "exposes",
+      "strength": 0.55,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "reactor_services_smr"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "NLR",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "etf_basket",
+      "bucket_id": "reactor_services_smr"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "FCX",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "copper_ai_adjacency"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "COPX",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "etf_basket",
+      "bucket_id": "copper_ai_adjacency"
+    },
+    {
+      "source": "glp1_adoption",
+      "target": "glp1_metabolic_health",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "LLY",
+      "type": "exposes",
+      "strength": 0.95,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "direct_glp1_leaders"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "NVO",
+      "type": "exposes",
+      "strength": 0.95,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "direct_glp1_leaders"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "WST",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "peptide_api_fill_finish"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "TMO",
+      "type": "exposes",
+      "strength": 0.78,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "peptide_api_fill_finish"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "DHR",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "peptide_api_fill_finish"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "BDX",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "peptide_api_fill_finish"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "DXCM",
+      "type": "exposes",
+      "strength": 0.58,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "diagnostics_monitoring"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "PODD",
+      "type": "exposes",
+      "strength": 0.58,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "pressure_or_negative",
+      "bucket_id": "diagnostics_monitoring"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "UNH",
+      "type": "exposes",
+      "strength": 0.5,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "healthcare_payers_pbms"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "MDLZ",
+      "type": "exposes",
+      "strength": 0.62,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "pressure_or_negative",
+      "bucket_id": "food_restaurant_pressure"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "HSY",
+      "type": "exposes",
+      "strength": 0.6,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "pressure_or_negative",
+      "bucket_id": "food_restaurant_pressure"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "KO",
+      "type": "exposes",
+      "strength": 0.52,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "pressure_or_negative",
+      "bucket_id": "food_restaurant_pressure"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "MCD",
+      "type": "exposes",
+      "strength": 0.5,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "pressure_or_negative",
+      "bucket_id": "food_restaurant_pressure"
+    },
+    {
+      "source": "geopolitical_risk_rising",
+      "target": "defence_rearmament",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "LMT",
+      "type": "exposes",
+      "strength": 0.92,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "prime_defence_contractors"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "RTX",
+      "type": "exposes",
+      "strength": 0.9,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "prime_defence_contractors"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "NOC",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "prime_defence_contractors"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "GD",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "prime_defence_contractors"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "LHX",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "prime_defence_contractors"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "AVAV",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "missiles_air_defence_munitions"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "KTOS",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "missiles_air_defence_munitions"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "HII",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "shipbuilding_naval"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "RKLB",
+      "type": "exposes",
+      "strength": 0.62,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "drones_autonomy_space"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "PLTR",
+      "type": "exposes",
+      "strength": 0.68,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "drones_autonomy_space"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "ITA",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "etf_basket",
+      "bucket_id": "defence_etf_route"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "XAR",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "etf_basket",
+      "bucket_id": "defence_etf_route"
+    },
+    {
+      "source": "ai_capex_growth",
+      "target": "cybersecurity_digital_resilience",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "cybersecurity_digital_resilience",
+      "target": "PANW",
+      "type": "exposes",
+      "strength": 0.9,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "platform_security_leaders"
+    },
+    {
+      "source": "cybersecurity_digital_resilience",
+      "target": "CRWD",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "platform_security_leaders"
+    },
+    {
+      "source": "cybersecurity_digital_resilience",
+      "target": "FTNT",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "platform_security_leaders"
+    },
+    {
+      "source": "cybersecurity_digital_resilience",
+      "target": "ZS",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "cloud_sase_zero_trust"
+    },
+    {
+      "source": "cybersecurity_digital_resilience",
+      "target": "NET",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "cloud_sase_zero_trust"
+    },
+    {
+      "source": "cybersecurity_digital_resilience",
+      "target": "OKTA",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "identity_privileged_access"
+    },
+    {
+      "source": "cybersecurity_digital_resilience",
+      "target": "CIBR",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "etf_basket",
+      "bucket_id": "cyber_etf_route"
+    },
+    {
+      "source": "cybersecurity_digital_resilience",
+      "target": "HACK",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "etf_basket",
+      "bucket_id": "cyber_etf_route"
+    },
+    {
+      "source": "domestic_manufacturing_investment",
+      "target": "reshoring_industrial_capex",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "AMAT",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "semiconductor_manufacturing_equipment"
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "LRCX",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "semiconductor_manufacturing_equipment"
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "KLAC",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "semiconductor_manufacturing_equipment"
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "ASML",
+      "type": "exposes",
+      "strength": 0.9,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "semiconductor_manufacturing_equipment"
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "ROK",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "factory_automation_controls"
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "HON",
+      "type": "exposes",
+      "strength": 0.68,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "factory_automation_controls"
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "EME",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "engineering_construction_electrical"
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "NUE",
+      "type": "exposes",
+      "strength": 0.7,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "materials_steel_cement"
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "VMC",
+      "type": "exposes",
+      "strength": 0.68,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "materials_steel_cement"
+    },
+    {
+      "source": "reshoring_industrial_capex",
+      "target": "PAVE",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "domestic_manufacturing_investment",
+      "exposure_type": "etf_basket",
+      "bucket_id": "industrial_etf_route"
+    },
+    {
+      "source": "yields_falling",
+      "target": "housing_rate_sensitivity",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "DHI",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "yields_falling",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "homebuilders_bucket"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "LEN",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "yields_falling",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "homebuilders_bucket"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "PHM",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "yields_falling",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "homebuilders_bucket"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "NVR",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "yields_falling",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "homebuilders_bucket"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "BLDR",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "yields_falling",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "building_products_materials"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "OC",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "yields_falling",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "building_products_materials"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "HD",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "yields_falling",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "home_improvement_retail"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "LOW",
+      "type": "exposes",
+      "strength": 0.7,
+      "driver_id": "yields_falling",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "home_improvement_retail"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "RKT",
+      "type": "exposes",
+      "strength": 0.78,
+      "driver_id": "yields_falling",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "mortgage_title_services"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "FNF",
+      "type": "exposes",
+      "strength": 0.68,
+      "driver_id": "yields_falling",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "mortgage_title_services"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "ITB",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "yields_falling",
+      "exposure_type": "etf_basket",
+      "bucket_id": "housing_etf_route"
+    },
+    {
+      "source": "housing_rate_sensitivity",
+      "target": "XHB",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "yields_falling",
+      "exposure_type": "etf_basket",
+      "bucket_id": "housing_etf_route"
+    },
+    {
+      "source": "water_stress",
+      "target": "water_infrastructure",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "water_infrastructure",
+      "target": "AWK",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "water_stress",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "water_utilities_bucket"
+    },
+    {
+      "source": "water_infrastructure",
+      "target": "WTRG",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "water_stress",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "water_utilities_bucket"
+    },
+    {
+      "source": "water_infrastructure",
+      "target": "XYL",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "water_stress",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "pumps_valves_meters"
+    },
+    {
+      "source": "water_infrastructure",
+      "target": "PNR",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "water_stress",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "pumps_valves_meters"
+    },
+    {
+      "source": "water_infrastructure",
+      "target": "ITRI",
+      "type": "exposes",
+      "strength": 0.75,
+      "driver_id": "water_stress",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "pumps_valves_meters"
+    },
+    {
+      "source": "water_infrastructure",
+      "target": "ECL",
+      "type": "exposes",
+      "strength": 0.8,
+      "driver_id": "water_stress",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "treatment_testing_analytics"
+    },
+    {
+      "source": "water_infrastructure",
+      "target": "PHO",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "water_stress",
+      "exposure_type": "etf_basket",
+      "bucket_id": "water_etf_route"
+    },
+    {
+      "source": "water_infrastructure",
+      "target": "FIW",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "water_stress",
+      "exposure_type": "etf_basket",
+      "bucket_id": "water_etf_route"
+    },
+    {
+      "source": "electrification",
+      "target": "critical_minerals_copper",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "critical_minerals_copper",
+      "target": "FCX",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "electrification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "copper_miners_bucket"
+    },
+    {
+      "source": "critical_minerals_copper",
+      "target": "SCCO",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "electrification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "copper_miners_bucket"
+    },
+    {
+      "source": "critical_minerals_copper",
+      "target": "TECK",
+      "type": "exposes",
+      "strength": 0.68,
+      "driver_id": "electrification",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "copper_miners_bucket"
+    },
+    {
+      "source": "critical_minerals_copper",
+      "target": "ALB",
+      "type": "exposes",
+      "strength": 0.78,
+      "driver_id": "electrification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "lithium_battery_materials"
+    },
+    {
+      "source": "critical_minerals_copper",
+      "target": "SQM",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "electrification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "lithium_battery_materials"
+    },
+    {
+      "source": "geopolitical_risk_rising",
+      "target": "critical_minerals_copper",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "critical_minerals_copper",
+      "target": "MP",
+      "type": "exposes",
+      "strength": 0.75,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "rare_earths_bucket"
+    },
+    {
+      "source": "critical_minerals_copper",
+      "target": "COPX",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "electrification",
+      "exposure_type": "etf_basket",
+      "bucket_id": "copper_etf_route"
+    },
+    {
+      "source": "critical_minerals_copper",
+      "target": "ICOP",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "electrification",
+      "exposure_type": "etf_basket",
+      "bucket_id": "copper_etf_route"
+    },
+    {
+      "source": "critical_minerals_copper",
+      "target": "LIT",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "electrification",
+      "exposure_type": "etf_basket",
+      "bucket_id": "lithium_battery_materials"
+    },
+    {
+      "source": "reserve_diversification",
+      "target": "gold_real_assets",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "GLD",
+      "type": "exposes",
+      "strength": 0.92,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "etf_basket",
+      "bucket_id": "bullion_etf_route"
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "IAU",
+      "type": "exposes",
+      "strength": 0.9,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "etf_basket",
+      "bucket_id": "bullion_etf_route"
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "NEM",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "senior_gold_miners"
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "GOLD",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "senior_gold_miners"
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "AEM",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "senior_gold_miners"
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "FNV",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "royalty_streaming"
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "WPM",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "royalty_streaming"
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "RGLD",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "royalty_streaming"
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "GDX",
+      "type": "exposes",
+      "strength": 0.88,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "etf_basket",
+      "bucket_id": "junior_miner_etfs"
+    },
+    {
+      "source": "gold_real_assets",
+      "target": "GDXJ",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "reserve_diversification",
+      "exposure_type": "etf_basket",
+      "bucket_id": "junior_miner_etfs"
+    },
+    {
+      "source": "crypto_liquidity",
+      "target": "digital_assets_infrastructure",
+      "type": "activates",
+      "strength": 1.0
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "IBIT",
+      "type": "exposes",
+      "strength": 0.9,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "etf_basket",
+      "bucket_id": "spot_bitcoin_etp_route"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "FBTC",
+      "type": "exposes",
+      "strength": 0.85,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "etf_basket",
+      "bucket_id": "spot_bitcoin_etp_route"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "GBTC",
+      "type": "exposes",
+      "strength": 0.75,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "etf_basket",
+      "bucket_id": "spot_bitcoin_etp_route"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "COIN",
+      "type": "exposes",
+      "strength": 0.82,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "crypto_exchanges_platforms"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "HOOD",
+      "type": "exposes",
+      "strength": 0.6,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "crypto_exchanges_platforms"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "MSTR",
+      "type": "exposes",
+      "strength": 0.78,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "corporate_bitcoin_exposure"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "MARA",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "bitcoin_miners_bucket"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "RIOT",
+      "type": "exposes",
+      "strength": 0.7,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "bitcoin_miners_bucket"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "CLSK",
+      "type": "exposes",
+      "strength": 0.62,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "bitcoin_miners_bucket"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "BLOK",
+      "type": "exposes",
+      "strength": 0.78,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "etf_basket",
+      "bucket_id": "crypto_etf_route"
+    },
+    {
+      "source": "glp1_metabolic_health",
+      "target": "AMGN",
+      "type": "exposes",
+      "strength": 0.6,
+      "driver_id": "glp1_adoption",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "next_gen_obesity_developers"
+    },
+    {
+      "source": "defence_rearmament",
+      "target": "ASTS",
+      "type": "exposes",
+      "strength": 0.65,
+      "driver_id": "geopolitical_risk_rising",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "drones_autonomy_space"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "APLD",
+      "type": "exposes",
+      "strength": 0.7,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "APLD",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "bitcoin_miners_bucket"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "IREN",
+      "type": "exposes",
+      "strength": 0.72,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "supply_chain_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "digital_assets_infrastructure",
+      "target": "IREN",
+      "type": "exposes",
+      "strength": 0.75,
+      "driver_id": "crypto_liquidity",
+      "exposure_type": "direct_beneficiary",
+      "bucket_id": "bitcoin_miners_bucket"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "IBM",
+      "type": "exposes",
+      "strength": 0.6,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "ai_energy_nuclear",
+      "target": "NOW",
+      "type": "exposes",
+      "strength": 0.65,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "ai_compute_accelerators_networking"
+    },
+    {
+      "source": "cybersecurity_digital_resilience",
+      "target": "ZETA",
+      "type": "exposes",
+      "strength": 0.45,
+      "driver_id": "ai_capex_growth",
+      "exposure_type": "second_order_beneficiary",
+      "bucket_id": "cloud_sase_zero_trust"
+    }
+  ]
+}

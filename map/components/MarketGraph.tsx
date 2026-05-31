@@ -33,12 +33,16 @@ export default function MarketGraph({ nodes, edges, clusters, onSelect, selected
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   useEffect(() => {
-    if (!svgRef.current) return;
+    if (!wrapRef.current) return;
+    const el = wrapRef.current;
+    // Set dims immediately in case ResizeObserver fires with 0 at mount
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) setDims({ w: rect.width, h: rect.height });
     const ro = new ResizeObserver(entries => {
       const { width, height } = entries[0].contentRect;
       if (width > 0 && height > 0) setDims({ w: width, h: height });
     });
-    ro.observe(svgRef.current);
+    ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
