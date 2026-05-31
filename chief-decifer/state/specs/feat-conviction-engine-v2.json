@@ -1,0 +1,399 @@
+{
+  "spec_id": "feat-conviction-engine-v2",
+  "title": "Conviction Engine v2 — Full Multi-Dimensional Intelligence Scoring",
+  "status": "approved-for-build",
+  "authored": "2026-05-31",
+  "approved_by": "Amit",
+
+  "north_star": "Conviction is the intelligence layer's single authoritative opinion on a name. It answers one question: how much do we believe this name will perform over the next 1–10 days given everything we know? It is not about whether now is a good entry candle — that is the signal engine's job. Conviction is the structural case for the name. Every dimension that contributes to IC belongs here.",
+
+  "architecture": {
+    "conviction_layer": "intelligence — owns the score, publishes it, updates it",
+    "execution_layer": "bot signal engine — reads conviction, adds intraday entry gate (5m bars, MFI, VWAP, squeeze)",
+    "apex": "receives conviction score + entry gate score → decides to execute, size, and time",
+    "separation_rule": "conviction uses daily and multi-day data. The signal engine uses sub-daily bars. Nothing about 5-minute price action belongs in conviction."
+  },
+
+  "conviction_dimensions": {
+    "note": "Weights are initial estimates. Will be recalibrated against IC once 200+ ml_eligible records are available. All weights sum to 1.00.",
+
+    "D1_analyst_consensus": {
+      "weight": 0.20,
+      "rationale": "Professional analysts with financial model access. Price target vs current price = explicit upside signal. Recent upgrades = fresh conviction from informed sources.",
+      "inputs": [
+        "FMP analyst-consensus: buy/hold/sell breakdown, % strong buy",
+        "FMP price target: median target vs current price (upside %)",
+        "FMP analyst-changes: upgrades/downgrades in last 30 days",
+        "FMP analyst-grades: grade trend (improving vs deteriorating)"
+      ],
+      "scoring": {
+        "consensus_buy_pct_70+": "+20 pts",
+        "consensus_buy_pct_50-69": "+12 pts",
+        "consensus_buy_pct_30-49": "+5 pts",
+        "consensus_hold_or_sell_majority": "0 pts",
+        "upside_to_target_20pct+": "+10 pts",
+        "upside_to_target_10-20pct": "+6 pts",
+        "at_or_above_target": "-5 pts",
+        "upgrade_last_30d": "+8 pts",
+        "downgrade_last_30d": "-10 pts",
+        "max_score": 38
+      }
+    },
+
+    "D2_price_momentum": {
+      "weight": 0.18,
+      "rationale": "Market is voting on the thesis in real time. 1D vs SPY catches today's agreement. 5D vs SPY catches week-long directional conviction. Both required because 1D can be noise.",
+      "inputs": [
+        "FMP stock-price-change: 1D and 5D return",
+        "SPY 1D and 5D return as benchmark"
+      ],
+      "scoring": {
+        "5d_outperform_5pct+": "+15 pts",
+        "5d_outperform_2-5pct": "+10 pts",
+        "5d_outperform_0.5-2pct": "+5 pts",
+        "5d_neutral": "0 pts",
+        "5d_underperform_1-3pct": "-8 pts",
+        "5d_underperform_3pct+": "-15 pts",
+        "1d_outperform_2pct+": "+5 pts bonus",
+        "1d_underperform_2pct+": "-5 pts penalty",
+        "max_score": 20
+      }
+    },
+
+    "D3_valuation": {
+      "weight": 0.15,
+      "rationale": "Conviction in a name that is trading at 3x fair value is structurally lower — the thesis may be correct but the alpha is already priced. Cheap names with active tailwinds have highest expected return.",
+      "inputs": [
+        "FMP DCF fair value vs current price",
+        "FMP key-metrics-ttm: forward P/E, EV/EBITDA",
+        "FMP financial-growth: revenue growth YoY, EPS growth YoY",
+        "Sector median P/E (computed from peer group in TTG bucket)"
+      ],
+      "scoring": {
+        "price_below_dcf_20pct+": "+15 pts",
+        "price_below_dcf_10-20pct": "+10 pts",
+        "price_within_10pct_dcf": "+5 pts",
+        "price_above_dcf_20pct+": "-10 pts",
+        "price_above_dcf_40pct+": "-18 pts",
+        "revenue_growth_30pct+": "+8 pts bonus",
+        "revenue_growth_negative": "-8 pts penalty",
+        "max_score": 23
+      }
+    },
+
+    "D4_distance_from_highs": {
+      "weight": 0.07,
+      "rationale": "A name at its lifetime high has less structural upside than a name recovering toward it. Distance from 52-week high and all-time high are independent signals — 52W measures recent momentum trajectory, ATH measures long-term positioning.",
+      "inputs": [
+        "FMP historical-price: 52-week high",
+        "FMP historical-price: all-time high (max close)",
+        "Current price"
+      ],
+      "scoring": {
+        "pct_below_52w_high_20pct+": "+10 pts — recovering, room to run",
+        "pct_below_52w_high_5-20pct": "+5 pts",
+        "within_5pct_of_52w_high": "0 pts",
+        "at_new_52w_high": "-5 pts — late, extended",
+        "pct_below_ath_30pct+": "+5 pts bonus — long-term recovery potential",
+        "at_new_ath": "-3 pts penalty",
+        "max_score": 15
+      }
+    },
+
+    "D5_macro_theme": {
+      "weight": 0.13,
+      "rationale": "The original thesis — is the macro driver that explains this name currently firing? TTG evidence quality — is the name a direct beneficiary or a loose thematic connection? Crowded themes reduce expected alpha.",
+      "inputs": [
+        "live_driver_state.json: active_drivers",
+        "TTG symbol_exposures.json: driver_id, confidence, exposure_type, evidence_basis",
+        "theme_activation.json: theme state (active/crowded/dormant/headwind)"
+      ],
+      "scoring": {
+        "driver_active_direct_beneficiary": "+20 pts",
+        "driver_active_supply_chain": "+15 pts",
+        "driver_active_etf_basket": "+10 pts",
+        "driver_active_weak_connection": "+5 pts",
+        "driver_inactive": "0 pts",
+        "theme_crowded": "-5 pts penalty",
+        "theme_headwind": "-15 pts penalty",
+        "evidence_basis_company_profile_or_filing": "+5 pts bonus",
+        "evidence_basis_llm_only": "-5 pts penalty",
+        "max_score": 25
+      }
+    },
+
+    "D6_news_and_catalyst": {
+      "weight": 0.10,
+      "rationale": "News flow is the most immediate signal that the narrative is building or fading. Catalyst quality matters — an earnings beat is worth more than a press release. Staleness decays the signal: news from 3 days ago is worth less than today.",
+      "inputs": [
+        "customer_event_tape.json: events for this symbol or its exposure drivers",
+        "FMP stock-news: recent headlines, recency",
+        "catalyst_engine.py output (earnings surprise, analyst actions)",
+        "known_conflicts from market_now_reconciler"
+      ],
+      "scoring": {
+        "positive_catalyst_24h": "+12 pts",
+        "positive_catalyst_48-72h": "+7 pts",
+        "no_material_news_7d": "0 pts",
+        "negative_catalyst_24h": "-12 pts",
+        "negative_catalyst_72h": "-6 pts",
+        "known_conflict_price_vs_narrative": "-8 pts",
+        "sentiment_positive_surprise_market_rejecting": "-5 pts",
+        "max_score": 12
+      }
+    },
+
+    "D7_options_flow": {
+      "weight": 0.08,
+      "rationale": "Unusual options volume is a smart-money signal. Institutional buyers do not telegraph intent through equity — they use options. Call expansion above baseline means informed demand ahead of a move.",
+      "inputs": [
+        "options_provider.py: call_volume, call_expansion, unusual_calls",
+        "options_flow_scanner.py: anomaly_score, dominant_side, sweep_count",
+        "Cached in data/api_cache/{SYMBOL}_flow.json — already in v1_api.py"
+      ],
+      "scoring": {
+        "unusual_calls_confirmed": "+12 pts",
+        "call_expansion_1.75-2.5x": "+6 pts",
+        "call_expansion_2.5x+": "+10 pts",
+        "unusual_puts": "-8 pts",
+        "put_expansion_dominant": "-6 pts",
+        "no_unusual_flow": "0 pts",
+        "max_score": 12
+      }
+    },
+
+    "D8_network_and_peers": {
+      "weight": 0.05,
+      "rationale": "The TTG maps which companies are structurally connected. If NVDA's direct peers (AVGO, AMD, MRVL) are all building momentum, the thesis has broader corroboration. If peers are flat while NVDA alone runs, it may be idiosyncratic noise.",
+      "inputs": [
+        "TTG theme_graph/symbol_exposures.json: peers in same bucket_id",
+        "Price momentum D2 scores of all peers in same theme bucket",
+        "Number of peers with positive momentum vs total peers"
+      ],
+      "scoring": {
+        "75pct_peers_positive_momentum": "+8 pts",
+        "50-74pct_peers_positive": "+4 pts",
+        "25-49pct_peers_positive": "0 pts",
+        "less_25pct_peers_positive": "-5 pts",
+        "max_score": 8
+      }
+    },
+
+    "D9_counter_thesis": {
+      "weight": 0.04,
+      "rationale": "The counter-thesis engine identifies structural conflicts with the bull case. A strong, evidenced counter-thesis reduces conviction. A weak or speculative one is a flag but not a disqualifier.",
+      "inputs": [
+        "counter_thesis_cache.json: structural_conflicts for this driver/theme",
+        "thesis_divergence.json: thesis_intact flag, lag vs proxy sensor",
+        "known_conflicts from customer_event_tape"
+      ],
+      "scoring": {
+        "no_counter_thesis": "0 pts",
+        "weak_counter_thesis_speculative": "-3 pts",
+        "strong_counter_thesis_evidenced": "-10 pts",
+        "thesis_diverging_price_lagging_proxy": "-8 pts",
+        "thesis_intact_confirmed": "+3 pts bonus",
+        "max_score": 3
+      }
+    }
+  },
+
+  "composite_score": {
+    "formula": "Weighted sum of all dimension raw scores, normalised to 0–100",
+    "max_raw": "Each dimension scored 0 to its max_score. Sum of max_scores = 156. Normalise: composite = round(raw_sum / 156 * 100)",
+    "floor": 0,
+    "ceiling": 100,
+    "tiers": {
+      "HIGH": "≥ 65 — strong multi-dimensional case. Eligible for tradeable universe.",
+      "MEDIUM": "45–64 — building conviction. In waiting room. Checked daily.",
+      "WATCHLIST": "25–44 — thesis exists but thin support. Monitored weekly or on trigger.",
+      "DORMANT": "< 25 — no active case. Excluded unless news trigger fires."
+    }
+  },
+
+  "funnel_architecture": {
+    "zones": {
+      "tradeable_universe": {
+        "entry_threshold": 65,
+        "exit_threshold": 55,
+        "hysteresis_note": "10-point band prevents thrashing — once in, needs to fall below 55 to exit",
+        "check_frequency": "every scan cycle (bot reads conviction, not re-scores from scratch)",
+        "full_rescore_frequency": "once per market session (open + close)"
+      },
+      "waiting_room": {
+        "entry_threshold": 45,
+        "promotion_threshold": 65,
+        "check_frequency": "once per day minimum, plus on any news trigger",
+        "purpose": "Names building toward tradeable. Track which dimensions are missing."
+      },
+      "watchlist": {
+        "entry_threshold": 25,
+        "check_frequency": "weekly, plus on news trigger",
+        "purpose": "Names with a thesis but no active corroboration. Reserve bench."
+      },
+      "dormant": {
+        "threshold": "below 25",
+        "check_frequency": "on news trigger only",
+        "purpose": "Not actively monitored. Re-evaluated only if a relevant event fires."
+      }
+    },
+
+    "rotation_signals": [
+      "Conviction drops below exit_threshold for 2 consecutive rescores → flag ROTATE_OUT",
+      "Valuation stretched >40% above DCF for 3+ days → flag VALUATION_EXIT",
+      "Counter-thesis strengthens to evidenced level → flag THESIS_RISK",
+      "Analyst consensus degrades to majority hold/sell → flag ANALYST_EXIT",
+      "Theme enters HEADWIND state → flag HEADWIND_EXIT"
+    ],
+
+    "promotion_signals": [
+      "Conviction crosses 65 from waiting room → PROMOTE_TO_TRADEABLE",
+      "Positive catalyst fires for dormant name → FAST_TRACK_TO_WAITING",
+      "Driver activates for watchlist name → PROMOTE_TO_WAITING"
+    ]
+  },
+
+  "recalibration_triggers": {
+    "full_suite_rescore": {
+      "schedule": "daily at 09:15 ET (market open) and 16:05 ET (market close)",
+      "scope": "all symbols in tradeable + waiting room",
+      "rationale": "Fresh analyst consensus, news, price data once per session"
+    },
+    "targeted_rescore": {
+      "news_trigger": {
+        "condition": "customer_event_tape records event with symbol in universe",
+        "scope": "that symbol + all peers in same TTG bucket",
+        "latency": "within 15 minutes of tape event"
+      },
+      "geopolitical_trigger": {
+        "condition": "geopolitical event classified in customer_event_tape",
+        "scope": "all symbols with driver_id in [geopolitical_risk_rising, oil_supply_shock, gold_safe_haven_bid]",
+        "latency": "within 30 minutes"
+      },
+      "sector_shock_trigger": {
+        "condition": "sector ETF (ITA, SMH, CIBR, ITB, etc.) moves >3% intraday",
+        "scope": "all symbols in that sector's TTG theme",
+        "latency": "within 15 minutes"
+      },
+      "earnings_trigger": {
+        "condition": "symbol in universe reports earnings",
+        "scope": "that symbol + all same-bucket peers",
+        "latency": "within 30 minutes of release"
+      },
+      "driver_state_change": {
+        "condition": "live_driver_state.json records a new or dropped driver",
+        "scope": "all symbols whose primary driver_id changed state",
+        "latency": "immediate — driver state change is already computed"
+      }
+    }
+  },
+
+  "data_freshness_windows": {
+    "analyst_consensus": "24 hours — FMP updates intraday but changes are slow-moving",
+    "price_momentum": "30 minutes — already cached in price_momentum.json",
+    "valuation_dcf": "24 hours — DCF is a daily FMP computation",
+    "distance_from_highs": "24 hours — daily historical data",
+    "macro_theme": "real-time — reads live_driver_state.json which updates every scan cycle",
+    "news_catalyst": "15 minutes — customer_event_tape + FMP news cache",
+    "options_flow": "5 minutes — already cached in {SYMBOL}_flow.json",
+    "network_peers": "30 minutes — derived from price momentum cache, no extra fetch",
+    "counter_thesis": "24 hours — counter_thesis_cache.json refreshed daily"
+  },
+
+  "fmp_api_calls_per_full_rescore": {
+    "symbols_in_universe": 124,
+    "calls_per_symbol": {
+      "analyst_consensus": 1,
+      "price_target": 1,
+      "recent_analyst_changes": "1 batch for all symbols",
+      "dcf_value": 1,
+      "key_metrics_ttm": 1,
+      "financial_growth": 1,
+      "stock_price_change": "1 batch for all symbols",
+      "52w_high": "derived from existing historical-price data",
+      "stock_news": "1 batch — most recent 5 headlines per symbol"
+    },
+    "total_per_full_rescore": "~5 per symbol = 620 calls. FMP allows 750/min. Full rescore completes in under 2 minutes with parallelism.",
+    "targeted_rescore": "~5 calls for 1 symbol = negligible"
+  },
+
+  "new_files": {
+    "conviction_engine.py": {
+      "layer": "INTELLIGENCE",
+      "responsibility": "Single function: score_symbol(symbol) → ConvictionScore. Reads all dimension data, applies formula, returns structured result with per-dimension breakdown.",
+      "key_types": [
+        "ConvictionScore: symbol, composite_score, tier, dimensions: dict[str, DimensionScore], ts, data_freshness",
+        "DimensionScore: raw_pts, max_pts, contribution_pct, signal_summary"
+      ]
+    },
+    "conviction_cache.py": {
+      "layer": "INTELLIGENCE",
+      "responsibility": "Manages the conviction score cache. score_all() rescores full universe. score_symbol() rescores one symbol. Handles staleness, background refresh, event-triggered rescores. Persists to data/intelligence/conviction/scores.json",
+      "key_functions": [
+        "score_all(symbols) → dict[str, ConvictionScore]",
+        "score_symbol(symbol) → ConvictionScore",
+        "get_cached(symbol) → ConvictionScore | None",
+        "trigger_rescore(symbols, reason) → schedules background rescore",
+        "is_stale(symbol) → bool"
+      ]
+    },
+    "conviction_universe.py": {
+      "layer": "INTELLIGENCE",
+      "responsibility": "Manages zone membership (tradeable/waiting/watchlist/dormant). Computes promotions, rotation flags, and zone transitions. Persists state to data/intelligence/conviction/universe_zones.json",
+      "key_functions": [
+        "get_zone(symbol) → Zone",
+        "evaluate_transitions() → list[ZoneTransition]",
+        "get_tradeable() → list[str]",
+        "get_waiting_room() → list[str]",
+        "get_rotation_flags() → list[RotationFlag]"
+      ]
+    },
+    "data/intelligence/conviction/scores.json": "Full conviction score for every universe symbol. Updated on each rescore.",
+    "data/intelligence/conviction/universe_zones.json": "Zone assignment per symbol with transition history.",
+    "data/intelligence/conviction/rescore_log.jsonl": "Write-ahead log of every rescore — symbol, trigger reason, before/after score, ts."
+  },
+
+  "modified_files": {
+    "v1_api.py": "Replace inline _conviction_score() with read from conviction_cache. Add momentum and all new dimensions. /v1/universe and /v1/symbol/<ticker> read from cache — no live computation at request time.",
+    "intelligence_api.py": "New routes: GET /api/conviction/universe (all zones), GET /api/conviction/symbol/<ticker>, GET /api/conviction/waiting-room, GET /api/conviction/rotation-flags, POST /api/conviction/rescore (admin trigger).",
+    "news.py / catalyst_engine.py": "On material event, call conviction_cache.trigger_rescore(affected_symbols, reason='news_trigger').",
+    "live_driver_resolver.py": "On driver state change, call conviction_cache.trigger_rescore(affected_symbols, reason='driver_state_change')."
+  },
+
+  "what_does_not_change": [
+    "signals/__init__.py — intraday signal engine unchanged. Still runs at scan time. Still provides entry gate score to Apex.",
+    "apex_call() — still receives both conviction score (from intelligence) and entry gate score (from signal engine). Apex job is to decide: threshold met? Size appropriately? Execute.",
+    "bot_trading.py execution path — unchanged",
+    "handoff_reader.py — unchanged"
+  ],
+
+  "implementation_phases": {
+    "phase_1": {
+      "title": "Core engine + valuation + analyst",
+      "files": ["conviction_engine.py", "conviction_cache.py"],
+      "dimensions": ["D1_analyst_consensus", "D2_price_momentum", "D3_valuation", "D5_macro_theme"],
+      "estimated_sessions": 1,
+      "deliverable": "v1_api.py uses real multi-dimensional conviction score. Universe grid shows meaningful differentiation."
+    },
+    "phase_2": {
+      "title": "Full dimension set + zone management",
+      "files": ["conviction_universe.py", "data/intelligence/conviction/"],
+      "dimensions": ["D4_distance_from_highs", "D6_news_catalyst", "D7_options_flow", "D8_network_peers", "D9_counter_thesis"],
+      "estimated_sessions": 1,
+      "deliverable": "All 9 dimensions live. Tradeable/waiting/rotation zones active. intelligence_api.py exposes zone state."
+    },
+    "phase_3": {
+      "title": "Event-triggered recalibration",
+      "files": ["news.py", "catalyst_engine.py", "live_driver_resolver.py"],
+      "deliverable": "Proactive rescoring on news, driver change, earnings, sector shock. Rescore log live. Response latency under 30 minutes for any material event."
+    }
+  },
+
+  "open_questions_for_amit": [
+    "D4 distance from highs: use 52-week high or all-time high as the primary signal? Or both with separate weights?",
+    "D7 options flow: only call expansion (bullish), or also flag put expansion as a negative signal that reduces conviction?",
+    "Rotation hysteresis: 10-point band (exit at 55 if entered at 65) — is that aggressive enough or too tight?",
+    "Should the waiting room have a maximum size? Or is it unbounded (any symbol with score 45+ sits there)?",
+    "Phase 3 trigger latency: 15-30 minutes is practical given droplet bandwidth. Is that acceptable or do we need sub-5-minute response?"
+  ]
+}

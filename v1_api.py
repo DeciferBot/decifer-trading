@@ -386,35 +386,34 @@ def _build_symbol_card(ticker: str) -> dict | None:
             "feed_ts": candidate.get("generated_at"),
         }
 
-    # Conviction score — same formula as /v1/universe
-    primary_exp = exposures[0] if exposures else {}
-    primary_driver_id = primary_exp.get("driver_id", "")
-    primary_driver_active = primary_driver_id in active_drivers
-    primary_confidence = float(primary_exp.get("confidence") or 0)
-    momentum_data = _get_momentum_data([ticker])
-    mom_pts = _momentum_pts(ticker, momentum_data)
-    conviction = _conviction_score(primary_confidence, primary_driver_active, in_feed, feed_confidence, mom_pts)
-
-    # Conviction breakdown — explains each contributing signal
-    breakdown = []
-    if primary_driver_active:
-        breakdown.append({"signal": "Driver active", "detail": primary_driver_id.replace("_", " "), "pts": 25})
-    if in_feed:
-        breakdown.append({"signal": "In intelligence feed", "detail": f"{round(feed_confidence * 100)}% feed confidence", "pts": round(15 + feed_confidence * 20)})
-    breakdown.append({"signal": "Theme evidence", "detail": f"{round(primary_confidence * 100)}% evidence quality", "pts": round(primary_confidence * 15)})
-    if mom_pts != 0:
-        label = "Outperforming market" if mom_pts > 0 else "Underperforming market"
-        breakdown.append({"signal": label, "detail": "5-day return vs S&P 500", "pts": mom_pts})
-    if not primary_driver_active:
-        breakdown.append({"signal": "Driver inactive", "detail": primary_driver_id.replace("_", " ") + " not currently firing", "pts": 0})
+    # Conviction score — from conviction_cache (multi-dimensional engine)
+    import conviction_cache as _conv_cache
+    cached = _conv_cache.get(ticker)
+    if cached:
+        conviction_score = cached["composite"]
+        conviction_tier  = cached["tier"].lower()
+        conviction_breakdown = [
+            {"signal": dim_id, "detail": d["signal"],
+             "pts": d["raw_pts"], "max_pts": d["max_pts"]}
+            for dim_id, d in cached.get("dimensions", {}).items()
+        ]
+        conviction_ts = cached.get("ts")
+    else:
+        # Conviction cache not yet populated — trigger background score and return null
+        _conv_cache.trigger_rescore([ticker], reason="symbol_card_miss")
+        conviction_score = None
+        conviction_tier  = "unknown"
+        conviction_breakdown = []
+        conviction_ts = None
 
     return {
         "symbol": ticker.upper(),
         "api_version": "1",
         "ts": datetime.now(UTC).isoformat(),
-        "conviction_score": conviction["score"],
-        "conviction_tier": conviction["tier"],
-        "conviction_breakdown": breakdown,
+        "conviction_score": conviction_score,
+        "conviction_tier": conviction_tier,
+        "conviction_breakdown": conviction_breakdown,
+        "conviction_scored_at": conviction_ts,
         "themes": themes,
         "intelligence_feed": intel_feed,
         "options_flow": flow,
@@ -429,6 +428,7 @@ def _build_symbol_card(ticker: str) -> dict | None:
             "options_flow": flow.get("data_ts") if flow else None,
             "drivers": driver_state.get("generated_at"),
             "intelligence_feed": candidate.get("generated_at") if candidate else None,
+            "conviction": conviction_ts,
         },
         "disclaimer": _DISCLAIMER,
     }
@@ -503,21 +503,16 @@ def universe_list() -> Response:
 
     Returns all active TTG symbols with their primary theme, company label,
     exposure type, driver-active status, and Decifer conviction score + tier.
+    Conviction scores come from conviction_cache (multi-dimensional engine).
     """
+    import conviction_cache as _conv_cache
+
     raw = _read_json(_DATA_DIR / "theme_graph" / "symbol_exposures.json")
     all_exposures = [e for e in raw.get("exposures", []) if e.get("status") == "active"]
 
     nodes = _load_nodes()
     driver_state = _read_drivers()
     active_drivers = set(driver_state.get("active_drivers", []))
-
-    # Build feed lookup: symbol -> candidate
-    feed_raw = _read_json(_DATA_DIR / "economic_candidate_feed.json")
-    feed_by_sym: dict[str, dict] = {
-        c.get("symbol", "").upper(): c
-        for c in feed_raw.get("candidates", [])
-        if c.get("symbol")
-    }
 
     # Deduplicate: one entry per symbol, highest-confidence exposure as primary
     by_symbol: dict[str, dict] = {}
@@ -529,35 +524,33 @@ def universe_list() -> Response:
         if existing is None or (exp.get("confidence") or 0) > (existing.get("confidence") or 0):
             by_symbol[sym] = exp
 
-    # Fetch price momentum data (serves cached data; refreshes in background if stale)
-    all_syms = list(by_symbol.keys())
-    momentum_data = _get_momentum_data(all_syms)
+    # Load all cached conviction scores — background refresh triggered automatically
+    all_conv = _conv_cache.get_all()
+
+    # Trigger a background rescore for any symbol not yet in cache
+    unscored = [sym for sym in by_symbol if sym not in all_conv]
+    if unscored:
+        _conv_cache.trigger_rescore(unscored, reason="universe_miss")
 
     symbols = []
     for sym, exp in sorted(by_symbol.items()):
         theme_node = nodes.get(exp.get("theme_id", ""), {})
-        driver_id = exp.get("driver_id", "")
+        driver_id  = exp.get("driver_id", "")
         driver_active = driver_id in active_drivers
-        feed_entry = feed_by_sym.get(sym)
-        in_feed = feed_entry is not None
-        feed_confidence = float(feed_entry.get("confidence") or 0) if feed_entry else 0.0
-        ttg_confidence = float(exp.get("confidence") or 0)
-        mom_pts = _momentum_pts(sym, momentum_data)
-
-        conviction = _conviction_score(ttg_confidence, driver_active, in_feed, feed_confidence, mom_pts)
+        cached = all_conv.get(sym)
 
         symbols.append({
-            "symbol": sym,
-            "label": exp.get("label", sym),
-            "theme_id": exp.get("theme_id"),
-            "theme_label": theme_node.get("label", exp.get("theme_id")),
-            "exposure_type": exp.get("exposure_type"),
-            "confidence": ttg_confidence,
-            "driver_id": driver_id,
-            "driver_active": driver_active,
-            "in_feed": in_feed,
-            "conviction_score": conviction["score"],
-            "conviction_tier": conviction["tier"],
+            "symbol":          sym,
+            "label":           exp.get("label", sym),
+            "theme_id":        exp.get("theme_id"),
+            "theme_label":     theme_node.get("label", exp.get("theme_id")),
+            "exposure_type":   exp.get("exposure_type"),
+            "confidence":      float(exp.get("confidence") or 0),
+            "driver_id":       driver_id,
+            "driver_active":   driver_active,
+            "conviction_score": cached["composite"] if cached else None,
+            "conviction_tier":  cached["tier"].lower() if cached else "unknown",
+            "conviction_ts":    cached["ts"] if cached else None,
         })
 
     r = jsonify({
