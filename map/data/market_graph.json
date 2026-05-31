@@ -3744,6 +3744,278 @@
       "type": "ecosystem",
       "strength": 0.7,
       "label": "Both aerospace materials, complementary"
+    },
+    {
+      "source": "CRM",
+      "target": "MSFT",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Salesforce runs on Azure cloud infrastructure",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CRM",
+      "target": "AMZN",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Salesforce uses AWS for global data residency and compute",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MSFT",
+      "target": "CRM",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Microsoft Dynamics competes and integrates with Salesforce CRM",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CRM",
+      "target": "NOW",
+      "type": "competition",
+      "strength": 0.6,
+      "label": "Salesforce and ServiceNow compete in enterprise workflow automation",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CRM",
+      "target": "PLTR",
+      "type": "competition",
+      "strength": 0.5,
+      "label": "Salesforce Einstein AI vs Palantir AIP in enterprise AI analytics",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NOW",
+      "target": "MSFT",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "ServiceNow runs on Azure for enterprise cloud delivery",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NOW",
+      "target": "AMZN",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "ServiceNow uses AWS infrastructure for global deployments",
+      "lag_weeks": 0
+    },
+    {
+      "source": "NOW",
+      "target": "NVDA",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "ServiceNow AI platform uses NVIDIA GPUs for generative AI workflows",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PLTR",
+      "target": "NVDA",
+      "type": "supply_chain_up",
+      "strength": 0.8,
+      "label": "Palantir AIP runs on NVIDIA GPU infrastructure for AI analytics",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PLTR",
+      "target": "MSFT",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Palantir deployed on Azure for US government and enterprise contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PLTR",
+      "target": "LMT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Palantir provides targeting and logistics AI to Lockheed programmes",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PLTR",
+      "target": "RTX",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Palantir defence AI used in Raytheon missile targeting systems",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PLTR",
+      "target": "NOW",
+      "type": "competition",
+      "strength": 0.5,
+      "label": "Palantir AIP vs ServiceNow Now Assist in enterprise process automation",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PANW",
+      "target": "MSFT",
+      "type": "ecosystem",
+      "strength": 0.7,
+      "label": "Palo Alto Prisma integrates with Azure for cloud-native security",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AXON",
+      "target": "LMT",
+      "type": "ecosystem",
+      "strength": 0.4,
+      "label": "Axon drone/autonomy technology adjacent to Lockheed unmanned programmes",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AXON",
+      "target": "NOC",
+      "type": "ecosystem",
+      "strength": 0.4,
+      "label": "Axon AI and sensor technology evaluated for military situational awareness",
+      "lag_weeks": 0
+    },
+    {
+      "source": "AXON",
+      "target": "KTOS",
+      "type": "competition",
+      "strength": 0.5,
+      "label": "Both Axon and Kratos develop autonomous systems for defence and public safety",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MNTS",
+      "target": "PL",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Momentus orbital transfer services support Planet Labs smallsat deployment",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MNTS",
+      "target": "SPIR",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "Momentus provides orbital transport for Spire satellite constellations",
+      "lag_weeks": 0
+    },
+    {
+      "source": "SPIR",
+      "target": "NOC",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Spire weather and AIS data sold to US defence and intelligence agencies",
+      "lag_weeks": 0
+    },
+    {
+      "source": "SPIR",
+      "target": "VSAT",
+      "type": "ecosystem",
+      "strength": 0.4,
+      "label": "Both Spire and Viasat provide data services from LEO/GEO constellations",
+      "lag_weeks": 0
+    },
+    {
+      "source": "CENX",
+      "target": "NRG",
+      "type": "supply_chain_up",
+      "strength": 0.9,
+      "label": "Century Aluminum smelters are among the largest US industrial power buyers",
+      "lag_weeks": 0
+    },
+    {
+      "source": "UUUU",
+      "target": "VST",
+      "type": "customer",
+      "strength": 0.5,
+      "label": "Vistra nuclear fleet contracts US uranium enrichment including Energy Fuels",
+      "lag_weeks": 8
+    },
+    {
+      "source": "UUUU",
+      "target": "NRG",
+      "type": "customer",
+      "strength": 0.4,
+      "label": "NRG nuclear plants source domestic uranium supply",
+      "lag_weeks": 8
+    },
+    {
+      "source": "BEP",
+      "target": "NEE",
+      "type": "competition",
+      "strength": 0.7,
+      "label": "Both Brookfield Renewable and NextEra are large-scale clean energy owners",
+      "lag_weeks": 0
+    },
+    {
+      "source": "FREYR",
+      "target": "TSLA",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "FREYR battery cells being qualified for EV and grid storage applications",
+      "lag_weeks": 12
+    },
+    {
+      "source": "QS",
+      "target": "RIVN",
+      "type": "ecosystem",
+      "strength": 0.5,
+      "label": "QuantumScape solid-state battery technology targeted at next-gen EV platforms",
+      "lag_weeks": 0
+    },
+    {
+      "source": "MDU",
+      "target": "VMC",
+      "type": "supply_chain_up",
+      "strength": 0.5,
+      "label": "MDU uses Vulcan aggregates for pipeline and utility construction",
+      "lag_weeks": 2
+    },
+    {
+      "source": "ICF",
+      "target": "AECOM",
+      "type": "competition",
+      "strength": 0.5,
+      "label": "ICF and AECOM both bid on US government infrastructure consulting contracts",
+      "lag_weeks": 0
+    },
+    {
+      "source": "RS",
+      "target": "CAT",
+      "type": "customer",
+      "strength": 0.7,
+      "label": "Reliance Steel supplies processed metals to Caterpillar manufacturing plants",
+      "lag_weeks": 2
+    },
+    {
+      "source": "RS",
+      "target": "DE",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "Reliance distributes steel and aluminium to Deere equipment factories",
+      "lag_weeks": 2
+    },
+    {
+      "source": "XPO",
+      "target": "CAT",
+      "type": "customer",
+      "strength": 0.6,
+      "label": "XPO LTL ships Caterpillar heavy equipment parts to dealers",
+      "lag_weeks": 0
+    },
+    {
+      "source": "PH",
+      "target": "RTX",
+      "type": "supply_chain_up",
+      "strength": 0.7,
+      "label": "Parker Hannifin hydraulic and pneumatic systems in RTX aircraft engines and airframes",
+      "lag_weeks": 8
+    },
+    {
+      "source": "ITW",
+      "target": "DE",
+      "type": "supply_chain_up",
+      "strength": 0.6,
+      "label": "Illinois Tool Works welding equipment and fasteners used in Deere manufacturing",
+      "lag_weeks": 4
     }
   ]
 }
