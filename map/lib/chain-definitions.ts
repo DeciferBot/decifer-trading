@@ -46,6 +46,7 @@ export const SYMBOL_CONVICTION: Record<string, number> = {
   URNM: 0.82, BWXT: 0.82, FCX: 0.82, AMD: 0.80, NLR: 0.80, MRVL: 0.75,
   HUBB: 0.75, GEV: 0.75, SMCI: 0.72, UEC: 0.72, IREN: 0.72, UUUU: 0.70,
   APLD: 0.70, DELL: 0.68, NOW: 0.65, DNN: 0.62, IBM: 0.60, SMR: 0.55, NEE: 0.52,
+  CIEN: 0.87, BE: 0.78, FLR: 0.76, AAOI: 0.70, NVTS: 0.70, ORCL: 0.82,
   // Critical Minerals
   SCCO: 0.85, COPX: 0.85, ICOP: 0.82, LIT: 0.82, ALB: 0.78, MP: 0.75,
   SQM: 0.72, TECK: 0.68,
@@ -55,9 +56,11 @@ export const SYMBOL_CONVICTION: Record<string, number> = {
   // Defence
   LMT: 0.92, RTX: 0.90, NOC: 0.88, HII: 0.88, ITA: 0.88, GD: 0.85,
   LHX: 0.82, XAR: 0.82, AVAV: 0.80, KTOS: 0.72, PLTR: 0.68, ASTS: 0.65, RKLB: 0.62,
+  LUNR: 0.70, PL: 0.67, SPCE: 0.40, ONDS: 0.65, KGS: 0.74,
   // GLP-1 / Healthcare
   LLY: 0.95, NVO: 0.95, WST: 0.82, TMO: 0.78, DHR: 0.72, BDX: 0.72,
   MDLZ: 0.62, HSY: 0.60, AMGN: 0.60, DXCM: 0.58, PODD: 0.58, KO: 0.52, UNH: 0.50, MCD: 0.50,
+  HIMS: 0.75, RDDT: 0.72, BB: 0.65, IONQ: 0.65, RGTI: 0.55, QBTS: 0.55,
   // Gold
   GLD: 0.92, IAU: 0.90, FNV: 0.88, GDX: 0.88, NEM: 0.85, WPM: 0.85,
   GOLD: 0.82, AEM: 0.82, RGLD: 0.82, GDXJ: 0.82,
@@ -342,6 +345,12 @@ export const CHAINS: Chain[] = [
         sublabel: "Food and beverage under pressure",
         symbols: ["MDLZ", "HSY", "KO", "MCD"],
       },
+      {
+        id: "platform_delivery",
+        label: "Platform & Delivery",
+        sublabel: "Subscription GLP-1 and telehealth platforms",
+        symbols: ["HIMS"],
+      },
     ],
   },
 
@@ -445,7 +454,7 @@ export const CHAINS: Chain[] = [
         id: "launch",
         label: "Launch Vehicles",
         sublabel: "Rockets, small launch",
-        symbols: ["RKLB", "MNTS", "LUNR"],
+        symbols: ["RKLB", "MNTS", "LUNR", "SPCE"],
       },
       {
         id: "satellites",
@@ -463,7 +472,38 @@ export const CHAINS: Chain[] = [
   },
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 9. Reshoring & Industrial
+  // 9. Quantum Computing
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "quantum_computing",
+    label: LABELS.themes["quantum_computing"] ?? "Quantum Computing",
+    themeId: "quantum_computing",
+    color: "#a78bfa",
+    description: "Pure-play quantum hardware companies riding US federal investment and AI adjacency",
+    stages: [
+      {
+        id: "trapped_ion",
+        label: "Trapped Ion",
+        sublabel: "Highest fidelity, scalable architecture",
+        symbols: ["IONQ"],
+      },
+      {
+        id: "superconducting",
+        label: "Superconducting",
+        sublabel: "Gate-based quantum processors",
+        symbols: ["RGTI"],
+      },
+      {
+        id: "annealing",
+        label: "Quantum Annealing",
+        sublabel: "Optimisation problems, high gross margin",
+        symbols: ["QBTS"],
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 10. Reshoring & Industrial
   // ─────────────────────────────────────────────────────────────────────────
   {
     id: "reshoring",
@@ -958,6 +998,9 @@ export const EXTRA_SYMBOL_LABELS: Record<string, string> = {
   REMX: "VanEck Rare Earth ETF",
 
   // AI / power / nuclear
+  BE: "Bloom Energy",        CIEN: "Ciena",             AAOI: "Applied Optoelectronics",
+  ORCL: "Oracle",            RDDT: "Reddit",            NVTS: "Navitas Semiconductor",
+  BB: "BlackBerry",          KGS: "Kodiak Gas Services",
   VRT: "Vertiv",             ETN: "Eaton",              EME: "EMCOR Group",
   PWR: "Quanta Services",    HUBB: "Hubbell",           CCJ: "Cameco",
   BWXT: "BWX Technologies",  GEV: "GE Vernova",         SMR: "NuScale Power",
@@ -987,8 +1030,14 @@ export const EXTRA_SYMBOL_LABELS: Record<string, string> = {
   RKLB: "Rocket Lab",        MNTS: "Momentus",          PL: "Planet Labs",
   SPIR: "Spire Global",      ASTS: "AST SpaceMobile",   VSAT: "Viasat",
   IRDM: "Iridium",           LUNR: "Intuitive Machines", GSAT: "Globalstar",
+  SPCE: "Virgin Galactic",
+
+  // Quantum Computing
+  IONQ: "IonQ",              RGTI: "Rigetti Computing",  QBTS: "D-Wave Quantum",
 
   // GLP-1 / Healthcare
+  HIMS: "Hims & Hers Health",
+
   NVO: "Novo Nordisk",       LLY: "Eli Lilly",          VKTX: "Viking Therapeutics",
   AMGN: "Amgen",             WST: "West Pharmaceutical", TMO: "Thermo Fisher",
   DHR: "Danaher",            BDX: "Becton Dickinson",   IQV: "IQVIA",
