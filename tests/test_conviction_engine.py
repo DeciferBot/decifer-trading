@@ -298,15 +298,19 @@ class TestMacroThemeScore:
 # ---------------------------------------------------------------------------
 
 class TestCompositeScore:
-    def _full_score(self, d1=20, d2=10, d3=15, d4=8, d5=20):
+    def _full_score(self, d1=20, d2=10, d3=15, d4=8, d5=20, d6=0, d7=0, d8=0, d9=0):
         import conviction_engine as ce
         ds = lambda r, m, s: ce.DimensionScore(r, m, s)
         with (
-            patch("conviction_engine._score_analyst",   return_value=ds(d1, 38, "analyst")),
-            patch("conviction_engine._score_momentum",  return_value=ds(d2, 20, "momentum")),
-            patch("conviction_engine._score_valuation", return_value=ds(d3, 23, "valuation")),
-            patch("conviction_engine._score_distance_from_highs", return_value=ds(d4, 12, "highs")),
-            patch("conviction_engine._score_macro_theme", return_value=ds(d5, 25, "macro")),
+            patch("conviction_engine._score_analyst",              return_value=ds(d1, 38, "analyst")),
+            patch("conviction_engine._score_momentum",             return_value=ds(d2, 20, "momentum")),
+            patch("conviction_engine._score_valuation",            return_value=ds(d3, 23, "valuation")),
+            patch("conviction_engine._score_distance_from_highs",  return_value=ds(d4, 12, "highs")),
+            patch("conviction_engine._score_macro_theme",          return_value=ds(d5, 25, "macro")),
+            patch("conviction_engine._score_news_catalyst",        return_value=ds(d6, 12, "news_catalyst")),
+            patch("conviction_engine._score_options_flow",         return_value=ds(d7, 12, "options_flow")),
+            patch("conviction_engine._score_peer_network",         return_value=ds(d8,  8, "peer_network")),
+            patch("conviction_engine._score_counter_thesis",       return_value=ds(d9,  3, "counter_thesis")),
         ):
             return ce.score_symbol("NVDA", price_changes={}, analyst_changes=[])
 
@@ -316,7 +320,8 @@ class TestCompositeScore:
         assert cs.composite >= 65
 
     def test_medium_tier_moderate_signals(self):
-        cs = self._full_score(d1=15, d2=0, d3=8, d4=3, d5=10)
+        # d1+d3+d4+d5+d6 = 15+8+3+10+6 = 42 → composite=round(42/153*100)=27 → WATCHLIST
+        cs = self._full_score(d1=15, d2=0, d3=8, d4=3, d5=10, d6=6)
         assert cs.tier in ("MEDIUM", "WATCHLIST")
 
     def test_dormant_tier_weak_signals(self):
@@ -333,7 +338,10 @@ class TestCompositeScore:
 
     def test_all_dimensions_present_in_result(self):
         cs = self._full_score()
-        assert set(cs.dimensions.keys()) == {"analyst", "momentum", "valuation", "highs", "macro"}
+        assert set(cs.dimensions.keys()) == {
+            "analyst", "momentum", "valuation", "highs", "macro",
+            "news_catalyst", "options_flow", "peer_network", "counter_thesis",
+        }
 
     def test_dimension_dicts_have_required_keys(self):
         cs = self._full_score()

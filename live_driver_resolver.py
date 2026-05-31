@@ -449,6 +449,19 @@ def _write(result: dict, output_path: str) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
     os.replace(tmp, output_path)
+    try:
+        import conviction_cache as _conv
+        changed_drivers = set(result.get("active_drivers", []))
+        import json as _json, os as _os
+        _exp_path = _os.path.join(_os.path.dirname(output_path), "theme_graph", "symbol_exposures.json")
+        if _os.path.exists(_exp_path):
+            _exp = _json.loads(open(_exp_path).read())
+            affected = [e.get("symbol", "").upper() for e in _exp.get("exposures", [])
+                        if e.get("driver_id") in changed_drivers and e.get("status") == "active"]
+            if affected:
+                _conv.trigger_rescore(affected, reason="driver_state_change")
+    except Exception as _exc:
+        pass  # conviction wiring is non-critical
 
 
 def load(path: str = _OUTPUT_PATH) -> dict | None:

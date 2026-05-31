@@ -1,0 +1,54 @@
+{
+  "updated_at": "2026-05-31T18:16:37.989949+00:00",
+  "zones": {
+    "NVDA": {
+      "zone": "WAITING_ROOM",
+      "entered_at": "2026-05-31T18:16:37.988093+00:00",
+      "last_score": 48.0,
+      "consecutive_below_exit": 0,
+      "hard_stop": null
+    },
+    "AAPL": {
+      "zone": "WAITING_ROOM",
+      "entered_at": "2026-05-31T18:16:37.989949+00:00",
+      "last_score": 55.0,
+      "consecutive_below_exit": 0,
+      "hard_stop": "analyst_consensus_flipped"
+    },
+    "VRT": {
+      "zone": "WATCHLIST",
+      "entered_at": "2026-05-31T18:16:37.985349+00:00",
+      "last_score": 35.0,
+      "consecutive_below_exit": 0,
+      "hard_stop": null
+    },
+    "DEAD": {
+      "zone": "DORMANT",
+      "entered_at": "2026-05-31T18:16:37.985349+00:00",
+      "last_score": 10.0,
+      "consecutive_below_exit": 0,
+      "hard_stop": null
+    }
+  },
+  "tradeable": [],
+  "waiting_room": [
+    "NVDA",
+    "AAPL"
+  ],
+  "rotation_flags": [
+    {
+      "symbol": "NVDA",
+      "reason": "score_drift",
+      "score": 48.0,
+      "consecutive": 2,
+      "ts": "2026-05-31T18:16:37.988093+00:00"
+    },
+    {
+      "symbol": "AAPL",
+      "reason": "analyst_consensus_flipped",
+      "score": 55.0,
+      "consecutive": 0,
+      "ts": "2026-05-31T18:16:37.989949+00:00"
+    }
+  ]
+}

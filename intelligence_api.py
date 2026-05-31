@@ -532,6 +532,147 @@ def counter_thesis() -> Response:
 
 
 # ---------------------------------------------------------------------------
+# Conviction system endpoints
+# ---------------------------------------------------------------------------
+
+@app.route("/api/conviction/universe", methods=["GET", "OPTIONS"])
+def conviction_universe_route() -> Response:
+    """
+    All symbols with their conviction score, tier, zone, and top dimension signal.
+
+    Reads from conviction_cache.get_all() and conviction_universe.load().
+    Returns tradeable_count (READY zone) and waiting_count (WAITING_ROOM zone).
+    """
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    try:
+        from conviction_cache import get_all as _cc_get_all
+        from conviction_universe import load as _cu_load
+        cache_entries = _cc_get_all()
+        universe_meta = _cu_load()
+        symbols = []
+        tradeable_count = 0
+        waiting_count = 0
+        for entry in cache_entries:
+            zone = entry.get("zone", "")
+            if zone == "READY":
+                tradeable_count += 1
+            elif zone == "WAITING_ROOM":
+                waiting_count += 1
+            dims = entry.get("dimensions", {})
+            dims_summary = {k: v.get("raw_pts") if isinstance(v, dict) else v
+                            for k, v in dims.items()} if isinstance(dims, dict) else {}
+            symbols.append({
+                "symbol": entry.get("symbol"),
+                "composite": entry.get("composite"),
+                "tier": entry.get("tier"),
+                "zone": zone,
+                "dimensions_summary": dims_summary,
+                "ts": entry.get("ts"),
+            })
+        return _json_response({
+            "symbols": symbols,
+            "tradeable_count": tradeable_count,
+            "waiting_count": waiting_count,
+            "ts": _now_iso(),
+        })
+    except Exception as exc:
+        log.error("/api/conviction/universe: %s", exc)
+        return _error("Conviction universe temporarily unavailable.", 503)
+
+
+@app.route("/api/conviction/symbol/<ticker>", methods=["GET", "OPTIONS"])
+def conviction_symbol(ticker: str) -> Response:
+    """
+    Full conviction score for one symbol including all dimension breakdowns.
+
+    404 if symbol is not in the conviction cache.
+    """
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    try:
+        from conviction_cache import get as _cc_get
+        entry = _cc_get(ticker.upper())
+        if entry is None:
+            return _error(f"Symbol {ticker.upper()} not in conviction cache.", 404)
+        return _json_response({
+            "symbol": entry.get("symbol"),
+            "composite": entry.get("composite"),
+            "tier": entry.get("tier"),
+            "zone": entry.get("zone"),
+            "dimensions": entry.get("dimensions", {}),
+            "ts": entry.get("ts"),
+        })
+    except Exception as exc:
+        log.error("/api/conviction/symbol/%s: %s", ticker, exc)
+        return _error("Conviction score temporarily unavailable.", 503)
+
+
+@app.route("/api/conviction/waiting-room", methods=["GET", "OPTIONS"])
+def conviction_waiting_room() -> Response:
+    """
+    Symbols in WAITING_ROOM zone with their scores and weakest dimension.
+    """
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    try:
+        from conviction_cache import get_all as _cc_get_all
+        cache_entries = _cc_get_all()
+        waiting = []
+        for entry in cache_entries:
+            if entry.get("zone") != "WAITING_ROOM":
+                continue
+            dims = entry.get("dimensions", {})
+            weakest_dim = None
+            weakest_pts = None
+            if isinstance(dims, dict):
+                for dim, val in dims.items():
+                    pts = val.get("raw_pts") if isinstance(val, dict) else val
+                    if pts is not None and (weakest_pts is None or pts < weakest_pts):
+                        weakest_pts = pts
+                        weakest_dim = dim
+            waiting.append({
+                "symbol": entry.get("symbol"),
+                "composite": entry.get("composite"),
+                "tier": entry.get("tier"),
+                "zone": entry.get("zone"),
+                "weakest_dimension": weakest_dim,
+                "weakest_dimension_pts": weakest_pts,
+                "ts": entry.get("ts"),
+            })
+        return _json_response({
+            "symbols": waiting,
+            "count": len(waiting),
+            "ts": _now_iso(),
+        })
+    except Exception as exc:
+        log.error("/api/conviction/waiting-room: %s", exc)
+        return _error("Conviction waiting room temporarily unavailable.", 503)
+
+
+@app.route("/api/conviction/rotation-flags", methods=["GET", "OPTIONS"])
+def conviction_rotation_flags() -> Response:
+    """
+    Symbols flagged for rotation out with reason.
+
+    Reads from conviction_universe.get_rotation_flags().
+    """
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    try:
+        from conviction_universe import get_rotation_flags as _cu_flags
+        flags = _cu_flags()
+        return _json_response({
+            "flags": flags,
+            "count": len(flags),
+            "ts": _now_iso(),
+        })
+    except Exception as exc:
+        log.error("/api/conviction/rotation-flags: %s", exc)
+        return _error("Conviction rotation flags temporarily unavailable.", 503)
+
+
+# ---------------------------------------------------------------------------
 # Root view — HTML landing page for intelligence.decifertrading.com
 # ---------------------------------------------------------------------------
 
@@ -1106,6 +1247,38 @@ def method_not_allowed(_exc: Exception) -> Response:
 def internal_error(exc: Exception) -> Response:
     log.error("Unhandled exception: %s", exc)
     return _json_response({"status": "error", "message": "Internal server error."}, 500)
+
+
+# ---------------------------------------------------------------------------
+# Startup conviction cache warm-up
+# ---------------------------------------------------------------------------
+
+def _warmup_conviction_cache() -> None:
+    """Background warm-up: rescore full TTG universe on startup."""
+    import threading
+    def _run():
+        try:
+            import conviction_cache, conviction_engine
+            from pathlib import Path
+            import json as _j
+            data_dir = Path(__file__).parent / "data" / "intelligence"
+            raw = _j.loads((data_dir / "theme_graph" / "symbol_exposures.json").read_text())
+            symbols = list({
+                e.get("symbol","").upper() for e in raw.get("exposures",[])
+                if e.get("status") == "active" and e.get("symbol")
+            })
+            if symbols:
+                import logging
+                logging.getLogger("decifer.conviction").info(
+                    "Startup warm-up: rescoring %d symbols", len(symbols))
+                conviction_cache.refresh_all(symbols)
+        except Exception as exc:
+            import logging
+            logging.getLogger("decifer.conviction").warning("Warm-up failed: %s", exc)
+    threading.Thread(target=_run, daemon=True, name="conviction-warmup").start()
+
+
+_warmup_conviction_cache()
 
 
 # ---------------------------------------------------------------------------

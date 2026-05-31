@@ -85,6 +85,13 @@ def record_article_for_customer_tape(
             source_published_at=source_published_at,
             source_type=source_type,
         )
+        try:
+            import conviction_cache as _conv_news
+            tickers = [t.upper() for t in (symbols or []) if t]
+            if tickers:
+                _conv_news.trigger_rescore(tickers, reason="news_event")
+        except Exception:
+            pass
     except Exception as exc:
         # Tape is advisory — never break news intake on failure.
         log.debug("record_article_for_customer_tape: fail-soft (%s)", exc)

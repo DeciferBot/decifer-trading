@@ -599,6 +599,12 @@ class CatalystEngine:
 
         sym = trigger.get("symbol", "")
         self._cooldown.set_cooldown(sym)
+        try:
+            import conviction_cache as _conv
+            if sym:
+                _conv.trigger_rescore([sym], reason="catalyst_fire")
+        except Exception:
+            pass
 
         candidate = self.store.get(sym) if sym else None
         if candidate:
