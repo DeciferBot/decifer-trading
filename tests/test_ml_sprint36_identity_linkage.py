@@ -103,8 +103,7 @@ class TestOrderIntentLinkage:
              patch("signal_dispatcher.execute_short", return_value=True), \
              patch("signal_dispatcher.execute_buy_option", return_value=True), \
              patch("risk.calculate_position_size", return_value=10), \
-             patch("signal_dispatcher.calculate_stops", return_value=(145.0, 160.0)), \
-             patch("signal_dispatcher._lazy_pru_tickers", return_value=frozenset()):
+             patch("signal_dispatcher.calculate_stops", return_value=(145.0, 160.0)):
             _dispatch(
                 decision,
                 candidates_by_symbol={"AAPL": payload},
@@ -187,8 +186,7 @@ class TestOrderIntentLinkage:
              patch("signal_dispatcher.execute_short", return_value=True), \
              patch("signal_dispatcher.execute_buy_option", return_value=True), \
              patch("risk.calculate_position_size", return_value=10) as mock_size, \
-             patch("signal_dispatcher.calculate_stops", return_value=(145.0, 160.0)) as mock_stops, \
-             patch("signal_dispatcher._lazy_pru_tickers", return_value=frozenset()):
+             patch("signal_dispatcher.calculate_stops", return_value=(145.0, 160.0)) as mock_stops:
             _dispatch(
                 decision,
                 candidates_by_symbol={"AAPL": payload},

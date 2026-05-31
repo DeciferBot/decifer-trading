@@ -186,7 +186,13 @@ def check_portfolio_placeholder() -> None:
 
 
 def check_no_mutation_routes() -> None:
-    """P4: No mutation routes (POST/DELETE) registered in intelligence_api."""
+    """P4: No state-mutation routes (POST/DELETE) registered in intelligence_api.
+
+    Allowlisted compute-only POSTs (no writes to data/broker/state):
+      /v1/options/scan — on-demand options flow scan; accepts symbol list, returns
+                         read-only analytics; no file writes, no broker calls.
+    """
+    _COMPUTE_ONLY_POST_ALLOWLIST = {"/v1/options/scan"}
     _set_intelligence_cloud_env()
     try:
         import runtime_config
@@ -196,13 +202,14 @@ def check_no_mutation_routes() -> None:
         mutation_routes: list[str] = []
         for rule in intelligence_api.app.url_map.iter_rules():
             methods = set(rule.methods or []) - {"HEAD", "OPTIONS"}
-            if methods - {"GET"}:
-                mutation_routes.append(f"{rule.rule} [{', '.join(sorted(methods - {'GET'}))}]")
+            write_methods = methods - {"GET"}
+            if write_methods and rule.rule not in _COMPUTE_ONLY_POST_ALLOWLIST:
+                mutation_routes.append(f"{rule.rule} [{', '.join(sorted(write_methods))}]")
 
         if mutation_routes:
             _record("P4", False, f"Mutation routes found in intelligence_api: {mutation_routes}")
         else:
-            _record("P4", True, "No mutation routes registered (GET-only API confirmed)")
+            _record("P4", True, "No state-mutation routes registered (GET-only API + approved compute POSTs)")
     except Exception as exc:
         _record("P4", False, f"Could not inspect routes: {exc}")
     finally:
