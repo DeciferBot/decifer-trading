@@ -161,6 +161,18 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .col-title{padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:.2px;color:var(--text);text-transform:none;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;display:flex;justify-content:space-between;align-items:center;border-left:3px solid var(--orange)}
 .col-body{overflow-y:auto;flex:1}
 
+/* ── LIVE TAB: single natural-scroll page (desktop only). The header, portfolio
+   stat rows and tab bar live ABOVE #view-live, so they stay pinned while the
+   whole Live view scrolls top-to-bottom as one unit — instead of cramming the
+   strips + three independent scroll panes into the leftover viewport height. ── */
+@media(min-width:769px){
+  #view-live.active{overflow-y:auto;overflow-x:hidden}
+  #view-live .live-grid{flex:0 0 auto;overflow:visible}
+  #view-live .col{overflow:visible !important}
+  #view-live .col-body{overflow:visible !important}
+  #view-live #pos-list{max-height:none !important;overflow:visible !important}
+}
+
 /* Tape */
 .regime-wrap{padding:10px}
 .regime-box{border-radius:5px;padding:10px;border:1px solid}
@@ -6321,6 +6333,67 @@ loadOvernightNotes();             // morning brief: events/calendar/performance 
 // ── Weekend / closed-market preview — ES futures + Monday calendar ────────────
 const _FUTURES_NAMES = { 'ES=F': 'E-Mini S&P', 'NQ=F': 'E-Mini Nasdaq', 'GC=F': 'Gold', 'CL=F': 'Crude Oil' };
 const _FOREX_NAMES   = { EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY' };
+
+// Plain-English names for the economic events that actually move markets.
+// First matching rule wins. A `null` label means "intentionally hide this one"
+// (a sub-component or regional Fed speaker that just adds noise).
+const _MAJOR_EVENTS = [
+  [/non.?farm payrolls/i,                      'Jobs report'],
+  [/unemployment rate/i,                       'Unemployment rate'],
+  [/average hourly earnings/i,                 'Wage growth'],
+  [/participation rate/i,                      null],
+  [/(initial )?jobless claims/i,               'Weekly jobless claims'],
+  [/continuing claims/i,                       null],
+  [/adp employment/i,                          'Private payrolls (ADP)'],
+  [/jolts|job openings/i,                      'Job openings'],
+  [/core pce|pce price/i,                      "Inflation (Fed's gauge)"],
+  [/cpi|consumer price/i,                      'Inflation (CPI)'],
+  [/ppi|producer price/i,                      'Wholesale prices'],
+  [/\bgdp\b/i,                                 'Economic growth (GDP)'],
+  [/retail sales/i,                            'Retail sales'],
+  [/ism manufacturing pmi/i,                   'Factory activity (ISM)'],
+  [/ism.*(services|non.?manufacturing) pmi/i,  'Services activity (ISM)'],
+  [/ism\b/i,                                   null],   // other ISM sub-prints
+  [/durable goods/i,                           'Big-ticket orders'],
+  [/(consumer (confidence|sentiment))|michigan/i, 'Consumer mood'],
+  [/fomc|interest rate decision|federal funds/i,  'Fed rate decision'],
+  [/beige book/i,                              'Fed economic survey'],
+  [/powell/i,                                  'Fed Chair Powell speaks'],
+  [/\bfed\b.*speech|speech.*\bfed\b/i,         null],   // regional Fed speakers
+  [/cftc|api crude|eia |mba |factory orders|wholesale invent|trade balance/i, null],
+];
+
+// Returns a friendly label, or null to hide the event entirely.
+function _simpleEventLabel(ev) {
+  const name = ev.event || '';
+  for (const [re, label] of _MAJOR_EVENTS) {
+    if (re.test(name)) return label;          // string => rename, null => hide
+  }
+  // Not in the curated list: keep it only if it's high-impact, with a tidy name.
+  if (ev.impact === 'High') {
+    return name.replace(/\s*\([^)]*\)/g, '').replace(/\b(MoM|YoY|Adv|Prel|Final)\b/gi, '').trim();
+  }
+  return null;
+}
+
+// "14:00" (ET) -> "2:00pm ET"
+function _fmt12h(t) {
+  if (!t || !/^\d{2}:\d{2}$/.test(t)) return '';
+  let [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'pm' : 'am';
+  h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2, '0')}${ampm} ET`;
+}
+
+// ISO date -> Today / Tomorrow / weekday name
+function _fmtDay(dateStr) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr + 'T00:00:00'); d.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - today) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  return d.toLocaleDateString('en-US', { weekday: 'short' });
+}
 let _wkndPreviewLoading = false;
 
 async function _loadWeekendPreview() {
@@ -6383,25 +6456,28 @@ async function _loadWeekendPreview() {
     // ── Economic calendar ─────────────────────────────────────────────────────
     const calRow = document.getElementById('wknd-calendar-row');
     if (calRow && (d.calendar || []).length) {
-      const today = new Date().toISOString().slice(0, 10);
-      const chips = (d.calendar || []).map(ev => {
+      const seen = new Set();
+      const chips = [];
+      for (const ev of (d.calendar || [])) {
+        const label = _simpleEventLabel(ev);
+        if (!label) continue;                       // noise / sub-component — hidden
+        if (seen.has(label)) continue;              // same headline already shown
+        seen.add(label);
         const printed = ev.actual != null;
-        const isHigh  = ev.impact === 'High';
-        const chipCls = (isHigh ? 'high' : 'medium') + (printed ? ' printed' : '');
-        const timeStr = ev.time_et ? ev.time_et + ' ET' : '';
-        const dateLabel = ev.date === today ? 'Today' : ev.date;
-        const valStr = printed
-          ? `Actual: ${ev.actual}${ev.unit ? ' ' + ev.unit : ''}`
-          : (ev.estimate != null ? `Est: ${ev.estimate}${ev.unit ? ' ' + ev.unit : ''}` : '');
-        return `<div class="wknd-cal-chip ${chipCls}" title="${esc(ev.event)}">
-          <span style="font-size:10px;opacity:.7">${esc(dateLabel)}${timeStr ? ' · ' + timeStr : ''}</span>
-          <span style="font-weight:700;font-size:10px">${esc(ev.event.length > 36 ? ev.event.slice(0, 36) + '…' : ev.event)}</span>
-          ${valStr ? `<span style="opacity:.8;font-size:10px">${esc(valStr)}</span>` : ''}
-          ${printed ? '<span style="color:var(--green);font-size:9px">✓</span>' : ''}
-        </div>`;
-      });
-      const calLabel = '<span style="font-size:10px;color:var(--muted2);letter-spacing:1px;padding-right:2px;flex-shrink:0;align-self:center">NEXT SESSION</span>';
-      calRow.innerHTML = calLabel + chips.join('');
+        const when = `${_fmtDay(ev.date)}${ev.time_et ? ' · ' + _fmt12h(ev.time_et) : ''}`;
+        chips.push(`<div class="wknd-cal-chip high${printed ? ' printed' : ''}" title="${esc(ev.event)}">
+          <span style="font-size:10px;opacity:.7">${esc(when)}</span>
+          <span style="font-weight:700;font-size:10px">${esc(label)}</span>
+          ${printed ? `<span style="color:var(--green);font-size:10px">→ ${esc(String(ev.actual))}${ev.unit ? ' ' + esc(ev.unit) : ''}</span>` : ''}
+        </div>`);
+        if (chips.length >= 8) break;               // keep the strip to what matters
+      }
+      if (chips.length) {
+        const calLabel = '<span style="font-size:10px;color:var(--muted2);letter-spacing:1px;padding-right:2px;flex-shrink:0;align-self:center">COMING UP</span>';
+        calRow.innerHTML = calLabel + chips.join('');
+      } else {
+        calRow.innerHTML = '';
+      }
     } else if (calRow) {
       calRow.innerHTML = '';
     }

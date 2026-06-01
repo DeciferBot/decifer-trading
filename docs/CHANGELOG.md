@@ -5,6 +5,31 @@ Format: newest entries at the top. Each entry includes the date, what changed, a
 
 ---
 
+## v4.96.0 — 2026-06-01 — "Conviction Engine v2"
+
+### What
+Bot dashboard Live tab UX. Two changes, both scoped to `static/dashboard.html`:
+
+- **Single-scroll Live tab.** The Live tab now scrolls top-to-bottom as one page instead of
+  cramming the market strips plus three independent scroll panes into the leftover viewport
+  height. The header, portfolio/P&L stat rows, and tab bar stay pinned above the scroll region.
+  Scoped to desktop (`@media(min-width:769px)`) and to `#view-live` only — the other 14 tabs and
+  the mobile layout are untouched.
+- **"NEXT SESSION" → "COMING UP", plain English.** The economic calendar strip was dumping every
+  High and Medium event with raw names, period tags, units, and estimates. It now runs a curated
+  plain-English map: jargon renamed (JOLTs → Job openings, Non Farm Payrolls → Jobs report),
+  duplicate prints merged (two ISM services prints → one; MoM/YoY wage prints → "Wage growth"),
+  noise dropped (regional Fed speeches, CFTC positioning, crude/mortgage sub-prints). Any
+  unmapped High-impact event still shows with a tidied label so nothing important vanishes.
+  Capped at 8, times as "2:00pm ET", days as Today/Tomorrow/weekday, printed results as "→ 96 K".
+
+### Why
+The fixed-height two-section layout squeezed the strip below the regime bar and forced three
+separate scrollbars on one screen. The calendar strip read like a Bloomberg terminal, against
+Decifer's mission of plain-English market sense for regular people.
+
+---
+
 ## v4.95.0 — 2026-06-01 — "Conviction Engine v2"
 
 ### What
