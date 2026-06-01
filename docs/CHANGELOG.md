@@ -5,6 +5,35 @@ Format: newest entries at the top. Each entry includes the date, what changed, a
 
 ---
 
+## v4.95.0 — 2026-06-01 — "Conviction Engine v2"
+
+### What
+Rebuilt the Symbol Intelligence conviction score from a static 3-signal formula into a
+9-dimension structural engine owned by the intelligence layer. Dimensions: analyst consensus +
+price target (D1), context-aware momentum (D2), forward catalyst (D2b), valuation/DCF (D3),
+distance from 52W high (D4), macro theme + driver (D5), news/catalyst (D6), options flow with
+asymmetric put penalty (D7), peer-network alignment (D8), counter-thesis (D9).
+
+Key design decisions (from first principles, with Amit):
+- **Context-aware momentum** — a quality name down on 5D returns is a reversal setup (+8), not a
+  penalty. The same dip on a low-quality name is avoided (-15). Backward 5D return alone does not
+  define forward conviction.
+- **Forward catalyst** — upcoming earnings (7/14/30-day windows) and EPS-estimate revisions add
+  conviction. A beaten-down quality name into a known event is a top idea, not a bottom one.
+- **Relative tiers** — composites are ranked across the universe and tiered by percentile
+  (top 20% HIGH, 20-45% MEDIUM, 45-70% WATCHLIST, bottom 30% DORMANT). Conviction is relative to
+  alternatives; "0 HIGH names" is not a valid output.
+- **Persistent cache** — conviction scores survive container restarts via a named Docker volume
+  (`conviction-cache` → `/tmp/decifer_conviction`), loaded instantly from disk on boot.
+
+### Why
+The old score showed 62 names as HIGH simultaneously — every name with an active macro driver,
+regardless of whether it was moving. The new engine produces a realistic distribution
+(28 HIGH / 35 MEDIUM / 35 WATCHLIST / 43 DORMANT across 141 names) that reflects actual
+forward conviction. 148 conviction tests passing. Live on intelligence.decifertrading.com.
+
+---
+
 ## v4.65.1 — 2026-05-27 — "Nexus" (M13G closure + session data)
 
 ### What

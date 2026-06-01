@@ -10,5 +10,5 @@
 
 
 
-__version__ = "4.94.0"
-__codename__ = "Nexus"
+__version__ = "4.95.0"
+__codename__ = "Conviction Engine v2"
