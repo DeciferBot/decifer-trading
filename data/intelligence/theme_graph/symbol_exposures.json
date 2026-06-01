@@ -240,7 +240,7 @@
       "source_type": "curated_reference",
       "route_hint": "Monitor only",
       "status": "active",
-      "risk_note": "Broad utility \u2014 nuclear thesis is diluted.",
+      "risk_note": "Broad utility — nuclear thesis is diluted.",
       "last_reviewed": "2026-05-26"
     },
     {
@@ -507,7 +507,7 @@
       "bucket_id": "peptide_api_fill_finish",
       "exposure_type": "direct_beneficiary",
       "confidence": 0.82,
-      "reason_to_care": "West Pharmaceutical Services makes injectable drug delivery systems \u2014 the stoppers and closures for GLP-1 drug vials and cartridges. GLP-1 drug volume growth directly increases West's container demand.",
+      "reason_to_care": "West Pharmaceutical Services makes injectable drug delivery systems — the stoppers and closures for GLP-1 drug vials and cartridges. GLP-1 drug volume growth directly increases West's container demand.",
       "evidence_basis": "company_profile",
       "source_type": "curated_reference",
       "route_hint": "In focus",
@@ -571,7 +571,7 @@
       "bucket_id": "diagnostics_monitoring",
       "exposure_type": "second_order_beneficiary",
       "confidence": 0.58,
-      "reason_to_care": "DexCom makes continuous glucose monitors (CGMs). GLP-1 adoption improves metabolic management but may reduce insulin-dependent CGM use over time. Mixed exposure \u2014 monitor for direction.",
+      "reason_to_care": "DexCom makes continuous glucose monitors (CGMs). GLP-1 adoption improves metabolic management but may reduce insulin-dependent CGM use over time. Mixed exposure — monitor for direction.",
       "evidence_basis": "company_profile",
       "source_type": "curated_reference",
       "route_hint": "Monitor only",
@@ -608,7 +608,7 @@
       "source_type": "curated_reference",
       "route_hint": "Monitor only",
       "status": "active",
-      "risk_note": "Higher drug costs vs long-term savings \u2014 mixed direction.",
+      "risk_note": "Higher drug costs vs long-term savings — mixed direction.",
       "last_reviewed": "2026-05-26"
     },
     {
@@ -624,7 +624,7 @@
       "source_type": "curated_reference",
       "route_hint": "Monitor only",
       "status": "active",
-      "risk_note": "Negative/mixed \u2014 monitor, not a directional trade.",
+      "risk_note": "Negative/mixed — monitor, not a directional trade.",
       "last_reviewed": "2026-05-26"
     },
     {
@@ -640,7 +640,7 @@
       "source_type": "curated_reference",
       "route_hint": "Monitor only",
       "status": "active",
-      "risk_note": "Negative/mixed \u2014 monitor, not a directional trade.",
+      "risk_note": "Negative/mixed — monitor, not a directional trade.",
       "last_reviewed": "2026-05-26"
     },
     {
@@ -656,7 +656,7 @@
       "source_type": "curated_reference",
       "route_hint": "Monitor only",
       "status": "active",
-      "risk_note": "Negative/mixed \u2014 monitor, not a directional trade.",
+      "risk_note": "Negative/mixed — monitor, not a directional trade.",
       "last_reviewed": "2026-05-26"
     },
     {
@@ -672,7 +672,7 @@
       "source_type": "curated_reference",
       "route_hint": "Monitor only",
       "status": "active",
-      "risk_note": "Negative/mixed \u2014 monitor, not a directional trade.",
+      "risk_note": "Negative/mixed — monitor, not a directional trade.",
       "last_reviewed": "2026-05-26"
     },
     {
@@ -1120,7 +1120,7 @@
       "source_type": "curated_reference",
       "route_hint": "On the radar",
       "status": "active",
-      "risk_note": "Cyclical \u2014 price and demand gates required.",
+      "risk_note": "Cyclical — price and demand gates required.",
       "last_reviewed": "2026-05-26"
     },
     {
@@ -1136,7 +1136,7 @@
       "source_type": "curated_reference",
       "route_hint": "On the radar",
       "status": "active",
-      "risk_note": "Cyclical \u2014 price and demand gates required.",
+      "risk_note": "Cyclical — price and demand gates required.",
       "last_reviewed": "2026-05-26"
     },
     {
@@ -1291,7 +1291,7 @@
       "bucket_id": "mortgage_title_services",
       "exposure_type": "direct_beneficiary",
       "confidence": 0.78,
-      "reason_to_care": "Rocket Companies is the leading US mortgage originator. Rate cuts directly drive refinance and purchase mortgage volumes \u2014 the primary Rocket revenue driver.",
+      "reason_to_care": "Rocket Companies is the leading US mortgage originator. Rate cuts directly drive refinance and purchase mortgage volumes — the primary Rocket revenue driver.",
       "evidence_basis": "company_profile",
       "source_type": "curated_reference",
       "route_hint": "On the radar",
@@ -1531,17 +1531,17 @@
       "bucket_id": "lithium_battery_materials",
       "exposure_type": "direct_beneficiary",
       "confidence": 0.78,
-      "reason_to_care": "Albemarle is the world's largest lithium producer. EV battery demand and energy storage growth drive lithium demand \u2014 separate from copper bucket.",
+      "reason_to_care": "Albemarle is the world's largest lithium producer. EV battery demand and energy storage growth drive lithium demand — separate from copper bucket.",
       "evidence_basis": "company_profile",
       "source_type": "curated_reference",
       "route_hint": "In focus",
       "status": "active",
-      "risk_note": "Requires battery/EV driver activation \u2014 not auto-included from electrification alone.",
+      "risk_note": "Requires battery/EV driver activation — not auto-included from electrification alone.",
       "last_reviewed": "2026-05-26"
     },
     {
       "symbol": "SQM",
-      "label": "Sociedad Qu\u00edmica y Minera",
+      "label": "Sociedad Química y Minera",
       "driver_id": "electrification",
       "theme_id": "critical_minerals_copper",
       "bucket_id": "lithium_battery_materials",
@@ -1707,7 +1707,7 @@
       "bucket_id": "royalty_streaming",
       "exposure_type": "direct_beneficiary",
       "confidence": 0.88,
-      "reason_to_care": "Franco-Nevada is the world's premier gold royalty/streaming company. No operating costs means pure gold-price leverage. Different risk profile from miners \u2014 revenue without mine execution risk.",
+      "reason_to_care": "Franco-Nevada is the world's premier gold royalty/streaming company. No operating costs means pure gold-price leverage. Different risk profile from miners — revenue without mine execution risk.",
       "evidence_basis": "company_profile",
       "source_type": "curated_reference",
       "route_hint": "In focus",
@@ -1979,12 +1979,12 @@
       "bucket_id": "next_gen_obesity_developers",
       "exposure_type": "second_order_beneficiary",
       "confidence": 0.6,
-      "reason_to_care": "Amgen's MariTide (AMG 133) is in Phase 2 obesity development. Not a direct GLP-1 revenue leader \u2014 catalyst-driven pipeline name.",
+      "reason_to_care": "Amgen's MariTide (AMG 133) is in Phase 2 obesity development. Not a direct GLP-1 revenue leader — catalyst-driven pipeline name.",
       "evidence_basis": "company_profile",
       "source_type": "curated_reference",
       "route_hint": "On the radar",
       "status": "active",
-      "risk_note": "Clinical stage pipeline exposure \u2014 not direct drug revenue.",
+      "risk_note": "Clinical stage pipeline exposure — not direct drug revenue.",
       "last_reviewed": "2026-05-26"
     },
     {
@@ -2032,7 +2032,7 @@
       "source_type": "curated_reference",
       "route_hint": "On the radar",
       "status": "active",
-      "risk_note": "Dual AI/crypto revenue mix \u2014 BTC price and halving cycle drive revenue swings.",
+      "risk_note": "Dual AI/crypto revenue mix — BTC price and halving cycle drive revenue swings.",
       "last_reviewed": "2026-05-30"
     },
     {
@@ -2091,7 +2091,7 @@
       "bucket_id": "ai_compute_accelerators_networking",
       "exposure_type": "second_order_beneficiary",
       "confidence": 0.65,
-      "reason_to_care": "ServiceNow is embedding AI agents (Now Assist) across its enterprise workflow platform. AI feature attach rates drive premium pricing and NRR expansion. ServiceNow is uniquely positioned as the AI orchestration layer for enterprise IT, HR, and operations workflows \u2014 it monetises AI adoption without GPU spend.",
+      "reason_to_care": "ServiceNow is embedding AI agents (Now Assist) across its enterprise workflow platform. AI feature attach rates drive premium pricing and NRR expansion. ServiceNow is uniquely positioned as the AI orchestration layer for enterprise IT, HR, and operations workflows — it monetises AI adoption without GPU spend.",
       "evidence_basis": "company_profile",
       "source_type": "curated_reference",
       "route_hint": "On the radar",
@@ -2107,12 +2107,12 @@
       "bucket_id": "cloud_sase_zero_trust",
       "exposure_type": "second_order_beneficiary",
       "confidence": 0.45,
-      "reason_to_care": "Zeta Global uses AI to power its marketing data platform. AI-driven customer intelligence and campaign personalisation are embedded in its revenue model. This is an indirect AI beneficiary \u2014 not a compute/infrastructure play but an AI-enabled software platform.",
+      "reason_to_care": "Zeta Global uses AI to power its marketing data platform. AI-driven customer intelligence and campaign personalisation are embedded in its revenue model. This is an indirect AI beneficiary — not a compute/infrastructure play but an AI-enabled software platform.",
       "evidence_basis": "company_profile",
       "source_type": "curated_reference",
       "route_hint": "Monitor only",
       "status": "active",
-      "risk_note": "Adtech exposure to digital ad spend cycles. Not a pure AI infrastructure play \u2014 thematic link is indirect.",
+      "risk_note": "Adtech exposure to digital ad spend cycles. Not a pure AI infrastructure play — thematic link is indirect.",
       "last_reviewed": "2026-05-30"
     },
     {
@@ -2223,7 +2223,7 @@
       "source_type": "curated_reference",
       "status": "active",
       "reason_to_care": "Hims & Hers runs a GLP-1 weight-loss subscription platform with revenue +59% YoY. Novo Nordisk partnership validates the platform and diversifies away from pure compounded GLP-1 dependency.",
-      "risk_note": "FDA proposed GLP-1 compounding rules knocked the stock 7% in one session \u2014 regulatory reclassification is the thesis-breaker.",
+      "risk_note": "FDA proposed GLP-1 compounding rules knocked the stock 7% in one session — regulatory reclassification is the thesis-breaker.",
       "route_hint": "In focus",
       "last_reviewed": "2026-05-31"
     },
@@ -2386,6 +2386,86 @@
       "risk_note": "Small revenue base; GaN faces competition from SiC; SPAC history creates overhang.",
       "route_hint": "Monitor",
       "last_reviewed": "2026-05-31"
+    },
+    {
+      "symbol": "MU",
+      "label": "Micron Technology, Inc.",
+      "driver_id": "ai_capex_growth",
+      "theme_id": "memory_storage",
+      "bucket_id": "memory_hbm_storage",
+      "exposure_type": "direct_beneficiary",
+      "confidence": 0.78,
+      "reason_to_care": "Micron - only US-listed pure-play HBM/DRAM manufacturer; NOT in semiconductors roster",
+      "evidence_basis": "internal_symbol_master",
+      "source_type": "internal_symbol_master",
+      "route_hint": "Watchlist",
+      "status": "active",
+      "risk_note": "Memory is a commodity cycle — oversupply and pricing collapses are the key risk. HBM demand depends on sustained hyperscaler AI capex.",
+      "last_reviewed": "2026-06-01"
+    },
+    {
+      "symbol": "SNDK",
+      "label": "Sandisk Corporation",
+      "driver_id": "ai_capex_growth",
+      "theme_id": "memory_storage",
+      "bucket_id": "memory_hbm_storage",
+      "exposure_type": "direct_beneficiary",
+      "confidence": 0.78,
+      "reason_to_care": "Sandisk Corporation - re-listed independent NAND flash business spun out from Western Digital Feb 2024",
+      "evidence_basis": "internal_symbol_master",
+      "source_type": "internal_symbol_master",
+      "route_hint": "Watchlist",
+      "status": "active",
+      "risk_note": "Memory is a commodity cycle — oversupply and pricing collapses are the key risk. HBM demand depends on sustained hyperscaler AI capex.",
+      "last_reviewed": "2026-06-01"
+    },
+    {
+      "symbol": "WDC",
+      "label": "Western Digital Corporation",
+      "driver_id": "ai_capex_growth",
+      "theme_id": "memory_storage",
+      "bucket_id": "memory_hbm_storage",
+      "exposure_type": "direct_beneficiary",
+      "confidence": 0.78,
+      "reason_to_care": "Western Digital - enterprise HDD and storage post-SNDK spinout",
+      "evidence_basis": "internal_symbol_master",
+      "source_type": "internal_symbol_master",
+      "route_hint": "Watchlist",
+      "status": "active",
+      "risk_note": "Memory is a commodity cycle — oversupply and pricing collapses are the key risk. HBM demand depends on sustained hyperscaler AI capex.",
+      "last_reviewed": "2026-06-01"
+    },
+    {
+      "symbol": "STX",
+      "label": "Seagate Technology Holdings plc",
+      "driver_id": "ai_capex_growth",
+      "theme_id": "memory_storage",
+      "bucket_id": "memory_hbm_storage",
+      "exposure_type": "direct_beneficiary",
+      "confidence": 0.78,
+      "reason_to_care": "Seagate Technology - enterprise HDD",
+      "evidence_basis": "internal_symbol_master",
+      "source_type": "internal_symbol_master",
+      "route_hint": "Watchlist",
+      "status": "active",
+      "risk_note": "Memory is a commodity cycle — oversupply and pricing collapses are the key risk. HBM demand depends on sustained hyperscaler AI capex.",
+      "last_reviewed": "2026-06-01"
+    },
+    {
+      "symbol": "NTAP",
+      "label": "NetApp, Inc.",
+      "driver_id": "ai_capex_growth",
+      "theme_id": "memory_storage",
+      "bucket_id": "memory_hbm_storage",
+      "exposure_type": "direct_beneficiary",
+      "confidence": 0.78,
+      "reason_to_care": "NetApp - hybrid cloud and data-centric storage infrastructure, ONTAP software and all-flash FAS arrays deployed in AI data-centre storage tiers; $34.6B FMP-verified",
+      "evidence_basis": "internal_symbol_master",
+      "source_type": "internal_symbol_master",
+      "route_hint": "Watchlist",
+      "status": "active",
+      "risk_note": "Memory is a commodity cycle — oversupply and pricing collapses are the key risk. HBM demand depends on sustained hyperscaler AI capex.",
+      "last_reviewed": "2026-06-01"
     }
   ]
 }

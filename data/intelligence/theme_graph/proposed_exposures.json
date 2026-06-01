@@ -1,0 +1,185 @@
+{
+  "generated_at": "2026-06-01T02:44:07.946578+00:00",
+  "source": "roster_reconciliation",
+  "total_proposed": 0,
+  "proposals": [],
+  "unmapped_themes": [
+    {
+      "roster_theme": "ai_compute_infrastructure",
+      "missing_symbols": [
+        "CRWV"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "banks",
+      "missing_symbols": [
+        "JPM",
+        "BAC",
+        "WFC",
+        "GS",
+        "C"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "biotech_risk_on",
+      "missing_symbols": [
+        "REGN",
+        "VRTX",
+        "GILD"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "consumer_discretionary_strength",
+      "missing_symbols": [
+        "AMZN",
+        "NKE",
+        "SBUX",
+        "EAT"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "copper_electrification",
+      "missing_symbols": [
+        "BHP"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "cybersecurity",
+      "missing_symbols": [
+        "RBRK"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "defensive_healthcare",
+      "missing_symbols": [
+        "ABBV",
+        "MRK",
+        "TFX"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "defensive_quality",
+      "missing_symbols": [
+        "COST",
+        "JNJ",
+        "PG",
+        "PEP",
+        "WMT",
+        "CL",
+        "ABT"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "energy",
+      "missing_symbols": [
+        "XOM",
+        "CVX",
+        "OXY",
+        "SLB",
+        "COP"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "housing_rate_sensitivity",
+      "missing_symbols": [
+        "LPX",
+        "FERG",
+        "CSL"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "infrastructure_reshoring",
+      "missing_symbols": [
+        "CAT",
+        "DE",
+        "GE",
+        "URI",
+        "CMI",
+        "PCOR"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "mega_cap_platforms",
+      "missing_symbols": [
+        "GOOGL",
+        "META",
+        "NFLX",
+        "DIS"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "quality_cash_flow",
+      "missing_symbols": [
+        "MSFT",
+        "AAPL",
+        "COST",
+        "BRK.B",
+        "V",
+        "MA"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "regional_banks",
+      "missing_symbols": [
+        "RF",
+        "CFG",
+        "FITB",
+        "MTB"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "reits_falling_yield",
+      "missing_symbols": [
+        "PLD",
+        "AMT",
+        "EQIX",
+        "DLR"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "semiconductors",
+      "missing_symbols": [
+        "TSM"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "software_cloud",
+      "missing_symbols": [
+        "CRM",
+        "ADBE",
+        "DDOG",
+        "SNOW"
+      ],
+      "status": "needs_driver_mapping"
+    },
+    {
+      "roster_theme": "travel_leisure",
+      "missing_symbols": [
+        "BKNG",
+        "MAR",
+        "DAL",
+        "ABNB",
+        "RCL",
+        "HLT",
+        "H"
+      ],
+      "status": "needs_driver_mapping"
+    }
+  ]
+}
