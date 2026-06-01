@@ -25,7 +25,18 @@ Executes the 5-stage intelligence pipeline in order:
           reads:  data/signals_log.jsonl
           writes: data/ic_weights.json, data/ic_validation_result.json
 
-Safe to run at any time. No broker calls. No LLM calls.
+  Step 6: Counter-thesis FMP verification cache  [FAIL-SOFT]
+          writes: data/intelligence/counter_thesis_cache.json
+
+  Step 7: Conviction scoring for full watchlist  [FAIL-SOFT]
+          reads:  live handoff candidates + data/favourites.json
+          writes: data/intelligence/conviction/scores.json
+
+  Step 8: Earnings transcript intelligence  [FAIL-SOFT]
+          reads:  committed universe symbols, FMP transcripts
+          writes: data/intelligence/macro_events.jsonl
+
+Safe to run at any time. No broker calls. No LLM calls (except earnings transcripts).
 """
 from __future__ import annotations
 
@@ -470,8 +481,67 @@ def run() -> None:
         log.warning("Counter-thesis cache refresh failed (non-fatal): %s: %s", type(_ct_err).__name__, _ct_err)
         print(f"      [WARN] Counter-thesis cache skipped: {type(_ct_err).__name__}: {_ct_err}")
 
-    # Step 7 — Earnings transcript intelligence (fail-soft)
-    print("[7/7] Processing recent earnings call transcripts...")
+    # Step 7 — Conviction scoring for full watchlist (fail-soft)
+    # Symbol set = TTG-active ∪ live handoff candidates ∪ favourites.
+    print("[7/8] Scoring conviction for full watchlist...")
+    try:
+        from conviction_cache import refresh_all as _conviction_refresh_all
+
+        _score_symbols: set[str] = set()
+
+        # TTG-active set (status == "active" exposures) — the structural watchlist
+        try:
+            _ttg_path = os.path.join(
+                "data", "intelligence", "theme_graph", "symbol_exposures.json"
+            )
+            with open(_ttg_path, encoding="utf-8") as _fh:
+                _ttg_raw = json.load(_fh)
+            _score_symbols |= {
+                e.get("symbol", "").upper()
+                for e in _ttg_raw.get("exposures", [])
+                if e.get("status") == "active" and e.get("symbol")
+            }
+        except Exception:
+            pass
+
+        # Live handoff candidates
+        try:
+            with open(_LIVE_UNIVERSE, encoding="utf-8") as _fh:
+                _lu = json.load(_fh)
+            _score_symbols |= {
+                c["symbol"].upper() for c in _lu.get("candidates", []) if c.get("symbol")
+            }
+        except Exception:
+            pass
+
+        # Favourites (the user's persistent watchlist — always scored)
+        try:
+            _favs_path = os.path.join("data", "favourites.json")
+            with open(_favs_path, encoding="utf-8") as _fh:
+                _favs_raw = json.load(_fh)
+            if isinstance(_favs_raw, list):
+                _favs = _favs_raw
+            elif isinstance(_favs_raw, dict):
+                _favs = _favs_raw.get("symbols", _favs_raw.get("favourites", []))
+            else:
+                _favs = []
+            _score_symbols |= {s.upper() for s in _favs if isinstance(s, str) and s}
+        except Exception:
+            pass
+
+        _score_list = sorted(s for s in _score_symbols if s)
+        if _score_list:
+            _conviction_refresh_all(_score_list)
+            print(f"      conviction scores refreshed for {len(_score_list)} symbols "
+                  f"(ttg-active ∪ handoff ∪ favourites)")
+        else:
+            print("      [WARN] no symbols to score")
+    except Exception as _cv_err:
+        log.warning("Conviction scoring failed (non-fatal): %s: %s", type(_cv_err).__name__, _cv_err)
+        print(f"      [WARN] Conviction scoring skipped: {type(_cv_err).__name__}: {_cv_err}")
+
+    # Step 8 — Earnings transcript intelligence (fail-soft)
+    print("[8/8] Processing recent earnings call transcripts...")
     try:
         from earnings_transcript_engine import process_recent_earnings
         # Load committed universe symbols for filtering

@@ -155,6 +155,13 @@ def refresh_all(symbols: list[str]) -> None:
         fetch_earnings_calendar, score_symbol,
     )
 
+    # Merge, don't clobber: load any scores already on disk (written by another
+    # writer — e.g. the intelligence_api warm-up or a prior pipeline run) into the
+    # in-memory cache before we add ours. Without this, a fresh process starts with
+    # an empty _scores and _save_to_disk() overwrites the file with only the symbols
+    # this run scored, wiping every symbol the other writer covered.
+    _ensure_loaded()
+
     log.info("conviction_cache: full rescore starting for %d symbols", len(symbols))
     t0 = time.time()
 
