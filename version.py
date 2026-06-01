@@ -10,5 +10,5 @@
 
 
 
-__version__ = "4.96.0"
+__version__ = "4.96.1"
 __codename__ = "Conviction Engine v2"

@@ -5,6 +5,29 @@ Format: newest entries at the top. Each entry includes the date, what changed, a
 
 ---
 
+## v4.96.1 — 2026-06-01 — "Conviction Engine v2"
+
+### What
+Bot dashboard Live tab fixes. Scoped to `static/dashboard.html`:
+
+- **Honest movers status badge.** Top gainers / Top losers always rendered a green
+  "● live" badge regardless of session, so closed-market data looked live with nothing
+  signalling otherwise. The badge now reads the real session (`window._marketSession`,
+  published from `poll()`): "● live" during regular trading hours, "● extended hours"
+  pre/post-market, and "○ market closed · at last close" when the market is shut. The
+  refresh-button "✓ Live" feedback was neutralised to "✓".
+- **Open positions + Today's results side by side on wide desktop.** The two right-rail
+  sections are now wrapped in `.rail-pane` elements; at `@media(min-width:1500px)` the
+  rail widens to 600px and lays them out side by side instead of stacked. Default,
+  tablet, and mobile layouts are unchanged.
+
+### Why
+The hardcoded "live" badge was actively misleading — there was no way to tell whether the
+movers reflected a live market or a frozen last close. On wide monitors the narrow stacked
+right rail wasted horizontal space.
+
+---
+
 ## v4.96.0 — 2026-06-01 — "Conviction Engine v2"
 
 ### What
