@@ -5,6 +5,37 @@ Format: newest entries at the top. Each entry includes the date, what changed, a
 
 ---
 
+## v4.97.0 — 2026-06-01 — "Full Watchlist Conviction"
+
+### What
+The intelligence pipeline now conviction-scores the full watchlist on every run, and two
+root-cause fixes make that scoring durable and complete.
+
+- **Pipeline scores the full watchlist every run** (`run_intelligence_pipeline.py`, new step 7).
+  Symbol set = TTG-active ∪ live handoff candidates ∪ favourites (~190 symbols). Previously the
+  only scheduled conviction rescore was the `intelligence_api` startup warm-up over the TTG-active
+  set; committed-universe and handoff names the user cared about were never scored unless they
+  happened to be in that set.
+- **Merge-safe cache writes** (`conviction_cache.py`). `refresh_all()` now loads any scores already
+  on disk before scoring, so it merges instead of overwriting. The standalone pipeline run and the
+  long-lived `intelligence_api` warm-up score different symbol sets and were clobbering each other's
+  writes on every run — neither ever persisted full coverage.
+- **Chunked price-change fetch** (`conviction_engine.py`). `fetch_price_changes()` sent every symbol
+  in one FMP `stock-price-change` call, which returned `402` once the set passed ~100 symbols
+  (per-request / per-minute limit). Now chunked at 50 symbols/call with escalating backoff on
+  402/429 so a quota-pressured chunk recovers instead of zeroing the momentum dimension.
+- **Watchlist coverage** (`data/favourites.json`). Added the 14 watchlist names not otherwise in
+  the union (HIVE, LUMN, OSCR + HPE, INTC, INTU, MDB, MPWR, NFLX, NOK, QCOM, SOFI, TER, VICR) so all
+  40 of the active watchlist names are scored every run. Verified: 40/40 in cache, 0 degraded.
+
+### Why
+Conviction scoring is only useful if it actually covers the names under consideration and the
+scores survive the next run. The clobber bug and the oversized FMP batch meant coverage silently
+collapsed to the TTG-active set with a zeroed momentum dimension. This makes full-watchlist
+conviction a durable, every-run guarantee.
+
+---
+
 ## v4.96.0 — 2026-06-01 — "Conviction Engine v2"
 
 ### What
