@@ -2,20 +2,25 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-interface Leader {
+interface HourPoint {
   hour: string;
-  rank: number;
-  symbol: string;
   volume: number;
   volumeM: string;
-  ratio?: number;
-  ratioLabel?: string;
+  ratio: number;
 }
-
+interface Mover {
+  symbol: string;
+  peakRatio: number;
+  peakHour: string;
+  dayVolume: number;
+  dayVolumeM: string;
+  priceChangePct: number | null;
+  series: HourPoint[];
+}
 interface VolumeData {
   hours: string[];
-  leaders: Leader[];
-  unusual_leaders: Leader[];
+  unusual: Mover[];
+  traded: Mover[];
   ts: string;
   date: string;
   market_open: boolean;
@@ -58,41 +63,62 @@ const NAMES: Record<string, string> = {
   AMKR:"Amkor", APLD:"Applied Digital",
 };
 
+function name(sym: string): string {
+  return NAMES[sym] ?? sym;
+}
+
 function formatHour(h: string): string {
   const [hh, mm] = h.split(":").map(Number);
   const suffix = hh >= 12 ? "PM" : "AM";
   const display = hh > 12 ? hh - 12 : hh === 0 ? 12 : hh;
-  return `${display}:${String(mm).padStart(2, "0")} ${suffix}`;
+  return mm === 0 ? `${display} ${suffix}` : `${display}:${String(mm).padStart(2, "0")} ${suffix}`;
 }
-
-// "2026-05-29" -> "Friday, May 29" (no timezone shift)
 function fullDate(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  return dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
-
 function timeAgo(ts: string): string {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   return `${Math.floor(diff / 3600)}h ago`;
 }
-
-// Heat tint for a ratio (green scale, capped at ~12x)
-function heatStyle(intensity: number): React.CSSProperties {
-  const a = Math.min(Math.max(intensity, 0), 1);
-  return {
-    backgroundColor: `rgba(16,185,129,${0.05 + a * 0.20})`,
-    borderColor: `rgba(16,185,129,${0.18 + a * 0.45})`,
-  };
+function pricePct(p: number | null): { text: string; cls: string } {
+  if (p == null) return { text: "", cls: "text-slate-500" };
+  const sign = p > 0 ? "+" : "";
+  if (p > 0.05) return { text: `${sign}${p.toFixed(2)}%`, cls: "text-emerald-400" };
+  if (p < -0.05) return { text: `${p.toFixed(2)}%`, cls: "text-rose-400" };
+  return { text: `${p.toFixed(2)}%`, cls: "text-slate-400" };
 }
 
-function ratioColor(ratio: number): string {
-  if (ratio >= 5) return "text-emerald-300";
-  if (ratio >= 3) return "text-emerald-400";
-  if (ratio >= 2) return "text-emerald-500";
-  return "text-slate-300";
+// Intraday bar strip — height = ratio (unusual) or volume (traded), peak bar bright
+function IntradayBars({ mover, mode }: { mover: Mover; mode: Tab }) {
+  const vals = mover.series.map((p) => (mode === "unusual" ? p.ratio : p.volume));
+  const max = Math.max(...vals, 0.0001);
+  const peakIdx = vals.indexOf(Math.max(...vals));
+  return (
+    <div className="flex items-end gap-[3px] h-10">
+      {mover.series.map((p, i) => {
+        const h = Math.max((vals[i] / max) * 100, 6);
+        const isPeak = i === peakIdx;
+        return (
+          <div
+            key={p.hour}
+            className="flex-1 rounded-sm transition-colors"
+            style={{
+              height: `${h}%`,
+              backgroundColor: isPeak ? "rgb(52,211,153)" : "rgba(52,211,153,0.22)",
+            }}
+            title={
+              mode === "unusual"
+                ? `${formatHour(p.hour)} · ${p.ratio.toFixed(1)}x normal`
+                : `${formatHour(p.hour)} · ${p.volumeM} shares`
+            }
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 export default function VolumePage() {
@@ -122,46 +148,17 @@ export default function VolumePage() {
     const interval = setInterval(fetchData, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchData]);
-
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(t);
   }, []);
 
   const isUnusual = tab === "unusual";
-  const activeLeaders = isUnusual ? (data?.unusual_leaders ?? []) : (data?.leaders ?? []);
-  const hasData = activeLeaders.length > 0;
-
-  // Group by hour
-  const byHour: Map<string, Leader[]> = new Map();
-  for (const l of activeLeaders) {
-    if (!byHour.has(l.hour)) byHour.set(l.hour, []);
-    byHour.get(l.hour)!.push(l);
-  }
-
-  const latestHour = data?.hours?.at(-1);
-
-  // Aggregate each symbol's peak across the day -> info cards
-  const peakBySymbol: Map<string, { symbol: string; metric: number; ratio: number; volumeM: string; hour: string }> = new Map();
-  for (const l of activeLeaders) {
-    const metric = isUnusual ? (l.ratio ?? 0) : l.volume;
-    const cur = peakBySymbol.get(l.symbol);
-    if (!cur || metric > cur.metric) {
-      peakBySymbol.set(l.symbol, {
-        symbol: l.symbol,
-        metric,
-        ratio: l.ratio ?? 0,
-        volumeM: l.volumeM,
-        hour: l.hour,
-      });
-    }
-  }
-  const movers = Array.from(peakBySymbol.values()).sort((a, b) => b.metric - a.metric).slice(0, 12);
-  const topMetric = movers[0]?.metric ?? 1;
+  const movers = (isUnusual ? data?.unusual : data?.traded) ?? [];
+  const lead = movers[0];
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-slate-100 font-mono">
-      {/* Header */}
       <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <span className="text-slate-400 text-xs uppercase tracking-widest">Decifer</span>
@@ -191,17 +188,17 @@ export default function VolumePage() {
 
         {data && !loading && (
           <>
-            {/* Date context — answers "which day is this?" */}
+            {/* Date context */}
             <div className="mb-6">
               <h1 className="text-white text-xl font-semibold">{fullDate(data.date)}</h1>
               <p className="text-slate-400 text-sm mt-1">
                 {data.is_today
-                  ? "Today's trading so far. Each hour is a US market hour (Eastern time)."
-                  : "Last completed trading session. Markets are closed for the weekend. 4:00 PM is the closing hour."}
+                  ? "Today's trading so far, hour by hour (US Eastern time)."
+                  : "The last completed trading session. Markets are closed for the weekend. The bars run from the 10 AM hour to the 4 PM close."}
               </p>
             </div>
 
-            {/* Tab switcher */}
+            {/* Tabs */}
             <div className="flex gap-1 mb-2">
               <button
                 onClick={() => setTab("unusual")}
@@ -220,109 +217,78 @@ export default function VolumePage() {
                 Most traded
               </button>
             </div>
-            <p className="text-slate-400 text-xs mb-8 max-w-2xl">
-              {isUnusual
-                ? "Stocks trading well above their normal pace. A higher number means more activity than usual, which often points to news or a big move."
-                : "Stocks with the most shares changing hands. The biggest names lead here almost every day."}
-            </p>
 
-            {!hasData && (
+            {/* Plain-English lead */}
+            {lead && (
+              <p className="text-slate-300 text-sm mb-8 max-w-3xl leading-relaxed">
+                {isUnusual ? (
+                  <>
+                    <span className="text-white font-semibold">{name(lead.symbol)}</span> saw the most unusual
+                    activity, trading <span className="text-emerald-400 font-semibold">{lead.peakRatio.toFixed(1)}x</span> its
+                    normal pace around {formatHour(lead.peakHour)}.
+                    {lead.priceChangePct != null && Math.abs(lead.priceChangePct) > 0.05 && (
+                      <> The stock finished {lead.priceChangePct > 0 ? "up" : "down"}{" "}
+                        <span className={pricePct(lead.priceChangePct).cls + " font-semibold"}>
+                          {pricePct(lead.priceChangePct).text}
+                        </span> on the day.</>
+                    )}{" "}
+                    Heavy volume with a price move is usually where the real story is.
+                  </>
+                ) : (
+                  <>
+                    <span className="text-white font-semibold">{name(lead.symbol)}</span> had the most shares
+                    change hands today ({lead.dayVolumeM}). The biggest companies lead this list almost every day,
+                    so the <span className="text-slate-200">Unusual volume</span> tab is usually more telling.
+                  </>
+                )}
+              </p>
+            )}
+
+            {/* Mover cards with intraday pattern */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {movers.map((m) => {
+                const price = pricePct(m.priceChangePct);
+                return (
+                  <div key={m.symbol} className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 hover:border-slate-700 transition-colors">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-white font-bold text-base">{m.symbol}</span>
+                          {price.text && <span className={`text-xs font-semibold ${price.cls}`}>{price.text}</span>}
+                        </div>
+                        <div className="text-slate-400 text-xs truncate">{name(m.symbol)}</div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        {isUnusual ? (
+                          <>
+                            <div className="text-emerald-400 font-bold text-base leading-none">{m.peakRatio.toFixed(1)}x</div>
+                            <div className="text-slate-500 text-[10px] mt-1">normal pace</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-emerald-400 font-bold text-base leading-none">{m.dayVolumeM}</div>
+                            <div className="text-slate-500 text-[10px] mt-1">shares</div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <IntradayBars mover={m} mode={tab} />
+                      <div className="flex justify-between mt-1.5 text-[10px] text-slate-500">
+                        <span>{formatHour(m.series[0]?.hour ?? "")}</span>
+                        <span className="text-emerald-400/80">peak {formatHour(m.peakHour)}</span>
+                        <span>{formatHour(m.series[m.series.length - 1]?.hour ?? "")}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {movers.length === 0 && (
               <div className="text-slate-400 text-sm py-12">
                 Nothing unusual yet. Stocks will appear here once they trade above their normal pace.
               </div>
-            )}
-
-            {hasData && (
-              <>
-                {/* Info cards — top movers of the day, heatmap tinted */}
-                <section className="mb-12">
-                  <div className="text-xs text-slate-400 uppercase tracking-widest mb-4">
-                    Biggest moves today
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {movers.map((m) => (
-                      <div
-                        key={m.symbol}
-                        className="rounded-lg border p-4 transition-colors"
-                        style={isUnusual ? heatStyle(m.ratio / 12) : heatStyle(m.metric / topMetric)}
-                      >
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-white font-bold text-lg">{m.symbol}</span>
-                          {isUnusual ? (
-                            <span className={`font-bold text-sm ${ratioColor(m.ratio)}`}>
-                              {m.ratio.toFixed(1)}x
-                            </span>
-                          ) : (
-                            <span className="text-emerald-400 font-bold text-sm">{m.volumeM}</span>
-                          )}
-                        </div>
-                        <div className="text-slate-300 text-sm mt-0.5 truncate">
-                          {NAMES[m.symbol] ?? m.symbol}
-                        </div>
-                        <div className="text-slate-500 text-xs mt-2">
-                          {isUnusual ? "Peak at " : "Most at "}{formatHour(m.hour)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* Hour-by-hour heatmap matrix */}
-                <section className="overflow-x-auto">
-                  <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">
-                    Hour by hour
-                  </div>
-                  <p className="text-slate-500 text-xs mb-4">
-                    Top names each hour. Brighter green means more unusual activity.
-                  </p>
-                  <table className="border-separate" style={{ borderSpacing: "4px", minWidth: `${data.hours.length * 104 + 40}px` }}>
-                    <thead>
-                      <tr>
-                        <th className="text-left text-slate-500 font-normal text-xs w-6"></th>
-                        {data.hours.map((h) => (
-                          <th
-                            key={h}
-                            className={`font-normal text-xs pb-1 text-center ${h === latestHour ? "text-white" : "text-slate-500"}`}
-                          >
-                            {formatHour(h)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.from({ length: 10 }, (_, i) => i + 1).map((rank) => (
-                        <tr key={rank}>
-                          <td className="text-slate-600 text-xs text-right pr-1 align-middle">{rank}</td>
-                          {data.hours.map((h) => {
-                            const leader = byHour.get(h)?.find((l) => l.rank === rank);
-                            if (!leader) {
-                              return <td key={h} className="rounded bg-slate-900/40 h-9" />;
-                            }
-                            const intensity = isUnusual ? (leader.ratio ?? 0) / 12 : 0.3;
-                            return (
-                              <td
-                                key={h}
-                                className="rounded border h-9 px-2 text-center align-middle"
-                                style={heatStyle(intensity)}
-                                title={
-                                  isUnusual && leader.ratioLabel
-                                    ? `${NAMES[leader.symbol] ?? leader.symbol} · ${leader.ratioLabel}`
-                                    : `${NAMES[leader.symbol] ?? leader.symbol} · ${leader.volumeM} shares`
-                                }
-                              >
-                                <span className="text-white text-xs font-semibold">{leader.symbol}</span>
-                                {isUnusual && leader.ratio != null && (
-                                  <span className="text-emerald-300/80 text-[10px] ml-1">{leader.ratio.toFixed(1)}x</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </section>
-              </>
             )}
           </>
         )}
@@ -332,8 +298,8 @@ export default function VolumePage() {
         <span>volume.decifertrading.com</span>
         <span>
           {isUnusual
-            ? "Compared against each stock's 30-day average · Alpaca data · updates every 5 min"
-            : "Alpaca data · updates every 5 min"}
+            ? "Each stock compared to its own 30-day average · Alpaca data · updates every 5 min"
+            : "Total shares traded · Alpaca data · updates every 5 min"}
         </span>
       </footer>
     </div>
