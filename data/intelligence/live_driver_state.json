@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-30T09:25:17Z",
+  "generated_at": "2026-06-01T06:34:35Z",
   "mode": "live_market_data",
   "active_drivers": [
     "ai_capex_growth",
@@ -40,12 +40,28 @@
     "gold_reason": "GLD 5d=0.03% \u2014 no safe-haven signal",
     "credit_easing_reason": "HYG-LQD=-0.59% \u2014 credit not easing",
     "small_cap_risk_on_reason": "IWM vs SPY=0.96% \u2014 no small-cap leadership",
-    "es_5d_ret": 0.017378783819983923,
-    "nq_5d_ret": 0.03253274923804428,
-    "futures_risk_on_reason": "ES 5d=1.74% > +0.75%, NQ=3.25% \u2014 futures bullish",
-    "futures_risk_off_reason": "ES 5d=1.74% \u2014 futures not bearish"
+    "es_5d_ret": 0.01678681083967426,
+    "nq_5d_ret": 0.03427918974922828,
+    "futures_risk_on_reason": "ES 5d=1.68% > +0.75%, NQ=3.43% \u2014 futures bullish",
+    "futures_risk_off_reason": "ES 5d=1.68% \u2014 futures not bearish"
   },
   "warnings": [],
+  "driver_confirmation": {
+    "ai_capex_growth": "PRICE_ONLY",
+    "ai_compute_demand": "PRICE_ONLY",
+    "yields_falling": "PRICE_ONLY",
+    "oil_supply_shock": "PRICE_ONLY",
+    "geopolitical_risk_rising": "PRICE_ONLY",
+    "credit_stress_rising": "PRICE_ONLY",
+    "risk_on_rotation": "PRICE_ONLY",
+    "futures_risk_on": "PRICE_ONLY"
+  },
+  "event_unconfirmed_drivers": [],
+  "macro_context_summary": {
+    "active_domains": [],
+    "risk_direction": "neutral",
+    "event_count": 0
+  },
   "live_output_changed": false,
   "broker_called": false,
   "llm_used": false
