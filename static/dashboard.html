@@ -142,6 +142,10 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .live-grid{display:grid;grid-template-columns:1fr 1fr 340px;width:100%;flex:1;min-height:0;overflow:hidden}
 .col{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
 .col:last-child{border-right:none}
+/* Right rail: stacks Open positions over Today's results by default; splits
+   into two side-by-side panes on a wide desktop (see min-width:1500px below). */
+.col-rail{display:flex;flex-direction:column}
+.rail-pane{display:flex;flex-direction:column;min-height:0}
 
 /* Tablet: 2-column (merge left+mid, keep right rail) */
 @media(max-width:1024px) and (min-width:769px){
@@ -171,6 +175,14 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
   #view-live .col{overflow:visible !important}
   #view-live .col-body{overflow:visible !important}
   #view-live #pos-list{max-height:none !important;overflow:visible !important}
+}
+
+/* Wide desktop: widen the right rail and place Open positions + Today's results
+   side by side instead of stacked. */
+@media(min-width:1500px){
+  .live-grid{grid-template-columns:1fr 1fr 600px}
+  .col-rail{display:grid;grid-template-columns:1fr 1fr;align-content:start}
+  .col-rail .rail-pane + .rail-pane{border-left:1px solid var(--border)}
 }
 
 /* Tape */
@@ -991,18 +1003,22 @@ canvas{display:block;width:100% !important}
     </div>
 
     <!-- COL 3: Portfolio + Today's results (right rail) -->
-    <div class="col">
-      <div class="col-title">Open positions <span style="margin-left:auto;display:flex;gap:6px">
-        <button class="pos-sort-btn" id="pos-sort-recency" onclick="sortPositions('recency')" style="background:none;border:none;color:var(--orange);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;padding:0">Recent</button>
-        <button class="pos-sort-btn" id="pos-sort-size"    onclick="sortPositions('size')"    style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;padding:0">Size</button>
-        <button class="pos-sort-btn" id="pos-sort-pnl"     onclick="sortPositions('pnl')"     style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;padding:0">P&amp;L</button>
-      </span></div>
-      <div style="flex:0 0 auto;overflow-y:auto;max-height:50%;border-bottom:1px solid var(--border)" id="pos-list">
-        <div class="empty">No open positions</div>
+    <div class="col col-rail">
+      <div class="rail-pane">
+        <div class="col-title">Open positions <span style="margin-left:auto;display:flex;gap:6px">
+          <button class="pos-sort-btn" id="pos-sort-recency" onclick="sortPositions('recency')" style="background:none;border:none;color:var(--orange);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;padding:0">Recent</button>
+          <button class="pos-sort-btn" id="pos-sort-size"    onclick="sortPositions('size')"    style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;padding:0">Size</button>
+          <button class="pos-sort-btn" id="pos-sort-pnl"     onclick="sortPositions('pnl')"     style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;padding:0">P&amp;L</button>
+        </span></div>
+        <div style="flex:0 0 auto;overflow-y:auto;max-height:50%;border-bottom:1px solid var(--border)" id="pos-list">
+          <div class="empty">No open positions</div>
+        </div>
       </div>
-      <div class="col-title" style="flex-shrink:0">Today's results</div>
-      <div class="col-body" id="trades-list">
-        <div class="empty">No closed trades today</div>
+      <div class="rail-pane">
+        <div class="col-title" style="flex-shrink:0">Today's results</div>
+        <div class="col-body" id="trades-list">
+          <div class="empty">No closed trades today</div>
+        </div>
       </div>
     </div>
 
@@ -5855,6 +5871,9 @@ async function poll() {
     };
     const rawSession = d.session || '—';
     document.getElementById('s-session').textContent = _SESSION_LABELS[rawSession] || rawSession;
+    // Publish session so the movers badge can tell live vs extended-hours vs closed.
+    window._marketSession = d.session;
+    if (typeof setMoverLabels === 'function') setMoverLabels();
 
     // Weekend / closed-market preview bar
     const _isOffHours = ['CLOSED', 'WEEKEND', 'AFTER_HOURS'].includes(rawSession);
@@ -6502,6 +6521,30 @@ async function loadRegimeLive() {
   } catch (_) {}
 }
 
+// ── Movers status badge — honest about whether the market is actually open ──
+// The movers come from Alpaca snapshots: during regular hours they are live,
+// pre/post-market they reflect extended-hours trading, and when the market is
+// closed they are frozen at the last close. The badge must say which.
+const _RTH_SESSIONS = ['OPEN_BUFFER','PRIME_AM','LUNCH','PRIME_PM','CLOSE_BUFFER'];
+const _EXT_SESSIONS = ['PRE_MARKET','PRE_OPEN','AFTER_HOURS'];
+function _moverStatusBadge() {
+  const s = window._marketSession;
+  if (_RTH_SESSIONS.includes(s))
+    return `<span style="font-size:10px;color:var(--green);font-family:'JetBrains Mono',monospace;margin-left:4px">● live</span>`;
+  if (_EXT_SESSIONS.includes(s))
+    return `<span style="font-size:10px;color:var(--orange);font-family:'JetBrains Mono',monospace;margin-left:4px">● extended hours</span>`;
+  if (s === 'CLOSED' || s === 'WEEKEND')
+    return `<span style="font-size:10px;color:var(--muted2);font-family:'JetBrains Mono',monospace;margin-left:4px">○ market closed · at last close</span>`;
+  return '';   // session not yet known — show no badge rather than a wrong one
+}
+function setMoverLabels() {
+  const badge = _moverStatusBadge();
+  const g = document.getElementById('on-gainers-label');
+  const l = document.getElementById('on-losers-label');
+  if (g) g.innerHTML = 'Top gainers ' + badge;
+  if (l) l.innerHTML = 'Top losers '  + badge;
+}
+
 // ── Live movers from Alpaca screener — replaces overnight-brief movers ──────
 async function loadMovers() {
   const btn = document.getElementById('on-movers-refresh-btn');
@@ -6520,11 +6563,9 @@ async function loadMovers() {
       while (ref.getDay() === 0 || ref.getDay() === 6) ref.setDate(ref.getDate() - 1);
       prevCloseDateEl.textContent = `vs ${ref.toLocaleDateString('en-US', {month:'short', day:'numeric'})} close`;
     }
-    // Always show live badge — never stale
-    const gainerLbl = document.getElementById('on-gainers-label');
-    const loserLbl  = document.getElementById('on-losers-label');
-    if (gainerLbl) gainerLbl.innerHTML = 'Top gainers <span style="font-size:10px;color:var(--green);font-family:\'JetBrains Mono\',monospace;margin-left:4px">● live</span>';
-    if (loserLbl)  loserLbl.innerHTML  = 'Top losers <span style="font-size:10px;color:var(--green);font-family:\'JetBrains Mono\',monospace;margin-left:4px">● live</span>';
+    // Badge reflects the real session — live during RTH, extended-hours, or
+    // "at last close" when the market is shut. Never a blanket "live".
+    setMoverLabels();
 
     // Keep globals in sync for any downstream references
     window._moverSymbols = [...gainers, ...losers].map(m => m.sym);
@@ -6554,7 +6595,7 @@ async function loadMovers() {
       ? losers.map(moverRow).join('')
       : '<span style="color:var(--muted2);font-size:11px">No data</span>';
 
-    if (btn) btn.textContent = '✓ Live';
+    if (btn) btn.textContent = '✓';
   } catch(e) {
     if (btn) btn.textContent = '✗';
   } finally {
@@ -6692,7 +6733,7 @@ async function refreshMovers() {
       if (gEl) gEl.innerHTML = gainers.slice(0,8).map(row).join('') || '<span style="color:var(--muted2);font-size:11px">No gainers</span>';
       if (lEl) lEl.innerHTML = losers.slice(0,8).map(row).join('') || '<span style="color:var(--muted2);font-size:11px">No losers</span>';
     }
-    if (btn) btn.textContent = '✓ Live';
+    if (btn) btn.textContent = '✓';
   } catch(e) {
     if (btn) btn.textContent = '✗';
   } finally {
