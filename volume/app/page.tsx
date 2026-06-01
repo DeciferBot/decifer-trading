@@ -107,7 +107,7 @@ function IntradayBars({ mover, mode }: { mover: Mover; mode: Tab }) {
             className="flex-1 rounded-sm transition-colors"
             style={{
               height: `${h}%`,
-              backgroundColor: isPeak ? "rgb(52,211,153)" : "rgba(52,211,153,0.22)",
+              backgroundColor: isPeak ? "#f97316" : "rgba(249,115,22,0.18)",
             }}
             title={
               mode === "unusual"
@@ -161,8 +161,8 @@ export default function VolumePage() {
     <div className="min-h-screen bg-[#0a0a0a] text-slate-100 font-mono">
       <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <span className="text-slate-400 text-xs uppercase tracking-widest">Decifer</span>
-          <span className="text-slate-500">|</span>
+          <span className="text-orange-500 text-xs uppercase tracking-widest font-semibold">Decifer</span>
+          <span className="text-slate-700">|</span>
           <span className="text-white font-semibold tracking-wide">Volume</span>
           {data?.market_open && (
             <span className="flex items-center gap-1 text-emerald-400 text-xs">
@@ -203,7 +203,7 @@ export default function VolumePage() {
               <button
                 onClick={() => setTab("unusual")}
                 className={`px-4 py-1.5 text-xs rounded transition-colors ${
-                  isUnusual ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"
+                  isUnusual ? "bg-orange-500 text-black font-semibold" : "text-slate-500 hover:text-slate-300"
                 }`}
               >
                 Unusual volume
@@ -211,7 +211,7 @@ export default function VolumePage() {
               <button
                 onClick={() => setTab("raw")}
                 className={`px-4 py-1.5 text-xs rounded transition-colors ${
-                  !isUnusual ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"
+                  !isUnusual ? "bg-orange-500 text-black font-semibold" : "text-slate-500 hover:text-slate-300"
                 }`}
               >
                 Most traded
@@ -224,7 +224,7 @@ export default function VolumePage() {
                 {isUnusual ? (
                   <>
                     <span className="text-white font-semibold">{name(lead.symbol)}</span> saw the most unusual
-                    activity, trading <span className="text-emerald-400 font-semibold">{lead.peakRatio.toFixed(1)}x</span> its
+                    activity, trading <span className="text-orange-400 font-semibold">{lead.peakRatio.toFixed(1)}x</span> its
                     normal pace around {formatHour(lead.peakHour)}.
                     {lead.priceChangePct != null && Math.abs(lead.priceChangePct) > 0.05 && (
                       <> The stock finished {lead.priceChangePct > 0 ? "up" : "down"}{" "}
@@ -261,12 +261,12 @@ export default function VolumePage() {
                       <div className="text-right flex-shrink-0">
                         {isUnusual ? (
                           <>
-                            <div className="text-emerald-400 font-bold text-base leading-none">{m.peakRatio.toFixed(1)}x</div>
+                            <div className="text-orange-400 font-bold text-base leading-none">{m.peakRatio.toFixed(1)}x</div>
                             <div className="text-slate-500 text-[10px] mt-1">normal pace</div>
                           </>
                         ) : (
                           <>
-                            <div className="text-emerald-400 font-bold text-base leading-none">{m.dayVolumeM}</div>
+                            <div className="text-orange-400 font-bold text-base leading-none">{m.dayVolumeM}</div>
                             <div className="text-slate-500 text-[10px] mt-1">shares</div>
                           </>
                         )}
@@ -276,7 +276,7 @@ export default function VolumePage() {
                       <IntradayBars mover={m} mode={tab} />
                       <div className="flex justify-between mt-1.5 text-[10px] text-slate-500">
                         <span>{formatHour(m.series[0]?.hour ?? "")}</span>
-                        <span className="text-emerald-400/80">peak {formatHour(m.peakHour)}</span>
+                        <span className="text-orange-400/80">peak {formatHour(m.peakHour)}</span>
                         <span>{formatHour(m.series[m.series.length - 1]?.hour ?? "")}</span>
                       </div>
                     </div>
