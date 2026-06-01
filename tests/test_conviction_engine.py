@@ -649,3 +649,73 @@ class TestNewsCatalystFallback:
         # tape positive should win — not negative FMP
         assert d.raw_pts > 0
         assert "tape" in d.signal
+
+
+# ---------------------------------------------------------------------------
+# Thesis-aware valuation & analyst (re-rating vs mean-reversion)
+# ---------------------------------------------------------------------------
+
+class TestThesisAwareValuation:
+    """A name above DCF/target is penalised in mean-reversion mode but rewarded
+    (growth-adjusted) in re-rating mode — driven by driver_active + strong growth."""
+
+    def _val(self, strengthening, dcf, price, rev_growth, pe=None):
+        import conviction_engine as ce
+        thesis = {"strengthening": strengthening, "rev_growth_pct": rev_growth}
+        def fmp_side(endpoint, params, **kw):
+            if "discounted-cash-flow" in endpoint:
+                return [{"dcf": dcf, "stockPrice": price}]
+            if "key-metrics-ttm" in endpoint:
+                return [{"peRatioTTM": pe}] if pe else []
+            if "financial-growth" in endpoint:
+                return [{"revenueGrowth": rev_growth / 100.0}]
+            return []
+        with patch("conviction_engine._fmp", side_effect=fmp_side), \
+             patch("conviction_engine._exposures_for", return_value=[]):
+            return ce._score_valuation("MU", thesis=thesis)
+
+    def test_above_dcf_penalised_in_mean_reversion(self):
+        # price way above DCF, no thesis → heavy penalty
+        d = self._val(strengthening=False, dcf=448, price=971, rev_growth=49)
+        assert d.raw_pts < 0
+
+    def test_above_dcf_not_penalised_in_rerating(self):
+        # same name, thesis strengthening → DCF overshoot ignored, growth rewarded
+        d = self._val(strengthening=True, dcf=448, price=971, rev_growth=49)
+        assert d.raw_pts > 0
+
+    def test_rerating_beats_mean_reversion_for_same_name(self):
+        mr = self._val(strengthening=False, dcf=448, price=971, rev_growth=49)
+        rr = self._val(strengthening=True,  dcf=448, price=971, rev_growth=49)
+        assert rr.raw_pts > mr.raw_pts + 15  # large, decisive swing
+
+    def test_low_peg_high_growth_max_reward(self):
+        # low P/E + high growth in re-rating mode → top valuation score
+        d = self._val(strengthening=True, dcf=448, price=971, rev_growth=49, pe=20)
+        assert d.raw_pts >= 15
+
+
+class TestThesisAwareAnalyst:
+    def _analyst(self, strengthening, pt, price):
+        import conviction_engine as ce
+        thesis = {"strengthening": strengthening, "rev_growth_pct": 49}
+        def fmp_side(endpoint, params, **kw):
+            if "grades-consensus" in endpoint:
+                return [{"consensus": "Buy"}]
+            if "price-target-consensus" in endpoint:
+                return [{"targetConsensus": pt}]
+            if "quote-short" in endpoint:
+                return [{"price": price}]
+            return None
+        with patch("conviction_engine._fmp", side_effect=fmp_side):
+            return ce._score_analyst("MU", [], thesis=thesis)
+
+    def test_above_target_penalised_in_mean_reversion(self):
+        d = self._analyst(strengthening=False, pt=624, price=971)  # price above target
+        # BUY=12 then upside -36% → -10 penalty
+        assert d.raw_pts < 12
+
+    def test_above_target_not_penalised_in_rerating(self):
+        d = self._analyst(strengthening=True, pt=624, price=971)
+        # BUY=12 + re-rating (no penalty) → >= 12
+        assert d.raw_pts >= 12

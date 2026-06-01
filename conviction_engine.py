@@ -190,16 +190,65 @@ def _thesis_divergence_for(symbol: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# D1 — Analyst consensus + price target  (max 38 pts)
+# Thesis context — re-rating vs mean-reversion mode
 # ---------------------------------------------------------------------------
-# Scoring:
-#   Consensus:   STRONG_BUY=20, BUY=12, HOLD=5, SELL=0, STRONG_SELL=-5
-#   Upside to PT: ≥20%=+10, 10-20%=+6, 0-10%=+3, <0%=-5, ≥-20%=-10
-#   Recent change (30d): upgrade=+8, downgrade=-10
-#   Grade trend (improving vs deteriorating): +4 / -4
-# Max achievable: 20+10+8+4 = 42  (clamped to 38 declared MAX)
+# A structural re-rating (the world needs more memory / power / copper) makes a
+# name run AHEAD of DCF and static analyst targets — that is what re-rating IS.
+# Penalising "above DCF / above target" then penalises the thesis working.
+#
+# The signal that distinguishes a re-rating from an overshoot is NOT the level of
+# price vs anchor — it is the DIRECTION of estimate revisions + growth acceleration.
+#   thesis_strengthening = driver_active AND (revenue growth strong OR EPS estimates rising)
+#
+# In strengthening mode, valuation switches from mean-reversion (penalise expensive)
+# to re-rating (reward growth-adjusted cheapness, brake only when estimates are cut).
 
-def _score_analyst(symbol: str, recent_changes: list[dict]) -> DimensionScore:
+def _revenue_growth_pct(symbol: str) -> float | None:
+    """Latest annual revenue growth as a percentage (e.g. 49.0 for 49%)."""
+    raw = _fmp("financial-growth", {"symbol": symbol, "period": "annual", "limit": 1})
+    g = _first(raw)
+    rg = _f(g.get("revenueGrowth") or g.get("revenue_growth"))
+    if rg is None:
+        return None
+    return rg * 100 if abs(rg) <= 5 else rg
+
+
+def _thesis_context(symbol: str, driver_active: bool, rev_growth_pct: float | None) -> dict:
+    """
+    Compute re-rating context once per symbol. Returns:
+      strengthening   — bool: driver active AND strong revenue growth (>=20%)
+      rev_growth_pct  — float|None
+
+    Note on what we deliberately do NOT use: FMP analyst-estimates with period=quarter
+    returns the NEXT two quarters' estimates, so comparing them measures seasonality /
+    cycle ramp, not a revision of analyst views. Real revision direction comes from
+    upgrades/downgrades (scored in D1's recent-changes block) and grade-trend — both of
+    which are already in D1. So the strengthening signal here is driver + growth; the
+    revision brake lives in D1 as actual downgrades.
+    """
+    strong_growth = rev_growth_pct is not None and rev_growth_pct >= 20
+    strengthening = bool(driver_active and strong_growth)
+    return {
+        "strengthening": strengthening,
+        "rev_growth_pct": rev_growth_pct,
+    }
+
+
+# ---------------------------------------------------------------------------
+# D1 — Analyst consensus + price target  (max 38 pts)  [thesis-aware]
+# ---------------------------------------------------------------------------
+# Consensus base: STRONG_BUY=20, BUY=12, HOLD=5, SELL=0, STRONG_SELL=-5
+# Target logic depends on mode:
+#   Mean-reversion: static upside-to-target (≥20%=+10 … <-20%=-10)
+#   Re-rating:      price running past a rising target is the thesis working —
+#                   reward, and brake only when estimates are being CUT.
+# Recent change (30d): upgrade=+8, downgrade=-10.  Grade trend: ±4.
+
+def _score_analyst(
+    symbol: str,
+    recent_changes: list[dict],
+    thesis: dict | None = None,
+) -> DimensionScore:
     MAX = 38
     pts = 0
     signals = []
@@ -226,18 +275,32 @@ def _score_analyst(symbol: str, recent_changes: list[dict]) -> DimensionScore:
     price_item = _first(price_raw)
     current_price = _f(price_item.get("price"))
 
+    strengthening = bool(thesis and thesis.get("strengthening"))
+
     if pt and current_price and current_price > 0:
         upside = (pt - current_price) / current_price * 100
-        if upside >= 20:
-            pts += 10; signals.append(f"upside={upside:.0f}%→+10")
-        elif upside >= 10:
-            pts += 6;  signals.append(f"upside={upside:.0f}%→+6")
-        elif upside >= 0:
-            pts += 3;  signals.append(f"upside={upside:.0f}%→+3")
-        elif upside >= -20:
-            pts -= 5;  signals.append(f"upside={upside:.0f}%→-5")
+        if strengthening:
+            # RE-RATING MODE: price running past the target is the thesis working.
+            # Don't penalise above-target. The revision brake is the downgrade count
+            # below (actual analyst cuts), not the static target gap.
+            if upside >= 10:
+                pts += 10; signals.append(f"upside={upside:.0f}%(runway)→+10")
+            elif upside >= -25:
+                pts += 6;  signals.append(f"upside={upside:.0f}%(re-rating)→+6")
+            else:
+                pts += 2;  signals.append(f"upside={upside:.0f}%(stretched)→+2")
         else:
-            pts -= 10; signals.append(f"upside={upside:.0f}%→-10")
+            # MEAN-REVERSION MODE: static upside-to-target
+            if upside >= 20:
+                pts += 10; signals.append(f"upside={upside:.0f}%→+10")
+            elif upside >= 10:
+                pts += 6;  signals.append(f"upside={upside:.0f}%→+6")
+            elif upside >= 0:
+                pts += 3;  signals.append(f"upside={upside:.0f}%→+3")
+            elif upside >= -20:
+                pts -= 5;  signals.append(f"upside={upside:.0f}%→-5")
+            else:
+                pts -= 10; signals.append(f"upside={upside:.0f}%→-10")
 
     # Recent analyst changes (pre-fetched batch)
     sym_changes = [c for c in recent_changes if c.get("symbol") == symbol.upper()]
@@ -387,23 +450,15 @@ def _score_forward_catalyst(
         else:
             pts = max(pts, 4);  signals.append(f"earnings_in_{days_away}d→+4")
 
-    # EPS revisions — only fetch in single-symbol path to keep batch warm-up fast
-    if symbol_earnings_days is None:
-        rev_raw = _fmp("analyst-estimates", {"symbol": symbol, "period": "quarter", "limit": 2})
-        if isinstance(rev_raw, list) and len(rev_raw) >= 2:
-            latest_eps = _f(rev_raw[0].get("epsAvg") or rev_raw[0].get("estimatedEpsAvg"))
-            prev_eps   = _f(rev_raw[1].get("epsAvg") or rev_raw[1].get("estimatedEpsAvg"))
-            if latest_eps is not None and prev_eps is not None and prev_eps != 0:
-                revision_pct = (latest_eps - prev_eps) / abs(prev_eps) * 100
-                if revision_pct >= 5:
-                    pts += 6; signals.append(f"eps_rev={revision_pct:+.0f}%→+6")
-                elif revision_pct <= -5:
-                    pts = max(-5, pts - 4); signals.append(f"eps_rev={revision_pct:+.0f}%→-4")
+    # NOTE: removed the analyst-estimates EPS "revision" sub-signal — FMP's
+    # period=quarter estimates are the NEXT two quarters, so comparing them measures
+    # seasonality / cycle ramp, not a revision. Forward catalyst is earnings proximity
+    # only; real revision direction lives in D1 (upgrades/downgrades + grade trend).
 
     if not signals:
         signals.append("no_upcoming_catalyst")
 
-    pts = max(-5, min(MAX, pts))
+    pts = max(0, min(MAX, pts))
     return DimensionScore(raw_pts=pts, max_pts=MAX, signal="; ".join(signals))
 
 
@@ -447,62 +502,98 @@ def _sector_median_pe(theme_id: str) -> float:
     return _SECTOR_PE.get(bucket) or _SECTOR_PE.get(theme_id) or _SECTOR_PE["default"]
 
 
-def _score_valuation(symbol: str) -> DimensionScore:
+def _pe_ttm(symbol: str) -> float | None:
+    """Trailing P/E from FMP key-metrics-ttm."""
+    km = _first(_fmp("key-metrics-ttm", {"symbol": symbol}))
+    return _f(km.get("peRatioTTM") or km.get("priceEarningsRatioTTM"))
+
+
+def _score_valuation(symbol: str, thesis: dict | None = None) -> DimensionScore:
+    """
+    Two modes (see _thesis_context):
+
+    RE-RATING (thesis strengthening) — the name is running ahead of DCF/targets
+      BECAUSE demand is inflecting. Reward growth-adjusted cheapness (PEG); a low
+      P/E with high growth and an active driver is the best setup there is (the MU
+      case). DCF only ever ADDS here (genuine cheapness) — never penalises overshoot.
+
+    MEAN-REVERSION (no active thesis) — an expensive name with no demand catalyst
+      really is overvalued. Keep the DCF penalty + sector-relative P/E.
+    """
     MAX = 23
     pts = 0
     signals = []
+    strengthening = bool(thesis and thesis.get("strengthening"))
+    rev_pct = (thesis or {}).get("rev_growth_pct")
+    if rev_pct is None:
+        rev_pct = _revenue_growth_pct(symbol)
 
-    dcf_raw = _fmp("discounted-cash-flow", {"symbol": symbol})
-    dcf_item = _first(dcf_raw)
+    dcf_item = _first(_fmp("discounted-cash-flow", {"symbol": symbol}))
     dcf   = _f(dcf_item.get("dcf") or dcf_item.get("dcfValue"))
     price = _f(dcf_item.get("stockPrice") or dcf_item.get("Stock Price") or dcf_item.get("price"))
+    dcf_upside = ((dcf - price) / price * 100) if (dcf and price and price > 0) else None
 
-    if dcf and price and price > 0:
-        upside = (dcf - price) / price * 100
-        if upside >= 20:
-            pts += 15; signals.append(f"DCF_upside={upside:.0f}%→+15")
-        elif upside >= 10:
-            pts += 10; signals.append(f"DCF_upside={upside:.0f}%→+10")
-        elif upside >= 0:
-            pts += 5;  signals.append(f"DCF_upside={upside:.0f}%→+5")
-        elif upside >= -20:
-            pts -= 10; signals.append(f"DCF_upside={upside:.0f}%→-10")
-        else:
-            pts -= 18; signals.append(f"DCF_upside={upside:.0f}%→-18")
-
-    growth_raw = _fmp("financial-growth", {"symbol": symbol, "period": "annual", "limit": 1})
-    g_item = _first(growth_raw)
-    rev_growth_raw = g_item.get("revenueGrowth") or g_item.get("revenue_growth")
-    rev_growth = _f(rev_growth_raw)
-    if rev_growth is not None:
-        rev_pct = rev_growth * 100 if abs(rev_growth) <= 5 else rev_growth
-        if rev_pct >= 30:
-            pts += 8; signals.append(f"rev_growth={rev_pct:.0f}%→+8")
-        elif rev_pct >= 15:
-            pts += 4; signals.append(f"rev_growth={rev_pct:.0f}%→+4")
-        elif rev_pct >= 0:
-            signals.append(f"rev_growth={rev_pct:.0f}%→0")
-        else:
-            pts -= 8; signals.append(f"rev_growth={rev_pct:.0f}%→-8")
-
-    # Sector-relative P/E: cheap vs peers = modest positive, expensive = modest negative
-    try:
-        km_raw = _fmp("key-metrics-ttm", {"symbol": symbol})
-        km_item = _first(km_raw)
-        pe_ttm = _f(km_item.get("peRatioTTM") or km_item.get("priceEarningsRatioTTM"))
-        if pe_ttm and pe_ttm > 0:
-            exposures = _exposures_for(symbol)
-            theme_id  = exposures[0].get("theme_id", "") if exposures else ""
-            median_pe = _sector_median_pe(theme_id)
-            ratio = pe_ttm / median_pe
-            if ratio < 0.75:
-                pts += 3; signals.append(f"PE={pe_ttm:.0f}x<0.75×sector({median_pe:.0f}x)→+3")
-            elif ratio > 2.0:
-                pts -= 3; signals.append(f"PE={pe_ttm:.0f}x>2×sector({median_pe:.0f}x)→-3")
+    if strengthening:
+        # ── RE-RATING MODE ──
+        pe = _pe_ttm(symbol)
+        if pe and pe > 0 and rev_pct and rev_pct > 0:
+            peg = pe / rev_pct
+            if peg < 1.0:
+                pts += 15; signals.append(f"PEG={peg:.2f}(cheap_vs_growth)→+15")
+            elif peg < 1.75:
+                pts += 10; signals.append(f"PEG={peg:.2f}→+10")
+            elif peg < 3.0:
+                pts += 5;  signals.append(f"PEG={peg:.2f}→+5")
             else:
-                signals.append(f"PE={pe_ttm:.0f}x(sector={median_pe:.0f}x)→0")
-    except Exception:
-        pass
+                pts += 2;  signals.append(f"PEG={peg:.2f}(rich_but_thesis_on)→+2")
+        elif rev_pct is not None and rev_pct >= 30:
+            pts += 10; signals.append(f"rev_growth={rev_pct:.0f}%(no_PE)→+10")
+        else:
+            pts += 3;  signals.append("re-rating(no_PEG_data)→+3")
+        # DCF only adds in re-rating mode — never penalises a thesis-driven overshoot
+        if dcf_upside is not None and dcf_upside > 0:
+            bonus = min(8, round(dcf_upside / 5))
+            pts += bonus; signals.append(f"DCF_upside={dcf_upside:.0f}%→+{bonus}")
+        else:
+            signals.append("DCF_overshoot_ignored(re-rating)")
+    else:
+        # ── MEAN-REVERSION MODE (original logic) ──
+        if dcf_upside is not None:
+            if dcf_upside >= 20:
+                pts += 15; signals.append(f"DCF_upside={dcf_upside:.0f}%→+15")
+            elif dcf_upside >= 10:
+                pts += 10; signals.append(f"DCF_upside={dcf_upside:.0f}%→+10")
+            elif dcf_upside >= 0:
+                pts += 5;  signals.append(f"DCF_upside={dcf_upside:.0f}%→+5")
+            elif dcf_upside >= -20:
+                pts -= 10; signals.append(f"DCF_upside={dcf_upside:.0f}%→-10")
+            else:
+                pts -= 18; signals.append(f"DCF_upside={dcf_upside:.0f}%→-18")
+
+        if rev_pct is not None:
+            if rev_pct >= 30:
+                pts += 8; signals.append(f"rev_growth={rev_pct:.0f}%→+8")
+            elif rev_pct >= 15:
+                pts += 4; signals.append(f"rev_growth={rev_pct:.0f}%→+4")
+            elif rev_pct >= 0:
+                signals.append(f"rev_growth={rev_pct:.0f}%→0")
+            else:
+                pts -= 8; signals.append(f"rev_growth={rev_pct:.0f}%→-8")
+
+        # Sector-relative P/E
+        try:
+            pe_ttm = _pe_ttm(symbol)
+            if pe_ttm and pe_ttm > 0:
+                exposures = _exposures_for(symbol)
+                theme_id  = exposures[0].get("theme_id", "") if exposures else ""
+                median_pe = _sector_median_pe(theme_id)
+                ratio = pe_ttm / median_pe
+                if ratio < 0.75:
+                    pts += 3; signals.append(f"PE={pe_ttm:.0f}x<0.75×sector→+3")
+                elif ratio > 2.0:
+                    pts -= 3; signals.append(f"PE={pe_ttm:.0f}x>2×sector→-3")
+        except Exception:
+            pass
 
     pts = max(-23, min(MAX, pts))
     return DimensionScore(raw_pts=pts, max_pts=MAX,
@@ -604,46 +695,68 @@ def _score_macro_theme(symbol: str) -> DimensionScore:
 # Batch price fetch (shared across all symbols in a universe rescore)
 # ---------------------------------------------------------------------------
 
+# FMP's stock-price-change batch endpoint returns 402 ("limit reached") once a
+# single request carries too many symbols and/or the per-minute quota is spent.
+# Chunking keeps every call well under the cap and paces load across the minute.
+_PRICE_CHANGE_CHUNK = 50
+
+
 def fetch_price_changes(symbols: list[str]) -> dict[str, float]:
     """
-    Fetch 1D and 5D price-change % for all symbols + SPY in one FMP call.
+    Fetch 1D and 5D price-change % for all symbols + SPY.
     Returns flat dict:  {SYMBOL: 5d_pct, SYMBOL_1D: 1d_pct, SPY: spy_5d, SPY_1D: spy_1d}
+
+    Symbols are fetched in chunks of _PRICE_CHANGE_CHUNK to stay under FMP's
+    per-request symbol cap; a chunk that 402s after a retry is skipped without
+    discarding the chunks that succeeded.
     """
-    all_syms = list({s.upper() for s in symbols} | {"SPY"})
+    all_syms = sorted({s.upper() for s in symbols} | {"SPY"})
     key = _FMP_KEY or os.environ.get("FMP_API_KEY", "")
     if not key:
         return {}
-    for attempt in range(2):
-        try:
-            resp = _requests.get(
-                f"{_FMP_BASE}/stock-price-change",
-                params={"symbol": ",".join(all_syms), "apikey": key},
-                timeout=15,
-            )
-            if resp.status_code == 429:
-                if attempt == 0:
-                    time.sleep(5)
-                    continue
-                log.warning("conviction_engine: price-change 429 — giving up")
-                return {}
-            resp.raise_for_status()
-            data = resp.json()
-            break
-        except Exception as exc:
-            log.warning("conviction_engine: price-change fetch failed — %s", exc)
-            return {}
-    else:
-        return {}
 
+    # 429 (rate limit) and 402 (per-minute quota reached) are both recoverable:
+    # FMP's quota window resets every ~60s, so a quota-spent chunk recovers if we
+    # wait out the window. 429 needs only a short pause; 402 needs a near-minute
+    # wait. Both retry up to 3 times before the chunk is finally skipped.
+    _BACKOFF = {429: 5, 402: 20}
     result: dict[str, float] = {}
-    for item in (data if isinstance(data, list) else []):
-        sym = (item.get("symbol") or "").upper()
-        d5  = _f(item.get("5D"))
-        d1  = _f(item.get("1D"))
-        if sym and d5 is not None:
-            result[sym] = d5
-        if sym and d1 is not None:
-            result[f"{sym}_1D"] = d1
+    for start in range(0, len(all_syms), _PRICE_CHANGE_CHUNK):
+        chunk = all_syms[start:start + _PRICE_CHANGE_CHUNK]
+        data = None
+        for attempt in range(3):
+            try:
+                resp = _requests.get(
+                    f"{_FMP_BASE}/stock-price-change",
+                    params={"symbol": ",".join(chunk), "apikey": key},
+                    timeout=15,
+                )
+                if resp.status_code in _BACKOFF:
+                    if attempt < 2:
+                        time.sleep(_BACKOFF[resp.status_code])
+                        continue
+                    log.warning(
+                        "conviction_engine: price-change %d on chunk %d-%d after retries — skipping chunk",
+                        resp.status_code, start, start + len(chunk),
+                    )
+                    break
+                resp.raise_for_status()
+                data = resp.json()
+                break
+            except Exception as exc:
+                log.warning("conviction_engine: price-change fetch failed (chunk %d-%d) — %s",
+                            start, start + len(chunk), exc)
+                break
+
+        for item in (data if isinstance(data, list) else []):
+            sym = (item.get("symbol") or "").upper()
+            d5  = _f(item.get("5D"))
+            d1  = _f(item.get("1D"))
+            if sym and d5 is not None:
+                result[sym] = d5
+            if sym and d1 is not None:
+                result[f"{sym}_1D"] = d1
+
     return result
 
 
@@ -1172,9 +1285,15 @@ def score_symbol(
     theme_id  = primary_exposure.get("theme_id", "")
     driver_id = primary_exposure.get("driver_id", "")
 
+    # Thesis context — is this a re-rating (driver active + rising estimates/growth)
+    # or mean-reversion? D1 and D3 interpret valuation/targets through this lens.
+    active_drivers, _ = _driver_state()
+    driver_active = driver_id in active_drivers
+    thesis = _thesis_context(symbol, driver_active, _revenue_growth_pct(symbol))
+
     # Score D1 and D3 first so D2 can use quality context
-    d1 = _score_analyst(symbol, analyst_changes)
-    d3 = _score_valuation(symbol)
+    d1 = _score_analyst(symbol, analyst_changes, thesis=thesis)
+    d3 = _score_valuation(symbol, thesis=thesis)
 
     # D2 uses quality context from D1/D3 to distinguish reversal from deterioration
     d2  = _score_momentum(symbol, price_changes, d1_raw=d1.raw_pts, d3_raw=d3.raw_pts)
