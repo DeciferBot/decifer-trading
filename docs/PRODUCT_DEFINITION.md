@@ -258,4 +258,37 @@ Windows tracked: 48h and 7d.
 
 ---
 
+## Theme Transmission Graph (TTG) — Canonical 20 Themes (as of 2026-06-01)
+
+The **single source of truth for the customer-facing theme set is the map** (`map.decifertrading.com`), defined in `map/lib/chain-definitions.ts`. It holds **20 themes** and ~315 unique symbols, structured as supply-chain "chains" → stages → symbols. This is the authoritative theme list every session should use when asked "how many themes" or "what's in a theme".
+
+| # | Theme | Names |
+|---|-------|-------|
+| 1 | AI Infrastructure | 44 |
+| 2 | Nuclear & Clean Power | 20 |
+| 3 | Semiconductors | 20 |
+| 4 | Cybersecurity | 13 |
+| 5 | GLP-1 & Metabolic Health | 23 |
+| 6 | Healthcare & Biotech | 18 |
+| 7 | Defence | 22 |
+| 8 | Space | 10 |
+| 9 | Quantum Computing | 3 |
+| 10 | Reshoring & Industrial | 26 |
+| 11 | Critical Minerals | 13 |
+| 12 | Precious Metals | 14 |
+| 13 | Oil & Energy | 15 |
+| 14 | Legacy Financials | 21 |
+| 15 | Fintech | 12 |
+| 16 | Real Estate & Housing | 25 |
+| 17 | Consumer | 15 |
+| 18 | Automotive & EV | 18 |
+| 19 | Crypto | 13 |
+| 20 | Water | 9 |
+
+Total: **20 themes**, **~315 unique symbols** (345 entries counting cross-theme overlaps).
+
+**Note on the second graph:** the backend intelligence-layer Theme Transmission Graph (Sprint M12A, `data/intelligence/theme_graph/`) is a separate, smaller dataset (10 themes, 149 exposures) that feeds the mobile app and `theme_graph_api.py`. The two are not reconciled and drift apart on edits. When a question is about the customer-facing theme map, the 20-theme map is canonical. The 10-theme backend graph is a known divergence pending consolidation.
+
+---
+
 *This document is the authoritative product definition for Decifer Trading v3. Update it whenever a feature ships or the architecture changes. Do not let it drift from the code.*
