@@ -65,6 +65,13 @@ function formatHour(h: string): string {
   return `${display}:${String(mm).padStart(2, "0")} ${suffix}`;
 }
 
+// "2026-05-29" -> "Friday, May 29" (no timezone shift)
+function fullDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
+
 function timeAgo(ts: string): string {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
   if (diff < 60) return `${diff}s ago`;
@@ -72,17 +79,20 @@ function timeAgo(ts: string): string {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-function volBarWidth(volume: number, maxVolume: number): number {
-  if (!maxVolume) return 0;
-  return Math.round((volume / maxVolume) * 100);
+// Heat tint for a ratio (green scale, capped at ~12x)
+function heatStyle(intensity: number): React.CSSProperties {
+  const a = Math.min(Math.max(intensity, 0), 1);
+  return {
+    backgroundColor: `rgba(16,185,129,${0.05 + a * 0.20})`,
+    borderColor: `rgba(16,185,129,${0.18 + a * 0.45})`,
+  };
 }
 
-// Colour the ratio badge: green for big spikes, amber for moderate
 function ratioColor(ratio: number): string {
   if (ratio >= 5) return "text-emerald-300";
   if (ratio >= 3) return "text-emerald-400";
-  if (ratio >= 2) return "text-amber-400";
-  return "text-slate-400";
+  if (ratio >= 2) return "text-emerald-500";
+  return "text-slate-300";
 }
 
 export default function VolumePage() {
@@ -118,8 +128,11 @@ export default function VolumePage() {
     return () => clearInterval(t);
   }, []);
 
-  const activeLeaders = tab === "unusual" ? (data?.unusual_leaders ?? []) : (data?.leaders ?? []);
+  const isUnusual = tab === "unusual";
+  const activeLeaders = isUnusual ? (data?.unusual_leaders ?? []) : (data?.leaders ?? []);
+  const hasData = activeLeaders.length > 0;
 
+  // Group by hour
   const byHour: Map<string, Leader[]> = new Map();
   for (const l of activeLeaders) {
     if (!byHour.has(l.hour)) byHour.set(l.hour, []);
@@ -127,16 +140,29 @@ export default function VolumePage() {
   }
 
   const latestHour = data?.hours?.at(-1);
-  const latestLeaders = latestHour ? (byHour.get(latestHour) ?? []) : [];
-  const latestTopVol = latestLeaders[0]?.volume ?? 0;
-  const latestTopRatio = latestLeaders[0]?.ratio ?? 0;
 
-  const hasUnusual = (data?.unusual_leaders?.length ?? 0) > 0;
+  // Aggregate each symbol's peak across the day -> info cards
+  const peakBySymbol: Map<string, { symbol: string; metric: number; ratio: number; volumeM: string; hour: string }> = new Map();
+  for (const l of activeLeaders) {
+    const metric = isUnusual ? (l.ratio ?? 0) : l.volume;
+    const cur = peakBySymbol.get(l.symbol);
+    if (!cur || metric > cur.metric) {
+      peakBySymbol.set(l.symbol, {
+        symbol: l.symbol,
+        metric,
+        ratio: l.ratio ?? 0,
+        volumeM: l.volumeM,
+        hour: l.hour,
+      });
+    }
+  }
+  const movers = Array.from(peakBySymbol.values()).sort((a, b) => b.metric - a.metric).slice(0, 12);
+  const topMetric = movers[0]?.metric ?? 1;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-slate-100 font-mono">
       {/* Header */}
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <span className="text-slate-400 text-xs uppercase tracking-widest">Decifer</span>
           <span className="text-slate-500">|</span>
@@ -144,18 +170,12 @@ export default function VolumePage() {
           {data?.market_open && (
             <span className="flex items-center gap-1 text-emerald-400 text-xs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
-              Live
-            </span>
-          )}
-          {data && !data.market_open && (
-            <span className="text-slate-400 text-xs">
-              {data.is_today ? "Market closed" : "Weekend · last session"}
+              Live now
             </span>
           )}
         </div>
         <div className="flex items-center gap-4 text-xs text-slate-400">
           {data && <span>Updated {timeAgo(data.ts)}</span>}
-          {data && <span>{data.date}</span>}
           <button
             onClick={fetchData}
             className="text-slate-400 hover:text-white transition-colors px-2 py-1 border border-slate-700 rounded text-xs"
@@ -166,30 +186,27 @@ export default function VolumePage() {
       </header>
 
       <main className="px-6 py-8 max-w-screen-xl mx-auto">
-        {loading && (
-          <div className="flex items-center justify-center h-64 text-slate-500 text-sm">
-            Loading...
-          </div>
-        )}
-        {error && (
-          <div className="flex items-center justify-center h-64 text-red-400 text-sm">{error}</div>
-        )}
-        {data && !loading && data.hours.length === 0 && (
-          <div className="text-slate-400 text-sm py-12 text-center">
-            No data for {data.date}. Market opens at 9:30 AM ET.
-          </div>
-        )}
+        {loading && <div className="flex items-center justify-center h-64 text-slate-500 text-sm">Loading...</div>}
+        {error && <div className="flex items-center justify-center h-64 text-red-400 text-sm">{error}</div>}
 
-        {data && !loading && data.hours.length > 0 && (
+        {data && !loading && (
           <>
+            {/* Date context — answers "which day is this?" */}
+            <div className="mb-6">
+              <h1 className="text-white text-xl font-semibold">{fullDate(data.date)}</h1>
+              <p className="text-slate-400 text-sm mt-1">
+                {data.is_today
+                  ? "Today's trading so far. Each hour is a US market hour (Eastern time)."
+                  : "Last completed trading session. Markets are closed for the weekend. 4:00 PM is the closing hour."}
+              </p>
+            </div>
+
             {/* Tab switcher */}
-            <div className="flex gap-1 mb-8">
+            <div className="flex gap-1 mb-2">
               <button
                 onClick={() => setTab("unusual")}
                 className={`px-4 py-1.5 text-xs rounded transition-colors ${
-                  tab === "unusual"
-                    ? "bg-slate-700 text-white"
-                    : "text-slate-500 hover:text-slate-300"
+                  isUnusual ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"
                 }`}
               >
                 Unusual volume
@@ -197,188 +214,126 @@ export default function VolumePage() {
               <button
                 onClick={() => setTab("raw")}
                 className={`px-4 py-1.5 text-xs rounded transition-colors ${
-                  tab === "raw"
-                    ? "bg-slate-700 text-white"
-                    : "text-slate-500 hover:text-slate-300"
+                  !isUnusual ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"
                 }`}
               >
                 Most traded
               </button>
             </div>
+            <p className="text-slate-400 text-xs mb-8 max-w-2xl">
+              {isUnusual
+                ? "Stocks trading well above their normal pace. A higher number means more activity than usual, which often points to news or a big move."
+                : "Stocks with the most shares changing hands. The biggest names lead here almost every day."}
+            </p>
 
-            {/* Unusual tab: no baseline yet */}
-            {tab === "unusual" && !hasUnusual && (
-              <div className="text-slate-400 text-sm py-8">
-                Building baselines — unusual volume data will appear once 30-day averages are ready.
+            {!hasData && (
+              <div className="text-slate-400 text-sm py-12">
+                Nothing unusual yet. Stocks will appear here once they trade above their normal pace.
               </div>
             )}
 
-            {/* Latest hour spotlight */}
-            {latestLeaders.length > 0 && (tab === "raw" || hasUnusual) && (
-              <section className="mb-10">
-                <div className="text-xs text-slate-400 uppercase tracking-widest mb-4">
-                  {formatHour(latestHour!)}
-                  {tab === "unusual" && (
-                    <span className="ml-2 normal-case text-slate-500">trading above normal</span>
-                  )}
-                </div>
-                <div className="space-y-1.5 max-w-xl">
-                  {latestLeaders.slice(0, 10).map((l) => (
-                    <div key={l.symbol} className="flex items-center gap-3">
-                      <span className="text-slate-500 text-xs w-5 text-right">{l.rank}</span>
-                      <div className="w-36 flex-shrink-0">
-                        <span className="text-white font-semibold text-sm">{l.symbol}</span>
-                        {NAMES[l.symbol] && (
-                          <span className="text-slate-400 text-xs ml-2">{NAMES[l.symbol]}</span>
-                        )}
+            {hasData && (
+              <>
+                {/* Info cards — top movers of the day, heatmap tinted */}
+                <section className="mb-12">
+                  <div className="text-xs text-slate-400 uppercase tracking-widest mb-4">
+                    Biggest moves today
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {movers.map((m) => (
+                      <div
+                        key={m.symbol}
+                        className="rounded-lg border p-4 transition-colors"
+                        style={isUnusual ? heatStyle(m.ratio / 12) : heatStyle(m.metric / topMetric)}
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-white font-bold text-lg">{m.symbol}</span>
+                          {isUnusual ? (
+                            <span className={`font-bold text-sm ${ratioColor(m.ratio)}`}>
+                              {m.ratio.toFixed(1)}x
+                            </span>
+                          ) : (
+                            <span className="text-emerald-400 font-bold text-sm">{m.volumeM}</span>
+                          )}
+                        </div>
+                        <div className="text-slate-300 text-sm mt-0.5 truncate">
+                          {NAMES[m.symbol] ?? m.symbol}
+                        </div>
+                        <div className="text-slate-500 text-xs mt-2">
+                          {isUnusual ? "Peak at " : "Most at "}{formatHour(m.hour)}
+                        </div>
                       </div>
-                      <div className="flex-1 h-px bg-slate-800 relative">
-                        <div
-                          className="absolute left-0 top-0 h-px bg-slate-500"
-                          style={{
-                            width: tab === "unusual"
-                              ? `${volBarWidth(l.ratio ?? 0, latestTopRatio)}%`
-                              : `${volBarWidth(l.volume, latestTopVol)}%`,
-                          }}
-                        />
-                      </div>
-                      {tab === "unusual" && l.ratioLabel ? (
-                        <span className={`text-xs w-24 text-right font-semibold ${ratioColor(l.ratio ?? 0)}`}>
-                          {l.ratioLabel}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 text-xs w-20 text-right">{l.volumeM} shares</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+                    ))}
+                  </div>
+                </section>
 
-            {/* Hour-by-hour grid */}
-            {(tab === "raw" || hasUnusual) && (
-              <section className="overflow-x-auto mb-10">
-                <div className="text-xs text-slate-400 uppercase tracking-widest mb-4">
-                  Hour by hour
-                </div>
-                <table className="text-xs border-collapse" style={{ minWidth: `${data.hours.length * 90 + 48}px` }}>
-                  <thead>
-                    <tr>
-                      <th className="text-left text-slate-500 pb-2 pr-6 font-normal w-8">#</th>
-                      {data.hours.map((h) => (
-                        <th
-                          key={h}
-                          className={`pb-2 pr-3 font-normal text-left w-20 ${h === latestHour ? "text-white" : "text-slate-500"}`}
-                        >
-                          {formatHour(h)}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Array.from({ length: 10 }, (_, i) => i + 1).map((rank) => (
-                      <tr key={rank} className="border-t border-slate-900">
-                        <td className="text-slate-600 pr-6 py-1 text-right">{rank}</td>
-                        {data.hours.map((h) => {
-                          const leader = byHour.get(h)?.find((l) => l.rank === rank);
-                          return (
-                            <td
-                              key={h}
-                              className={`pr-3 py-1 ${h === latestHour ? "text-white" : "text-slate-300"}`}
-                              title={
-                                leader
-                                  ? tab === "unusual" && leader.ratioLabel
+                {/* Hour-by-hour heatmap matrix */}
+                <section className="overflow-x-auto">
+                  <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">
+                    Hour by hour
+                  </div>
+                  <p className="text-slate-500 text-xs mb-4">
+                    Top names each hour. Brighter green means more unusual activity.
+                  </p>
+                  <table className="border-separate" style={{ borderSpacing: "4px", minWidth: `${data.hours.length * 104 + 40}px` }}>
+                    <thead>
+                      <tr>
+                        <th className="text-left text-slate-500 font-normal text-xs w-6"></th>
+                        {data.hours.map((h) => (
+                          <th
+                            key={h}
+                            className={`font-normal text-xs pb-1 text-center ${h === latestHour ? "text-white" : "text-slate-500"}`}
+                          >
+                            {formatHour(h)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((rank) => (
+                        <tr key={rank}>
+                          <td className="text-slate-600 text-xs text-right pr-1 align-middle">{rank}</td>
+                          {data.hours.map((h) => {
+                            const leader = byHour.get(h)?.find((l) => l.rank === rank);
+                            if (!leader) {
+                              return <td key={h} className="rounded bg-slate-900/40 h-9" />;
+                            }
+                            const intensity = isUnusual ? (leader.ratio ?? 0) / 12 : 0.3;
+                            return (
+                              <td
+                                key={h}
+                                className="rounded border h-9 px-2 text-center align-middle"
+                                style={heatStyle(intensity)}
+                                title={
+                                  isUnusual && leader.ratioLabel
                                     ? `${NAMES[leader.symbol] ?? leader.symbol} · ${leader.ratioLabel}`
                                     : `${NAMES[leader.symbol] ?? leader.symbol} · ${leader.volumeM} shares`
-                                  : ""
-                              }
-                            >
-                              {leader ? (
-                                <span className={rank === 1 ? "font-bold" : "font-medium"}>
-                                  {leader.symbol}
-                                </span>
-                              ) : (
-                                <span className="text-slate-700">·</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                    <tr className="border-t border-slate-800">
-                      <td className="text-slate-600 pr-6 pt-2">
-                        {tab === "unusual" ? "peak" : "vol"}
-                      </td>
-                      {data.hours.map((h) => {
-                        const top = byHour.get(h)?.[0];
-                        return (
-                          <td key={h} className={`pr-3 pt-2 ${h === latestHour ? "text-slate-300" : "text-slate-500"}`}>
-                            {top
-                              ? tab === "unusual" && top.ratioLabel
-                                ? top.ratioLabel
-                                : top.volumeM
-                              : ""}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  </tbody>
-                </table>
-              </section>
-            )}
-
-            {/* All hours detail */}
-            {(tab === "raw" || hasUnusual) && (
-              <section>
-                <div className="text-xs text-slate-400 uppercase tracking-widest mb-4">
-                  All hours
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-px bg-slate-800">
-                  {[...data.hours].reverse().map((h) => {
-                    const hourLeaders = byHour.get(h) ?? [];
-                    return (
-                      <div key={h} className="bg-[#0a0a0a] p-3">
-                        <div className={`text-xs mb-3 ${h === latestHour ? "text-white font-semibold" : "text-slate-400"}`}>
-                          {formatHour(h)}
-                        </div>
-                        <div className="space-y-1.5">
-                          {hourLeaders.map((l) => (
-                            <div key={l.symbol} className="flex items-center gap-1.5">
-                              <span className="text-slate-600 text-xs w-3">{l.rank}</span>
-                              <div className="flex-1 min-w-0">
-                                <span className={`text-xs font-semibold ${l.rank === 1 ? "text-white" : "text-slate-300"}`}>
-                                  {l.symbol}
-                                </span>
-                                {NAMES[l.symbol] && (
-                                  <span className="text-slate-500 text-xs ml-1">{NAMES[l.symbol]}</span>
+                                }
+                              >
+                                <span className="text-white text-xs font-semibold">{leader.symbol}</span>
+                                {isUnusual && leader.ratio != null && (
+                                  <span className="text-emerald-300/80 text-[10px] ml-1">{leader.ratio.toFixed(1)}x</span>
                                 )}
-                              </div>
-                              {tab === "unusual" && l.ratioLabel ? (
-                                <span className={`text-xs flex-shrink-0 font-semibold ${ratioColor(l.ratio ?? 0)}`}>
-                                  {l.ratioLabel}
-                                </span>
-                              ) : (
-                                <span className="text-slate-500 text-xs flex-shrink-0">{l.volumeM}</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              </>
             )}
           </>
         )}
       </main>
 
-      <footer className="border-t border-slate-800 px-6 py-4 mt-8 text-xs text-slate-500 flex items-center justify-between">
+      <footer className="border-t border-slate-800 px-6 py-4 mt-8 text-xs text-slate-500 flex items-center justify-between flex-wrap gap-2">
         <span>volume.decifertrading.com</span>
         <span>
-          {tab === "unusual"
-            ? "Ratio vs 30-day average · Alpaca SIP · updates every 5 min"
-            : "Alpaca SIP · updates every 5 min"}
+          {isUnusual
+            ? "Compared against each stock's 30-day average · Alpaca data · updates every 5 min"
+            : "Alpaca data · updates every 5 min"}
         </span>
       </footer>
     </div>
